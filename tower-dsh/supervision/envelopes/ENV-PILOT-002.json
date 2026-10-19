@@ -41,7 +41,7 @@
     }
   ],
   "envelope_head_sha": "0fa28147ab163fe29147573df58778373297b5c9",
-  "status": "MERGED",
+  "status": "CORRECTION_REQUIRED",
   "merge_commit": "2a255ca4f70bb21e734a9c4d95ce9938470707ed",
   "merged_at": "2026-10-19T16:45:15+08:00",
   "supervisor": "sup-phase3-audit"
