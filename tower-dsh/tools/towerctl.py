@@ -2066,14 +2066,22 @@ def cmd_verify_ledger(root: Path, args) -> None:
 
 
 def cmd_spec_lint(root: Path, args) -> None:
+    commands = set(cli_commands())
+    strict = bool(getattr(args, "strict", False))
+    if getattr(args, "dir", None) is None:
+        # Default scan: specs/*.md plus root-level tower/policy@1 documents.
+        result = spec_lint.lint_root(root, commands=commands, strict=strict)
+        emit(result, 0 if result["ok"] else 2)
+        return
     directory = Path(args.dir)
     if not directory.is_absolute():
         directory = root / directory
     result = spec_lint.lint_dir(
         directory,
         root=root,
-        commands=set(cli_commands()),
+        commands=commands,
         dir_label=args.dir,
+        strict=strict,
     )
     emit(result, 0 if result["ok"] else 2)
 
@@ -2095,7 +2103,10 @@ def build_parser() -> argparse.ArgumentParser:
                     choices=["primary", "supervision", "all"])
 
     sl = sub.add_parser("spec-lint")
-    sl.add_argument("--dir", default="specs")
+    sl.add_argument("--dir", default=None,
+                    help="lint one directory (default: root specs/ plus root policy docs)")
+    sl.add_argument("--strict", action="store_true",
+                    help="enable strict structural checks (opt-in)")
 
     hn = sub.add_parser("handoff-new")
     hn.add_argument("--package", required=True)
