@@ -71,6 +71,9 @@ def run_git(repo: Path, *args: str) -> subprocess.CompletedProcess:
 
 def run_cli(root: Path, *args: str) -> subprocess.CompletedProcess:
     env = dict(os.environ)
+    # towerctl shells out to git (e.g. ``git merge``); on a clean runner there
+    # is no global user.name/user.email, so the child needs an explicit identity.
+    env.update(GIT_IDENTITY)
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
     return subprocess.run(
