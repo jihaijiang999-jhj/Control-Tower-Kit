@@ -216,6 +216,63 @@ def git_ok(repo: Path, *args: str) -> str:
     return cp.stdout.strip()
 
 
+# State directories towerctl itself writes during post-merge.  The tower root
+# can live inside the verified repository (the kit repo is often the parent of
+# ``tower-dsh``), so these artefacts must not count as implementation dirt.
+TOOL_OWNED_STATE_DIRS = ("supervision/reviews", "supervision/outbox")
+
+
+def repo_relative(repo: Path, path: Path) -> str | None:
+    """Return ``path`` relative to ``repo`` (posix form), or None if outside."""
+    try:
+        return path.resolve().relative_to(repo.resolve()).as_posix()
+    except ValueError:
+        return None
+
+
+def tool_owned_paths(root: Path, repo: Path) -> list[str]:
+    """Repo-relative prefixes of the state directories towerctl owns."""
+    owned: list[str] = []
+    for name in TOOL_OWNED_STATE_DIRS:
+        rel_path = repo_relative(repo, root / name)
+        if rel_path:
+            owned.append(rel_path)
+    return owned
+
+
+def status_path(line: str) -> str:
+    """Extract the path from one ``git status --porcelain`` line."""
+    path = line[3:] if len(line) > 3 else ""
+    if " -> " in path:  # rename / copy entries use ``old -> new``
+        path = path.split(" -> ", 1)[1]
+    return path.strip().strip('"')
+
+
+def working_tree_state(root: Path, repo: Path) -> tuple[list[str], list[str]]:
+    """Return ``(dirty, tool_owned)`` porcelain entries for ``repo``.
+
+    ``dirty`` holds everything a caller would normally see; ``tool_owned``
+    holds the entries under :data:`TOOL_OWNED_STATE_DIRS` that post-merge
+    itself produced (reviews, correction notes).
+    """
+    cp = git(repo, "status", "--porcelain")
+    if cp.returncode != 0:
+        detail = cp.stderr.strip() or cp.stdout.strip() or "git status failed"
+        return [detail], []
+    owned = tool_owned_paths(root, repo)
+    dirty: list[str] = []
+    ignored: list[str] = []
+    for line in cp.stdout.splitlines():
+        if not line.strip():
+            continue
+        path = status_path(line)
+        if any(path == prefix or path.startswith(prefix + "/") for prefix in owned):
+            ignored.append(path)
+        else:
+            dirty.append(line)
+    return dirty, ignored
+
+
 def load_supervision(root: Path) -> dict:
     path = root / "supervision" / "CURRENT_STATE.json"
     if not path.exists():
@@ -1348,8 +1405,16 @@ def cmd_post_merge(root: Path, args) -> None:
     if not env_path.exists():
         fail([f"envelope not found: {args.envelope}"])
     env = jload(env_path)
-    if env.get("status") != "MERGED":
-        fail([f"envelope status {env.get('status')} is not MERGED"])
+    status = env.get("status")
+    if status == "POST_MERGE_VERIFIED":
+        fail([f"envelope {args.envelope} is already POST_MERGE_VERIFIED"])
+    if status not in ("MERGED", "CORRECTION_REQUIRED"):
+        # CORRECTION_REQUIRED is retryable: a failed post-merge must be able to
+        # re-run after the correction instead of deadlocking the envelope.
+        fail([
+            f"envelope status {status} is not MERGED or CORRECTION_REQUIRED; "
+            "post-merge only runs after a successful merge"
+        ])
     repo = root / env.get("repository", "pilot/repo")
     base = env.get("base", "main")
     a = env.get("implementation_head_sha")
@@ -1360,12 +1425,20 @@ def cmd_post_merge(root: Path, args) -> None:
         [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
         cwd=str(repo), capture_output=True, text=True, encoding="utf-8", env=env_vars,
     )
+    # The clean check runs before the review file is written, and it ignores
+    # the state directories towerctl itself owns.  Both parts matter: the tower
+    # root may live inside the verified repository, so writing the review first
+    # (or counting it as dirt) made every post-merge fail its own gate.
+    dirty, tool_owned = working_tree_state(root, repo)
+    clean = not dirty
     reviews = root / "supervision" / "reviews"
     reviews.mkdir(parents=True, exist_ok=True)
     review_file = reviews / f"{args.envelope}-post-merge.txt"
     review_file.write_text(
         f"# {args.envelope} post-merge verification\n\n"
         f"- base: {base}\n- implementation: {a}\n- merge_commit: {env.get('merge_commit')}\n"
+        f"- result: {args.result}\n- working_tree_clean: {clean}\n"
+        f"- tool_owned_paths_ignored: {tool_owned}\n"
         f"- test_exit: {tests.returncode}\n\n## Test output\n\n"
         f"{tests.stdout}\n{tests.stderr}\n", encoding="utf-8")
     checks = [
@@ -1377,9 +1450,9 @@ def cmd_post_merge(root: Path, args) -> None:
         {"name": "envelope file exists on base",
          "ok": git(repo, "cat-file", "-e", f"{base}:{envelope_path}").returncode == 0,
          "detail": f"{base}:{envelope_path}"},
-        {"name": "working tree clean",
-         "ok": git(repo, "status", "--porcelain").stdout.strip() == "",
-         "detail": "git status --porcelain"},
+        {"name": "working tree clean", "ok": clean,
+         "detail": (f"dirty={dirty}" if dirty else "clean")
+         + (f"; ignored tool-owned: {tool_owned}" if tool_owned else "")},
     ]
     ok = args.result == "PASS" and all(c["ok"] for c in checks)
     queue = load_queue(root)
@@ -1402,7 +1475,8 @@ def cmd_post_merge(root: Path, args) -> None:
         entry["status"] = "CORRECTION_REQUIRED"
         save_queue(root, queue)
     append_supervision_ledger(root, "POST_MERGE_FAILED", "supervision",
-                              {"envelope": args.envelope, "checks": checks})
+                              {"envelope": args.envelope, "result": args.result,
+                               "checks": checks})
     emit({"ok": False, "envelope": args.envelope, "status": "CORRECTION_REQUIRED",
           "checks": checks, "review": rel(root, review_file)}, 2)
 
