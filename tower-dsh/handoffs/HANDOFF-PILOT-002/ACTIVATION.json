@@ -1,0 +1,7 @@
+{
+  "schema": "tower/handoff-activation@1",
+  "package_id": "HANDOFF-PILOT-002",
+  "controller": "ctl-yingxian-qa-001",
+  "activated_at": "2026-10-19T23:27:32+08:00",
+  "status": "ACTIVE"
+}

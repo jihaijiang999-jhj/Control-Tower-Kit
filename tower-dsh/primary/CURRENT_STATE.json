@@ -2,7 +2,7 @@
   "schema": "tower/current-state@1",
   "tower_id": "tower-dsh",
   "role": "primary",
-  "phase": "READY_FOR_PRACTICE",
+  "phase": "HANDOFF_ACTIVE",
   "objective": "用 tower-dsh 的内部任务跑通控制塔首版闭环",
   "owner": {
     "name": "mac",
@@ -14,17 +14,17 @@
     }
   },
   "primary": {
-    "id": "ctl-phase3-receiver-001",
+    "id": "ctl-yingxian-qa-001",
     "session": "handoff-receiver"
   },
-  "next_action": "new window: control-tower Q&A + map/portrait; then real project pilot",
+  "next_action": "resume from handoffs/HANDOFF-PILOT-002/HANDOFF.md",
   "blockers": [],
-  "updated_at": "2026-10-19T22:41:58+08:00",
+  "updated_at": "2026-10-19T23:27:32+08:00",
   "revision": 5,
   "handoff": {
     "status": "ACTIVE",
-    "package": "HANDOFF-PILOT-001",
-    "receiver": "ctl-phase3-receiver-001",
-    "activated_at": "2026-10-19T12:52:42+08:00"
+    "package": "HANDOFF-PILOT-002",
+    "receiver": "ctl-yingxian-qa-001",
+    "activated_at": "2026-10-19T23:27:32+08:00"
   }
 }

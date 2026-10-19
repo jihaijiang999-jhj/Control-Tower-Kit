@@ -8,7 +8,7 @@
   "source_controller": "ctl-phase3-receiver-001",
   "task": "PILOT-010",
   "envelope": "ENV-PILOT-010",
-  "status": "PREPARED",
+  "status": "ACTIVE",
   "files": {
     "HANDOFF.md": "8b46c915fda98cc50663a9387889602f1025b94072e7d72167b736202917d56c",
     "SELF-CHECK.md": "310272b42c54305944ce9fc83aff9b16b094799bfce5f1c2815875a332891f66"
@@ -70,6 +70,246 @@
     "ledger_seq": 98,
     "captured_at": "2026-10-19T22:43:52+08:00"
   },
-  "claim": null,
-  "acceptance": null
+  "claim": {
+    "schema": "tower/handoff-claim@1",
+    "package_id": "HANDOFF-PILOT-002",
+    "controller": "ctl-yingxian-qa-001",
+    "claimed_at": "2026-10-19T23:27:11+08:00",
+    "checks": [
+      {
+        "name": "HANDOFF.md exists",
+        "ok": true,
+        "detail": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\handoffs\\HANDOFF-PILOT-002\\HANDOFF.md"
+      },
+      {
+        "name": "SELF-CHECK.md exists",
+        "ok": true,
+        "detail": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\handoffs\\HANDOFF-PILOT-002\\SELF-CHECK.md"
+      },
+      {
+        "name": "section ## §0",
+        "ok": true,
+        "detail": "## §0"
+      },
+      {
+        "name": "section ## §0a",
+        "ok": true,
+        "detail": "## §0a"
+      },
+      {
+        "name": "section ## §1",
+        "ok": true,
+        "detail": "## §1"
+      },
+      {
+        "name": "section ## §2",
+        "ok": true,
+        "detail": "## §2"
+      },
+      {
+        "name": "section ## §3",
+        "ok": true,
+        "detail": "## §3"
+      },
+      {
+        "name": "section ## §4",
+        "ok": true,
+        "detail": "## §4"
+      },
+      {
+        "name": "section ## §4a",
+        "ok": true,
+        "detail": "## §4a"
+      },
+      {
+        "name": "section ## §5",
+        "ok": true,
+        "detail": "## §5"
+      },
+      {
+        "name": "section ## §6",
+        "ok": true,
+        "detail": "## §6"
+      },
+      {
+        "name": "section ## §7",
+        "ok": true,
+        "detail": "## §7"
+      },
+      {
+        "name": "self-check no unchecked items",
+        "ok": true,
+        "detail": "all checked"
+      },
+      {
+        "name": "HANDOFF.md hash",
+        "ok": true,
+        "detail": "8b46c915fda98cc50663a9387889602f1025b94072e7d72167b736202917d56c"
+      },
+      {
+        "name": "SELF-CHECK.md hash",
+        "ok": true,
+        "detail": "310272b42c54305944ce9fc83aff9b16b094799bfce5f1c2815875a332891f66"
+      },
+      {
+        "name": "main SHA unchanged",
+        "ok": true,
+        "detail": "9fb5ba243f5cf03f7ccafb0eb381793770835db2 vs 9fb5ba243f5cf03f7ccafb0eb381793770835db2"
+      },
+      {
+        "name": "worktree head unchanged",
+        "ok": true,
+        "detail": "6e00d6975540dfc3df8d29ec7083d6960ff637df vs 6e00d6975540dfc3df8d29ec7083d6960ff637df"
+      },
+      {
+        "name": "queue still POST_MERGE_VERIFIED",
+        "ok": true,
+        "detail": "POST_MERGE_VERIFIED"
+      },
+      {
+        "name": "task still closed",
+        "ok": true,
+        "detail": "closed"
+      },
+      {
+        "name": "repo working tree clean",
+        "ok": true,
+        "detail": "clean"
+      },
+      {
+        "name": "worktree clean",
+        "ok": true,
+        "detail": "clean"
+      }
+    ],
+    "status": "READY_FOR_RECEIVER"
+  },
+  "acceptance": {
+    "schema": "tower/handoff-acceptance@1",
+    "package_id": "HANDOFF-PILOT-002",
+    "source_controller": "ctl-phase3-receiver-001",
+    "receiver": "ctl-yingxian-qa-001",
+    "accepted_at": "2026-10-19T23:27:27+08:00",
+    "status": "ACCEPTED"
+  },
+  "receipt": {
+    "controller": "ctl-yingxian-qa-001",
+    "received_at": "2026-10-19T23:27:24+08:00",
+    "checks": [
+      {
+        "name": "HANDOFF.md exists",
+        "ok": true,
+        "detail": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\handoffs\\HANDOFF-PILOT-002\\HANDOFF.md"
+      },
+      {
+        "name": "SELF-CHECK.md exists",
+        "ok": true,
+        "detail": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\handoffs\\HANDOFF-PILOT-002\\SELF-CHECK.md"
+      },
+      {
+        "name": "section ## §0",
+        "ok": true,
+        "detail": "## §0"
+      },
+      {
+        "name": "section ## §0a",
+        "ok": true,
+        "detail": "## §0a"
+      },
+      {
+        "name": "section ## §1",
+        "ok": true,
+        "detail": "## §1"
+      },
+      {
+        "name": "section ## §2",
+        "ok": true,
+        "detail": "## §2"
+      },
+      {
+        "name": "section ## §3",
+        "ok": true,
+        "detail": "## §3"
+      },
+      {
+        "name": "section ## §4",
+        "ok": true,
+        "detail": "## §4"
+      },
+      {
+        "name": "section ## §4a",
+        "ok": true,
+        "detail": "## §4a"
+      },
+      {
+        "name": "section ## §5",
+        "ok": true,
+        "detail": "## §5"
+      },
+      {
+        "name": "section ## §6",
+        "ok": true,
+        "detail": "## §6"
+      },
+      {
+        "name": "section ## §7",
+        "ok": true,
+        "detail": "## §7"
+      },
+      {
+        "name": "self-check no unchecked items",
+        "ok": true,
+        "detail": "all checked"
+      },
+      {
+        "name": "HANDOFF.md hash",
+        "ok": true,
+        "detail": "8b46c915fda98cc50663a9387889602f1025b94072e7d72167b736202917d56c"
+      },
+      {
+        "name": "SELF-CHECK.md hash",
+        "ok": true,
+        "detail": "310272b42c54305944ce9fc83aff9b16b094799bfce5f1c2815875a332891f66"
+      },
+      {
+        "name": "main SHA unchanged",
+        "ok": true,
+        "detail": "9fb5ba243f5cf03f7ccafb0eb381793770835db2 vs 9fb5ba243f5cf03f7ccafb0eb381793770835db2"
+      },
+      {
+        "name": "worktree head unchanged",
+        "ok": true,
+        "detail": "6e00d6975540dfc3df8d29ec7083d6960ff637df vs 6e00d6975540dfc3df8d29ec7083d6960ff637df"
+      },
+      {
+        "name": "queue still POST_MERGE_VERIFIED",
+        "ok": true,
+        "detail": "POST_MERGE_VERIFIED"
+      },
+      {
+        "name": "task still closed",
+        "ok": true,
+        "detail": "closed"
+      },
+      {
+        "name": "repo working tree clean",
+        "ok": true,
+        "detail": "clean"
+      },
+      {
+        "name": "worktree clean",
+        "ok": true,
+        "detail": "clean"
+      }
+    ],
+    "note": "",
+    "path": "handoffs/HANDOFF-PILOT-002/RECEIPT.md"
+  },
+  "activation": {
+    "schema": "tower/handoff-activation@1",
+    "package_id": "HANDOFF-PILOT-002",
+    "controller": "ctl-yingxian-qa-001",
+    "activated_at": "2026-10-19T23:27:32+08:00",
+    "status": "ACTIVE"
+  }
 }

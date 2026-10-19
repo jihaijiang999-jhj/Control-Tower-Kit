@@ -1,0 +1,8 @@
+{
+  "schema": "tower/handoff-acceptance@1",
+  "package_id": "HANDOFF-PILOT-002",
+  "source_controller": "ctl-phase3-receiver-001",
+  "receiver": "ctl-yingxian-qa-001",
+  "accepted_at": "2026-10-19T23:27:27+08:00",
+  "status": "ACCEPTED"
+}
