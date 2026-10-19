@@ -20,6 +20,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
+import spec_coverage
 import spec_lint
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
@@ -2086,6 +2087,15 @@ def cmd_spec_lint(root: Path, args) -> None:
     emit(result, 0 if result["ok"] else 2)
 
 
+def cmd_spec_coverage(root: Path, args) -> None:
+    result = spec_coverage.evaluate(
+        root,
+        bindings_path=getattr(args, "bindings", None),
+        tests_dir=getattr(args, "tests_dir", None),
+    )
+    emit(result, 0 if result["ok"] else 2)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Tower/DSH file-backed control-plane CLI")
     p.add_argument("--root", default=str(DEFAULT_ROOT))
@@ -2107,6 +2117,12 @@ def build_parser() -> argparse.ArgumentParser:
                     help="lint one directory (default: root specs/ plus root policy docs)")
     sl.add_argument("--strict", action="store_true",
                     help="enable strict structural checks (opt-in)")
+
+    sc = sub.add_parser("spec-coverage")
+    sc.add_argument("--bindings", default=None,
+                    help="bindings module (default: tools/tests/clause_bindings.py)")
+    sc.add_argument("--tests-dir", default=None,
+                    help="test directory to scan (default: tools/tests)")
 
     hn = sub.add_parser("handoff-new")
     hn.add_argument("--package", required=True)
@@ -2237,6 +2253,7 @@ def main() -> None:
         "merge-check": cmd_merge_check, "merge": cmd_merge, "post-merge": cmd_post_merge,
         "verify-ledger": cmd_verify_ledger,
         "spec-lint": cmd_spec_lint,
+        "spec-coverage": cmd_spec_coverage,
     }
     try:
         handlers[args.cmd](root, args)
