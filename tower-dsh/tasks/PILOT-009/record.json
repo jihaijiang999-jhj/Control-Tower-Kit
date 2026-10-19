@@ -1,0 +1,123 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-009",
+  "title": "条款覆盖：把 spec 条款绑定到真实测试并设门",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "新增 tools/tests/clause_bindings.py：把每条 tool-check 条款映射到至少一个已存在的测试 ID",
+    "新增 tools/spec_coverage.py：解析 workflow/policy 条款、加载绑定、校验测试存在、输出覆盖矩阵",
+    "towerctl 注册 spec-coverage 子命令，输出 JSON；tool-check 缺口或未知绑定 exit 2",
+    "review-check / owner-gate 条款单独计数为 manual / owner，不判失败",
+    "新增 tools/tests/test_coverage.py：覆盖真实塔根 gaps=0、未知测试 ID、未知条款、未绑定 tool 条款",
+    "缺失的 tool-check 测试补在 test_coverage.py 内（不改既有测试行为）"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-009/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-009/tower-dsh/tools/spec_coverage.py",
+    "pilot/worktrees/PILOT-009/tower-dsh/tools/tests/clause_bindings.py",
+    "pilot/worktrees/PILOT-009/tower-dsh/tools/tests/test_coverage.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access"
+  ],
+  "acceptance": [
+    "python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 95",
+    "对真实塔根运行 spec-coverage 返回 ok=true，specs=6，tool_gaps=0，unknown=0",
+    "6 份 spec 的每条 tool-check 条款都至少绑定 1 个已存在的测试",
+    "绑定到不存在的测试 ID → exit 2",
+    "绑定到不存在的条款 ID → exit 2",
+    "tool-check 条款未绑定 → exit 2（用临时 spec 夹具验证）",
+    "review-check / owner-gate 条款计入 manual/owner，不导致失败",
+    "startup / wiring / handoff-check / spec-lint 不回归"
+  ],
+  "depends_on": [
+    "PILOT-008"
+  ],
+  "worktree": "pilot/worktrees/PILOT-009",
+  "spec_path": "pilot/PILOT-009.spec.json",
+  "spec_sha256": "93803ddc18e21fa82d98e9ba6a2c866bd2f3ad176f3f18fe26d0d350e3c19ebb",
+  "spec_gate": "PASS",
+  "executor": "subagent:4ed8e3bc-a5f4-47e6-97d3-c05242723887",
+  "dispatch": {
+    "executor": "subagent:4ed8e3bc-a5f4-47e6-97d3-c05242723887",
+    "worktree": "pilot/worktrees/PILOT-009",
+    "at": "2026-10-19T19:41:31+08:00"
+  },
+  "evidence": [
+    {
+      "id": "E-001",
+      "path": "tasks/PILOT-009/evidence/towerctl.py",
+      "sha256": "7df7e92a7cdfb9ab718787c11ab831c670fd0aa89d58e0dd611e513146e2011d",
+      "bytes": 92532,
+      "at": "2026-10-19T19:48:48+08:00"
+    },
+    {
+      "id": "E-002",
+      "path": "tasks/PILOT-009/evidence/spec_coverage.py",
+      "sha256": "4ed9c3a84e8bb12f81519d558b85d3cb0f869a6eb3d18dade13eaf9c1c0275e1",
+      "bytes": 10949,
+      "at": "2026-10-19T19:48:48+08:00"
+    },
+    {
+      "id": "E-003",
+      "path": "tasks/PILOT-009/evidence/clause_bindings.py",
+      "sha256": "d4c0c5c3f6026737e0d5eb7454ec553afc1fb129e7a4b6e203341b5f7558eea6",
+      "bytes": 8043,
+      "at": "2026-10-19T19:48:48+08:00"
+    },
+    {
+      "id": "E-004",
+      "path": "tasks/PILOT-009/evidence/test_coverage.py",
+      "sha256": "f6b14f4c4bde52205bab9958edfba386bc92b8953d02d88bd035fd21dcfbe4ea",
+      "bytes": 33916,
+      "at": "2026-10-19T19:48:48+08:00"
+    },
+    {
+      "id": "E-005",
+      "path": "tasks/PILOT-009/evidence/test-output.txt",
+      "sha256": "9026180c9115154d82ff4c3c2d0eb8345699a3f8a5bf77bfa9391fb10669dec2",
+      "bytes": 14271,
+      "at": "2026-10-19T19:48:48+08:00"
+    },
+    {
+      "id": "E-006",
+      "path": "tasks/PILOT-009/evidence/commit.txt",
+      "sha256": "aec18e1562aa5c61801e79dd0a541ea083326960666382a797333935dc69a37b",
+      "bytes": 100,
+      "at": "2026-10-19T19:48:48+08:00"
+    },
+    {
+      "id": "E-007",
+      "path": "tasks/PILOT-009/evidence/diff.txt",
+      "sha256": "81142b46ac2389429a6e088e6f83c96bca4ce77a91df397981e5e33b25459415",
+      "bytes": 58005,
+      "at": "2026-10-19T19:48:48+08:00"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:f443bad6-ba3a-4f69-b7a2-25f95ae18b85",
+    "verdict": "PASS",
+    "note": "independent reviewer PASS: 109 tests; 8/8 acceptance; 7/7 evidence; 27/27 tool-check clauses bound; 0 gaps; invalid fixtures exit 2",
+    "at": "2026-10-19T19:57:16+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-009",
+    "actor": "owner",
+    "text": "owner approved clause-coverage gate",
+    "at": "2026-10-19T19:57:16+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-009/CLOSEOUT.md",
+    "at": "2026-10-19T19:57:16+08:00"
+  },
+  "created_at": "2026-10-19T19:41:16+08:00",
+  "updated_at": "2026-10-19T19:57:16+08:00",
+  "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+  "delivered_at": "2026-10-19T19:48:48+08:00",
+  "accepted_at": "2026-10-19T19:57:16+08:00"
+}

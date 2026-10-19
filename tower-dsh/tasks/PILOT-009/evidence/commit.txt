@@ -1,0 +1,2 @@
+28f5b20904a862de5f59a17b4edf55d52f178b5e
+PILOT-009: clause coverage bindings + spec-coverage gate

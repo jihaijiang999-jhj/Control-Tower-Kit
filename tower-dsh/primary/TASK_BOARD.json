@@ -81,7 +81,17 @@
       "reviewer": "subagent:6dfa3e2b-0e5f-4a5d-9432-7350d5bbdedf",
       "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
       "updated_at": "2026-10-19T18:54:47+08:00"
+    },
+    {
+      "id": "PILOT-009",
+      "title": "条款覆盖：把 spec 条款绑定到真实测试并设门",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:4ed8e3bc-a5f4-47e6-97d3-c05242723887",
+      "reviewer": "subagent:f443bad6-ba3a-4f69-b7a2-25f95ae18b85",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T19:57:16+08:00"
     }
   ],
-  "updated_at": "2026-10-19T18:54:47+08:00"
+  "updated_at": "2026-10-19T19:57:16+08:00"
 }
