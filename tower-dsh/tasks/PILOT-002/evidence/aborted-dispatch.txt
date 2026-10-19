@@ -1,0 +1,8 @@
+# PILOT-002 dispatch abort record
+
+- 时间：2026-10-19T16:21:39+08:00
+- 首次 executor：`subagent:16e56411-3790-417c-a04f-6c0b22f0dd9b`
+- 事件：DSH 运行时重启（GUI 端口由 55241 变为 61769），executor 进程被中断。
+- 影响：worktree `pilot/worktrees/PILOT-002` 相对 main 零改动；分支停在基线 `7c883b7`。
+- 处置：以本记录为证据交付，`checkback FAIL` 回退到 `rework`，再由主塔重新派发。
+- 未做：未手改 `record.json`；未改写 ledger；未删除历史。

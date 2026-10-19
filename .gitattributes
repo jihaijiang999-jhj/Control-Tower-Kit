@@ -1,6 +1,10 @@
-# Normalize all text to LF in the working tree.
-# Why: evidence SHA-256 must be reproducible from git blobs (see AUDIT-2026-10-19 P1-3).
+# Normalize prose to LF, but NEVER touch hash-addressed artifacts.
+# Evidence and handoff files carry recorded SHA-256 values; line-ending
+# conversion would silently invalidate them (see AUDIT-2026-10-19 P1-3).
 * text=auto eol=lf
+
+tower-dsh/tasks/**/evidence/** -text
+tower-dsh/handoffs/** -text
 
 *.png binary
 *.jpg binary

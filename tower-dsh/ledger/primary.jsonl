@@ -16,3 +16,10 @@
 {"seq": 16, "at": "2026-10-19T12:51:58+08:00", "type": "HANDOFF_ACCEPT", "actor": "primary", "payload": {"package": "HANDOFF-PILOT-001", "receiver": "ctl-phase3-receiver-001"}}
 {"seq": 17, "at": "2026-10-19T12:52:05+08:00", "type": "HANDOFF_ACTIVATE", "actor": "receiver", "payload": {"package": "HANDOFF-PILOT-001", "controller": "ctl-phase3-receiver-001"}}
 {"seq": 18, "at": "2026-10-19T12:52:42+08:00", "type": "HANDOFF_ACTIVATE", "actor": "receiver", "payload": {"package": "HANDOFF-PILOT-001", "controller": "ctl-phase3-receiver-001"}}
+{"seq": 19, "at": "2026-10-19T16:18:25+08:00", "type": "TASK_NEW", "actor": "primary", "payload": {"task": "PILOT-002", "title": "towerctl 门禁硬化：spec 前置、证据前置、reviewer 非空、merge 分支断言 + 回归测试"}}
+{"seq": 20, "at": "2026-10-19T16:18:25+08:00", "type": "SPEC_APPROVED", "actor": "mac", "payload": {"task": "PILOT-002", "by": "mac", "note": "owner approved audit fix plan (all recommendations)"}}
+{"seq": 21, "at": "2026-10-19T16:18:25+08:00", "type": "CHECK", "actor": "primary", "payload": {"task": "PILOT-002", "phase": "spec", "ok": true}}
+{"seq": 22, "at": "2026-10-19T16:22:51+08:00", "type": "DISPATCH", "actor": "primary", "payload": {"task": "PILOT-002", "executor": "subagent:16e56411-3790-417c-a04f-6c0b22f0dd9b", "worktree": "pilot/worktrees/PILOT-002"}}
+{"seq": 23, "at": "2026-10-19T16:36:05+08:00", "type": "DELIVER", "actor": "executor", "payload": {"task": "PILOT-002", "evidence": 1}}
+{"seq": 24, "at": "2026-10-19T16:36:05+08:00", "type": "CHECKBACK", "actor": "reviewer", "payload": {"task": "PILOT-002", "reviewer": "ctl-phase3-receiver-001", "verdict": "FAIL"}}
+{"seq": 25, "at": "2026-10-19T16:36:05+08:00", "type": "DISPATCH", "actor": "primary", "payload": {"task": "PILOT-002", "executor": "subagent:4e3a1640-cff9-4135-8f67-caa396bed7ba", "worktree": "pilot/worktrees/PILOT-002"}}

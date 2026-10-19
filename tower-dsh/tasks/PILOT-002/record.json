@@ -1,0 +1,72 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-002",
+  "title": "towerctl 门禁硬化：spec 前置、证据前置、reviewer 非空、merge 分支断言 + 回归测试",
+  "status": "dispatched",
+  "authority": "workspace_write",
+  "scope": [
+    "dispatch 在 spec_gate != PASS 时拒绝；无 spec_path 的卡不再豁免",
+    "dispatch 在 tasks/<id>/TASK.md 缺失时拒绝",
+    "check --phase spec 对无 spec_path 的任务卡返回失败",
+    "checkback 与 check --phase review 要求 reviewer 非空且 != executor",
+    "accept / close 内联 check_evidence：证据为 0 或哈希不符时拒绝",
+    "spec 文件变更后 spec_gate 自动失效（实时比对 spec_sha256）",
+    "merge 前断言当前 HEAD 分支 == envelope.base，否则拒绝且队列不得变为 MERGED",
+    "merge 前要求 queue entry.status ∈ {WAITING, CORRECTION_REQUIRED}",
+    "新增 tools/tests/test_gates.py 覆盖以上行为"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-002/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-002/tower-dsh/tools/tests/test_gates.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access"
+  ],
+  "acceptance": [
+    "在 tower-dsh 根目录运行 python -B -m unittest discover -s tools/tests -v 全部通过，用例数 >= 8",
+    "dispatch 在 spec_gate != PASS 时 exit 2，错误信息含 spec",
+    "dispatch 在 TASK.md 缺失时 exit 2",
+    "check --phase spec 对无 spec_path 的卡 exit 2",
+    "checkback --reviewer '' 时 exit 2",
+    "accept 在证据缺失或哈希不符时 exit 2",
+    "改 spec 文件后 check --phase ready 失败",
+    "merge 在当前分支 != base 时 exit 2，且 MERGE_QUEUE 中该 envelope 状态不是 MERGED",
+    "PILOT-001 的 startup / wiring / handoff-check 在改动后仍通过"
+  ],
+  "depends_on": [],
+  "worktree": "pilot/worktrees/PILOT-002",
+  "spec_path": "pilot/PILOT-002.spec.json",
+  "spec_sha256": "41945ae8858ff28c70b4fb9d0ebdec66fdc530b3d101a821bf34e8950bad07a3",
+  "spec_gate": "PASS",
+  "executor": "subagent:4e3a1640-cff9-4135-8f67-caa396bed7ba",
+  "dispatch": {
+    "executor": "subagent:4e3a1640-cff9-4135-8f67-caa396bed7ba",
+    "worktree": "pilot/worktrees/PILOT-002",
+    "at": "2026-10-19T16:36:05+08:00"
+  },
+  "evidence": [
+    {
+      "id": "E-001",
+      "path": "tasks/PILOT-002/evidence/aborted-dispatch.txt",
+      "sha256": "c71fe91ca9ce140a8f5478aa4f39c78a9a0121e6546d4bdbeb5539aa6313b407",
+      "bytes": 525,
+      "at": "2026-10-19T16:36:05+08:00"
+    }
+  ],
+  "review": {
+    "reviewer": "ctl-phase3-receiver-001",
+    "verdict": "FAIL",
+    "note": "runtime restart killed executor 16e56411; worktree unchanged; reset for re-dispatch",
+    "at": "2026-10-19T16:36:05+08:00"
+  },
+  "decision": null,
+  "closeout": null,
+  "created_at": "2026-10-19T16:18:25+08:00",
+  "updated_at": "2026-10-19T16:36:05+08:00",
+  "next": "等待 executor 交付",
+  "delivered_at": "2026-10-19T16:36:05+08:00"
+}

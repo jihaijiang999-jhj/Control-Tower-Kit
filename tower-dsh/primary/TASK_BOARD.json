@@ -11,7 +11,17 @@
       "reviewer": "subagent:aed01de9-71f1-46cd-ace8-84b720a3e01f",
       "next": "merged via ENV-PILOT-001; POST_MERGE_VERIFIED",
       "updated_at": "2026-10-19T12:29:52+08:00"
+    },
+    {
+      "id": "PILOT-002",
+      "title": "towerctl 门禁硬化：spec 前置、证据前置、reviewer 非空、merge 分支断言 + 回归测试",
+      "status": "dispatched",
+      "authority": "workspace_write",
+      "executor": "subagent:4e3a1640-cff9-4135-8f67-caa396bed7ba",
+      "reviewer": "ctl-phase3-receiver-001",
+      "next": "等待 executor 交付",
+      "updated_at": "2026-10-19T16:36:05+08:00"
     }
   ],
-  "updated_at": "2026-10-19T12:29:52+08:00"
+  "updated_at": "2026-10-19T16:36:05+08:00"
 }
