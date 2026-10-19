@@ -61,7 +61,17 @@
       "reviewer": "subagent:5882dd69-c4a0-492d-b483-f76207104f76",
       "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
       "updated_at": "2026-10-19T17:50:43+08:00"
+    },
+    {
+      "id": "PILOT-007",
+      "title": "spec-lint：让工作流规范可被机器校验",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:b98bd372-3dcc-4cb6-add8-06c16b7b364d",
+      "reviewer": "subagent:dcfb55f3-6d2d-44cc-bc2a-cf61e8e54a30",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T18:35:37+08:00"
     }
   ],
-  "updated_at": "2026-10-19T17:50:43+08:00"
+  "updated_at": "2026-10-19T18:35:37+08:00"
 }

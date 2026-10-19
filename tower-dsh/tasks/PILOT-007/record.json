@@ -1,0 +1,116 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-007",
+  "title": "spec-lint：让工作流规范可被机器校验",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "新增 tools/spec_lint.py：校验 tower/workflow@1 文档",
+    "towerctl 注册 spec-lint 子命令，输出 JSON 并在有错时 exit 2",
+    "校验 front matter：schema/id/title/owner/version/enforcement_legend",
+    "校验 7 个必需章节齐全",
+    "校验状态表：状态唯一，且转移中的 from/to 必须是已声明状态或 —",
+    "校验每个声明状态至少出现在一条转移中（无不可达状态）",
+    "校验 INV/FM/TR 编号唯一且符合前缀",
+    "校验 invariant 的 enforcement 取值在 enforcement_legend 内",
+    "校验 命令 列引用的 towerctl 子命令真实存在",
+    "新增 tools/tests/test_spec_lint.py 覆盖合法与各类非法夹具"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-007/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-007/tower-dsh/tools/spec_lint.py",
+    "pilot/worktrees/PILOT-007/tower-dsh/tools/tests/test_spec_lint.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access"
+  ],
+  "acceptance": [
+    "python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 67",
+    "对仓库真实 specs/ 目录运行 spec-lint 返回 ok=true，files=4，errors=0",
+    "缺少章节、未知状态、不可达状态、非法 enforcement、未知命令、重复 ID、缺 front matter 各自使 exit 2",
+    "startup / wiring / handoff-check --package HANDOFF-PILOT-001 不回归",
+    "不改变既有子命令行为"
+  ],
+  "depends_on": [
+    "PILOT-002"
+  ],
+  "worktree": "pilot/worktrees/PILOT-007",
+  "spec_path": "pilot/PILOT-007.spec.json",
+  "spec_sha256": "efaf1ade50404a37b987e26088aea80fe31d614ccbf8a2d371ee79e41fb4b221",
+  "spec_gate": "PASS",
+  "executor": "subagent:b98bd372-3dcc-4cb6-add8-06c16b7b364d",
+  "dispatch": {
+    "executor": "subagent:b98bd372-3dcc-4cb6-add8-06c16b7b364d",
+    "worktree": "pilot/worktrees/PILOT-007",
+    "at": "2026-10-19T18:22:57+08:00"
+  },
+  "evidence": [
+    {
+      "id": "E-001",
+      "path": "tasks/PILOT-007/evidence/towerctl.py",
+      "sha256": "680ad34fdd45817b1c89fb681dd5c3de3dca5addeacf9ec3b14b11e0121b9a70",
+      "bytes": 91343,
+      "at": "2026-10-19T18:27:20+08:00"
+    },
+    {
+      "id": "E-002",
+      "path": "tasks/PILOT-007/evidence/spec_lint.py",
+      "sha256": "de0271210c017a44683389c1e2f47b90682447a794a8f2051f8bcdc82710d902",
+      "bytes": 13180,
+      "at": "2026-10-19T18:27:20+08:00"
+    },
+    {
+      "id": "E-003",
+      "path": "tasks/PILOT-007/evidence/test_spec_lint.py",
+      "sha256": "796fa0fc3e1b373dbb3bbe52217d7cb566d45d2d9aab51245751866ae86c5a35",
+      "bytes": 8841,
+      "at": "2026-10-19T18:27:20+08:00"
+    },
+    {
+      "id": "E-004",
+      "path": "tasks/PILOT-007/evidence/test-output.txt",
+      "sha256": "6d353fc7829443e5258aa4588fabbc26fe937fad28679187666f14669a8f4a99",
+      "bytes": 9372,
+      "at": "2026-10-19T18:27:20+08:00"
+    },
+    {
+      "id": "E-005",
+      "path": "tasks/PILOT-007/evidence/commit.txt",
+      "sha256": "5d7816d733d0c57bdaf572fe4dca3b996ed406a14b6333473dae07c506e45663",
+      "bytes": 83,
+      "at": "2026-10-19T18:27:20+08:00"
+    },
+    {
+      "id": "E-006",
+      "path": "tasks/PILOT-007/evidence/diff.txt",
+      "sha256": "4f1dfa3dfd56bd9e61a0daf296cd5f3c20dc26beb5c93ea4e048ebab60958ba2",
+      "bytes": 26044,
+      "at": "2026-10-19T18:27:20+08:00"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:dcfb55f3-6d2d-44cc-bc2a-cf61e8e54a30",
+    "verdict": "PASS",
+    "note": "independent reviewer PASS: 71 tests; 5/5 acceptance; 6/6 evidence; 8/8 invalid fixtures exit 2; real specs 4/4 ok; no regression",
+    "at": "2026-10-19T18:35:36+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-007",
+    "actor": "owner",
+    "text": "owner approved workflow-spec + spec-lint",
+    "at": "2026-10-19T18:35:37+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-007/CLOSEOUT.md",
+    "at": "2026-10-19T18:35:37+08:00"
+  },
+  "created_at": "2026-10-19T18:22:40+08:00",
+  "updated_at": "2026-10-19T18:35:37+08:00",
+  "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+  "delivered_at": "2026-10-19T18:27:20+08:00",
+  "accepted_at": "2026-10-19T18:35:37+08:00"
+}

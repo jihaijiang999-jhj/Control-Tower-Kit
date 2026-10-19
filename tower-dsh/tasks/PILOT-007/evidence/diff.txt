@@ -1,0 +1,680 @@
+diff --git a/tower-dsh/tools/spec_lint.py b/tower-dsh/tools/spec_lint.py
+new file mode 100644
+index 0000000..b5a2760
+--- /dev/null
++++ b/tower-dsh/tools/spec_lint.py
+@@ -0,0 +1,361 @@
++"""Lint ``tower/workflow@1`` Markdown specs.
++
++The parser is deliberately pure-stdlib: a workflow spec is a document humans
++read, so this module reads the same front matter, ``##`` sections and pipe
++tables without a YAML or Markdown dependency. It never touches tower state,
++the network or any file outside the directory being linted.
++
++Cell escaping
++-------------
++A table cell may list several states separated by ``|``. Markdown requires the
++inner pipes to be escaped as ``\\|``; :func:`split_cells` unescapes them before
++:func:`lint_file` splits a ``from``/``to`` cell on ``|`` again.
++"""
++from __future__ import annotations
++
++import re
++from pathlib import Path
++
++SCHEMA = "tower/workflow@1"
++REQUIRED_FRONT_MATTER = (
++    "schema",
++    "id",
++    "title",
++    "owner",
++    "version",
++    "enforcement_legend",
++)
++REQUIRED_SECTIONS = {
++    1: "范围",
++    2: "状态机",
++    3: "转移",
++    4: "不变量",
++    5: "证据",
++    6: "失败模式",
++    7: "变更记录",
++}
++
++FILE_ID_RE = re.compile(r"^WF-[A-Z]+$")
++TR_ID_RE = re.compile(r"^TR-\d+$")
++INV_ID_RE = re.compile(r"^INV-\d+$")
++FM_ID_RE = re.compile(r"^FM-\d+$")
++# A command token is a bare lowercase word (letters, digits, hyphen). Tokens
++# such as ``spec_gate=PASS``, ``TASK.md`` or Chinese prose are not commands and
++# are skipped by rule 10.
++COMMAND_WORD_RE = re.compile(r"^[a-z][a-z0-9-]*$")
++SECTION_RE = re.compile(r"^##\s+(\d+)(?:[.．、]|\s)")
++TABLE_SEPARATOR_RE = re.compile(r"^\|?[\s:|-]+\|?$")
++BACKTICK_TOKEN_RE = re.compile(r"`([^`]+)`")
++WILDCARD_STATE = "—"
++
++
++def unbacktick(value: str) -> str:
++    """Strip surrounding whitespace and any backticks from a table cell."""
++    return value.strip().strip("`").strip()
++
++
++def split_cells(line: str) -> list[str]:
++    """Split one Markdown table row into trimmed cells.
++
++    Respects ``\\|`` escapes so a cell can contain a literal pipe.
++    """
++    text = line.strip()
++    if text.startswith("|"):
++        text = text[1:]
++    if text.endswith("|") and not text.endswith("\\|"):
++        text = text[:-1]
++    cells: list[str] = []
++    buf: list[str] = []
++    i = 0
++    while i < len(text):
++        char = text[i]
++        if char == "\\" and i + 1 < len(text) and text[i + 1] == "|":
++            buf.append("|")
++            i += 2
++            continue
++        if char == "|":
++            cells.append("".join(buf).strip())
++            buf = []
++            i += 1
++            continue
++        buf.append(char)
++        i += 1
++    cells.append("".join(buf).strip())
++    return cells
++
++
++def _is_table_row(line: str) -> bool:
++    return line.strip().startswith("|")
++
++
++def _is_separator(line: str) -> bool:
++    text = line.strip()
++    return "-" in text and bool(TABLE_SEPARATOR_RE.match(text))
++
++
++def parse_tables(lines: list[str]) -> list[tuple[list[str], list[list[str]]]]:
++    """Return ``(header, rows)`` for every pipe table in ``lines``."""
++    tables: list[tuple[list[str], list[list[str]]]] = []
++    i = 0
++    while i < len(lines):
++        if (_is_table_row(lines[i]) and i + 1 < len(lines)
++                and _is_separator(lines[i + 1])):
++            header = split_cells(lines[i])
++            rows: list[list[str]] = []
++            i += 2
++            while i < len(lines) and _is_table_row(lines[i]):
++                if _is_separator(lines[i]):
++                    i += 1
++                    continue
++                rows.append(split_cells(lines[i]))
++                i += 1
++            tables.append((header, rows))
++            continue
++        i += 1
++    return tables
++
++
++def parse_front_matter(lines: list[str]) -> tuple[dict[str, str], int, list[str]]:
++    """Parse the leading ``---`` block.
++
++    Returns ``(fields, body_start, errors)``. When the block is missing or
++    unterminated, ``body_start`` still points somewhere safe so the rest of the
++    document can be reported on independently.
++    """
++    errors: list[str] = []
++    if not lines or lines[0].strip() != "---":
++        errors.append("missing front matter (file must start with '---')")
++        return {}, 0, errors
++    end = None
++    for index in range(1, len(lines)):
++        if lines[index].strip() == "---":
++            end = index
++            break
++    if end is None:
++        errors.append("front matter is not terminated by '---'")
++        return {}, len(lines), errors
++    fields: dict[str, str] = {}
++    for line in lines[1:end]:
++        if not line.strip() or ":" not in line:
++            continue
++        key, value = line.split(":", 1)
++        fields[key.strip()] = value.strip()
++    return fields, end + 1, errors
++
++
++def parse_sections(lines: list[str]) -> dict[int, list[str]]:
++    """Group body lines under their ``## <number>`` heading."""
++    sections: dict[int, list[str]] = {}
++    current: list[str] | None = None
++    for line in lines:
++        match = SECTION_RE.match(line)
++        if match:
++            number = int(match.group(1))
++            sections.setdefault(number, [])
++            current = sections[number]
++            continue
++        if line.startswith("## "):
++            current = None
++            continue
++        if current is not None:
++            current.append(line)
++    return sections
++
++
++def _legend_values(raw: str) -> list[str]:
++    return [unbacktick(value) for value in raw.split("|") if unbacktick(value)]
++
++
++def _split_states(cell: str) -> list[str]:
++    return [unbacktick(part) for part in cell.split("|")]
++
++
++def lint_file(path: Path, display: str, commands: set[str]) -> dict:
++    """Lint one workflow spec file and return its result entry."""
++    entry: dict = {
++        "path": display,
++        "id": "",
++        "states": [],
++        "transitions": [],
++        "invariants": [],
++        "failures": [],
++        "errors": [],
++    }
++
++    def err(message: str) -> None:
++        entry["errors"].append(f"{display}: {message}")
++
++    try:
++        text = path.read_text(encoding="utf-8-sig")
++    except (OSError, UnicodeDecodeError) as exc:
++        err(f"cannot read file: {exc}")
++        return entry
++
++    lines = text.splitlines()
++    fields, body_start, front_errors = parse_front_matter(lines)
++    for message in front_errors:
++        err(message)
++
++    if fields.get("id"):
++        entry["id"] = fields["id"]
++
++    for key in REQUIRED_FRONT_MATTER:
++        if not fields.get(key):
++            err(f"front matter missing required field: {key}")
++    if fields.get("schema") and fields["schema"] != SCHEMA:
++        err(f"front matter schema must be {SCHEMA!r}, got {fields['schema']!r}")
++    if fields.get("id") and not FILE_ID_RE.match(fields["id"]):
++        err(f"front matter id {fields['id']!r} does not match ^WF-[A-Z]+$")
++    legend = _legend_values(fields.get("enforcement_legend", ""))
++    if fields.get("enforcement_legend") and not legend:
++        err("front matter enforcement_legend declares no values")
++
++    sections = parse_sections(lines[body_start:])
++    for number, title in REQUIRED_SECTIONS.items():
++        if number not in sections:
++            err(f"missing required section: ## {number}. {title}")
++
++    # -- rule 4: state table -------------------------------------------------
++    states: list[str] = []
++    seen_states: set[str] = set()
++    state_tables = parse_tables(sections.get(2, []))
++    if not state_tables:
++        err("section 2: missing state table")
++    else:
++        for row_no, row in enumerate(state_tables[0][1], 1):
++            name = unbacktick(row[0]) if row else ""
++            if not name:
++                err(f"section 2: empty state name in data row {row_no}")
++            elif name in seen_states:
++                err(f"section 2: duplicate state {name!r}")
++            else:
++                seen_states.add(name)
++                states.append(name)
++        if not states:
++            err("section 2: state table declares no states")
++    entry["states"] = states
++
++    # -- rules 5, 9, 10: transition table ------------------------------------
++    transition_ids: list[str] = []
++    seen_transitions: set[str] = set()
++    touched_states: set[str] = set()
++    transition_tables = parse_tables(sections.get(3, []))
++    if not transition_tables:
++        err("section 3: missing transition table")
++    else:
++        for row_no, row in enumerate(transition_tables[0][1], 1):
++            if len(row) < 3:
++                err(f"section 3: malformed transition row {row_no} (needs ID/from/to)")
++                continue
++            transition_id = unbacktick(row[0])
++            transition_ids.append(transition_id)
++            if transition_id in seen_transitions:
++                err(f"section 3: duplicate transition id {transition_id!r}")
++            seen_transitions.add(transition_id)
++            if not TR_ID_RE.match(transition_id):
++                err(f"section 3: transition id {transition_id!r} does not match ^TR-\\d+$")
++            label = transition_id or f"row {row_no}"
++            for column, side in ((1, "from"), (2, "to")):
++                cell = row[column] if column < len(row) else ""
++                if not cell.strip():
++                    err(f"section 3: {label}: empty {side} cell")
++                    continue
++                for state in _split_states(cell):
++                    if not state:
++                        err(f"section 3: {label}: empty state in {side} cell")
++                        continue
++                    touched_states.add(state)
++                    if state != WILDCARD_STATE and state not in seen_states:
++                        err(f"section 3: {label}: {side} references undeclared state {state!r}")
++            if len(row) < 5:
++                err(f"section 3: {label}: missing command column")
++                continue
++            for token in BACKTICK_TOKEN_RE.findall(row[4]):
++                token = token.strip()
++                if not token:
++                    continue
++                word = token.split()[0]
++                if COMMAND_WORD_RE.match(word) and word not in commands:
++                    err(f"section 3: {label}: unknown command {word!r} in command column")
++    entry["transitions"] = transition_ids
++
++    # -- rule 6: reachability ------------------------------------------------
++    for state in states:
++        if state not in touched_states:
++            err(f"section 3: declared state {state!r} is unreachable (absent from every from/to)")
++
++    # -- rules 7, 9: invariants ---------------------------------------------
++    invariant_ids: list[str] = []
++    seen_invariants: set[str] = set()
++    invariant_tables = parse_tables(sections.get(4, []))
++    if not invariant_tables:
++        err("section 4: missing invariant table")
++    else:
++        for row_no, row in enumerate(invariant_tables[0][1], 1):
++            if not row:
++                continue
++            invariant_id = unbacktick(row[0])
++            invariant_ids.append(invariant_id)
++            if invariant_id in seen_invariants:
++                err(f"section 4: duplicate invariant id {invariant_id!r}")
++            seen_invariants.add(invariant_id)
++            if not INV_ID_RE.match(invariant_id):
++                err(f"section 4: invariant id {invariant_id!r} does not match ^INV-\\d+$")
++            if len(row) < 3:
++                err(f"section 4: {invariant_id or 'row %d' % row_no}: missing enforcement column")
++                continue
++            enforcement = unbacktick(row[2])
++            if enforcement not in legend:
++                err(f"section 4: {invariant_id}: enforcement {enforcement!r} "
++                    f"not in enforcement_legend {legend}")
++    entry["invariants"] = invariant_ids
++
++    # -- rules 8, 9: failure modes ------------------------------------------
++    failure_ids: list[str] = []
++    seen_failures: set[str] = set()
++    failure_tables = parse_tables(sections.get(6, []))
++    if not failure_tables:
++        err("section 6: missing failure-mode table")
++    else:
++        for row in failure_tables[0][1]:
++            if not row:
++                continue
++            failure_id = unbacktick(row[0])
++            failure_ids.append(failure_id)
++            if failure_id in seen_failures:
++                err(f"section 6: duplicate failure id {failure_id!r}")
++            seen_failures.add(failure_id)
++            if not FM_ID_RE.match(failure_id):
++                err(f"section 6: failure id {failure_id!r} does not match ^FM-\\d+$")
++    entry["failures"] = failure_ids
++
++    return entry
++
++
++def _display_path(path: Path, root: Path) -> str:
++    try:
++        return path.resolve().relative_to(root.resolve()).as_posix()
++    except ValueError:
++        return path.name
++
++
++def lint_dir(
++    directory: Path,
++    *,
++    root: Path,
++    commands: set[str],
++    dir_label: str | None = None,
++) -> dict:
++    """Lint every ``*.md`` file in ``directory`` and return the JSON payload."""
++    label = dir_label if dir_label is not None else str(directory)
++    result: dict = {"ok": True, "dir": label, "files": [], "errors": []}
++    if not directory.is_dir():
++        result["ok"] = False
++        result["errors"].append(f"specs directory not found: {label}")
++        return result
++    for path in sorted(directory.glob("*.md")):
++        entry = lint_file(path, _display_path(path, root), commands)
++        result["files"].append(entry)
++        result["errors"].extend(entry["errors"])
++    result["ok"] = not result["errors"]
++    return result
+diff --git a/tower-dsh/tools/tests/test_spec_lint.py b/tower-dsh/tools/tests/test_spec_lint.py
+new file mode 100644
+index 0000000..6c9fe5d
+--- /dev/null
++++ b/tower-dsh/tools/tests/test_spec_lint.py
+@@ -0,0 +1,240 @@
++"""Tests for ``towerctl spec-lint`` (PILOT-007).
++
++Each test builds a throw-away ``specs/`` directory under ``tempfile`` and
++drives the real CLI via ``subprocess``, so exit codes and JSON are asserted
++exactly as a caller sees them. A minimal valid spec is written first and then
++broken one rule at a time.
++
++Run from the tower root (``tower-dsh``)::
++
++    python -B -m unittest discover -s tools/tests -v
++"""
++from __future__ import annotations
++
++import json
++import os
++import re
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++TOOLS_DIR = Path(__file__).resolve().parents[1]
++TOWER_ROOT = TOOLS_DIR.parent
++TCLI = TOOLS_DIR / "towerctl.py"
++
++VALID_SPEC = r"""---
++schema: tower/workflow@1
++id: WF-TEST
++title: test workflow
++owner: tester
++version: 1
++enforcement_legend: tool-check | review-check | owner-gate
++---
++
++# WF-TEST — test workflow
++
++## 1. 范围
++
++Test only.
++
++## 2. 状态机
++
++| 状态 | 含义 | 终态 |
++|---|---|---|
++| `READY` | ready | 否 |
++| `DONE` | done | 是 |
++
++## 3. 转移
++
++| ID | from | to | 前置条件 | 命令 | 证据 | 失败动作 |
++|---|---|---|---|---|---|---|
++| TR-01 | `—` | `READY` | start | `task-new` | e | refuse |
++| TR-02 | `READY` | `DONE` | finish | `close` | e | refuse |
++
++## 4. 不变量
++
++| ID | 不变量 | enforcement |
++|---|---|---|
++| INV-01 | something holds | tool-check |
++
++## 5. 证据
++
++- proof
++
++## 6. 失败模式
++
++| ID | 失败 | 唯一合法动作 |
++|---|---|---|
++| FM-01 | something broke | stop |
++
++## 7. 变更记录
++
++| 版本 | 日期 | 变更 | 批准 |
++|---|---|---|---|
++| 1 | 2026-10-19 | init | owner |
++"""
++
++
++def strip_front_matter(text: str) -> str:
++    start = text.index("---")
++    end = text.index("\n---", start + 3) + len("\n---")
++    return text[end:].lstrip("\n")
++
++
++def remove_section(text: str, number: int) -> str:
++    pattern = re.compile(rf"^## {number}\.[^\n]*\n.*?(?=^## \d+\.)", re.S | re.M)
++    return pattern.sub("", text)
++
++
++class SpecLintTestCase(unittest.TestCase):
++    def setUp(self) -> None:
++        self._tmp = tempfile.TemporaryDirectory(
++            prefix="towerctl-spec-lint-", ignore_cleanup_errors=True)
++        self.root = Path(self._tmp.name)
++        self.specs = self.root / "specs"
++        self.specs.mkdir(parents=True, exist_ok=True)
++
++    def tearDown(self) -> None:
++        self._tmp.cleanup()
++
++    # -- helpers ---------------------------------------------------------
++    def write_spec(self, text: str, name: str = "wf-test.md") -> Path:
++        path = self.specs / name
++        path.write_text(text, encoding="utf-8")
++        return path
++
++    def run_cli(self, *args: str) -> subprocess.CompletedProcess:
++        env = dict(os.environ)
++        env["PYTHONIOENCODING"] = "utf-8"
++        return subprocess.run(
++            [sys.executable, "-B", str(TCLI), "--root", str(self.root), *args],
++            capture_output=True, text=True, encoding="utf-8", env=env,
++        )
++
++    def lint(self) -> tuple[subprocess.CompletedProcess, dict]:
++        cp = self.run_cli("spec-lint")
++        self.assertTrue(cp.stdout.strip(), msg=f"stderr={cp.stderr}")
++        return cp, json.loads(cp.stdout)
++
++    def assert_rejected(self, cp: subprocess.CompletedProcess, data: dict,
++                        *keywords: str) -> None:
++        self.assertEqual(cp.returncode, 2,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        self.assertFalse(data["ok"])
++        self.assertTrue(data["errors"])
++        blob = "\n".join(data["errors"]).lower()
++        for keyword in keywords:
++            self.assertIn(keyword.lower(), blob,
++                          msg=f"missing {keyword!r} in errors={data['errors']}")
++
++    # -- 1. real specs ---------------------------------------------------
++    def test_real_specs_directory_passes(self) -> None:
++        cp = self.run_cli("spec-lint", "--dir", str(TOWER_ROOT / "specs"))
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        data = json.loads(cp.stdout)
++        self.assertTrue(data["ok"])
++        self.assertEqual(len(data["files"]), 4)
++        self.assertEqual(data["errors"], [])
++        for entry in data["files"]:
++            self.assertEqual(entry["errors"], [], msg=entry["path"])
++
++    # -- 2. missing front matter ----------------------------------------
++    def test_missing_front_matter_fails(self) -> None:
++        self.write_spec(strip_front_matter(VALID_SPEC))
++        cp, data = self.lint()
++        self.assert_rejected(cp, data, "front matter")
++
++    # -- 3. missing section ---------------------------------------------
++    def test_missing_section_fails(self) -> None:
++        self.write_spec(remove_section(VALID_SPEC, 5))
++        cp, data = self.lint()
++        self.assert_rejected(cp, data, "missing required section", "5")
++
++    # -- 4. transition references an undeclared state -------------------
++    def test_transition_undeclared_state_fails(self) -> None:
++        broken = VALID_SPEC.replace("| TR-02 | `READY` | `DONE`",
++                                    "| TR-02 | `READY` | `GHOST`")
++        self.write_spec(broken)
++        cp, data = self.lint()
++        self.assert_rejected(cp, data, "undeclared state", "GHOST")
++
++    # -- 5. declared state is unreachable -------------------------------
++    def test_unreachable_state_fails(self) -> None:
++        broken = VALID_SPEC.replace(
++            "| `DONE` | done | 是 |",
++            "| `DONE` | done | 是 |\n| `ORPHAN` | orphan | 否 |",
++        )
++        self.write_spec(broken)
++        cp, data = self.lint()
++        self.assert_rejected(cp, data, "unreachable", "ORPHAN")
++
++    # -- 6. enforcement value outside the legend ------------------------
++    def test_invalid_enforcement_fails(self) -> None:
++        broken = VALID_SPEC.replace("| INV-01 | something holds | tool-check |",
++                                    "| INV-01 | something holds | vibes |")
++        self.write_spec(broken)
++        cp, data = self.lint()
++        self.assert_rejected(cp, data, "enforcement", "vibes")
++
++    # -- 7. unknown command in the command column -----------------------
++    def test_unknown_command_fails(self) -> None:
++        self.write_spec(VALID_SPEC.replace("`task-new`", "`frobnicate`"))
++        cp, data = self.lint()
++        self.assert_rejected(cp, data, "unknown command", "frobnicate")
++
++    # -- 8. duplicate numbering -----------------------------------------
++    def test_duplicate_transition_id_fails(self) -> None:
++        self.write_spec(VALID_SPEC.replace("| TR-02 |", "| TR-01 |"))
++        cp, data = self.lint()
++        self.assert_rejected(cp, data, "duplicate transition id", "TR-01")
++
++    # -- 9. --dir does not exist ----------------------------------------
++    def test_missing_specs_directory_fails(self) -> None:
++        cp = self.run_cli("spec-lint", "--dir", str(self.root / "no-such-dir"))
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        data = json.loads(cp.stdout)
++        self.assertFalse(data["ok"])
++        self.assertEqual(data["files"], [])
++        self.assertIn("not found", "\n".join(data["errors"]))
++
++    # -- 10. one bad file does not stop the good one --------------------
++    def test_bad_file_does_not_block_good_file(self) -> None:
++        self.write_spec(remove_section(VALID_SPEC, 5), "a-bad.md")
++        self.write_spec(VALID_SPEC.replace("WF-TEST", "WF-GOOD"), "b-good.md")
++        cp, data = self.lint()
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        self.assertFalse(data["ok"])
++        self.assertEqual(len(data["files"]), 2)
++        by_id = {entry["id"]: entry for entry in data["files"]}
++        self.assertTrue(by_id["WF-TEST"]["errors"])
++        self.assertEqual(by_id["WF-GOOD"]["errors"], [])
++        self.assertTrue(any("a-bad.md" in message for message in data["errors"]))
++        self.assertFalse(any("b-good.md" in message for message in data["errors"]))
++
++    # -- extra: invalid id, duplicate state, non-backtick command text --
++    def test_invalid_id_fails(self) -> None:
++        self.write_spec(VALID_SPEC.replace("id: WF-TEST", "id: WF-test"))
++        cp, data = self.lint()
++        self.assert_rejected(cp, data, "does not match")
++
++    def test_duplicate_state_fails(self) -> None:
++        broken = VALID_SPEC.replace(
++            "| `DONE` | done | 是 |",
++            "| `DONE` | done | 是 |\n| `READY` | again | 否 |",
++        )
++        self.write_spec(broken)
++        cp, data = self.lint()
++        self.assert_rejected(cp, data, "duplicate state", "READY")
++
++    def test_non_backtick_command_text_is_skipped(self) -> None:
++        self.write_spec(VALID_SPEC.replace("`task-new`", "任意写事件命令"))
++        cp, data = self.lint()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertTrue(data["ok"])
++        self.assertEqual(data["errors"], [])
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tower-dsh/tools/towerctl.py b/tower-dsh/tools/towerctl.py
+index fe2abb6..36b0dec 100644
+--- a/tower-dsh/tools/towerctl.py
++++ b/tower-dsh/tools/towerctl.py
+@@ -20,6 +20,8 @@ from contextlib import contextmanager
+ from datetime import datetime
+ from pathlib import Path
+ 
++import spec_lint
++
+ DEFAULT_ROOT = Path(__file__).resolve().parents[1]
+ TASK_ID_RE = re.compile(r"^[A-Z0-9][A-Z0-9-]{1,40}$")
+ 
+@@ -2063,6 +2065,19 @@ def cmd_verify_ledger(root: Path, args) -> None:
+          0 if not errors else 2)
+ 
+ 
++def cmd_spec_lint(root: Path, args) -> None:
++    directory = Path(args.dir)
++    if not directory.is_absolute():
++        directory = root / directory
++    result = spec_lint.lint_dir(
++        directory,
++        root=root,
++        commands=set(cli_commands()),
++        dir_label=args.dir,
++    )
++    emit(result, 0 if result["ok"] else 2)
++
++
+ def build_parser() -> argparse.ArgumentParser:
+     p = argparse.ArgumentParser(description="Tower/DSH file-backed control-plane CLI")
+     p.add_argument("--root", default=str(DEFAULT_ROOT))
+@@ -2079,6 +2094,9 @@ def build_parser() -> argparse.ArgumentParser:
+     vl.add_argument("--ledger", default="all",
+                     choices=["primary", "supervision", "all"])
+ 
++    sl = sub.add_parser("spec-lint")
++    sl.add_argument("--dir", default="specs")
++
+     hn = sub.add_parser("handoff-new")
+     hn.add_argument("--package", required=True)
+     hn.add_argument("--task", help="task id to capture (default: derived selection)")
+@@ -2177,6 +2195,15 @@ def build_parser() -> argparse.ArgumentParser:
+     return p
+ 
+ 
++def cli_commands() -> list[str]:
++    """Every registered towerctl subcommand, derived from build_parser()."""
++    parser = build_parser()
++    for action in parser._actions:
++        if isinstance(action, argparse._SubParsersAction):
++            return sorted(action.choices)
++    return []
++
++
+ def main() -> None:
+     args = build_parser().parse_args()
+     root = Path(args.root).resolve()
+@@ -2198,6 +2225,7 @@ def main() -> None:
+         "envelope-new": cmd_envelope_new, "queue-add": cmd_queue_add,
+         "merge-check": cmd_merge_check, "merge": cmd_merge, "post-merge": cmd_post_merge,
+         "verify-ledger": cmd_verify_ledger,
++        "spec-lint": cmd_spec_lint,
+     }
+     try:
+         handlers[args.cmd](root, args)
