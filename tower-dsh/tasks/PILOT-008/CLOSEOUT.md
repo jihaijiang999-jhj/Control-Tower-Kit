@@ -18,3 +18,15 @@
 ## Next
 
 merge/handoff decision (owner gate) — not performed in Phase 1
+
+## Post-merge addendum (2026-10-19)
+
+> 上文由 `close` 在合并前生成；“Merge: not performed”是当时事实，**不改写**。
+
+- Envelope: `ENV-PILOT-008`
+- Implementation head: `4ed512ff422c2217b199d6d064daef1fed9a1a01`
+- Merge commit: `09115e3950d2b57fe3c662289ae4173860cc35e5`
+- 合并门：10/10 PASS
+- Post-merge：`POST_MERGE_VERIFIED`（89 tests）
+- 交付：`spec-lint` 支持 `tower/policy@1` + `--strict`；真实塔根普通与 strict 均 6/6 通过
+- 已知非阻断：strict 裸命令正则仅匹配小写 `^[a-z][a-z0-9-]+$`；根目录 md 丢 front matter 会被静默跳过
