@@ -1,0 +1,35 @@
+# PILOT-013 — 让门禁测试 hermetic：CLI 子进程注入 git 身份，空全局配置下全套件仍绿
+
+- Status: `ready`
+- Authority: `workspace_write`
+- Worktree: `pilot/worktrees/PILOT-013`
+
+## Scope
+
+- 修复 test_coverage.run_cli 与 test_hardening2.run_cli：把 GIT_IDENTITY 注入子进程环境，使 towerctl 内部 git merge 不再依赖机器全局 gitconfig
+- 新增 tools/tests/test_git_config_isolation.py：用 mock 断言两个 run_cli 都注入 GIT_AUTHOR_NAME/EMAIL 与 GIT_COMMITTER_NAME/EMAIL 且非空
+- 不改 towerctl.py，不改 CI workflow，不改既有断言语义
+- 只修 scrubbed 运行证明确实需要的 helper，不做顺手重构
+
+## Allowed paths
+
+- `pilot/worktrees/PILOT-013/tower-dsh/tools/tests/test_coverage.py`
+- `pilot/worktrees/PILOT-013/tower-dsh/tools/tests/test_hardening2.py`
+- `pilot/worktrees/PILOT-013/tower-dsh/tools/tests/test_git_config_isolation.py`
+
+## Forbidden
+
+- network
+- external dependencies
+- changes outside the task worktree
+- merge
+- production access
+- changing towerctl.py or the CI workflow
+
+## Acceptance
+
+- 常规全量：python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 157
+- 空全局配置全量：GIT_CONFIG_GLOBAL 与 GIT_CONFIG_SYSTEM 指向同一个空文件时，全套件仍全部通过且 >= 157
+- test_git_config_isolation.py 断言 test_coverage.run_cli 与 test_hardening2.run_cli 注入四个 GIT_* 键且非空；去掉注入即为红
+- spec-coverage 仍 27/27、tool_gaps 为空；spec-lint --strict 仍 6/6
+- git diff --name-only main..HEAD 恰好是三个 allowed 文件；towerctl.py 与 .github/ 零改动

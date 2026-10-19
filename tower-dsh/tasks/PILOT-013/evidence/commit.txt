@@ -1,0 +1,14 @@
+﻿# PILOT-013 commit
+branch: pilot/PILOT-013
+head: 3bc20d6cd2124b5ad2a9d7cba85f788e14cad7c1
+subject: PILOT-013: inject git identity into CLI subprocesses
+
+git show --stat:
+3bc20d6 PILOT-013: inject git identity into CLI subprocesses
+ tower-dsh/tools/tests/test_coverage.py             |  3 +
+ tower-dsh/tools/tests/test_git_config_isolation.py | 96 ++++++++++++++++++++++
+ tower-dsh/tools/tests/test_hardening2.py           |  3 +
+ 3 files changed, 102 insertions(+)
+
+git status --short (after commit):
+?? evidence/

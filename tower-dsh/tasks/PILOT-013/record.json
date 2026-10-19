@@ -1,0 +1,125 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-013",
+  "title": "让门禁测试 hermetic：CLI 子进程注入 git 身份，空全局配置下全套件仍绿",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "修复 test_coverage.run_cli 与 test_hardening2.run_cli：把 GIT_IDENTITY 注入子进程环境，使 towerctl 内部 git merge 不再依赖机器全局 gitconfig",
+    "新增 tools/tests/test_git_config_isolation.py：用 mock 断言两个 run_cli 都注入 GIT_AUTHOR_NAME/EMAIL 与 GIT_COMMITTER_NAME/EMAIL 且非空",
+    "不改 towerctl.py，不改 CI workflow，不改既有断言语义",
+    "只修 scrubbed 运行证明确实需要的 helper，不做顺手重构"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-013/tower-dsh/tools/tests/test_coverage.py",
+    "pilot/worktrees/PILOT-013/tower-dsh/tools/tests/test_hardening2.py",
+    "pilot/worktrees/PILOT-013/tower-dsh/tools/tests/test_git_config_isolation.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "changing towerctl.py or the CI workflow"
+  ],
+  "acceptance": [
+    "常规全量：python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 157",
+    "空全局配置全量：GIT_CONFIG_GLOBAL 与 GIT_CONFIG_SYSTEM 指向同一个空文件时，全套件仍全部通过且 >= 157",
+    "test_git_config_isolation.py 断言 test_coverage.run_cli 与 test_hardening2.run_cli 注入四个 GIT_* 键且非空；去掉注入即为红",
+    "spec-coverage 仍 27/27、tool_gaps 为空；spec-lint --strict 仍 6/6",
+    "git diff --name-only main..HEAD 恰好是三个 allowed 文件；towerctl.py 与 .github/ 零改动"
+  ],
+  "depends_on": [
+    "PILOT-012"
+  ],
+  "worktree": "pilot/worktrees/PILOT-013",
+  "spec_path": "pilot/PILOT-013.spec.json",
+  "spec_sha256": "5b7fea1a16d716692356b29c2c11319962e3942a86b61102d6096ab4e37c2eff",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-pilot-013",
+  "dispatch": {
+    "executor": "subagent:exec-pilot-013",
+    "worktree": "pilot/worktrees/PILOT-013",
+    "at": "2026-10-20T07:37:58+08:00"
+  },
+  "evidence": [
+    {
+      "id": "E-001",
+      "path": "tasks/PILOT-013/evidence/test_coverage.py",
+      "sha256": "10a0d589cad2cd203c388736b0492fd091ed84c7cd32b48e7b3f9dd0ff738f07",
+      "bytes": 45833,
+      "at": "2026-10-20T07:42:53+08:00"
+    },
+    {
+      "id": "E-002",
+      "path": "tasks/PILOT-013/evidence/test_hardening2.py",
+      "sha256": "d576df377163ea28a2f78e6f7bfd406332eaed05e7627e96ec2afc8f3533d629",
+      "bytes": 25357,
+      "at": "2026-10-20T07:42:54+08:00"
+    },
+    {
+      "id": "E-003",
+      "path": "tasks/PILOT-013/evidence/test_git_config_isolation.py",
+      "sha256": "9683dbb9c3e4a2bcf941220373b46fe81252b84155afc60401a7889101cc7891",
+      "bytes": 3228,
+      "at": "2026-10-20T07:42:54+08:00"
+    },
+    {
+      "id": "E-004",
+      "path": "tasks/PILOT-013/evidence/test-output.txt",
+      "sha256": "33346e8384a5f0e0deee5bb586c4621fd65b40db85470379be060a76b2b35cd5",
+      "bytes": 43412,
+      "at": "2026-10-20T07:42:54+08:00"
+    },
+    {
+      "id": "E-005",
+      "path": "tasks/PILOT-013/evidence/test-output-no-gitconfig.txt",
+      "sha256": "27527f2eaf77a8fe42d1c17c6b6a78b30a06a41a7ef7e73ef142489ab0297dcd",
+      "bytes": 21986,
+      "at": "2026-10-20T07:42:54+08:00"
+    },
+    {
+      "id": "E-006",
+      "path": "tasks/PILOT-013/evidence/mutation-check.txt",
+      "sha256": "c3144e2b10de1f004fa3f9569ed00c3741745bb7a467cb6f4aada91a924b23ce",
+      "bytes": 3163,
+      "at": "2026-10-20T07:42:54+08:00"
+    },
+    {
+      "id": "E-007",
+      "path": "tasks/PILOT-013/evidence/commit.txt",
+      "sha256": "8832e5aa3342f3d37f1282a62392822ce39dc09b96e528ea9ac520185e2c51db",
+      "bytes": 531,
+      "at": "2026-10-20T07:42:54+08:00"
+    },
+    {
+      "id": "E-008",
+      "path": "tasks/PILOT-013/evidence/diff.txt",
+      "sha256": "803b6c590a2ab83281ba9d60494d3b3a0002d5d4c4be7114e9afab494409d0bb",
+      "bytes": 5088,
+      "at": "2026-10-20T07:42:54+08:00"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-pilot-013",
+    "verdict": "PASS",
+    "note": "AC-1..AC-5 全 PASS。独立因果复现：git archive main 到 %TEMP%，空 GIT_CONFIG_* 跑出 156 tests / failures=2（正是 CI 上那两个，Committer identity unknown）；HEAD 同条件 158 OK。变异测试：分别删两处注入 -> 对应 guard 各自变红。8 份证据哈希一致；towerctl.py 与 .github/ 零改动。已知缺口：其余 6 个模块的 run_cli 仍未注入（当前不触发成功 merge）；工具侧 git() 仍依赖调用方身份（本卡界定为测试 hermetic，未越权）。",
+    "at": "2026-10-20T07:49:13+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-013",
+    "actor": "owner",
+    "text": "owner approved fixing CI-discovered non-hermetic tests; review PASS",
+    "at": "2026-10-20T07:49:13+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-013/CLOSEOUT.md",
+    "at": "2026-10-20T07:49:13+08:00"
+  },
+  "created_at": "2026-10-20T07:37:58+08:00",
+  "updated_at": "2026-10-20T07:49:13+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-013/MERGE.md",
+  "delivered_at": "2026-10-20T07:42:54+08:00",
+  "accepted_at": "2026-10-20T07:49:13+08:00"
+}

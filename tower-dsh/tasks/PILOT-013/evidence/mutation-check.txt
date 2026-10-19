@@ -1,0 +1,50 @@
+﻿# mutation check: %TEMP% copy with env.update(GIT_IDENTITY) removed from test_coverage.run_cli
+# temp copy: C:\Users\mac\AppData\Local\Temp\pilot013-mutation
+python : test_run_cli_passes_git_identity (test_git_config_isolation.CoverageRunCliIdentityTestCase.test_run_cli_passes
+_git_identity) ... FAIL
+所在位置 行:6 字符: 1
++ python -B -m unittest discover -s tools/tests -p "test_git_config_iso ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (test_run_cli_pa...ntity) ... FAIL:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+test_run_cli_passes_git_identity (test_git_config_isolation.Hardening2RunCliIdentityTestCase.test_run_cli_passes_git_id
+entity) ... ok
+
+======================================================================
+FAIL: test_run_cli_passes_git_identity (test_git_config_isolation.CoverageRunCliIdentityTestCase.test_run_cli_passes_gi
+t_identity)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot013-mutation\tools\tests\test_git_config_isolation.py", line 73, in test_r
+un_cli_passes_git_identity
+    self.assertEqual(
+AssertionError: Lists differ: [] != ['GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'G[37 chars]AIL']
+
+Second list contains 4 additional elements.
+First extra element 0:
+'GIT_AUTHOR_NAME'
+
+- []
++ ['GIT_AUTHOR_NAME',
++  'GIT_AUTHOR_EMAIL',
++  'GIT_COMMITTER_NAME',
++  'GIT_COMMITTER_EMAIL'] : run_cli env is missing non-empty git identity keys ['GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 
+'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL']; env keys present: ['ACSETUPSVCPORT', 'ALLUSERSPROFILE', 'ALL_PROXY', 'APP
+DATA', 'COMMONPROGRAMFILES', 'COMMONPROGRAMFILES(X86)', 'COMMONPROGRAMW6432', 'COMPUTERNAME', 'COMSPEC', 'DRIVERDATA', 
+'DSH_HOME', 'DSH_PROFILE', 'DSH_PROFILE_DIR', 'DSH_SESSION_ID', 'DSH_SHELL', 'DSH_WEB_URL', 'EEBDE7A_LLM_DIRECTOR_COMMA
+ND', 'EEBDE7A_LLM_DIRECTOR_MODEL', 'EFC_11416_1262719628', 'EFC_11416_1592913036', 'EFC_11416_2283032206', 'EFC_11416_2
+775293581', 'EFC_11416_3789132940', 'EFC_11416_4126798990', 'ELECTRON_RUN_AS_NODE', 'FPS_BROWSER_APP_PROFILE_STRING', '
+FPS_BROWSER_USER_PROFILE_STRING', 'GIT_PAGER', 'HOMEDRIVE', 'HOMEPATH', 'HTTPS_PROXY', 'HTTP_PROXY', 'JAVA_HOME', 'LOCA
+LAPPDATA', 'LOGONSERVER', 'MAVEN_HOME', 'NODE_USE_ENV_PROXY', 'NO_COLOR', 'NO_PROXY', 'NUMBER_OF_PROCESSORS', 'ONEDRIVE
+', 'OS', 'PAGER', 'PATH', 'PATHEXT', 'POLYMARKET_CTF_RPC_URL', 'PROCESSOR_ARCHITECTURE', 'PROCESSOR_IDENTIFIER', 'PROCE
+SSOR_LEVEL', 'PROCESSOR_REVISION', 'PROGRAMDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)', 'PROGRAMW6432', 'PSMODULEPATH', 
+'PUBLIC', 'PYTHONIOENCODING', 'PYTHONUTF8', 'RLSSVCPORT', 'SESSIONNAME', 'SYSTEMDRIVE', 'SYSTEMROOT', 'TEMP', 'TMP', 'U
+SERDOMAIN', 'USERDOMAIN_ROAMINGPROFILE', 'USERNAME', 'USERPROFILE', 'VBOX_HWVIRTEX_IGNORE_SVM_IN_USE', 'VOLCENGINE_CODI
+NG_BASE_URL', 'WINDIR']
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.001s
+
+FAILED (failures=1)
+# unittest exit code: 1

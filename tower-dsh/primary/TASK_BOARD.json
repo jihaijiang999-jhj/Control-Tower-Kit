@@ -121,7 +121,17 @@
       "reviewer": "subagent:rev-pilot-012",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-012/MERGE.md",
       "updated_at": "2026-10-20T07:29:29+08:00"
+    },
+    {
+      "id": "PILOT-013",
+      "title": "让门禁测试 hermetic：CLI 子进程注入 git 身份，空全局配置下全套件仍绿",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-013",
+      "reviewer": "subagent:rev-pilot-013",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-013/MERGE.md",
+      "updated_at": "2026-10-20T07:49:13+08:00"
     }
   ],
-  "updated_at": "2026-10-20T07:29:29+08:00"
+  "updated_at": "2026-10-20T07:49:13+08:00"
 }
