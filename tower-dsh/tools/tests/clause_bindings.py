@@ -108,17 +108,21 @@ BINDINGS = {
     "WF-HANDOFF/INV-01": [
         "test_coverage.HandoffInvariantTestCase.test_handoff_claim_rejects_source_controller",
     ],
-    # INV-02: HANDOFF.md / SELF-CHECK.md hashes match the package record.
+    # INV-02: HANDOFF.md / SELF-CHECK.md hashes match the package record;
+    # tampering with either file is detected (both assertions in one test).
     "WF-HANDOFF/INV-02": [
-        "test_coverage.HandoffInvariantTestCase.test_handoff_check_rejects_tampered_handoff_hash",
+        "test_coverage.HandoffInvariantTestCase.test_handoff_check_detects_tampered_handoff_and_selfcheck",
     ],
-    # INV-03: §0 anchors match the values captured at generation time.
+    # INV-03: §0 anchors match the values captured at generation time; the
+    # strengthened test drifts main SHA and queue status together.
     "WF-HANDOFF/INV-03": [
-        "test_coverage.HandoffInvariantTestCase.test_handoff_check_detects_section0_drift",
+        "test_coverage.HandoffInvariantTestCase.test_handoff_check_detects_multiple_section0_drifts",
     ],
-    # INV-04: claim -> receipt -> accept -> activate; no skipping.
+    # INV-04: claim -> receipt -> accept -> activate; no skipping.  Activate
+    # before accept and receipt/accept before claim both fail.
     "WF-HANDOFF/INV-04": [
         "test_coverage.HandoffInvariantTestCase.test_handoff_activate_requires_acceptance",
+        "test_coverage.HandoffInvariantTestCase.test_handoff_receipt_and_accept_before_claim_are_rejected",
     ],
 
     # -- POL-RED-LINES -----------------------------------------------------
@@ -133,16 +137,19 @@ BINDINGS = {
         "test_coverage.PolicyInvariantTestCase.test_merge_rejects_supervisor_equal_primary",
     ],
     # C-14: gate skipping is rejected (dispatch without spec gate, merge
-    # without a queued entry).
+    # without a queued entry) and MERGED alone never counts as completion --
+    # only POST_MERGE_VERIFIED does.
     "POL-RED-LINES/C-14": [
         "test_gates.TowerGateTestCase.test_dispatch_rejects_missing_spec_gate",
         "test_gates.TowerGateTestCase.test_merge_rejects_queue_entry_not_waiting",
+        "test_coverage.CompletionGateTestCase.test_merged_is_not_completion_until_post_merge_verified",
     ],
 
     # -- POL-CHANGE-LEVELS -------------------------------------------------
-    # C-02: L1 changes need a task card, independent review and the merge /
-    # post-merge gates.
+    # C-02: L1 changes need a task card, an independent reviewer (reviewer !=
+    # executor at the envelope gate) and the merge / post-merge gates.
     "POL-CHANGE-LEVELS/C-02": [
+        "test_coverage.MergeInvariantTestCase.test_merge_check_requires_independent_reviewer",
         "test_coverage.PolicyInvariantTestCase.test_envelope_new_requires_accepted_task_and_pass_review",
         "test_post_merge.PostMergeTestCase.test_rejects_envelope_that_was_never_merged",
     ],

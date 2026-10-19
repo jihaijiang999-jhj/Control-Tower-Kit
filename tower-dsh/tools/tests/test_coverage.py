@@ -558,6 +558,189 @@ class MergeInvariantTestCase(unittest.TestCase):
         self.write_record(status="closed", evidence=evidence)
         self.assertFalse(self.check(env, "evidence hashes valid")["ok"])
 
+    # -- POL-CHANGE-LEVELS C-02: the envelope gate itself must require an
+    #    independent reviewer, not just a PASS verdict.
+    def test_merge_check_requires_independent_reviewer(self) -> None:
+        env = self.envelope()
+        (self.root / "supervision" / "envelopes").mkdir(parents=True,
+                                                        exist_ok=True)
+        write_json(self.root / "supervision" / "envelopes" / "ENV-1.json", env)
+        write_json(self.root / "supervision" / "MERGE_QUEUE.json", {
+            "schema": "tower/merge-queue@1",
+            "entries": [{
+                "envelope_id": "ENV-1", "task": MERGE_TASK,
+                "branch": "feature", "base": "main",
+                "status": "WAITING", "added_at": FIXED_TIME,
+            }],
+        })
+        independent = run_cli(self.root, "merge-check", "--envelope", "ENV-1")
+        self.assertEqual(independent.returncode, 0,
+                         msg=independent.stdout + independent.stderr)
+
+        # Same closed task + PASS verdict, but the reviewer is the executor.
+        self.write_record(status="closed",
+                          review={"reviewer": "exec-a", "verdict": "PASS"})
+        rejected = run_cli(self.root, "merge-check", "--envelope", "ENV-1")
+        self.assertEqual(rejected.returncode, 2,
+                         msg=rejected.stdout + rejected.stderr)
+        payload = json.loads(rejected.stdout)
+        self.assertIn("reviewer != executor",
+                      [error["name"] for error in payload["errors"]])
+
+
+# ---------------------------------------------------------------------------
+# POL-RED-LINES C-14 supplementary test: MERGED is not completion
+# ---------------------------------------------------------------------------
+class CompletionGateTestCase(unittest.TestCase):
+    """Only ``POST_MERGE_VERIFIED`` completes an L1 change.
+
+    A successful ``merge`` leaves the envelope ``MERGED``; a failed post-merge
+    verification downgrades it to ``CORRECTION_REQUIRED``; only a passing
+    ``post-merge`` records completion.  This is the C-14 "no completion before
+    POST_MERGE_VERIFIED" gate exercised through the real CLI.
+    """
+
+    TASK = "T-COMPLETE"
+    ENVELOPE = "ENV-COMPLETE"
+    ENVELOPE_PATH = f"merge-envelopes/{ENVELOPE}.json"
+    BRANCH = "feature/complete"
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory(
+            prefix="towerctl-completion-", ignore_cleanup_errors=True)
+        self.kit = Path(self._tmp.name) / "kit"
+        self.root = self.kit / "tower-dsh"
+        for directory in ("primary", "supervision/envelopes", "ledger",
+                          f"tasks/{self.TASK}/evidence", "specs"):
+            (self.root / directory).mkdir(parents=True, exist_ok=True)
+        (self.root / "ledger" / "primary.jsonl").touch()
+        proof = self.root / "tasks" / self.TASK / "evidence" / "proof.txt"
+        proof.write_text("proof\n", encoding="utf-8")
+        write_json(self.root / "tasks" / self.TASK / "record.json", {
+            "schema": "tower/task@1",
+            "id": self.TASK,
+            "title": "completion gate",
+            "status": "accepted",
+            "executor": "exec-a",
+            "review": {"reviewer": "rev-a", "verdict": "PASS"},
+            "evidence": [{
+                "id": "E-001",
+                "path": f"tasks/{self.TASK}/evidence/proof.txt",
+                "sha256": sha256_file(proof),
+                "bytes": proof.stat().st_size,
+                "at": FIXED_TIME,
+            }],
+        })
+        write_json(self.root / "primary" / "CURRENT_STATE.json", {
+            "schema": "tower/current-state@1",
+            "tower_id": "tower-dsh", "role": "primary",
+            "primary": {"id": "ctl-primary"}, "owner": {"name": "mac"},
+            "phase": "TEST",
+        })
+        write_json(self.root / "supervision" / "CURRENT_STATE.json", {
+            "schema": "tower/supervision-state@1",
+            "role": "supervision", "phase": "TEST",
+            "supervisor": {"id": "sup-1"},
+        })
+        write_json(self.root / "supervision" / "MERGE_QUEUE.json", {
+            "schema": "tower/merge-queue@1",
+            "entries": [{
+                "envelope_id": self.ENVELOPE, "task": self.TASK,
+                "branch": self.BRANCH, "base": "main",
+                "status": "WAITING", "added_at": FIXED_TIME,
+            }],
+        })
+        self.init_repo()
+        self.write_envelope()
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def git(self, *args: str) -> subprocess.CompletedProcess:
+        env = dict(os.environ)
+        env.update(GIT_IDENTITY)
+        return subprocess.run(["git", "-C", str(self.kit), *args],
+                              capture_output=True, text=True, encoding="utf-8",
+                              env=env)
+
+    def commit_all(self, message: str) -> str:
+        add = self.git("add", "-A")
+        self.assertEqual(add.returncode, 0, msg=add.stderr)
+        commit = self.git("-c", "commit.gpgsign=false", "commit", "-m", message)
+        self.assertEqual(commit.returncode, 0, msg=commit.stdout + commit.stderr)
+        return self.git("rev-parse", "HEAD").stdout.strip()
+
+    def init_repo(self) -> None:
+        self.kit.mkdir(parents=True, exist_ok=True)
+        self.assertEqual(self.git("init").returncode, 0)
+        self.assertEqual(
+            self.git("symbolic-ref", "HEAD", "refs/heads/main").returncode, 0)
+        (self.kit / "README.md").write_text("base\n", encoding="utf-8")
+        tests_dir = self.kit / "tests"
+        tests_dir.mkdir()
+        (tests_dir / "test_smoke.py").write_text(
+            "import unittest\n\n\n"
+            "class SmokeTest(unittest.TestCase):\n"
+            "    def test_smoke(self):\n"
+            "        self.assertTrue(True)\n",
+            encoding="utf-8",
+        )
+        (self.kit / "merge-envelopes").mkdir()
+        self.commit_all("base")
+        self.assertEqual(self.git("checkout", "-b", self.BRANCH).returncode, 0)
+        (self.kit / "feature.txt").write_text("implementation\n", encoding="utf-8")
+        self.implementation_head = self.commit_all("implementation")
+        write_json(self.kit / self.ENVELOPE_PATH, {"envelope_id": self.ENVELOPE})
+        self.envelope_head = self.commit_all("envelope")
+        self.assertEqual(self.git("checkout", "main").returncode, 0)
+
+    def write_envelope(self) -> None:
+        write_json(self.root / "supervision" / "envelopes"
+                   / f"{self.ENVELOPE}.json", {
+            "schema": "tower/merge-envelope@1",
+            "envelope_id": self.ENVELOPE,
+            "task": self.TASK,
+            "repository": "..",
+            "branch": self.BRANCH,
+            "base": "main",
+            "envelope_path": self.ENVELOPE_PATH,
+            "implementation_head_sha": self.implementation_head,
+            "envelope_head_sha": self.envelope_head,
+            "status": "DRAFT",
+        })
+
+    def envelope(self) -> dict:
+        return read_json(self.root / "supervision" / "envelopes"
+                         / f"{self.ENVELOPE}.json")
+
+    def queue_entry(self) -> dict:
+        queue = read_json(self.root / "supervision" / "MERGE_QUEUE.json")
+        return next(e for e in queue["entries"] if e["envelope_id"] == self.ENVELOPE)
+
+    def test_merged_is_not_completion_until_post_merge_verified(self) -> None:
+        merged = run_cli(self.root, "merge", "--envelope", self.ENVELOPE,
+                         "--role", "supervisor", "--supervisor", "sup-x")
+        self.assertEqual(merged.returncode, 0,
+                         msg=merged.stdout + merged.stderr)
+        # A merge alone is not completion.
+        self.assertEqual(self.envelope()["status"], "MERGED")
+        self.assertEqual(self.queue_entry()["status"], "MERGED")
+
+        self.commit_all("state after merge")
+        failed = run_cli(self.root, "post-merge", "--envelope", self.ENVELOPE,
+                         "--result", "FAIL")
+        self.assertEqual(failed.returncode, 2,
+                         msg=failed.stdout + failed.stderr)
+        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
+
+        self.commit_all("state after failed verification")
+        verified = run_cli(self.root, "post-merge", "--envelope", self.ENVELOPE,
+                           "--result", "PASS")
+        self.assertEqual(verified.returncode, 0,
+                         msg=verified.stdout + verified.stderr)
+        self.assertEqual(self.envelope()["status"], "POST_MERGE_VERIFIED")
+        self.assertEqual(self.queue_entry()["status"], "POST_MERGE_VERIFIED")
+
 
 # ---------------------------------------------------------------------------
 # WF-HANDOFF supplementary clause tests
@@ -593,8 +776,17 @@ class HandoffInvariantTestCase(unittest.TestCase):
         })
         write_json(self.root / "primary" / "TASK_BOARD.json",
                    {"schema": "tower/task-board@1", "tasks": []})
-        write_json(self.root / "supervision" / "MERGE_QUEUE.json",
-                   {"schema": "tower/merge-queue@1", "entries": []})
+        # A verified queue entry makes every §0 anchor available for drift:
+        # main_sha, worktree_head and queue status.
+        write_json(self.root / "supervision" / "MERGE_QUEUE.json", {
+            "schema": "tower/merge-queue@1",
+            "entries": [{
+                "envelope_id": "ENV-1", "task": "T-HANDOFF",
+                "branch": "main", "base": "main",
+                "status": "POST_MERGE_VERIFIED", "added_at": FIXED_TIME,
+                "merge_commit": "a" * 40,
+            }],
+        })
 
         self.repo = self.root / "pilot" / "repo"
         self.assertEqual(run_git(self.repo, "init").returncode, 0)
@@ -651,6 +843,54 @@ class HandoffInvariantTestCase(unittest.TestCase):
         (self.repo / "drift.txt").write_text("drift\n", encoding="utf-8")
         self.commit_all("drift")
         self.assertFalse(self.check(self.package(), "main SHA unchanged")["ok"])
+
+    # -- INV-02 (complete): BOTH package files are hash-checked ----------
+    def test_handoff_check_detects_tampered_handoff_and_selfcheck(self) -> None:
+        pkg = self.package()
+        self.assertTrue(self.check(pkg, "HANDOFF.md hash")["ok"],
+                        msg="fixture must start with intact hashes")
+        self.assertTrue(self.check(pkg, "SELF-CHECK.md hash")["ok"],
+                        msg="fixture must start with intact hashes")
+        for name in ("HANDOFF.md", "SELF-CHECK.md"):
+            path = self.package_dir() / name
+            path.write_text(path.read_text(encoding="utf-8") + "\ntampered\n",
+                            encoding="utf-8")
+        pkg = self.package()
+        self.assertFalse(self.check(pkg, "HANDOFF.md hash")["ok"])
+        self.assertFalse(self.check(pkg, "SELF-CHECK.md hash")["ok"])
+
+    # -- INV-03 (complete): several §0 anchors drift at once -------------
+    def test_handoff_check_detects_multiple_section0_drifts(self) -> None:
+        pkg = self.package()
+        self.assertTrue(self.check(pkg, "main SHA unchanged")["ok"],
+                        msg="fixture must start without drift")
+        self.assertTrue(self.check(pkg, "queue still POST_MERGE_VERIFIED")["ok"],
+                        msg="fixture must start without drift")
+        (self.repo / "drift.txt").write_text("drift\n", encoding="utf-8")
+        self.commit_all("drift")
+        queue_path = self.root / "supervision" / "MERGE_QUEUE.json"
+        queue = read_json(queue_path)
+        queue["entries"][0]["status"] = "WAITING"
+        write_json(queue_path, queue)
+        drifted = self.package()
+        self.assertFalse(self.check(drifted, "main SHA unchanged")["ok"])
+        self.assertFalse(self.check(drifted, "queue still POST_MERGE_VERIFIED")["ok"])
+
+    # -- INV-04 (complete): claim -> receipt -> accept order is enforced
+    def test_handoff_receipt_and_accept_before_claim_are_rejected(self) -> None:
+        receipt = run_cli(self.root, "handoff-receipt", "--package", PACKAGE,
+                          "--controller", "rev-1")
+        self.assertEqual(receipt.returncode, 2,
+                         msg=receipt.stdout + receipt.stderr)
+        self.assertIn("READY_FOR_RECEIVER", receipt.stdout)
+        self.assertFalse((self.package_dir() / "RECEIPT.md").exists())
+
+        accept = run_cli(self.root, "handoff-accept", "--package", PACKAGE,
+                         "--controller", "rev-1")
+        self.assertEqual(accept.returncode, 2, msg=accept.stdout + accept.stderr)
+        self.assertIn("READY_FOR_RECEIVER/RECEIVED", accept.stdout)
+        self.assertFalse((self.package_dir() / "ACCEPTANCE.json").exists())
+        self.assertEqual(self.package()["status"], "PREPARED")
 
     # -- INV-04: activate requires a prior accept ------------------------
     def test_handoff_activate_requires_acceptance(self) -> None:
