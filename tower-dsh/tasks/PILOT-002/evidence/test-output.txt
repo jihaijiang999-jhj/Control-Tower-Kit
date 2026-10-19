@@ -1,0 +1,25 @@
+test_accept_rejects_evidence_hash_mismatch (test_gates.TowerGateTestCase.test_accept_rejects_evidence_hash_mismatch) ... ok
+test_accept_rejects_missing_evidence (test_gates.TowerGateTestCase.test_accept_rejects_missing_evidence) ... ok
+test_accept_then_close_happy_path (test_gates.TowerGateTestCase.test_accept_then_close_happy_path) ... ok
+test_check_ready_rejects_legacy_card_without_spec_path (test_gates.TowerGateTestCase.test_check_ready_rejects_legacy_card_without_spec_path) ... ok
+test_check_ready_rejects_spec_changed_after_gate_pass (test_gates.TowerGateTestCase.test_check_ready_rejects_spec_changed_after_gate_pass) ... ok
+test_check_review_rejects_empty_reviewer (test_gates.TowerGateTestCase.test_check_review_rejects_empty_reviewer) ... ok
+test_check_spec_passes_and_records_gate_for_valid_spec (test_gates.TowerGateTestCase.test_check_spec_passes_and_records_gate_for_valid_spec) ... ok
+test_check_spec_rejects_legacy_card_without_spec_path (test_gates.TowerGateTestCase.test_check_spec_rejects_legacy_card_without_spec_path) ... ok
+test_checkback_normalizes_reviewer (test_gates.TowerGateTestCase.test_checkback_normalizes_reviewer) ... ok
+test_checkback_rejects_reviewer_equal_to_executor (test_gates.TowerGateTestCase.test_checkback_rejects_reviewer_equal_to_executor) ... ok
+test_checkback_rejects_whitespace_only_reviewer (test_gates.TowerGateTestCase.test_checkback_rejects_whitespace_only_reviewer) ... ok
+test_close_rejects_evidence_hash_mismatch (test_gates.TowerGateTestCase.test_close_rejects_evidence_hash_mismatch) ... ok
+test_close_rejects_missing_task_md (test_gates.TowerGateTestCase.test_close_rejects_missing_task_md) ... ok
+test_dispatch_rejects_legacy_card_without_spec_path (test_gates.TowerGateTestCase.test_dispatch_rejects_legacy_card_without_spec_path) ... ok
+test_dispatch_rejects_missing_spec_gate (test_gates.TowerGateTestCase.test_dispatch_rejects_missing_spec_gate) ... ok
+test_dispatch_rejects_missing_task_md (test_gates.TowerGateTestCase.test_dispatch_rejects_missing_task_md) ... ok
+test_dispatch_rejects_spec_changed_after_task_new (test_gates.TowerGateTestCase.test_dispatch_rejects_spec_changed_after_task_new) ... ok
+test_dispatch_succeeds_when_spec_gate_is_fresh (test_gates.TowerGateTestCase.test_dispatch_succeeds_when_spec_gate_is_fresh) ... ok
+test_merge_rejects_current_branch_not_envelope_base (test_gates.TowerGateTestCase.test_merge_rejects_current_branch_not_envelope_base) ... ok
+test_merge_rejects_queue_entry_not_waiting (test_gates.TowerGateTestCase.test_merge_rejects_queue_entry_not_waiting) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 1.502s
+
+OK

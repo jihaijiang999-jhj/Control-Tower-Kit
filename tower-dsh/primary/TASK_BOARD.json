@@ -15,13 +15,13 @@
     {
       "id": "PILOT-002",
       "title": "towerctl 门禁硬化：spec 前置、证据前置、reviewer 非空、merge 分支断言 + 回归测试",
-      "status": "dispatched",
+      "status": "closed",
       "authority": "workspace_write",
       "executor": "subagent:4e3a1640-cff9-4135-8f67-caa396bed7ba",
-      "reviewer": "ctl-phase3-receiver-001",
-      "next": "等待 executor 交付",
-      "updated_at": "2026-10-19T16:36:05+08:00"
+      "reviewer": "subagent:11381940-604b-4d97-90cb-b6a85349a162",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T16:45:02+08:00"
     }
   ],
-  "updated_at": "2026-10-19T16:36:05+08:00"
+  "updated_at": "2026-10-19T16:45:02+08:00"
 }

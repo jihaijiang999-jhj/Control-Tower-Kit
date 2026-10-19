@@ -1,0 +1,2 @@
+643b4e9739594a7ff8bba804af7b114b4c17499f
+PILOT-002: harden towerctl gates + regression tests

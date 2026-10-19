@@ -2,7 +2,7 @@
   "schema": "tower/task@1",
   "id": "PILOT-002",
   "title": "towerctl 门禁硬化：spec 前置、证据前置、reviewer 非空、merge 分支断言 + 回归测试",
-  "status": "dispatched",
+  "status": "closed",
   "authority": "workspace_write",
   "scope": [
     "dispatch 在 spec_gate != PASS 时拒绝；无 spec_path 的卡不再豁免",
@@ -55,18 +55,62 @@
       "sha256": "c71fe91ca9ce140a8f5478aa4f39c78a9a0121e6546d4bdbeb5539aa6313b407",
       "bytes": 525,
       "at": "2026-10-19T16:36:05+08:00"
+    },
+    {
+      "id": "E-002",
+      "path": "tasks/PILOT-002/evidence/towerctl.py",
+      "sha256": "0ab8af4588dafda043213c0f6f3ec10e691a42f29ddf8bc2a58a5478a8f607fa",
+      "bytes": 68024,
+      "at": "2026-10-19T16:41:50+08:00"
+    },
+    {
+      "id": "E-003",
+      "path": "tasks/PILOT-002/evidence/test_gates.py",
+      "sha256": "e49c0afab685050985e3be3ab170f5d4fc16e9f753850471d773920403ffc410",
+      "bytes": 17236,
+      "at": "2026-10-19T16:41:50+08:00"
+    },
+    {
+      "id": "E-004",
+      "path": "tasks/PILOT-002/evidence/test-output.txt",
+      "sha256": "7c242799f9d46b00bd422c6a8214dae618797559ce6e42c8e289191e27d23c22",
+      "bytes": 2694,
+      "at": "2026-10-19T16:41:50+08:00"
+    },
+    {
+      "id": "E-005",
+      "path": "tasks/PILOT-002/evidence/commit.txt",
+      "sha256": "4583acd94199752c9798b836c389406148a67eb557ccb0fc3c3df62d94ea2211",
+      "bytes": 95,
+      "at": "2026-10-19T16:41:50+08:00"
+    },
+    {
+      "id": "E-006",
+      "path": "tasks/PILOT-002/evidence/diff.txt",
+      "sha256": "cea8095d71e09ed488932f4d189e281c6e3249eedf0003e87552c797ce984609",
+      "bytes": 27721,
+      "at": "2026-10-19T16:41:50+08:00"
     }
   ],
   "review": {
-    "reviewer": "ctl-phase3-receiver-001",
-    "verdict": "FAIL",
-    "note": "runtime restart killed executor 16e56411; worktree unchanged; reset for re-dispatch",
-    "at": "2026-10-19T16:36:05+08:00"
+    "reviewer": "subagent:11381940-604b-4d97-90cb-b6a85349a162",
+    "verdict": "PASS",
+    "note": "independent reviewer PASS: 20 tests OK; 9/9 acceptance; 6/6 evidence hashes; scope allowed_paths clean; startup/wiring/handoff-check 21/21 on real state; 8/8 gate probes exit 2",
+    "at": "2026-10-19T16:45:02+08:00"
   },
-  "decision": null,
-  "closeout": null,
+  "decision": {
+    "id": "D-PILOT-002",
+    "actor": "owner",
+    "text": "owner approved all audit recommendations (2026-10-19)",
+    "at": "2026-10-19T16:45:02+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-002/CLOSEOUT.md",
+    "at": "2026-10-19T16:45:02+08:00"
+  },
   "created_at": "2026-10-19T16:18:25+08:00",
-  "updated_at": "2026-10-19T16:36:05+08:00",
-  "next": "等待 executor 交付",
-  "delivered_at": "2026-10-19T16:36:05+08:00"
+  "updated_at": "2026-10-19T16:45:02+08:00",
+  "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+  "delivered_at": "2026-10-19T16:41:50+08:00",
+  "accepted_at": "2026-10-19T16:45:02+08:00"
 }

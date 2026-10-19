@@ -23,3 +23,7 @@
 {"seq": 23, "at": "2026-10-19T16:36:05+08:00", "type": "DELIVER", "actor": "executor", "payload": {"task": "PILOT-002", "evidence": 1}}
 {"seq": 24, "at": "2026-10-19T16:36:05+08:00", "type": "CHECKBACK", "actor": "reviewer", "payload": {"task": "PILOT-002", "reviewer": "ctl-phase3-receiver-001", "verdict": "FAIL"}}
 {"seq": 25, "at": "2026-10-19T16:36:05+08:00", "type": "DISPATCH", "actor": "primary", "payload": {"task": "PILOT-002", "executor": "subagent:4e3a1640-cff9-4135-8f67-caa396bed7ba", "worktree": "pilot/worktrees/PILOT-002"}}
+{"seq": 26, "at": "2026-10-19T16:41:50+08:00", "type": "DELIVER", "actor": "executor", "payload": {"task": "PILOT-002", "evidence": 6}}
+{"seq": 27, "at": "2026-10-19T16:45:02+08:00", "type": "CHECKBACK", "actor": "reviewer", "payload": {"task": "PILOT-002", "reviewer": "subagent:11381940-604b-4d97-90cb-b6a85349a162", "verdict": "PASS"}}
+{"seq": 28, "at": "2026-10-19T16:45:02+08:00", "type": "ACCEPT", "actor": "primary", "payload": {"task": "PILOT-002", "decision": "D-PILOT-002"}}
+{"seq": 29, "at": "2026-10-19T16:45:02+08:00", "type": "CLOSEOUT", "actor": "primary", "payload": {"task": "PILOT-002", "closeout": "tasks/PILOT-002/CLOSEOUT.md"}}
