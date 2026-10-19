@@ -45,8 +45,10 @@
     }
   ],
   "envelope_head_sha": "7f600bc0d80a29fdc57b4108918af5fc91afab29",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "merge_commit": "bc4be8869ec659bd2714a6137db4e77c3319efdd",
   "merged_at": "2026-10-20T07:29:38+08:00",
-  "supervisor": "sup-pilot-012-verify"
+  "supervisor": "sup-pilot-012-verify",
+  "post_merge_at": "2026-10-20T07:30:17+08:00",
+  "post_merge_note": "CI gate workflow + CODEOWNERS; 156 tests"
 }
