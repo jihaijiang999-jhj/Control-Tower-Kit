@@ -108,7 +108,7 @@
 
 | # | 空白 | 现状证据 | 后果 |
 |---|---|---|---|
-| ∅1 | 远端 PR / 分支保护 | 本地 `git merge --no-ff`；无服务端保护 | 无第二人复核闸，无强制 CI |
+| ∅1 | 远端 PR / 分支保护 | CI workflow 已入库（`.github/workflows/tower-gate.yml`，PILOT-012），但**未 push、未开 branch protection**；merge 仍是本地 `git merge --no-ff` | CI 只在推上去之后才跑；本地 merge 仍无人拦 |
 | ∅2 | Console / presets（Phase 4） | 无代码 | 操作全靠 CLI |
 | ∅3 | 多任务并发 | 队列只校验 `entry.status`，不排斥并发 `MERGING`（P1-14） | 并发合并可能写坏 base |
 | ∅4 | 真实项目 pilot | 只有 `pilot/repo` 玩具项目（10 个 worktree） | 未证过接第二个项目 |
@@ -141,10 +141,10 @@
 | 路径越界防护 | `[证]` | `ensure_within` 覆盖 evidence / worktree / package / envelope / repository |
 | ledger 哈希链 | `[证]` | `verify-ledger` → primary 103 事件、supervision 54，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
 | 条款→测试绑定 | `[证]` | `spec-coverage`：6 份规范 / 56 条款 / tool-check 27 / covered **27** / gaps 0 |
-| 测试全绿 | `[证]`（有条件） | `Ran 146 tests / OK`（2026-10-20，PILOT-011 后）。**前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
+| 测试全绿 | `[证]`（有条件） | `Ran 156 tests / OK`（2026-10-20，PILOT-012 后）。**前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
 | 29 条条款靠人 | `[声]` | 12 `review-check` + 17 `owner-gate`（`spec-coverage.manual` / `.owner`） |
 | "每次迭代全局正确" | `[无]` | 无对象层不变量、无趋势锚点、无状态重放 |
-| 11 个任务 / 11 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（PILOT-011：merge `6a849b9`，post-merge 4/4）；kit main `0941f70` |
+| 12 个任务 / 12 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（PILOT-011：`6a849b9`；PILOT-012：`bc4be88`，post-merge 均 4/4）；kit main `e5e2edb` |
 
 ---
 
@@ -189,6 +189,14 @@ envelope-new → FAIL: "base main is ancestor of implementation"
 处置：`git reset --mixed HEAD~1` 撤回**我自己刚做、尚未推送**的状态提交（文件原样保留），让 `main` 回到分支点，再建信封 → 合并 → 最后统一提交状态。没有改写已推送历史，也没有丢文件。
 
 **应写进 `WF-MERGE` 的结论**：状态提交只能在 `merge` 之后（或至少不早于 `envelope-new`）。这是工具没拦、只能靠顺序纪律的地方——正是 ⊙C 想消灭的那类隐式约束。
+
+### 6.3 PILOT-012：门从"人跑"变成"平台跑"（但还没接上锁）
+
+`PILOT-012` 新增 `.github/workflows/tower-gate.yml`：`pull_request` / `push: main` / 手动触发，`windows-latest` + Python 3.12，在 `tower-dsh` 下跑全量测试 + `spec-lint --strict` + `spec-coverage` + `verify-ledger`，`status` 只记录不判红。另加 `.github/CODEOWNERS` 与 10 个回归测试（把 workflow 契约钉死，变异测试可证：删命令/换 runner/去 working-directory/降 Python/移动 `continue-on-error`/去掉 `--strict` 都会红）。
+
+闭环：`cde8f1d`（实现，156 tests）→ `7f600bc`（信封）→ `bc4be88`（merge）→ post-merge 4/4。
+
+**但它现在是"未通电"的**：没有 push，GitHub 上不跑；没有 branch protection，本地 merge 也拦不住。已知盲区（reviewer 记录）：测试只断言"命令文本出现"，注释掉 `run:`、加 `if: false`、接 `|| true` 都抓不到；这类语义必须靠"真的跑一次"来兜底——所以 push + 首次 CI 结果才是这张卡的最终证据。
 
 **同时更正**：`handoff-activate` 把 phase 从 `READY_FOR_PRACTICE` 改为 `HANDOFF_ACTIVE`、`next_action` 改为 `resume from handoffs/HANDOFF-PILOT-002/HANDOFF.md`；§1 主图已按实值更新。
 
