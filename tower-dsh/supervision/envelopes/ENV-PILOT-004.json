@@ -37,8 +37,10 @@
     }
   ],
   "envelope_head_sha": "9278747ca7150ad623c7a8f0d6a59265147f1e2b",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "merge_commit": "a507504b8a3cd99e40dffc93cbfd8e422176002f",
   "merged_at": "2026-10-19T17:21:53+08:00",
-  "supervisor": "sup-phase3-audit"
+  "supervisor": "sup-phase3-audit",
+  "post_merge_at": "2026-10-19T17:22:10+08:00",
+  "post_merge_note": "handoff parameterized; 40 tests"
 }
