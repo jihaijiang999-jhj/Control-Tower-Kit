@@ -1,0 +1,2 @@
+4ed512ff422c2217b199d6d064daef1fed9a1a01
+PILOT-008: lint policy docs + strict mode

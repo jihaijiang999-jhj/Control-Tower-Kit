@@ -1,0 +1,38 @@
+# PILOT-008 — spec-lint 扩展：policy 文档校验 + 严格模式
+
+- Status: `ready`
+- Authority: `workspace_write`
+- Worktree: `pilot/worktrees/PILOT-008`
+
+## Scope
+
+- spec_lint 识别 tower/policy@1：tower 根目录的 RED-LINES.md 与 CHANGE-LEVELS.md 以及 specs/ 下的 policy 文件
+- policy 校验：front matter、id ^POL-[A-Z-]+$、5 个章节、条款 ID C-\d+、级别 MUST/MUST NOT/SHOULD/SHOULD NOT/MAY、enforcement 在图例内、判定方法非空、FM 编号唯一
+- 输出 files 增加 kind: workflow|policy
+- 新增 --strict：表格列数必须与表头一致；表格中间空行视为截断；重复章节号报错；命令列必须是反引号 token 或 —
+- 非严格模式保持现有宽容行为
+- 命令列支持 `towerctl <subcommand>` 形式，取第二个词做校验
+- 新增 tools/tests/test_policy_lint.py 覆盖 policy 与 strict 行为
+
+## Allowed paths
+
+- `pilot/worktrees/PILOT-008/tower-dsh/tools/towerctl.py`
+- `pilot/worktrees/PILOT-008/tower-dsh/tools/spec_lint.py`
+- `pilot/worktrees/PILOT-008/tower-dsh/tools/tests/test_policy_lint.py`
+
+## Forbidden
+
+- network
+- external dependencies
+- changes outside the task worktree
+- merge
+- production access
+
+## Acceptance
+
+- python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 83
+- 对塔根运行 spec-lint 返回 ok=true，files=6（4 workflow + 2 policy），errors=0
+- 缺条款 ID、非法级别、非法 enforcement、空判定方法各自使 exit 2
+- --strict 下裸 | 列错位、表格空行截断、重复章节号、纯文本命令各自使 exit 2
+- 同样夹具在非严格模式下不报错（strict 为 opt-in）
+- startup / wiring / handoff-check --package HANDOFF-PILOT-001 不回归

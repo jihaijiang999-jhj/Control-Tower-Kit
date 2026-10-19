@@ -1,0 +1,114 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-008",
+  "title": "spec-lint 扩展：policy 文档校验 + 严格模式",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "spec_lint 识别 tower/policy@1：tower 根目录的 RED-LINES.md 与 CHANGE-LEVELS.md 以及 specs/ 下的 policy 文件",
+    "policy 校验：front matter、id ^POL-[A-Z-]+$、5 个章节、条款 ID C-\\d+、级别 MUST/MUST NOT/SHOULD/SHOULD NOT/MAY、enforcement 在图例内、判定方法非空、FM 编号唯一",
+    "输出 files 增加 kind: workflow|policy",
+    "新增 --strict：表格列数必须与表头一致；表格中间空行视为截断；重复章节号报错；命令列必须是反引号 token 或 —",
+    "非严格模式保持现有宽容行为",
+    "命令列支持 `towerctl <subcommand>` 形式，取第二个词做校验",
+    "新增 tools/tests/test_policy_lint.py 覆盖 policy 与 strict 行为"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-008/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-008/tower-dsh/tools/spec_lint.py",
+    "pilot/worktrees/PILOT-008/tower-dsh/tools/tests/test_policy_lint.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access"
+  ],
+  "acceptance": [
+    "python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 83",
+    "对塔根运行 spec-lint 返回 ok=true，files=6（4 workflow + 2 policy），errors=0",
+    "缺条款 ID、非法级别、非法 enforcement、空判定方法各自使 exit 2",
+    "--strict 下裸 | 列错位、表格空行截断、重复章节号、纯文本命令各自使 exit 2",
+    "同样夹具在非严格模式下不报错（strict 为 opt-in）",
+    "startup / wiring / handoff-check --package HANDOFF-PILOT-001 不回归"
+  ],
+  "depends_on": [
+    "PILOT-007"
+  ],
+  "worktree": "pilot/worktrees/PILOT-008",
+  "spec_path": "pilot/PILOT-008.spec.json",
+  "spec_sha256": "ea1288a8ad36cfeec742a4c83d186dcec80e45684fdafcfb126da1e0a772fec0",
+  "spec_gate": "PASS",
+  "executor": "subagent:12af8987-2ef2-4913-adfa-2ea01a64e937",
+  "dispatch": {
+    "executor": "subagent:12af8987-2ef2-4913-adfa-2ea01a64e937",
+    "worktree": "pilot/worktrees/PILOT-008",
+    "at": "2026-10-19T18:39:20+08:00"
+  },
+  "evidence": [
+    {
+      "id": "E-001",
+      "path": "tasks/PILOT-008/evidence/towerctl.py",
+      "sha256": "f15d4468665cb869d3d3febf157f664eede19e22b7f4e3f53166a745b4ff87e1",
+      "bytes": 91910,
+      "at": "2026-10-19T18:46:27+08:00"
+    },
+    {
+      "id": "E-002",
+      "path": "tasks/PILOT-008/evidence/spec_lint.py",
+      "sha256": "5eb8e569f23c8a800d1a219b9e1880e6cf3a2050f4ae991168ad49fbda386610",
+      "bytes": 27418,
+      "at": "2026-10-19T18:46:27+08:00"
+    },
+    {
+      "id": "E-003",
+      "path": "tasks/PILOT-008/evidence/test_policy_lint.py",
+      "sha256": "7b7e25163811291967067fbead0df13186051e6adbd9fd4853693f4fa8693985",
+      "bytes": 12770,
+      "at": "2026-10-19T18:46:27+08:00"
+    },
+    {
+      "id": "E-004",
+      "path": "tasks/PILOT-008/evidence/test-output.txt",
+      "sha256": "77a3dc78ccee4f2e04b9e6a4fc18fe26cf657279362f44d703111fb34f8586dc",
+      "bytes": 11502,
+      "at": "2026-10-19T18:46:27+08:00"
+    },
+    {
+      "id": "E-005",
+      "path": "tasks/PILOT-008/evidence/commit.txt",
+      "sha256": "6327f71045033bb36ec2c2b7c249beeadfe2cd273241e792a9184aa7b3cd28a3",
+      "bytes": 85,
+      "at": "2026-10-19T18:46:27+08:00"
+    },
+    {
+      "id": "E-006",
+      "path": "tasks/PILOT-008/evidence/diff.txt",
+      "sha256": "2c81a3fe707f103634ae65784c4261e55cb5d0ebe752d3dcb6493ba9275c165f",
+      "bytes": 36813,
+      "at": "2026-10-19T18:46:27+08:00"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:6dfa3e2b-0e5f-4a5d-9432-7350d5bbdedf",
+    "verdict": "PASS",
+    "note": "independent reviewer PASS: 89 tests; 6/6 acceptance; 6/6 evidence; policy 5/5 invalid fixtures; strict 6/6; real root strict-clean",
+    "at": "2026-10-19T18:54:47+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-008",
+    "actor": "owner",
+    "text": "owner approved policy-lint + strict mode",
+    "at": "2026-10-19T18:54:47+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-008/CLOSEOUT.md",
+    "at": "2026-10-19T18:54:47+08:00"
+  },
+  "created_at": "2026-10-19T18:39:08+08:00",
+  "updated_at": "2026-10-19T18:54:47+08:00",
+  "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+  "delivered_at": "2026-10-19T18:46:27+08:00",
+  "accepted_at": "2026-10-19T18:54:47+08:00"
+}

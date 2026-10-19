@@ -71,7 +71,17 @@
       "reviewer": "subagent:dcfb55f3-6d2d-44cc-bc2a-cf61e8e54a30",
       "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
       "updated_at": "2026-10-19T18:35:37+08:00"
+    },
+    {
+      "id": "PILOT-008",
+      "title": "spec-lint 扩展：policy 文档校验 + 严格模式",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:12af8987-2ef2-4913-adfa-2ea01a64e937",
+      "reviewer": "subagent:6dfa3e2b-0e5f-4a5d-9432-7350d5bbdedf",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T18:54:47+08:00"
     }
   ],
-  "updated_at": "2026-10-19T18:35:37+08:00"
+  "updated_at": "2026-10-19T18:54:47+08:00"
 }
