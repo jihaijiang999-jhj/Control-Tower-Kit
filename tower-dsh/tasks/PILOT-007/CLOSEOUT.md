@@ -18,3 +18,15 @@
 ## Next
 
 merge/handoff decision (owner gate) — not performed in Phase 1
+
+## Post-merge addendum (2026-10-19)
+
+> 上文由 `close` 在合并前生成；“Merge: not performed”是当时事实，**不改写**。
+
+- Envelope: `ENV-PILOT-007`
+- Implementation head: `05c5a46459ff3da78d8d7b18dcd4388cdb675ab1`
+- Merge commit: `b7c8e5ad95872aa8b2c769c1649c4644934ef077`
+- 合并门：10/10 PASS
+- Post-merge：`POST_MERGE_VERIFIED`（71 tests）
+- 交付：`towerctl spec-lint` 上线；真实 `specs/` 4 份规范全部通过
+- 已知非阻断：裸 `|` 列错位、空行截断表格、重复章节号静默合并（仅影响非法 Markdown）

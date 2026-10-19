@@ -41,8 +41,10 @@
     }
   ],
   "envelope_head_sha": "195a45b4a2eeb2e455bdcb8c219f2ccde95e6e4c",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "merge_commit": "b7c8e5ad95872aa8b2c769c1649c4644934ef077",
   "merged_at": "2026-10-19T18:35:42+08:00",
-  "supervisor": "sup-phase3-audit"
+  "supervisor": "sup-phase3-audit",
+  "post_merge_at": "2026-10-19T18:36:04+08:00",
+  "post_merge_note": "spec-lint for workflow specs; 71 tests"
 }
