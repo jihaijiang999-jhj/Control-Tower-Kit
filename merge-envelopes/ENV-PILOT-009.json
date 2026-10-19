@@ -1,0 +1,47 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-009",
+  "task": "PILOT-009",
+  "repository": "..",
+  "branch": "pilot/PILOT-009",
+  "base": "main",
+  "implementation_head_sha": "28f5b20904a862de5f59a17b4edf55d52f178b5e",
+  "envelope_path": "merge-envelopes/ENV-PILOT-009.json",
+  "created_at": "2026-10-19T19:57:26+08:00",
+  "scope": "PILOT-009: clause coverage gate",
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-009/evidence/towerctl.py",
+      "sha256": "7df7e92a7cdfb9ab718787c11ab831c670fd0aa89d58e0dd611e513146e2011d"
+    },
+    {
+      "path": "tasks/PILOT-009/evidence/spec_coverage.py",
+      "sha256": "4ed9c3a84e8bb12f81519d558b85d3cb0f869a6eb3d18dade13eaf9c1c0275e1"
+    },
+    {
+      "path": "tasks/PILOT-009/evidence/clause_bindings.py",
+      "sha256": "d4c0c5c3f6026737e0d5eb7454ec553afc1fb129e7a4b6e203341b5f7558eea6"
+    },
+    {
+      "path": "tasks/PILOT-009/evidence/test_coverage.py",
+      "sha256": "f6b14f4c4bde52205bab9958edfba386bc92b8953d02d88bd035fd21dcfbe4ea"
+    },
+    {
+      "path": "tasks/PILOT-009/evidence/test-output.txt",
+      "sha256": "9026180c9115154d82ff4c3c2d0eb8345699a3f8a5bf77bfa9391fb10669dec2"
+    },
+    {
+      "path": "tasks/PILOT-009/evidence/commit.txt",
+      "sha256": "aec18e1562aa5c61801e79dd0a541ea083326960666382a797333935dc69a37b"
+    },
+    {
+      "path": "tasks/PILOT-009/evidence/diff.txt",
+      "sha256": "81142b46ac2389429a6e088e6f83c96bca4ce77a91df397981e5e33b25459415"
+    }
+  ]
+}
