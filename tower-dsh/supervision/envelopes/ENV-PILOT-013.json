@@ -49,8 +49,10 @@
     }
   ],
   "envelope_head_sha": "f796570e5a0ff43d5e27f051dd1accf9a855bfc6",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "merge_commit": "10bf606b0d87c872e6d9aa6818d3872dba098711",
   "merged_at": "2026-10-20T07:49:35+08:00",
-  "supervisor": "sup-pilot-013-verify"
+  "supervisor": "sup-pilot-013-verify",
+  "post_merge_at": "2026-10-20T07:50:14+08:00",
+  "post_merge_note": "git identity injection; 158 tests"
 }
