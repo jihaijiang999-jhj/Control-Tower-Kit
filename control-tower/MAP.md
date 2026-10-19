@@ -3,6 +3,7 @@
 > 生成者：`ctl-yingxian-qa-001`（接续 controller）· 生成时刻：2026-10-19T23:5x +08:00
 > 性质：**只读快照**。不替代 `tower-dsh/primary/CURRENT_STATE.json`，不构成状态。
 > 修订：2026-10-20T00:5x —— §6 由"漂移"改为"已闭合"，§1 phase 按实值更正，§8 口径同步。
+> 修订：2026-10-20T02:2x —— PILOT-011 落地（authority drift 可观测）；§3/§5/§6/§7 同步，新增 §6.2 排序陷阱。
 > 依据：`startup` / `wiring` / `status` / `handoff-check` / `spec-coverage` / `verify-ledger` 实跑输出 + 代码通读 + git 实值 + 一次测试复跑。
 > 标注约定：`[证]` 有可执行证据 / `[声]` 仅文档或口头声明 / `[无]` 未做 / `⊙` 单点 / `∅` 空白。
 
@@ -94,7 +95,7 @@
 | ⊙Q | `supervision/MERGE_QUEUE.json` | `supervision/` | 唯一合并队列 | 丢失即无法判断在途合并 |
 | ⊙L | `ledger/.lock` | `ledger/` | 串行化并发写 | 竞争写 = 断号/丢事件 |
 | ⊙S | `sup-phase2-pilot` | `supervision/CURRENT_STATE.json` | 只有一个 supervisor 会话；`--role supervisor` 是字符串 | 任何人带参数即可 merge（P1-6） |
-| ⊙C | 手工 commit | 无 | 状态写完后无自动提交步骤 | 本次 handoff 产生 7 个未提交改动；已由 `26d2f6f` 人工闭合（§6），但机制仍在 |
+| ⊙C | 手工 commit | 无 | 状态写完后无自动提交步骤 | 本次 handoff 产生 7 个未提交改动，已由 `26d2f6f` 人工闭合（§6）；**PILOT-011 起 `status`/`startup` 报 `authority_dirty`、`handoff-activate` 报 `commit_required`——能看见，但仍要人提交** |
 | ⊙E | `%TEMP%` ACL | `%TEMP%\dsh-*\` | 134 个测试先在临时目录建塔 | ACL 一变，全套回归 0.056 s 全 ERROR（§5） |
 | ⊙P | Python 3.12.10 + Windows | `HANDOFF.md §3` | 唯一已验环境 | 换环境即"绿"不可复现 |
 | ⊙G | `spec_gate` 单字段 | `record.json` | 一个字段决定 `dispatch` 放行 | 该字段被误写 = 绕过第一道闸 |
@@ -140,10 +141,10 @@
 | 路径越界防护 | `[证]` | `ensure_within` 覆盖 evidence / worktree / package / envelope / repository |
 | ledger 哈希链 | `[证]` | `verify-ledger` → primary 103 事件、supervision 54，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
 | 条款→测试绑定 | `[证]` | `spec-coverage`：6 份规范 / 56 条款 / tool-check 27 / covered **27** / gaps 0 |
-| **134 个测试全绿** | **`[声]` 本次未复现** | 复跑 `python -B -m unittest discover -s tools/tests` → `Ran 134 tests in 0.056s` / `FAILED (errors=134)`，根因 `PermissionError WinError 5` 建 `%TEMP%\dsh-*\kit` 被拒——**环境层先失败，断言层没跑起来** |
+| 测试全绿 | `[证]`（有条件） | `Ran 146 tests / OK`（2026-10-20，PILOT-011 后）。**前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
 | 29 条条款靠人 | `[声]` | 12 `review-check` + 17 `owner-gate`（`spec-coverage.manual` / `.owner`） |
 | "每次迭代全局正确" | `[无]` | 无对象层不变量、无趋势锚点、无状态重放 |
-| 10 个任务 / 10 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`；pilot repo main `9fb5ba2…835db2` |
+| 11 个任务 / 11 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（PILOT-011：merge `6a849b9`，post-merge 4/4）；kit main `0941f70` |
 
 ---
 
@@ -167,6 +168,28 @@
 
 **残余**：闭合靠的是人记得提交，不是工具保证（⊙C / ∅10 仍未解）。本文件以独立 `docs:` 提交入库——地图是投影，不与状态混在一次提交里。
 
+### 6.1 PILOT-011 的闭合（2026-10-20）
+
+把"靠人记得"变成"工具会喊"：`status` / `startup` 新增 `authority_dirty` / `authority_dirty_count`，`handoff-activate` 新增 `commit_required` 与可直接执行的 `commit_hint`；**工具仍不自动 commit**（commit 边界归人）。
+
+全闭环实跑：`task-new → spec-approve → check spec/ready → dispatch → deliver(5 证据) → 独立 reviewer FAIL（AC-8：整个 `handoffs/`/`ledger/` 目录被删时漏报）→ rework → 复验 PASS → accept/close → envelope → queue → merge `6a849b9` → post-merge 4/4`，146 tests。
+
+值得记的两点：返工不是走过场——独立 reviewer 找到的漏报（watched 被 `exists()` 过滤）是真的，executor 自己写的 9 个测试没覆盖它；修复顺带解决了中文路径被 `core.quotepath` 转义的问题。
+
+### 6.2 协议陷阱：状态提交会把 base 推离分支点
+
+`envelope-new` 要求 `main` 是 `implementation_head` 的祖先。若在**建分支之后、建信封之前**把塔状态提交到 `main`，这条立刻不成立：
+
+```
+main:              f65b9f2 → 03889d3 (state: PILOT-011 closed)   ← 我先做了这一步
+pilot/PILOT-011:   f65b9f2 → 5ec4443 (实现) → 608d082 (信封)
+envelope-new → FAIL: "base main is ancestor of implementation"
+```
+
+处置：`git reset --mixed HEAD~1` 撤回**我自己刚做、尚未推送**的状态提交（文件原样保留），让 `main` 回到分支点，再建信封 → 合并 → 最后统一提交状态。没有改写已推送历史，也没有丢文件。
+
+**应写进 `WF-MERGE` 的结论**：状态提交只能在 `merge` 之后（或至少不早于 `envelope-new`）。这是工具没拦、只能靠顺序纪律的地方——正是 ⊙C 想消灭的那类隐式约束。
+
 **同时更正**：`handoff-activate` 把 phase 从 `READY_FOR_PRACTICE` 改为 `HANDOFF_ACTIVE`、`next_action` 改为 `resume from handoffs/HANDOFF-PILOT-002/HANDOFF.md`；§1 主图已按实值更新。
 
 ---
@@ -175,7 +198,7 @@
 
 | 维度 | K3 / SeeMake 塔 | tower-dsh | 谁更强 |
 |---|---|---|---|
-| 项目状态 | `CURRENT`（包号禁令）+ Authority State + v37 包 | `CURRENT_STATE.json` + handoff 包 | K3：多一层窗防呆 |
+| 项目状态 | `CURRENT`（包号禁令）+ Authority State + v37 包 | `CURRENT_STATE.json` + handoff 包 + **`authority_dirty` 检测**（PILOT-011） | K3：多一层窗防呆 |
 | 系统事实冻结 | 画像族：DB / 队列 / 存储 / 部署 / 多用户 / 实施 | **无** | K3 |
 | 不变量可执行性 | 画像多为散文 + 基线与采集脚本 | 27/27 tool-check 有测试、门是 `exit 2` | **木塔** |
 | 趋势治理 | 锚点 + 周测 diff + 熔断 + 重锚 | **无** | K3 |
