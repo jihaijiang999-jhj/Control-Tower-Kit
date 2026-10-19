@@ -1,0 +1,43 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-008",
+  "task": "PILOT-008",
+  "repository": "..",
+  "branch": "pilot/PILOT-008",
+  "base": "main",
+  "implementation_head_sha": "4ed512ff422c2217b199d6d064daef1fed9a1a01",
+  "envelope_path": "merge-envelopes/ENV-PILOT-008.json",
+  "created_at": "2026-10-19T18:54:53+08:00",
+  "scope": "PILOT-008: policy lint + strict mode",
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-008/evidence/towerctl.py",
+      "sha256": "f15d4468665cb869d3d3febf157f664eede19e22b7f4e3f53166a745b4ff87e1"
+    },
+    {
+      "path": "tasks/PILOT-008/evidence/spec_lint.py",
+      "sha256": "5eb8e569f23c8a800d1a219b9e1880e6cf3a2050f4ae991168ad49fbda386610"
+    },
+    {
+      "path": "tasks/PILOT-008/evidence/test_policy_lint.py",
+      "sha256": "7b7e25163811291967067fbead0df13186051e6adbd9fd4853693f4fa8693985"
+    },
+    {
+      "path": "tasks/PILOT-008/evidence/test-output.txt",
+      "sha256": "77a3dc78ccee4f2e04b9e6a4fc18fe26cf657279362f44d703111fb34f8586dc"
+    },
+    {
+      "path": "tasks/PILOT-008/evidence/commit.txt",
+      "sha256": "6327f71045033bb36ec2c2b7c249beeadfe2cd273241e792a9184aa7b3cd28a3"
+    },
+    {
+      "path": "tasks/PILOT-008/evidence/diff.txt",
+      "sha256": "2c81a3fe707f103634ae65784c4261e55cb5d0ebe752d3dcb6493ba9275c165f"
+    }
+  ]
+}
