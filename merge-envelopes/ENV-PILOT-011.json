@@ -1,0 +1,39 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-011",
+  "task": "PILOT-011",
+  "repository": "..",
+  "branch": "pilot/PILOT-011",
+  "base": "main",
+  "implementation_head_sha": "5ec4443e4e6ca3d92741cd767b3c1df661081b8c",
+  "envelope_path": "merge-envelopes/ENV-PILOT-011.json",
+  "created_at": "2026-10-20T01:50:38+08:00",
+  "scope": "PILOT-011: authority drift surfacing (status/startup/activate)",
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-011/evidence/towerctl.py",
+      "sha256": "c8e6b994af2bc9e18bd99fc7435bc87ebe762f846407090b2afdb7b42d0e9a1d"
+    },
+    {
+      "path": "tasks/PILOT-011/evidence/test_authority_drift.py",
+      "sha256": "9b339e17dbd3f80decd0ec742fb2c359490e2a4b16c48f08e2a30e7564f015b3"
+    },
+    {
+      "path": "tasks/PILOT-011/evidence/test-output.txt",
+      "sha256": "82d88d45e59588a06f5decb0ffac1ccc00ded0bab9cad57717dda0e40460b84f"
+    },
+    {
+      "path": "tasks/PILOT-011/evidence/commit.txt",
+      "sha256": "5fd3af4c3b800660f210a89bf94c9416a9c4e3bb4a73987517046eb4af825fdd"
+    },
+    {
+      "path": "tasks/PILOT-011/evidence/diff.txt",
+      "sha256": "1093657d454948605dff02259f04888ab4e13e39a1c046f2c8569f527c068a00"
+    }
+  ]
+}

@@ -541,6 +541,84 @@ def working_tree_state(root: Path, repo: Path) -> tuple[list[str], list[str]]:
     return dirty, ignored
 
 
+# Authority state that a caller is expected to commit in the surrounding git
+# repository.  ``status``/``startup`` report it, ``handoff-activate`` hints at
+# the commit; towerctl itself never commits (the commit boundary stays human).
+AUTHORITY_STATE_DIRS = ("primary", "supervision", "ledger", "handoffs", "shared")
+
+
+def authority_repo(root: Path) -> Path | None:
+    """Return the git top-level that contains ``root``, or None.
+
+    None means "not inside a git repository" (or the tower root resolved
+    outside the reported top-level), in which case authority drift cannot be
+    computed at all.
+    """
+    cp = git(root, "rev-parse", "--show-toplevel")
+    if cp.returncode != 0:
+        return None
+    top = cp.stdout.strip()
+    if not top:
+        return None
+    repo = Path(top)
+    if repo_relative(repo, root) is None:
+        return None
+    return repo
+
+
+def authority_drift(root: Path) -> list[str] | None:
+    """Uncommitted authority-state paths, relative to the repository root.
+
+    Returns ``None`` when the tower root is not inside a git repository, so a
+    caller can distinguish "unknown" from "clean" (``[]``).  Tool-owned output
+    directories (``supervision/reviews``, ``supervision/outbox``) are excluded
+    because post-merge writes them itself.
+    """
+    repo = authority_repo(root)
+    if repo is None:
+        return None
+    root_rel = repo_relative(repo, root) or ""
+    base = "" if root_rel in ("", ".") else root_rel + "/"
+    # Every authority directory is a pathspec, whether or not it still exists:
+    # a pathspec also matches tracked paths that were deleted from the working
+    # tree, so removing e.g. ``handoffs/`` wholesale is still reported.  A
+    # missing directory with nothing tracked under it simply matches nothing.
+    watched = [base + name for name in AUTHORITY_STATE_DIRS]
+    # ``--untracked-files=all`` keeps a brand-new package directory from
+    # collapsing into a single ``handoffs/<id>/`` entry, so the reported list
+    # (and the commit hint built from it) names every file.  ``quotepath`` is
+    # disabled so non-ASCII paths come back literally and the reported path
+    # (and the hint built from it) is actually usable.
+    cp = git(repo, "-c", "core.quotepath=false", "status", "--porcelain",
+             "--untracked-files=all", "--", *watched)
+    if cp.returncode != 0:
+        return None
+    owned = tool_owned_paths(root, repo)
+    drift: list[str] = []
+    for line in cp.stdout.splitlines():
+        if not line.strip():
+            continue
+        path = status_path(line)
+        if not path:
+            continue
+        if any(path == prefix or path.startswith(prefix + "/") for prefix in owned):
+            continue
+        drift.append(path)
+    return drift
+
+
+def authority_commit_hint(root: Path, drift: list[str]) -> str:
+    """Shell-ready ``git add``/``git commit`` hint, or "" when nothing drifts."""
+    repo = authority_repo(root)
+    if not drift or repo is None:
+        return ""
+    paths = " ".join(f'"{p}"' if " " in p else p for p in drift)
+    message = f"handoff: record activated authority state ({len(drift)} file(s))"
+    repo_posix = repo.as_posix()
+    return (f'git -C "{repo_posix}" add -- {paths} && '
+            f'git -C "{repo_posix}" commit -m "{message}"')
+
+
 def load_supervision(root: Path) -> dict:
     path = root / "supervision" / "CURRENT_STATE.json"
     if not path.exists():
@@ -717,9 +795,11 @@ def cmd_startup(root: Path, args) -> None:
     if errors:
         fail(errors)
     board = load_board(root)
+    drift = authority_drift(root)
     emit({"ok": True, "tower_id": state.get("tower_id"), "role": state.get("role"),
           "phase": state.get("phase"), "primary": state.get("primary"),
-          "tasks": len(board.get("tasks", [])), "next_action": state.get("next_action")})
+          "tasks": len(board.get("tasks", [])), "next_action": state.get("next_action"),
+          "authority_dirty_count": None if drift is None else len(drift)})
 
 
 SPEC_SCHEMA = "tower/spec@1"
@@ -1751,8 +1831,12 @@ def cmd_handoff_activate(root: Path, args) -> None:
     jdump(pkg_path, pkg)
     append_ledger(root, "HANDOFF_ACTIVATE", "receiver",
                   {"package": args.package, "controller": args.controller})
+    drift = authority_drift(root)
+    commit_required = bool(drift)
     emit({"ok": True, "package": args.package, "status": "ACTIVE",
-          "controller": args.controller})
+          "controller": args.controller,
+          "commit_required": commit_required,
+          "commit_hint": authority_commit_hint(root, drift or [])})
 
 
 def cmd_handoff_status(root: Path, args) -> None:
@@ -2160,9 +2244,12 @@ def cmd_phase(root: Path, args) -> None:
 def cmd_status(root: Path, args) -> None:
     state = jload(root / "primary" / "CURRENT_STATE.json")
     board = load_board(root)
+    drift = authority_drift(root)
     emit({"ok": True, "tower": state.get("tower_id"), "role": state.get("role"),
           "phase": state.get("phase"), "next_action": state.get("next_action"),
-          "tasks": board.get("tasks", [])})
+          "tasks": board.get("tasks", []),
+          "authority_dirty": drift,
+          "authority_dirty_count": None if drift is None else len(drift)})
 
 
 def verify_ledger_file(root: Path, name: str) -> dict:
