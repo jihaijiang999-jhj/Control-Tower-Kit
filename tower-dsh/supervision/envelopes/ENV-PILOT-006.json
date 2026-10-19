@@ -37,8 +37,10 @@
     }
   ],
   "envelope_head_sha": "56d996e4b0cfdc6a0fe216d2241a897b0a3bde3e",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "merge_commit": "edbb8092cf8f894638e688d7122387492c614721",
   "merged_at": "2026-10-19T17:50:48+08:00",
-  "supervisor": "sup-phase3-audit"
+  "supervisor": "sup-phase3-audit",
+  "post_merge_at": "2026-10-19T17:51:09+08:00",
+  "post_merge_note": "Windows lock race fixed; 58 tests incl. 20-round stress"
 }

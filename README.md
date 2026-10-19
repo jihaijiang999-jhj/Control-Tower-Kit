@@ -43,7 +43,8 @@ python tools/towerctl.py supervision-status
 ## 当前状态
 
 - Phase 3：`HANDOFF-PILOT-001` ACTIVE，controller `ctl-phase3-receiver-001`
-- 任务：`PILOT-001` … `PILOT-005` 全部 `closed` 且 `POST_MERGE_VERIFIED`
+- 任务：`PILOT-001` … `PILOT-006` 全部 `closed` 且 `POST_MERGE_VERIFIED`
+- 测试：58 个（门禁 / handoff / post-merge / ledger 链 / Windows 锁并发）
 - 门禁：spec 强制、证据强制、reviewer 非空、merge 分支断言（PILOT-002）
 - post-merge：清洁检查先于写 review，可从 `CORRECTION_REQUIRED` 重试（PILOT-003）
 - handoff：按 task/envelope 参数化，无写死（PILOT-004）

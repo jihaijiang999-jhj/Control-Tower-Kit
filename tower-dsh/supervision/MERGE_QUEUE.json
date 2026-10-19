@@ -51,10 +51,10 @@
       "task": "PILOT-006",
       "branch": "pilot/PILOT-006",
       "base": "main",
-      "status": "MERGED",
+      "status": "POST_MERGE_VERIFIED",
       "added_at": "2026-10-19T17:50:48+08:00",
       "merge_commit": "edbb8092cf8f894638e688d7122387492c614721"
     }
   ],
-  "updated_at": "2026-10-19T17:50:48+08:00"
+  "updated_at": "2026-10-19T17:51:09+08:00"
 }

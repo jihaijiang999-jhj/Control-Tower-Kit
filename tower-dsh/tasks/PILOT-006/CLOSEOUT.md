@@ -17,3 +17,16 @@
 ## Next
 
 merge/handoff decision (owner gate) — not performed in Phase 1
+
+## Post-merge addendum (2026-10-19)
+
+> 上文由 `close` 在合并前生成；“Merge: not performed”是当时事实，**不改写**。
+
+- Envelope: `ENV-PILOT-006`
+- Implementation head: `bea3ba9bdf5171841bfc2fdf8424f7cb67164634`
+- Merge commit: `edbb8092cf8f894638e688d7122387492c614721`
+- 合并门：10/10 PASS
+- Post-merge：`POST_MERGE_VERIFIED`（58 tests）
+- 修复：Windows `O_CREAT|O_EXCL` 在待删除窗口返回 `PermissionError(13)` 导致的并发锁竞态
+- 对比：修复前 20/800 次 append 失败（12/20 轮），修复后 0 失败；根级 harness 连跑 10/10 通过
+- 已知边界（记入 backlog）：若目录 ACL 持续拒绝创建锁文件且 `.lock` 不存在，重试循环可能绕过 deadline 忙等
