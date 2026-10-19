@@ -14,7 +14,9 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import uuid
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -63,38 +65,203 @@ def rel(root: Path, path: Path) -> str:
         return str(path.resolve())
 
 
+GENESIS_PREV_HASH = "GENESIS"
+LEDGER_FILES = {"primary": "primary.jsonl", "supervision": "supervision.jsonl"}
+LEDGER_LOCK_TIMEOUT = 10.0
+LEDGER_LOCK_STALE_AFTER = 60.0
+LEDGER_LOCK_POLL_INTERVAL = 0.05
+
+
+class LedgerLockTimeout(RuntimeError):
+    """Raised when the single-writer ledger lock cannot be acquired in time."""
+
+
+def canonical_event_bytes(event: dict) -> bytes:
+    """Canonical bytes hashed for an event.
+
+    The ``hash`` field itself is excluded; every other field (including
+    ``prev_hash``) is serialised as compact, key-sorted, non-ASCII-escaped
+    JSON and encoded as UTF-8.
+    """
+    body = {k: v for k, v in event.items() if k != "hash"}
+    return json.dumps(body, ensure_ascii=False, sort_keys=True,
+                      separators=(",", ":")).encode("utf-8")
+
+
+def event_hash(event: dict) -> str:
+    return hashlib.sha256(canonical_event_bytes(event)).hexdigest()
+
+
+def ledger_rows(path: Path) -> list[bytes]:
+    """Raw content bytes of each non-blank JSONL row, terminator excluded.
+
+    Only ``\\n`` (optionally preceded by ``\\r``) is treated as a row
+    terminator; ``bytes.splitlines`` is deliberately avoided because UTF-8
+    continuation bytes such as ``0x85`` would be misread as line breaks.
+    """
+    if not path.exists():
+        return []
+    data = path.read_bytes()
+    if not data:
+        return []
+    raw_rows = data.split(b"\n")
+    if raw_rows and raw_rows[-1] == b"":
+        raw_rows.pop()
+    rows = []
+    for raw in raw_rows:
+        if raw.endswith(b"\r"):
+            raw = raw[:-1]
+        if raw.strip():
+            rows.append(raw)
+    return rows
+
+
+def legacy_anchor(raw_row: bytes) -> str:
+    """SHA-256 of a legacy row's raw content bytes (no hash on that row)."""
+    return hashlib.sha256(raw_row).hexdigest()
+
+
+def parse_ledger_row(raw_row: bytes):
+    """Parse a raw ledger row, returning ``None`` when it is not valid JSON."""
+    try:
+        event = json.loads(raw_row.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return None
+    return event if isinstance(event, dict) else None
+
+
+def prev_hash_for_rows(rows: list[bytes]) -> str:
+    """prev_hash for the next event given the existing rows of a ledger."""
+    if not rows:
+        return GENESIS_PREV_HASH
+    last = parse_ledger_row(rows[-1])
+    if last is not None:
+        recorded = last.get("hash")
+        if isinstance(recorded, str) and recorded:
+            return recorded
+    return legacy_anchor(rows[-1])
+
+
+def ledger_lock_path(root: Path) -> Path:
+    return root / "ledger" / ".lock"
+
+
+def _clear_stale_lock(path: Path, stale_after: float) -> bool:
+    """Remove an over-age lock file; returns True when the caller may retry."""
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        return True
+    if time.time() - stat.st_mtime <= stale_after:
+        return False
+    # Displace atomically so two waiters cannot both break the same lock.
+    displaced = path.with_name(f"{path.name}.stale.{os.getpid()}.{time.time_ns()}")
+    try:
+        os.replace(path, displaced)
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+    try:
+        displaced.unlink()
+    except OSError:
+        pass
+    print(f"warning: removed stale ledger lock {path}", file=sys.stderr)
+    return True
+
+
+def _acquire_lock_file(path: Path, timeout: float, stale_after: float) -> None:
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            fd = None
+        if fd is not None:
+            try:
+                os.write(fd, f"pid={os.getpid()} at={now()}\n".encode("utf-8"))
+            finally:
+                os.close(fd)
+            return
+        if _clear_stale_lock(path, stale_after):
+            continue
+        if time.monotonic() >= deadline:
+            raise LedgerLockTimeout(
+                f"ledger write lock busy for more than {timeout:g}s: {path}")
+        time.sleep(LEDGER_LOCK_POLL_INTERVAL)
+
+
+def _release_lock_file(path: Path, identity) -> None:
+    try:
+        current = path.stat()
+    except FileNotFoundError:
+        return
+    if identity is not None and (current.st_dev, current.st_ino) != (
+            identity.st_dev, identity.st_ino):
+        # The lock was broken and re-taken by somebody else; leave it alone.
+        return
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+
+
+@contextmanager
+def ledger_lock(root: Path, timeout: float | None = None,
+                stale_after: float | None = None):
+    """Single-writer lock around the read-max(seq)+append critical section."""
+    path = ledger_lock_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    limit = LEDGER_LOCK_TIMEOUT if timeout is None else timeout
+    stale = LEDGER_LOCK_STALE_AFTER if stale_after is None else stale_after
+    _acquire_lock_file(path, limit, stale)
+    try:
+        identity = path.stat()
+    except FileNotFoundError:
+        identity = None
+    try:
+        yield path
+    finally:
+        _release_lock_file(path, identity)
+
+
+def _append_ledger_event(root: Path, filename: str, event_type: str,
+                         actor: str, payload: dict) -> dict:
+    ledger = root / "ledger" / filename
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    with ledger_lock(root):
+        rows = ledger_rows(ledger)
+        seq = 0
+        for raw in rows:
+            parsed = parse_ledger_row(raw)
+            if parsed is None:
+                continue
+            try:
+                seq = max(seq, int(parsed.get("seq", 0)))
+            except (TypeError, ValueError):
+                continue
+        event = {
+            "seq": seq + 1,
+            "at": now(),
+            "type": event_type,
+            "actor": actor,
+            "payload": payload,
+            "prev_hash": prev_hash_for_rows(rows),
+        }
+        event["hash"] = event_hash(event)
+        # Binary append keeps the line terminator LF on every platform.
+        with ledger.open("ab") as fh:
+            fh.write((json.dumps(event, ensure_ascii=False) + "\n").encode("utf-8"))
+    return event
+
+
 def append_ledger(root: Path, event_type: str, actor: str, payload: dict) -> dict:
-    ledger = root / "ledger" / "primary.jsonl"
-    ledger.parent.mkdir(parents=True, exist_ok=True)
-    seq = 0
-    if ledger.exists():
-        for line in ledger.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                try:
-                    seq = max(seq, int(json.loads(line).get("seq", 0)))
-                except Exception:
-                    continue
-    event = {"seq": seq + 1, "at": now(), "type": event_type, "actor": actor, "payload": payload}
-    with ledger.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(event, ensure_ascii=False) + "\n")
-    return event
+    return _append_ledger_event(root, LEDGER_FILES["primary"], event_type, actor, payload)
 
 
-def append_supervision_ledger(root: Path, event_type: str, actor: str, payload: dict) -> dict:
-    ledger = root / "ledger" / "supervision.jsonl"
-    ledger.parent.mkdir(parents=True, exist_ok=True)
-    seq = 0
-    if ledger.exists():
-        for line in ledger.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                try:
-                    seq = max(seq, int(json.loads(line).get("seq", 0)))
-                except Exception:
-                    continue
-    event = {"seq": seq + 1, "at": now(), "type": event_type, "actor": actor, "payload": payload}
-    with ledger.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(event, ensure_ascii=False) + "\n")
-    return event
+def append_supervision_ledger(root: Path, event_type: str, actor: str,
+                              payload: dict) -> dict:
+    return _append_ledger_event(root, LEDGER_FILES["supervision"], event_type, actor, payload)
 
 
 def task_dir(root: Path, tid: str) -> Path:
@@ -1815,6 +1982,67 @@ def cmd_status(root: Path, args) -> None:
           "tasks": board.get("tasks", [])})
 
 
+def verify_ledger_file(root: Path, name: str) -> dict:
+    """Validate one ledger file: JSON, seq continuity, hashes and prev links."""
+    path = root / "ledger" / LEDGER_FILES[name]
+    rows = ledger_rows(path)
+    result = {
+        "path": rel(root, path),
+        "exists": path.exists(),
+        "events": 0,
+        "legacy_unhashed": 0,
+        "errors": [],
+    }
+    expected_seq = 1
+    expected_prev = GENESIS_PREV_HASH
+    chain_started = False
+    for row_no, raw in enumerate(rows, 1):
+        event = parse_ledger_row(raw)
+        if event is None:
+            result["errors"].append(f"row {row_no}: not a valid JSON object")
+            expected_prev = legacy_anchor(raw)
+            expected_seq += 1
+            continue
+        result["events"] += 1
+        seq = event.get("seq")
+        if not isinstance(seq, int) or isinstance(seq, bool):
+            result["errors"].append(f"row {row_no}: seq missing or not an integer")
+        elif seq != expected_seq:
+            result["errors"].append(
+                f"row {row_no}: seq {seq} != expected {expected_seq}")
+        expected_seq += 1
+        if "hash" in event:
+            chain_started = True
+            if event.get("prev_hash") != expected_prev:
+                result["errors"].append(
+                    f"row {row_no}: prev_hash {event.get('prev_hash')!r} != expected {expected_prev!r}")
+            if event.get("hash") != event_hash(event):
+                result["errors"].append(f"row {row_no}: hash mismatch (event tampered)")
+            recorded = event.get("hash")
+            expected_prev = recorded if isinstance(recorded, str) and recorded \
+                else legacy_anchor(raw)
+        else:
+            if chain_started:
+                result["errors"].append(
+                    f"row {row_no}: unhashed event after the hash chain started")
+            else:
+                result["legacy_unhashed"] += 1
+            expected_prev = legacy_anchor(raw)
+    return result
+
+
+def cmd_verify_ledger(root: Path, args) -> None:
+    names = ["primary", "supervision"] if args.ledger == "all" else [args.ledger]
+    files = {}
+    errors = []
+    for name in names:
+        report = verify_ledger_file(root, name)
+        files[name] = report
+        errors.extend(f"{name}: {err}" for err in report["errors"])
+    emit({"ok": not errors, "files": files, "errors": errors},
+         0 if not errors else 2)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Tower/DSH file-backed control-plane CLI")
     p.add_argument("--root", default=str(DEFAULT_ROOT))
@@ -1827,6 +2055,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("supervision-init")
     sub.add_parser("supervision-status")
     sub.add_parser("handoff-status")
+    vl = sub.add_parser("verify-ledger")
+    vl.add_argument("--ledger", default="all",
+                    choices=["primary", "supervision", "all"])
 
     hn = sub.add_parser("handoff-new")
     hn.add_argument("--package", required=True)
@@ -1946,8 +2177,12 @@ def main() -> None:
         "handoff-status": cmd_handoff_status,
         "envelope-new": cmd_envelope_new, "queue-add": cmd_queue_add,
         "merge-check": cmd_merge_check, "merge": cmd_merge, "post-merge": cmd_post_merge,
+        "verify-ledger": cmd_verify_ledger,
     }
-    handlers[args.cmd](root, args)
+    try:
+        handlers[args.cmd](root, args)
+    except LedgerLockTimeout as exc:
+        fail([str(exc)])
 
 
 if __name__ == "__main__":
