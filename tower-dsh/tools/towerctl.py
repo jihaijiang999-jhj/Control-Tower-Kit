@@ -789,20 +789,241 @@ def cmd_close(root: Path, args) -> None:
           "closeout": rel(root, closeout)})
 
 
-def current_snapshot(root: Path) -> dict:
+def _latest_by(items: list[dict], field: str) -> dict:
+    """Return the item whose ``field`` timestamp is newest (empty if none)."""
+    if not items:
+        return {}
+
+    def sort_key(item: dict) -> float:
+        raw = str(item.get(field) or "")
+        try:
+            return datetime.fromisoformat(raw).timestamp()
+        except Exception:
+            return float("-inf")
+
+    return max(items, key=sort_key)
+
+
+def select_task(board: dict, task_id: str | None = None) -> dict:
+    """Pick the task a handoff is about.
+
+    An explicit ``task_id`` wins.  Otherwise a single non-closed task is used;
+    with several non-closed tasks the most recently updated one wins, and when
+    every task is closed the most recently updated task overall is used.
+    """
+    tasks = [t for t in (board.get("tasks") or []) if isinstance(t, dict)]
+    if task_id:
+        return next((t for t in tasks if t.get("id") == task_id), {})
+    open_tasks = [t for t in tasks if t.get("status") != "closed"]
+    if len(open_tasks) == 1:
+        return open_tasks[0]
+    if open_tasks:
+        return _latest_by(open_tasks, "updated_at")
+    return _latest_by(tasks, "updated_at")
+
+
+def select_envelope(queue: dict, envelope_id: str | None = None) -> dict:
+    """Pick the merge-queue entry a handoff is about.
+
+    An explicit ``envelope_id`` wins; a single queued entry is used as-is;
+    otherwise the entry with the newest ``added_at`` wins.
+    """
+    entries = [e for e in (queue.get("entries") or []) if isinstance(e, dict)]
+    if envelope_id:
+        return next((e for e in entries if e.get("envelope_id") == envelope_id), {})
+    if len(entries) == 1:
+        return entries[0]
+    return _latest_by(entries, "added_at")
+
+
+def load_profile(root: Path) -> dict:
+    path = root / "shared" / "PROJECT_PROFILE.json"
+    if not path.exists():
+        return {}
+    try:
+        return jload(path)
+    except Exception:
+        return {}
+
+
+def _profile_base(root: Path, profile: dict) -> Path:
+    """Base for ``pilot.repo`` / ``pilot.worktree`` declared in the profile.
+
+    The profile records the tower root it belongs to; a worktree copy of the
+    tower keeps that absolute value, so resolving the declared pilot paths
+    against it points at the real pilot instead of the copy.
+    """
+    declared = profile.get("tower_root")
+    if declared:
+        try:
+            candidate = Path(str(declared))
+            if candidate.is_dir():
+                return candidate
+        except OSError:
+            pass
+    return root
+
+
+def _profile_worktree_matches_task(pilot: dict, worktree: str, task_id: str) -> bool:
+    """Only use the profile worktree when it belongs to the selected task."""
+    if not worktree:
+        return False
+    if not task_id:
+        return True
+    declared_task = str(pilot.get("task") or "").strip()
+    if declared_task:
+        return declared_task == task_id
+    return Path(worktree).name == task_id
+
+
+def resolve_pilot_paths(root: Path, record: dict, profile: dict,
+                        task_id: str) -> tuple[Path | None, Path | None]:
+    """Resolve the pilot repo and worktree for the selected task.
+
+    ``PROJECT_PROFILE.pilot.repo`` / ``pilot.worktree`` win when present.  The
+    profile worktree is only used when it belongs to the selected task;
+    otherwise the task's own ``record.worktree`` wins, so a handoff never
+    points at another task's worktree.  Missing values fall back to the record
+    and finally to the conventional ``pilot/worktrees/<task>`` path.
+    """
+    pilot = profile.get("pilot") or {}
+    profile_base = _profile_base(root, profile)
+
+    repo_value = str(pilot.get("repo") or "").strip()
+    repo_base = profile_base
+    if not repo_value:
+        repo_value = str(record.get("repo") or "").strip()
+        repo_base = root
+    if not repo_value:
+        repo_value = "pilot/repo"
+        repo_base = root
+
+    worktree_value = ""
+    worktree_base = root
+    profile_worktree = str(pilot.get("worktree") or "").strip()
+    if _profile_worktree_matches_task(pilot, profile_worktree, task_id):
+        worktree_value = profile_worktree
+        worktree_base = profile_base
+    if not worktree_value:
+        worktree_value = str(record.get("worktree") or "").strip()
+        worktree_base = root
+    if not worktree_value and task_id:
+        worktree_value = f"pilot/worktrees/{task_id}"
+        worktree_base = root
+
+    def join(base: Path, value: str) -> Path | None:
+        if not value:
+            return None
+        path = Path(value)
+        return path if path.is_absolute() else base / path
+
+    return join(repo_base, repo_value), join(worktree_base, worktree_value)
+
+
+def _optional_git(repo: Path | None, *args: str) -> str:
+    """Run git best-effort: a missing path or git failure yields ``""``."""
+    if repo is None:
+        return ""
+    try:
+        if not repo.exists():
+            return ""
+        return git_ok(repo, *args)
+    except Exception:
+        return ""
+
+
+def _optional_git_status(repo: Path | None) -> str:
+    """``clean`` / porcelain text, or ``""`` when git/path is unavailable."""
+    if repo is None or not repo.exists():
+        return ""
+    try:
+        cp = git(repo, "status", "--porcelain")
+    except Exception:
+        return ""
+    if cp.returncode != 0:
+        return ""
+    return cp.stdout.strip() or "clean"
+
+
+def _load_optional_record(root: Path, task_id: str) -> dict:
+    if not task_id:
+        return {}
+    path = task_record_path(root, task_id)
+    if not path.exists():
+        return {}
+    try:
+        return jload(path)
+    except Exception:
+        return {}
+
+
+def match_task_by_evidence(root: Path, state: dict) -> str | None:
+    """Match a legacy package (no ``task`` field) to a task by evidence hashes.
+
+    Returns the task id whose record contains every ``(path, sha256)`` pair
+    recorded in the package's ``state.evidence``; when no record matches
+    completely, the task with the largest overlap wins; no overlap returns
+    ``None`` so the caller can fall back to the default selection.
+    """
+    wanted = {(e.get("path"), e.get("sha256"))
+              for e in (state.get("evidence") or []) if e.get("path")}
+    if not wanted:
+        return None
+    best_id: str | None = None
+    best_score = 0
+    for task in load_board(root).get("tasks", []):
+        tid = task.get("id") or ""
+        if not tid:
+            continue
+        record = _load_optional_record(root, tid)
+        have = {(e.get("path"), e.get("sha256"))
+                for e in (record.get("evidence") or [])}
+        score = len(wanted & have)
+        if score > best_score:
+            best_score, best_id = score, tid
+        if wanted <= have:
+            return tid
+    return best_id if best_score else None
+
+
+def envelope_for_task(root: Path, task_id: str) -> str:
+    """Best-effort envelope id for a task (legacy packages carry no envelope)."""
+    if not task_id:
+        return ""
+    entries = [e for e in load_queue(root).get("entries", [])
+               if isinstance(e, dict) and e.get("task") == task_id]
+    if not entries:
+        return ""
+    entry = _latest_by(entries, "added_at") if len(entries) > 1 else entries[0]
+    return str(entry.get("envelope_id") or "")
+
+
+def current_snapshot(root: Path, task_id: str | None = None,
+                     envelope_id: str | None = None) -> dict:
+    """Capture live tower state for the selected task / envelope.
+
+    Task and envelope selection is explicit-id first, then single-candidate,
+    then most-recently-updated.  Repo/worktree come from the project profile
+    (falling back to the task record), and git is best-effort: an unavailable
+    repository or worktree yields ``""`` instead of raising.
+    """
     state = jload(root / "primary" / "CURRENT_STATE.json")
     supervision = load_supervision(root)
     board = load_board(root)
-    task = next((t for t in board.get("tasks", []) if t.get("id") == "PILOT-001"), {})
-    rec = load_record(root, "PILOT-001") if (root / "tasks" / "PILOT-001" / "record.json").exists() else {}
     queue = load_queue(root)
-    entry = next((e for e in queue.get("entries", []) if e.get("envelope_id") == "ENV-PILOT-001"), {})
-    repo = root / "pilot" / "repo"
-    worktree = root / "pilot" / "worktrees" / "PILOT-001"
-    main_sha = git_ok(repo, "rev-parse", "main")
-    worktree_head = git_ok(worktree, "rev-parse", "HEAD")
-    repo_status = git(repo, "status", "--porcelain").stdout.strip()
-    worktree_status = git(worktree, "status", "--porcelain").stdout.strip()
+    task = select_task(board, task_id)
+    selected_task = str(task.get("id") or "")
+    record = _load_optional_record(root, selected_task)
+    entry = select_envelope(queue, envelope_id)
+    selected_envelope = str(entry.get("envelope_id") or "")
+    profile = load_profile(root)
+    repo, worktree = resolve_pilot_paths(root, record, profile, selected_task)
+    evidence = [{"path": e.get("path"), "sha256": e.get("sha256")}
+                for e in (record.get("evidence") or [])]
+    open_tasks = [{"id": t.get("id"), "status": t.get("status"),
+                   "next": t.get("next") or ""}
+                  for t in (board.get("tasks") or [])
+                  if isinstance(t, dict) and t.get("status") != "closed"]
     ledger = root / "ledger" / "primary.jsonl"
     ledger_seq = 0
     if ledger.exists():
@@ -818,16 +1039,25 @@ def current_snapshot(root: Path) -> dict:
         "primary_id": (state.get("primary") or {}).get("id"),
         "supervisor_id": (supervision.get("supervisor") or {}).get("id"),
         "supervision_phase": supervision.get("phase"),
-        "main_sha": main_sha,
-        "worktree_head": worktree_head,
-        "repo_status": repo_status or "clean",
-        "worktree_status": worktree_status or "clean",
-        "task_status": rec.get("status", task.get("status")),
-        "task_next": rec.get("next", task.get("next")),
-        "queue_status": entry.get("status"),
+        "owner": (state.get("owner") or {}).get("name") or "",
+        "next_action": state.get("next_action") or "",
+        "task_id": selected_task,
+        "task_status": record.get("status") or task.get("status") or "",
+        "task_next": record.get("next") or task.get("next") or "",
+        "task_evidence_count": len(record.get("evidence") or []),
+        "envelope_id": selected_envelope,
+        "queue_status": entry.get("status") or "",
         "merge_commit": entry.get("merge_commit") or "",
-        "evidence": [{"path": e.get("path"), "sha256": e.get("sha256")}
-                     for e in (rec.get("evidence") or [])],
+        "main_sha": _optional_git(repo, "rev-parse", "main"),
+        "worktree_head": _optional_git(worktree, "rev-parse", "HEAD"),
+        "repo_status": _optional_git_status(repo),
+        "worktree_status": _optional_git_status(worktree),
+        "tower_root": str(root.resolve()),
+        "repo": str(repo) if repo is not None else "",
+        "worktree": str(worktree) if worktree is not None else "",
+        "python": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        "open_tasks": open_tasks,
+        "evidence": evidence,
         "ledger_seq": ledger_seq,
         "captured_at": now(),
     }
@@ -857,7 +1087,17 @@ def handoff_checks(root: Path, package_id: str, pkg: dict) -> list[dict]:
         path = pkgdir / name
         if path.exists():
             add(f"{name} hash", sha256_file(path) == files.get(name), files.get(name, ""))
-    snap = current_snapshot(root)
+    # New packages carry the task/envelope they were generated for.  Legacy
+    # packages (e.g. HANDOFF-PILOT-001) predate those fields: match them back
+    # to a task by evidence hashes, then fall back to the default selection.
+    pkg_task = str(pkg.get("task") or "").strip()
+    if not pkg_task:
+        pkg_task = match_task_by_evidence(root, pkg.get("state") or {}) or ""
+    pkg_envelope = str(pkg.get("envelope") or "").strip()
+    if not pkg_envelope and pkg_task:
+        pkg_envelope = envelope_for_task(root, pkg_task)
+    snap = current_snapshot(root, task_id=pkg_task or None,
+                            envelope_id=pkg_envelope or None)
     expected = pkg.get("state") or {}
     add("main SHA unchanged", snap["main_sha"] == expected.get("main_sha"),
         f"{snap['main_sha']} vs {expected.get('main_sha')}")
@@ -876,11 +1116,38 @@ def cmd_handoff_new(root: Path, args) -> None:
     pkgdir = root / "handoffs" / package_id
     if pkgdir.exists():
         fail([f"handoff package already exists: {package_id}"])
+    snap = current_snapshot(root, task_id=args.task, envelope_id=args.envelope)
+    if args.task and not snap["task_id"]:
+        fail([f"task not found for --task {args.task}"])
+    if args.envelope and not snap["envelope_id"]:
+        fail([f"envelope not found for --envelope {args.envelope}"])
     pkgdir.mkdir(parents=True)
-    snap = current_snapshot(root)
+
+    task_id = snap["task_id"]
+    envelope_id = snap["envelope_id"]
     evidence_rows = "\n".join(
         f"| `{e['path']}` | `{e['sha256']}` |" for e in snap["evidence"]
-    )
+    ) or "| （无） | （无） |"
+    if task_id:
+        task_line = (f"任务 `{task_id}` 状态 `{snap['task_status'] or 'unknown'}`"
+                     f"（next：{snap['task_next'] or '—'}）")
+    else:
+        task_line = "任务：未选择（TASK_BOARD 为空或显式查询未命中）"
+    if envelope_id:
+        queue_line = (f"合并队列 `{envelope_id}` 状态 "
+                      f"`{snap['queue_status'] or 'unknown'}`（merge commit："
+                      f"`{snap['merge_commit'] or '—'}`）")
+    else:
+        queue_line = "合并队列：空"
+    section1 = f"主塔 phase `{snap['phase'] or 'unknown'}`；{task_line}；{queue_line}。"
+    open_lines = "\n".join(
+        f"- `{t['id']}` — `{t['status']}` — {t.get('next') or '—'}"
+        for t in snap["open_tasks"]
+    ) or "- 无在途任务。"
+    task_card = f"tasks/{task_id}/TASK.md" if task_id else "—"
+    closeout = f"tasks/{task_id}/CLOSEOUT.md" if task_id else "—"
+    in_flight = (f"当前 {len(snap['open_tasks'])} 项在途" if snap["open_tasks"]
+                 else "当前无在途")
     handoff_md = f"""# tower-dsh 交接上下文包 — {package_id}
 
 > 项目：Tower/DSH · 机制：project-handoff v2.1 · 装配路径：塔台直写
@@ -895,14 +1162,16 @@ def cmd_handoff_new(root: Path, args) -> None:
 | primary id | `{snap['primary_id']}` |
 | supervisor id | `{snap['supervisor_id']}` |
 | supervision phase | `{snap['supervision_phase']}` |
+| task id | `{task_id or '—'}` |
+| envelope id | `{envelope_id or '—'}` |
 | main SHA | `{snap['main_sha']}` |
 | worktree head | `{snap['worktree_head']}` |
 | repo status | `{snap['repo_status']}` |
 | worktree status | `{snap['worktree_status']}` |
-| task status | `{snap['task_status']}` |
-| task next | `{snap['task_next']}` |
-| merge queue | `{snap['queue_status']}` |
-| merge commit | `{snap['merge_commit']}` |
+| task status | `{snap['task_status'] or '—'}` |
+| task next | `{snap['task_next'] or '—'}` |
+| merge queue | `{snap['queue_status'] or '—'}` |
+| merge commit | `{snap['merge_commit'] or '—'}` |
 | primary ledger seq | `{snap['ledger_seq']}` |
 
 ### 证据锚点
@@ -913,11 +1182,11 @@ def cmd_handoff_new(root: Path, args) -> None:
 
 ## §0a 材料漂移警示
 
-NONE（无阻断性漂移；已知非阻断项：merge envelope 的证据列表 5 项，task record 6 项，含 `commit.txt`）。
+NONE（无阻断性漂移；证据锚点：package {len(snap['evidence'])} 项，所选 task record {snap['task_evidence_count']} 项）。
 
 ## §1 30 秒版现状
 
-Phase 2 双塔已验证：`PILOT-001` 已合并并 `POST_MERGE_VERIFIED`；merge commit `{snap['merge_commit']}`；post-merge 14 tests OK；主塔与监督塔状态均为已验证。下一步是 Phase 3 handoff 或真实项目 pilot。
+{section1}
 
 ## §2 接续读序
 
@@ -929,23 +1198,22 @@ Phase 2 双塔已验证：`PILOT-001` 已合并并 `POST_MERGE_VERIFIED`；merge
 6. `supervision/CURRENT_STATE.json`
 7. `primary/TASK_BOARD.json`
 8. `supervision/MERGE_QUEUE.json`
-9. `tasks/PILOT-001/CLOSEOUT.md`
+9. `{closeout}`
 10. `ledger/primary.jsonl` 与 `ledger/supervision.jsonl`
 
 ## §3 运行时操作手册
 
-- Tower root：`{root}`
-- Pilot repo：`pilot/repo`（main）
-- Pilot worktree：`pilot/worktrees/PILOT-001`
-- Python：3.12；测试：`python -B -m unittest discover -s tests -v`
+- Tower root：`{snap['tower_root']}`
+- Pilot repo：`{snap['repo'] or '（未配置）'}`
+- Pilot worktree：`{snap['worktree'] or '（未配置）'}`
+- Python：{snap['python']}；测试：`python -B -m unittest discover -s tools/tests -v`
 - CLI：`python tools/towerctl.py <command>`
 - 不读凭据、不调用生产、不部署；所有状态经 `towerctl`。
 
 ## §4 在途任务队列
 
-- 无在途任务。
-- 下一动作：owner 选择 Phase 3 handoff 完成后接真实项目 pilot，或补远端 PR/分支保护。
-- 待 owner 输入：下一个真实任务/项目。
+{open_lines}
+- 下一动作：{snap['next_action'] or '—'}
 
 ## §4a 调研/方案/未实现需求资产登记
 
@@ -957,7 +1225,7 @@ Phase 2 双塔已验证：`PILOT-001` 已合并并 `POST_MERGE_VERIFIED`；merge
 
 ## §5 owner 偏好与裁决档案
 
-- Owner：`mac`。
+- Owner：`{snap['owner'] or '—'}`。
 - 四闸永远归 owner：merge / 外部调用 / 部署·生产数据 / L0 文档写 main。
 - Primary 不 merge；Supervision 独占合并队列。
 - 生产轨 `no_access`；本 pilot 未碰生产。
@@ -967,7 +1235,7 @@ Phase 2 双塔已验证：`PILOT-001` 已合并并 `POST_MERGE_VERIFIED`；merge
 
 - 本地 git 合并，不是远端 PR；无服务端分支保护。
 - `--role supervisor` 是程序性分离，不是密码学身份。
-- merge envelope 证据列表 5 项，task record 6 项（`commit.txt` 未列）。
+- 证据锚点以 package 与 task record 各自的列表为准，两侧条目数可能不同（如 `commit.txt` 可能只登记在 record 中）。
 - Windows CRLF 警告属正常；控制台中文可能显示乱码，文件本身 UTF-8。
 - 不要手改 `primary/`、`supervision/`、`ledger/`；用 `towerctl`。
 
@@ -982,8 +1250,8 @@ Phase 2 双塔已验证：`PILOT-001` 已合并并 `POST_MERGE_VERIFIED`；merge
 | 监督塔状态 | `supervision/CURRENT_STATE.json` |
 | 合并队列 | `supervision/MERGE_QUEUE.json` |
 | 合并账本 | `supervision/registries/merge-ledger.json` |
-| 任务卡 | `tasks/PILOT-001/TASK.md` |
-| 收口 | `tasks/PILOT-001/CLOSEOUT.md` |
+| 任务卡 | `{task_card}` |
+| 收口 | `{closeout}` |
 | Ledger | `ledger/primary.jsonl`、`ledger/supervision.jsonl` |
 
 **四闸：merge / 外部调用 / 部署·生产数据 / L0 文档写 main。**
@@ -993,7 +1261,7 @@ Phase 2 双塔已验证：`PILOT-001` 已合并并 `POST_MERGE_VERIFIED`；merge
 
 - [x] 无未释放的锁/残留工作树/残留进程端口
 - [x] 唯一真相源已更新到最新，在途项都有“下一步”
-- [x] 在途任务卡每张有明确状态（当前无在途）
+- [x] 在途任务卡每张有明确状态（{in_flight}）
 - [x] 高危操作处于完整闸点，无半截（本 pilot 无生产动作）
 - [x] 待 owner 输入项已汇总进 §4
 - [x] 本窗调研/方案/未实现需求已登记进 §4a
@@ -1011,6 +1279,8 @@ Phase 2 双塔已验证：`PILOT-001` 已合并并 `POST_MERGE_VERIFIED`；merge
         "assembly_path": "tower_direct",
         "created_at": now(),
         "source_controller": snap["primary_id"],
+        "task": task_id,
+        "envelope": envelope_id,
         "status": "PREPARED",
         "files": {
             "HANDOFF.md": sha256_file(pkgdir / "HANDOFF.md"),
@@ -1022,9 +1292,10 @@ Phase 2 双塔已验证：`PILOT-001` 已合并并 `POST_MERGE_VERIFIED`；merge
     }
     jdump(pkgdir / "package.json", pkg)
     append_ledger(root, "HANDOFF_NEW", "primary",
-                  {"package": package_id, "source": snap["primary_id"]})
+                  {"package": package_id, "source": snap["primary_id"],
+                   "task": task_id, "envelope": envelope_id})
     emit({"ok": True, "package": package_id, "dir": rel(root, pkgdir),
-          "files": pkg["files"]})
+          "task": task_id, "envelope": envelope_id, "files": pkg["files"]})
 
 
 def cmd_handoff_check(root: Path, args) -> None:
@@ -1559,6 +1830,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     hn = sub.add_parser("handoff-new")
     hn.add_argument("--package", required=True)
+    hn.add_argument("--task", help="task id to capture (default: derived selection)")
+    hn.add_argument("--envelope", help="merge-queue envelope id (default: derived selection)")
 
     hc = sub.add_parser("handoff-check")
     hc.add_argument("--package", required=True)
