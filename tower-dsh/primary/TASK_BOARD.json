@@ -101,7 +101,17 @@
       "reviewer": "subagent:92bab935-b241-4a3e-aa17-58d68106244e",
       "next": "merged via ENV-PILOT-010; POST_MERGE_VERIFIED; hardening 2 complete",
       "updated_at": "2026-10-19T22:43:52+08:00"
+    },
+    {
+      "id": "PILOT-011",
+      "title": "权威状态脏检测：status/startup 报告未提交的权威状态，handoff-activate 提示提交",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-011",
+      "reviewer": "subagent:rev-pilot-011",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-011/MERGE.md",
+      "updated_at": "2026-10-20T01:50:28+08:00"
     }
   ],
-  "updated_at": "2026-10-19T22:43:52+08:00"
+  "updated_at": "2026-10-20T01:50:28+08:00"
 }
