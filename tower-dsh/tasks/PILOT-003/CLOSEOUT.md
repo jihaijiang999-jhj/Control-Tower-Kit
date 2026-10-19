@@ -17,3 +17,15 @@
 ## Next
 
 merge/handoff decision (owner gate) — not performed in Phase 1
+
+## Post-merge addendum (2026-10-19)
+
+> 上文由 `close` 在合并前生成；“Merge: not performed”是当时事实，**不改写**。
+
+- Envelope: `ENV-PILOT-003`
+- Implementation head: `d2a68b2e3449c7da8269d460b30dba0f2a5fd993`
+- Envelope head: `5a6a36e73cbe4b84b982b0eb8c12a81bb3cb5b9f`
+- Merge commit: `8ac9ba29ebe50d2f009f4fcf0eea022f08fd9e9c`
+- 合并门：10/10 PASS
+- Post-merge：`POST_MERGE_VERIFIED`（26 tests，exit 0）
+- 本卡修复 P1-13：post-merge 清洁检查先于写 review，且允许从 `CORRECTION_REQUIRED` 重试

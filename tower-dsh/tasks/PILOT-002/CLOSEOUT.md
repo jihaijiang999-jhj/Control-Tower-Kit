@@ -30,4 +30,4 @@ merge/handoff decision (owner gate) — not performed in Phase 1
 - 合并执行：`merge --role supervisor --supervisor sup-phase3-audit`，使用**硬化后的 towerctl**（断言 `HEAD == main`）
 - 合并门：10/10 PASS
 - 复核：独立 reviewer `subagent:11381940-604b-4d97-90cb-b6a85349a162` PASS（20 tests，9/9 验收，6/6 证据，范围合规）
-- Post-merge：见 `supervision/reviews/ENV-PILOT-002-post-merge.txt`
+- Post-merge：`POST_MERGE_VERIFIED`（经 PILOT-003 修复后**重试成功**；首次因工具“先写 review 再查干净”被锁为 `CORRECTION_REQUIRED`，失败事件保留在 `ledger/supervision.jsonl`）
