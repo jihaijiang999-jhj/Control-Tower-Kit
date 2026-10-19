@@ -20,6 +20,8 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
+import spec_lint
+
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 TASK_ID_RE = re.compile(r"^[A-Z0-9][A-Z0-9-]{1,40}$")
 
@@ -2063,6 +2065,19 @@ def cmd_verify_ledger(root: Path, args) -> None:
          0 if not errors else 2)
 
 
+def cmd_spec_lint(root: Path, args) -> None:
+    directory = Path(args.dir)
+    if not directory.is_absolute():
+        directory = root / directory
+    result = spec_lint.lint_dir(
+        directory,
+        root=root,
+        commands=set(cli_commands()),
+        dir_label=args.dir,
+    )
+    emit(result, 0 if result["ok"] else 2)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Tower/DSH file-backed control-plane CLI")
     p.add_argument("--root", default=str(DEFAULT_ROOT))
@@ -2078,6 +2093,9 @@ def build_parser() -> argparse.ArgumentParser:
     vl = sub.add_parser("verify-ledger")
     vl.add_argument("--ledger", default="all",
                     choices=["primary", "supervision", "all"])
+
+    sl = sub.add_parser("spec-lint")
+    sl.add_argument("--dir", default="specs")
 
     hn = sub.add_parser("handoff-new")
     hn.add_argument("--package", required=True)
@@ -2177,6 +2195,15 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def cli_commands() -> list[str]:
+    """Every registered towerctl subcommand, derived from build_parser()."""
+    parser = build_parser()
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            return sorted(action.choices)
+    return []
+
+
 def main() -> None:
     args = build_parser().parse_args()
     root = Path(args.root).resolve()
@@ -2198,6 +2225,7 @@ def main() -> None:
         "envelope-new": cmd_envelope_new, "queue-add": cmd_queue_add,
         "merge-check": cmd_merge_check, "merge": cmd_merge, "post-merge": cmd_post_merge,
         "verify-ledger": cmd_verify_ledger,
+        "spec-lint": cmd_spec_lint,
     }
     try:
         handlers[args.cmd](root, args)
