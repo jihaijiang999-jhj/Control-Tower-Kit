@@ -58,16 +58,17 @@ spec 是任务卡的来源，也是闭环的第一道闸。规则：
 9. `tools/towerctl.py` — 唯一状态/门禁 CLI；
 10. `RED-LINES.md` — 红线清单（触碰即停）；
 11. `CHANGE-LEVELS.md` — 变更分级 L0–L3；
-12. `AUDIT-2026-10-19.md` — 首次全面体检与缺口清单。
+12. `AUDIT-2026-10-19.md` — 首次全面体检与缺口清单；
+13. `specs/WF-TASK|MERGE|HANDOFF|LEDGER.md` — 四条工作流规范（`tower/workflow@1`）。
 
-## 当前 pilot
+## 当前状态
 
-- Task: `PILOT-001` — Ledger SHA-256 哈希链模块与篡改检测
-- Repo: `pilot/repo` (git)
-- Worktree: `pilot/worktrees/PILOT-001`
-- Phase 1: closed（未 merge）
-- Phase 2: `ENV-PILOT-001` 已由监督塔合并，`POST_MERGE_VERIFIED`
-- Phase 3: `HANDOFF-PILOT-001` 已激活，controller `ctl-phase3-receiver-001`
+- 代号：**应县木塔 / Yingxian**（`YX-001`）
+- 任务：`PILOT-001` … `PILOT-006` 全部 `closed`；6 个 envelope 全部 `POST_MERGE_VERIFIED`
+- Phase 3：`HANDOFF-PILOT-001` ACTIVE，controller `ctl-phase3-receiver-001`
+- 门禁：spec 强制 / 证据强制 / merge 分支断言 / post-merge 可重试 / handoff 参数化 / ledger 哈希链
+- 工作流规范：`specs/WF-TASK.md`、`WF-MERGE.md`、`WF-HANDOFF.md`、`WF-LEDGER.md`
+- 已知 backlog：`AUDIT-2026-10-19.md` §8
 
 ## 四闸
 
