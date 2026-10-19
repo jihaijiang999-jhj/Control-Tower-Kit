@@ -21,7 +21,17 @@
       "reviewer": "subagent:11381940-604b-4d97-90cb-b6a85349a162",
       "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
       "updated_at": "2026-10-19T16:45:02+08:00"
+    },
+    {
+      "id": "PILOT-003",
+      "title": "post-merge 修复：清洁检查先于写 review，且允许从 CORRECTION_REQUIRED 重试",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:a7474492-5d9f-4ccb-ba30-51826c4f6e24",
+      "reviewer": "subagent:70e01687-6426-4ff7-ac79-1d6d24c0d10e",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T16:57:25+08:00"
     }
   ],
-  "updated_at": "2026-10-19T16:45:02+08:00"
+  "updated_at": "2026-10-19T16:57:25+08:00"
 }

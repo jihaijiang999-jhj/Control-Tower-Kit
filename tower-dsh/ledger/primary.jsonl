@@ -27,3 +27,11 @@
 {"seq": 27, "at": "2026-10-19T16:45:02+08:00", "type": "CHECKBACK", "actor": "reviewer", "payload": {"task": "PILOT-002", "reviewer": "subagent:11381940-604b-4d97-90cb-b6a85349a162", "verdict": "PASS"}}
 {"seq": 28, "at": "2026-10-19T16:45:02+08:00", "type": "ACCEPT", "actor": "primary", "payload": {"task": "PILOT-002", "decision": "D-PILOT-002"}}
 {"seq": 29, "at": "2026-10-19T16:45:02+08:00", "type": "CLOSEOUT", "actor": "primary", "payload": {"task": "PILOT-002", "closeout": "tasks/PILOT-002/CLOSEOUT.md"}}
+{"seq": 30, "at": "2026-10-19T16:47:13+08:00", "type": "TASK_NEW", "actor": "primary", "payload": {"task": "PILOT-003", "title": "post-merge 修复：清洁检查先于写 review，且允许从 CORRECTION_REQUIRED 重试"}}
+{"seq": 31, "at": "2026-10-19T16:47:13+08:00", "type": "SPEC_APPROVED", "actor": "mac", "payload": {"task": "PILOT-003", "by": "mac", "note": "owner approved audit fix plan"}}
+{"seq": 32, "at": "2026-10-19T16:47:14+08:00", "type": "CHECK", "actor": "primary", "payload": {"task": "PILOT-003", "phase": "spec", "ok": true}}
+{"seq": 33, "at": "2026-10-19T16:47:22+08:00", "type": "DISPATCH", "actor": "primary", "payload": {"task": "PILOT-003", "executor": "subagent:a7474492-5d9f-4ccb-ba30-51826c4f6e24", "worktree": "pilot/worktrees/PILOT-003"}}
+{"seq": 34, "at": "2026-10-19T16:50:47+08:00", "type": "DELIVER", "actor": "executor", "payload": {"task": "PILOT-003", "evidence": 5}}
+{"seq": 35, "at": "2026-10-19T16:57:25+08:00", "type": "CHECKBACK", "actor": "reviewer", "payload": {"task": "PILOT-003", "reviewer": "subagent:70e01687-6426-4ff7-ac79-1d6d24c0d10e", "verdict": "PASS"}}
+{"seq": 36, "at": "2026-10-19T16:57:25+08:00", "type": "ACCEPT", "actor": "primary", "payload": {"task": "PILOT-003", "decision": "D-PILOT-003"}}
+{"seq": 37, "at": "2026-10-19T16:57:25+08:00", "type": "CLOSEOUT", "actor": "primary", "payload": {"task": "PILOT-003", "closeout": "tasks/PILOT-003/CLOSEOUT.md"}}

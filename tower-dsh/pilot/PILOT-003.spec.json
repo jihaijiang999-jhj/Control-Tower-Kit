@@ -1,0 +1,34 @@
+{
+  "schema": "tower/spec@1",
+  "id": "PILOT-003",
+  "title": "post-merge 修复：清洁检查先于写 review，且允许从 CORRECTION_REQUIRED 重试",
+  "authority": "workspace_write",
+  "scope": [
+    "post-merge 的 working tree clean 检查移到写 supervision/reviews/<env>-post-merge.txt 之前",
+    "clean 检查忽略工具自身产物：supervision/reviews/、supervision/outbox/",
+    "post-merge 允许 envelope 状态为 MERGED 或 CORRECTION_REQUIRED 时重试",
+    "重试成功时写 POST_MERGE_VERIFIED；失败时置 CORRECTION_REQUIRED 并记 ledger",
+    "queue entry 状态与 envelope 同步",
+    "新增 tools/tests/test_post_merge.py 覆盖上述行为"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-003/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-003/tower-dsh/tools/tests/test_post_merge.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access"
+  ],
+  "acceptance": [
+    "python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 24",
+    "存在 review 文件且内容变化时，post-merge 仍判定 working tree clean",
+    "post-merge 在 envelope.status=CORRECTION_REQUIRED 时可重试并成功置 POST_MERGE_VERIFIED",
+    "post-merge 失败时仍置 CORRECTION_REQUIRED 并写 ledger",
+    "不改变 merge / check / handoff 的既有行为"
+  ],
+  "depends_on": ["PILOT-002"],
+  "worktree": "pilot/worktrees/PILOT-003"
+}

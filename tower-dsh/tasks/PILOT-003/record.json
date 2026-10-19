@@ -1,0 +1,104 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-003",
+  "title": "post-merge 修复：清洁检查先于写 review，且允许从 CORRECTION_REQUIRED 重试",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "post-merge 的 working tree clean 检查移到写 supervision/reviews/<env>-post-merge.txt 之前",
+    "clean 检查忽略工具自身产物：supervision/reviews/、supervision/outbox/",
+    "post-merge 允许 envelope 状态为 MERGED 或 CORRECTION_REQUIRED 时重试",
+    "重试成功时写 POST_MERGE_VERIFIED；失败时置 CORRECTION_REQUIRED 并记 ledger",
+    "queue entry 状态与 envelope 同步",
+    "新增 tools/tests/test_post_merge.py 覆盖上述行为"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-003/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-003/tower-dsh/tools/tests/test_post_merge.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access"
+  ],
+  "acceptance": [
+    "python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 24",
+    "存在 review 文件且内容变化时，post-merge 仍判定 working tree clean",
+    "post-merge 在 envelope.status=CORRECTION_REQUIRED 时可重试并成功置 POST_MERGE_VERIFIED",
+    "post-merge 失败时仍置 CORRECTION_REQUIRED 并写 ledger",
+    "不改变 merge / check / handoff 的既有行为"
+  ],
+  "depends_on": [
+    "PILOT-002"
+  ],
+  "worktree": "pilot/worktrees/PILOT-003",
+  "spec_path": "pilot/PILOT-003.spec.json",
+  "spec_sha256": "eed464300c0fa8ea06ce9ce511408d60d19bf82416ef9fe2adfd0b297fb5f236",
+  "spec_gate": "PASS",
+  "executor": "subagent:a7474492-5d9f-4ccb-ba30-51826c4f6e24",
+  "dispatch": {
+    "executor": "subagent:a7474492-5d9f-4ccb-ba30-51826c4f6e24",
+    "worktree": "pilot/worktrees/PILOT-003",
+    "at": "2026-10-19T16:47:22+08:00"
+  },
+  "evidence": [
+    {
+      "id": "E-001",
+      "path": "tasks/PILOT-003/evidence/towerctl.py",
+      "sha256": "a611401a5427d46103fbd14928abad4ff49961228f17b18d51a60002819047d3",
+      "bytes": 71157,
+      "at": "2026-10-19T16:50:47+08:00"
+    },
+    {
+      "id": "E-002",
+      "path": "tasks/PILOT-003/evidence/test_post_merge.py",
+      "sha256": "2a070431c27826c2dd613dfa6a203da6684f546d7e64071de6f874e5e5188a7f",
+      "bytes": 13419,
+      "at": "2026-10-19T16:50:47+08:00"
+    },
+    {
+      "id": "E-003",
+      "path": "tasks/PILOT-003/evidence/test-output.txt",
+      "sha256": "4781a2e81bdd8c2300b9e94a59affce2d95b4b8b1e0a829f98b07fed3d5e1538",
+      "bytes": 3450,
+      "at": "2026-10-19T16:50:47+08:00"
+    },
+    {
+      "id": "E-004",
+      "path": "tasks/PILOT-003/evidence/commit.txt",
+      "sha256": "bb8fed128338d2bb869c3a92b9192c3ea573ab13a2dbd0436f26eb5ee69aa673",
+      "bytes": 104,
+      "at": "2026-10-19T16:50:47+08:00"
+    },
+    {
+      "id": "E-005",
+      "path": "tasks/PILOT-003/evidence/diff.txt",
+      "sha256": "1b54da63ff4baed40feae5dff28e33aeb4629d382cab0bbc8b8d28596530baef",
+      "bytes": 20440,
+      "at": "2026-10-19T16:50:47+08:00"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:70e01687-6426-4ff7-ac79-1d6d24c0d10e",
+    "verdict": "PASS",
+    "note": "independent reviewer PASS: 26 tests OK; 5/5 acceptance; 5/5 evidence; scope clean; 4 post-merge scenarios; startup/wiring/handoff-check 21/21",
+    "at": "2026-10-19T16:57:25+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-003",
+    "actor": "owner",
+    "text": "owner approved all audit recommendations",
+    "at": "2026-10-19T16:57:25+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-003/CLOSEOUT.md",
+    "at": "2026-10-19T16:57:25+08:00"
+  },
+  "created_at": "2026-10-19T16:47:13+08:00",
+  "updated_at": "2026-10-19T16:57:25+08:00",
+  "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+  "delivered_at": "2026-10-19T16:50:47+08:00",
+  "accepted_at": "2026-10-19T16:57:25+08:00"
+}

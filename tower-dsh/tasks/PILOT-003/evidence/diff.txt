@@ -1,0 +1,429 @@
+diff --git a/tower-dsh/tools/tests/test_post_merge.py b/tower-dsh/tools/tests/test_post_merge.py
+new file mode 100644
+index 0000000..b1e1ea2
+--- /dev/null
++++ b/tower-dsh/tools/tests/test_post_merge.py
+@@ -0,0 +1,292 @@
++"""Regression tests for ``towerctl post-merge`` (PILOT-003).
++
++The bug under test: ``post-merge`` used to write
++``supervision/reviews/<env>-post-merge.txt`` *before* running
++``git status --porcelain``.  The tower root lives inside the verified kit
++repository (``repository: ".."``), so that review file made the working tree
++dirty on every run -- including the retry after a ``CORRECTION_REQUIRED``
++failure, which could never escape the correction state.
++
++Each test builds an isolated tower root plus a real throw-away git repository
++under ``%TEMP%`` and drives the CLI through ``subprocess`` so exit codes are
++asserted exactly as a caller observes them.
++
++Run from the tower root (``tower-dsh``)::
++
++    python -B -m unittest discover -s tools/tests -v
++"""
++from __future__ import annotations
++
++import json
++import os
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++TOOLS_DIR = Path(__file__).resolve().parents[1]
++TCLI = TOOLS_DIR / "towerctl.py"
++TOWER_NAME = "tower-dsh"
++TASK_ID = "TEST-PM-001"
++ENVELOPE_ID = "ENV-TEST-PM-001"
++ENVELOPE_PATH = f"merge-envelopes/{ENVELOPE_ID}.json"
++BASE = "main"
++BRANCH = "feature/post-merge"
++FIXED_TIME = "2026-10-19T00:00:00+08:00"
++
++GIT_IDENTITY = {
++    "GIT_AUTHOR_NAME": "Tower Test",
++    "GIT_AUTHOR_EMAIL": "tower@example.invalid",
++    "GIT_COMMITTER_NAME": "Tower Test",
++    "GIT_COMMITTER_EMAIL": "tower@example.invalid",
++}
++
++
++class PostMergeTestCase(unittest.TestCase):
++    """Fixture: ``kit`` git repo at tmp root, tower root nested as ``kit/tower-dsh``."""
++
++    def setUp(self) -> None:
++        self._tmp = tempfile.TemporaryDirectory(
++            prefix="towerctl-post-merge-", ignore_cleanup_errors=True)
++        self.kit = Path(self._tmp.name) / "kit"
++        self.root = self.kit / TOWER_NAME
++        for d in ("supervision/envelopes", "supervision/reviews",
++                  "supervision/outbox/corrections", "tasks", "ledger"):
++            (self.root / d).mkdir(parents=True, exist_ok=True)
++        self.write_static_tower_files()
++        self.init_repo()
++        self.write_envelope(status="MERGED", merge_commit=self.merge_commit)
++        self.write_queue(status="MERGED")
++        self.commit_all("supervision state")
++
++    def tearDown(self) -> None:
++        self._tmp.cleanup()
++
++    # -- fixture helpers --------------------------------------------------
++    def git(self, *args: str) -> subprocess.CompletedProcess:
++        env = dict(os.environ)
++        env.update(GIT_IDENTITY)
++        return subprocess.run(
++            ["git", "-C", str(self.kit), *args],
++            capture_output=True, text=True, encoding="utf-8", env=env,
++        )
++
++    def commit_all(self, message: str) -> str:
++        add = self.git("add", "-A")
++        self.assertEqual(add.returncode, 0, msg=add.stderr)
++        cp = self.git("-c", "commit.gpgsign=false", "commit", "-m", message)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        return self.git("rev-parse", "HEAD").stdout.strip()
++
++    def write_json(self, path: Path, data: dict) -> None:
++        path.parent.mkdir(parents=True, exist_ok=True)
++        path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
++                        encoding="utf-8")
++
++    def write_static_tower_files(self) -> None:
++        self.write_json(self.root / "supervision" / "CURRENT_STATE.json", {
++            "schema": "tower/supervision-state@1",
++            "tower_id": TOWER_NAME,
++            "role": "supervision",
++            "phase": "TEST",
++            "supervisor": {"id": "sup-test"},
++        })
++        self.write_json(self.root / "tasks" / TASK_ID / "record.json", {
++            "schema": "tower/task@1",
++            "id": TASK_ID,
++            "title": "post-merge regression",
++            "status": "closed",
++            "executor": "exec-test",
++            "review": {"reviewer": "rev-test", "verdict": "PASS"},
++        })
++        (self.root / "ledger" / "supervision.jsonl").write_text("", encoding="utf-8")
++        # A stale review from an earlier attempt must not break the clean check.
++        self.review_file().write_text("stale review from an earlier attempt\n",
++                                      encoding="utf-8")
++
++    def init_repo(self) -> None:
++        self.kit.mkdir(parents=True, exist_ok=True)
++        init = self.git("init")
++        self.assertEqual(init.returncode, 0, msg=init.stderr)
++        self.assertEqual(self.git("symbolic-ref", "HEAD", "refs/heads/main").returncode, 0)
++        (self.kit / "README.md").write_text("base\n", encoding="utf-8")
++        tests_dir = self.kit / "tests"
++        tests_dir.mkdir()
++        (tests_dir / "test_smoke.py").write_text(
++            "import unittest\n\n\n"
++            "class SmokeTest(unittest.TestCase):\n"
++            "    def test_smoke(self):\n"
++            "        self.assertTrue(True)\n",
++            encoding="utf-8",
++        )
++        (self.kit / "merge-envelopes").mkdir()
++        self.write_json(self.kit / ENVELOPE_PATH, {
++            "schema": "tower/merge-envelope@1",
++            "envelope_id": ENVELOPE_ID,
++            "task": TASK_ID,
++        })
++        self.commit_all("base")
++        self.assertEqual(self.git("checkout", "-b", BRANCH).returncode, 0)
++        (self.kit / "feature.txt").write_text("implementation\n", encoding="utf-8")
++        self.implementation_head = self.commit_all("implementation")
++        self.assertEqual(self.git("checkout", BASE).returncode, 0)
++        merge = self.git("-c", "commit.gpgsign=false", "merge", "--no-ff",
++                         "-m", f"merge: {TASK_ID} ({ENVELOPE_ID})", BRANCH)
++        self.assertEqual(merge.returncode, 0, msg=merge.stdout + merge.stderr)
++        self.merge_commit = self.git("rev-parse", "HEAD").stdout.strip()
++
++    def write_envelope(self, *, status: str, merge_commit: str | None) -> None:
++        envelope = {
++            "schema": "tower/merge-envelope@1",
++            "envelope_id": ENVELOPE_ID,
++            "task": TASK_ID,
++            "repository": "..",  # the verified kit repo is the tower root's parent
++            "branch": BRANCH,
++            "base": BASE,
++            "envelope_path": ENVELOPE_PATH,
++            "implementation_head_sha": self.implementation_head,
++            "envelope_head_sha": self.merge_commit,
++            "status": status,
++            "merge_commit": merge_commit,
++        }
++        self.write_json(self.root / "supervision" / "envelopes" / f"{ENVELOPE_ID}.json",
++                        envelope)
++
++    def write_queue(self, *, status: str) -> None:
++        self.write_json(self.root / "supervision" / "MERGE_QUEUE.json", {
++            "schema": "tower/merge-queue@1",
++            "entries": [{
++                "envelope_id": ENVELOPE_ID,
++                "task": TASK_ID,
++                "branch": BRANCH,
++                "base": BASE,
++                "status": status,
++                "added_at": FIXED_TIME,
++                "merge_commit": self.merge_commit,
++            }],
++            "updated_at": FIXED_TIME,
++        })
++
++    # -- assertions -------------------------------------------------------
++    def run_post_merge(self, result: str = "PASS") -> subprocess.CompletedProcess:
++        return subprocess.run(
++            [sys.executable, "-B", str(TCLI), "--root", str(self.root),
++             "post-merge", "--envelope", ENVELOPE_ID, "--result", result],
++            capture_output=True, text=True, encoding="utf-8",
++        )
++
++    def envelope(self) -> dict:
++        path = self.root / "supervision" / "envelopes" / f"{ENVELOPE_ID}.json"
++        return json.loads(path.read_text(encoding="utf-8"))
++
++    def queue_entry(self) -> dict:
++        path = self.root / "supervision" / "MERGE_QUEUE.json"
++        queue = json.loads(path.read_text(encoding="utf-8"))
++        return next(e for e in queue["entries"] if e["envelope_id"] == ENVELOPE_ID)
++
++    def review_file(self) -> Path:
++        return self.root / "supervision" / "reviews" / f"{ENVELOPE_ID}-post-merge.txt"
++
++    def ledger_events(self) -> list[dict]:
++        path = self.root / "ledger" / "supervision.jsonl"
++        if not path.exists():
++            return []
++        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()
++                if line.strip()]
++
++    def check(self, cp: subprocess.CompletedProcess, name: str) -> dict:
++        payload = json.loads(cp.stdout)
++        return next(c for c in payload["checks"] if c["name"] == name)
++
++    # -- 1. review artefact does not dirty the verified tree --------------
++    def test_preexisting_review_file_does_not_fail_clean_check(self) -> None:
++        review = self.review_file()
++        review.write_text("different review text left by an earlier attempt\n",
++                          encoding="utf-8")
++        outbox = (self.root / "supervision" / "outbox" / "corrections"
++                  / f"{ENVELOPE_ID}-post-merge-retry.md")
++        outbox.write_text("# correction note\n", encoding="utf-8")
++
++        cp = self.run_post_merge("PASS")
++        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++
++        clean = self.check(cp, "working tree clean")
++        self.assertTrue(clean["ok"], clean)
++        self.assertIn("ignored tool-owned", clean["detail"])
++        self.assertIn(f"{TOWER_NAME}/supervision/reviews", clean["detail"])
++        self.assertEqual(self.envelope()["status"], "POST_MERGE_VERIFIED")
++        self.assertEqual(self.queue_entry()["status"], "POST_MERGE_VERIFIED")
++        self.assertTrue(review.read_text(encoding="utf-8").startswith(
++            f"# {ENVELOPE_ID} post-merge verification"))
++
++    # -- 2. FAIL then retry PASS escapes CORRECTION_REQUIRED --------------
++    def test_fail_is_retryable_after_correction(self) -> None:
++        first = self.run_post_merge("FAIL")
++        self.assertEqual(first.returncode, 2, msg=first.stdout + first.stderr)
++        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
++        self.assertEqual(self.queue_entry()["status"], "CORRECTION_REQUIRED")
++        self.assertIn("- result: FAIL", self.review_file().read_text(encoding="utf-8"))
++        merge_commit = self.envelope()["merge_commit"]
++
++        # Supervision records the corrected state in the kit repo before the
++        # retry, exactly as the real merge cycle does.
++        self.commit_all("state after failed post-merge")
++
++        second = self.run_post_merge("PASS")
++        self.assertEqual(second.returncode, 0,
++                         msg=f"stdout={second.stdout}\nstderr={second.stderr}")
++        envelope = self.envelope()
++        self.assertEqual(envelope["status"], "POST_MERGE_VERIFIED")
++        self.assertEqual(envelope["merge_commit"], merge_commit)
++        self.assertEqual(self.queue_entry()["status"], "POST_MERGE_VERIFIED")
++        self.assertIn("- result: PASS", self.review_file().read_text(encoding="utf-8"))
++
++    # -- 3. failure appends a failed ledger event -------------------------
++    def test_failure_appends_ledger_event(self) -> None:
++        cp = self.run_post_merge("FAIL")
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        events = self.ledger_events()
++        failed = [e for e in events if e["type"] == "POST_MERGE_FAILED"]
++        self.assertEqual(len(failed), 1, events)
++        self.assertEqual(failed[0]["payload"]["envelope"], ENVELOPE_ID)
++        self.assertEqual(failed[0]["payload"]["result"], "FAIL")
++        self.assertFalse([e for e in events if e["type"] == "POST_MERGE_VERIFIED"])
++
++    # -- 4. success appends the verified ledger event ---------------------
++    def test_success_appends_ledger_event(self) -> None:
++        cp = self.run_post_merge("PASS")
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        events = self.ledger_events()
++        verified = [e for e in events if e["type"] == "POST_MERGE_VERIFIED"]
++        self.assertEqual(len(verified), 1, events)
++        self.assertEqual(verified[0]["payload"]["envelope"], ENVELOPE_ID)
++        self.assertFalse([e for e in events if e["type"] == "POST_MERGE_FAILED"])
++
++    # -- 5. real dirt still blocks ---------------------------------------
++    def test_unrelated_dirty_file_still_blocks(self) -> None:
++        (self.kit / "README.md").write_text("uncommitted implementation change\n",
++                                            encoding="utf-8")
++        cp = self.run_post_merge("PASS")
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        clean = self.check(cp, "working tree clean")
++        self.assertFalse(clean["ok"], clean)
++        self.assertIn("README.md", clean["detail"])
++        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
++        self.assertEqual(self.queue_entry()["status"], "CORRECTION_REQUIRED")
++        self.assertIn("working_tree_clean: False",
++                      self.review_file().read_text(encoding="utf-8"))
++
++    # -- 6. status guard: only MERGED / CORRECTION_REQUIRED may run -------
++    def test_rejects_envelope_that_was_never_merged(self) -> None:
++        self.write_envelope(status="DRAFT", merge_commit=None)
++        cp = self.run_post_merge("PASS")
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        self.assertIn("not MERGED or CORRECTION_REQUIRED", cp.stdout)
++        self.assertEqual(self.envelope()["status"], "DRAFT")
++        self.assertEqual(self.queue_entry()["status"], "MERGED")
++        self.assertEqual(self.ledger_events(), [])
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tower-dsh/tools/towerctl.py b/tower-dsh/tools/towerctl.py
+index 524fbc1..fe784f8 100644
+--- a/tower-dsh/tools/towerctl.py
++++ b/tower-dsh/tools/towerctl.py
+@@ -216,6 +216,63 @@ def git_ok(repo: Path, *args: str) -> str:
+     return cp.stdout.strip()
+ 
+ 
++# State directories towerctl itself writes during post-merge.  The tower root
++# can live inside the verified repository (the kit repo is often the parent of
++# ``tower-dsh``), so these artefacts must not count as implementation dirt.
++TOOL_OWNED_STATE_DIRS = ("supervision/reviews", "supervision/outbox")
++
++
++def repo_relative(repo: Path, path: Path) -> str | None:
++    """Return ``path`` relative to ``repo`` (posix form), or None if outside."""
++    try:
++        return path.resolve().relative_to(repo.resolve()).as_posix()
++    except ValueError:
++        return None
++
++
++def tool_owned_paths(root: Path, repo: Path) -> list[str]:
++    """Repo-relative prefixes of the state directories towerctl owns."""
++    owned: list[str] = []
++    for name in TOOL_OWNED_STATE_DIRS:
++        rel_path = repo_relative(repo, root / name)
++        if rel_path:
++            owned.append(rel_path)
++    return owned
++
++
++def status_path(line: str) -> str:
++    """Extract the path from one ``git status --porcelain`` line."""
++    path = line[3:] if len(line) > 3 else ""
++    if " -> " in path:  # rename / copy entries use ``old -> new``
++        path = path.split(" -> ", 1)[1]
++    return path.strip().strip('"')
++
++
++def working_tree_state(root: Path, repo: Path) -> tuple[list[str], list[str]]:
++    """Return ``(dirty, tool_owned)`` porcelain entries for ``repo``.
++
++    ``dirty`` holds everything a caller would normally see; ``tool_owned``
++    holds the entries under :data:`TOOL_OWNED_STATE_DIRS` that post-merge
++    itself produced (reviews, correction notes).
++    """
++    cp = git(repo, "status", "--porcelain")
++    if cp.returncode != 0:
++        detail = cp.stderr.strip() or cp.stdout.strip() or "git status failed"
++        return [detail], []
++    owned = tool_owned_paths(root, repo)
++    dirty: list[str] = []
++    ignored: list[str] = []
++    for line in cp.stdout.splitlines():
++        if not line.strip():
++            continue
++        path = status_path(line)
++        if any(path == prefix or path.startswith(prefix + "/") for prefix in owned):
++            ignored.append(path)
++        else:
++            dirty.append(line)
++    return dirty, ignored
++
++
+ def load_supervision(root: Path) -> dict:
+     path = root / "supervision" / "CURRENT_STATE.json"
+     if not path.exists():
+@@ -1348,8 +1405,16 @@ def cmd_post_merge(root: Path, args) -> None:
+     if not env_path.exists():
+         fail([f"envelope not found: {args.envelope}"])
+     env = jload(env_path)
+-    if env.get("status") != "MERGED":
+-        fail([f"envelope status {env.get('status')} is not MERGED"])
++    status = env.get("status")
++    if status == "POST_MERGE_VERIFIED":
++        fail([f"envelope {args.envelope} is already POST_MERGE_VERIFIED"])
++    if status not in ("MERGED", "CORRECTION_REQUIRED"):
++        # CORRECTION_REQUIRED is retryable: a failed post-merge must be able to
++        # re-run after the correction instead of deadlocking the envelope.
++        fail([
++            f"envelope status {status} is not MERGED or CORRECTION_REQUIRED; "
++            "post-merge only runs after a successful merge"
++        ])
+     repo = root / env.get("repository", "pilot/repo")
+     base = env.get("base", "main")
+     a = env.get("implementation_head_sha")
+@@ -1360,12 +1425,20 @@ def cmd_post_merge(root: Path, args) -> None:
+         [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
+         cwd=str(repo), capture_output=True, text=True, encoding="utf-8", env=env_vars,
+     )
++    # The clean check runs before the review file is written, and it ignores
++    # the state directories towerctl itself owns.  Both parts matter: the tower
++    # root may live inside the verified repository, so writing the review first
++    # (or counting it as dirt) made every post-merge fail its own gate.
++    dirty, tool_owned = working_tree_state(root, repo)
++    clean = not dirty
+     reviews = root / "supervision" / "reviews"
+     reviews.mkdir(parents=True, exist_ok=True)
+     review_file = reviews / f"{args.envelope}-post-merge.txt"
+     review_file.write_text(
+         f"# {args.envelope} post-merge verification\n\n"
+         f"- base: {base}\n- implementation: {a}\n- merge_commit: {env.get('merge_commit')}\n"
++        f"- result: {args.result}\n- working_tree_clean: {clean}\n"
++        f"- tool_owned_paths_ignored: {tool_owned}\n"
+         f"- test_exit: {tests.returncode}\n\n## Test output\n\n"
+         f"{tests.stdout}\n{tests.stderr}\n", encoding="utf-8")
+     checks = [
+@@ -1377,9 +1450,9 @@ def cmd_post_merge(root: Path, args) -> None:
+         {"name": "envelope file exists on base",
+          "ok": git(repo, "cat-file", "-e", f"{base}:{envelope_path}").returncode == 0,
+          "detail": f"{base}:{envelope_path}"},
+-        {"name": "working tree clean",
+-         "ok": git(repo, "status", "--porcelain").stdout.strip() == "",
+-         "detail": "git status --porcelain"},
++        {"name": "working tree clean", "ok": clean,
++         "detail": (f"dirty={dirty}" if dirty else "clean")
++         + (f"; ignored tool-owned: {tool_owned}" if tool_owned else "")},
+     ]
+     ok = args.result == "PASS" and all(c["ok"] for c in checks)
+     queue = load_queue(root)
+@@ -1402,7 +1475,8 @@ def cmd_post_merge(root: Path, args) -> None:
+         entry["status"] = "CORRECTION_REQUIRED"
+         save_queue(root, queue)
+     append_supervision_ledger(root, "POST_MERGE_FAILED", "supervision",
+-                              {"envelope": args.envelope, "checks": checks})
++                              {"envelope": args.envelope, "result": args.result,
++                               "checks": checks})
+     emit({"ok": False, "envelope": args.envelope, "status": "CORRECTION_REQUIRED",
+           "checks": checks, "review": rel(root, review_file)}, 2)
+ 
