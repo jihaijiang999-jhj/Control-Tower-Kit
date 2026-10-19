@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -82,6 +83,9 @@ class AuthorityDriftTestCase(unittest.TestCase):
         # Tracked placeholders keep the tool-owned directories real git paths.
         for name in ("supervision/reviews", "supervision/outbox"):
             (self.root / name / ".gitkeep").write_text("", encoding="utf-8")
+        # ``handoffs`` needs a tracked file so that deleting the whole
+        # directory registers as a tracked deletion rather than a no-op.
+        (self.root / "handoffs" / ".gitkeep").write_text("", encoding="utf-8")
         (self.root / "ledger" / "primary.jsonl").write_text("", encoding="utf-8")
 
         self.kit.mkdir(parents=True, exist_ok=True)
@@ -117,6 +121,10 @@ class AuthorityDriftTestCase(unittest.TestCase):
                 env_extra: dict | None = None) -> subprocess.CompletedProcess:
         env = dict(os.environ)
         env.update(GIT_IDENTITY)
+        # The child would otherwise encode stdout with the Windows locale code
+        # page (GBK here) while this harness decodes as UTF-8.  Pinning the
+        # child's stream encoding keeps non-ASCII path assertions exact.
+        env["PYTHONIOENCODING"] = "utf-8"
         if env_extra:
             env.update(env_extra)
         return subprocess.run(
@@ -259,6 +267,31 @@ class AuthorityDriftTestCase(unittest.TestCase):
         self.assertIn("tower-dsh/ledger/primary.jsonl", dirty)
         self.assertIn(f"tower-dsh/handoffs/{PACKAGE}/package.json", dirty)
         self.assertEqual(data["authority_dirty_count"], len(dirty))
+
+    # -- 8. deleted authority directories are still drift ----------------
+    def test_deleting_handoffs_directory_is_reported(self) -> None:
+        shutil.rmtree(self.root / "handoffs")
+        data = self.status_json()
+        self.assertTrue(any(path.startswith("tower-dsh/handoffs/")
+                            for path in data["authority_dirty"]),
+                        msg=f"deleted handoffs/ not reported: {data['authority_dirty']}")
+        self.assertGreaterEqual(data["authority_dirty_count"], 1)
+
+    def test_deleting_ledger_directory_is_reported(self) -> None:
+        shutil.rmtree(self.root / "ledger")
+        data = self.status_json()
+        self.assertIn("tower-dsh/ledger/primary.jsonl", data["authority_dirty"])
+        self.assertGreaterEqual(data["authority_dirty_count"], 1)
+
+    # -- 9. non-ASCII paths are reported literally ----------------------
+    def test_non_ascii_path_is_reported_without_escapes(self) -> None:
+        target = self.root / "primary" / "中文.json"
+        target.write_text("{}\n", encoding="utf-8")
+        data = self.status_json()
+        self.assertIn("tower-dsh/primary/中文.json", data["authority_dirty"])
+        joined = " ".join(data["authority_dirty"])
+        self.assertNotIn("\\344", joined,
+                         msg=f"path was octal-escaped: {joined}")
 
 
 if __name__ == "__main__":

@@ -579,14 +579,18 @@ def authority_drift(root: Path) -> list[str] | None:
         return None
     root_rel = repo_relative(repo, root) or ""
     base = "" if root_rel in ("", ".") else root_rel + "/"
-    watched = [base + name for name in AUTHORITY_STATE_DIRS
-               if (root / name).exists()]
-    if not watched:
-        return []
+    # Every authority directory is a pathspec, whether or not it still exists:
+    # a pathspec also matches tracked paths that were deleted from the working
+    # tree, so removing e.g. ``handoffs/`` wholesale is still reported.  A
+    # missing directory with nothing tracked under it simply matches nothing.
+    watched = [base + name for name in AUTHORITY_STATE_DIRS]
     # ``--untracked-files=all`` keeps a brand-new package directory from
     # collapsing into a single ``handoffs/<id>/`` entry, so the reported list
-    # (and the commit hint built from it) names every file.
-    cp = git(repo, "status", "--porcelain", "--untracked-files=all", "--", *watched)
+    # (and the commit hint built from it) names every file.  ``quotepath`` is
+    # disabled so non-ASCII paths come back literally and the reported path
+    # (and the hint built from it) is actually usable.
+    cp = git(repo, "-c", "core.quotepath=false", "status", "--porcelain",
+             "--untracked-files=all", "--", *watched)
     if cp.returncode != 0:
         return None
     owned = tool_owned_paths(root, repo)
