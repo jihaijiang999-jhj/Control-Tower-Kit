@@ -99,9 +99,9 @@
       "authority": "workspace_write",
       "executor": "subagent:b570c09a-fccf-4e18-a4f1-4d134b06f186",
       "reviewer": "subagent:92bab935-b241-4a3e-aa17-58d68106244e",
-      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
-      "updated_at": "2026-10-19T21:01:23+08:00"
+      "next": "merged via ENV-PILOT-010; POST_MERGE_VERIFIED; hardening 2 complete",
+      "updated_at": "2026-10-19T22:43:52+08:00"
     }
   ],
-  "updated_at": "2026-10-19T21:01:23+08:00"
+  "updated_at": "2026-10-19T22:43:52+08:00"
 }

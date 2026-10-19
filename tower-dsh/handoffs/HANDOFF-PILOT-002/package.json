@@ -1,0 +1,75 @@
+{
+  "schema": "tower/handoff-package@1",
+  "package_id": "HANDOFF-PILOT-002",
+  "project": "tower-dsh",
+  "mechanism": "project-handoff-v2.1",
+  "assembly_path": "tower_direct",
+  "created_at": "2026-10-19T22:43:52+08:00",
+  "source_controller": "ctl-phase3-receiver-001",
+  "task": "PILOT-010",
+  "envelope": "ENV-PILOT-010",
+  "status": "PREPARED",
+  "files": {
+    "HANDOFF.md": "8b46c915fda98cc50663a9387889602f1025b94072e7d72167b736202917d56c",
+    "SELF-CHECK.md": "310272b42c54305944ce9fc83aff9b16b094799bfce5f1c2815875a332891f66"
+  },
+  "state": {
+    "tower_id": "tower-dsh",
+    "phase": "READY_FOR_PRACTICE",
+    "primary_id": "ctl-phase3-receiver-001",
+    "supervisor_id": "sup-phase2-pilot",
+    "supervision_phase": "PHASE_2_PILOT_VERIFIED",
+    "owner": "mac",
+    "next_action": "new window: control-tower Q&A + map/portrait; then real project pilot",
+    "task_id": "PILOT-010",
+    "task_status": "closed",
+    "task_next": "merged via ENV-PILOT-010; POST_MERGE_VERIFIED; hardening 2 complete",
+    "task_evidence_count": 7,
+    "envelope_id": "ENV-PILOT-010",
+    "queue_status": "POST_MERGE_VERIFIED",
+    "merge_commit": "87bd88c40950a4ef141907f837a5a8b8ea2724d2",
+    "main_sha": "9fb5ba243f5cf03f7ccafb0eb381793770835db2",
+    "worktree_head": "6e00d6975540dfc3df8d29ec7083d6960ff637df",
+    "repo_status": "clean",
+    "worktree_status": "clean",
+    "tower_root": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh",
+    "repo": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\repo",
+    "worktree": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-010",
+    "python": "3.12.10",
+    "open_tasks": [],
+    "evidence": [
+      {
+        "path": "tasks/PILOT-010/evidence/towerctl.py",
+        "sha256": "2823da2c1dd018a3f5e2950e5b306efdc73d9111adbac824508ac1ba06be1a8a"
+      },
+      {
+        "path": "tasks/PILOT-010/evidence/test_hardening2.py",
+        "sha256": "726a87a871275cae0ebbc45ec68405f192b94b85d0c962c8ef34a1f36f53930a"
+      },
+      {
+        "path": "tasks/PILOT-010/evidence/test_coverage.py",
+        "sha256": "3cd2f9436906684b959fce58c08cce0d04a3c530d2324dff861615b59f25bb1d"
+      },
+      {
+        "path": "tasks/PILOT-010/evidence/clause_bindings.py",
+        "sha256": "4fa325e937d8a312f044b528520048606d1e106e1b98943bfa348a39c066b3bc"
+      },
+      {
+        "path": "tasks/PILOT-010/evidence/test-output.txt",
+        "sha256": "047917b0b216bc6c7283290a369323aeab8508531822fa2645e380dbe1543e0f"
+      },
+      {
+        "path": "tasks/PILOT-010/evidence/commit.txt",
+        "sha256": "c614977c94faa31a9a1c624af35bff9b6fb824c0b30e1ba46274916d14dc2910"
+      },
+      {
+        "path": "tasks/PILOT-010/evidence/diff.txt",
+        "sha256": "60c84485b0f854c03744cca017fd17446b9151d3f0be2db5e39d4d36be747e07"
+      }
+    ],
+    "ledger_seq": 98,
+    "captured_at": "2026-10-19T22:43:52+08:00"
+  },
+  "claim": null,
+  "acceptance": null
+}

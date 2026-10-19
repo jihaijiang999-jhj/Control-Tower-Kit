@@ -119,8 +119,8 @@
     "at": "2026-10-19T21:01:23+08:00"
   },
   "created_at": "2026-10-19T20:38:35+08:00",
-  "updated_at": "2026-10-19T21:01:23+08:00",
-  "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+  "updated_at": "2026-10-19T22:43:52+08:00",
+  "next": "merged via ENV-PILOT-010; POST_MERGE_VERIFIED; hardening 2 complete",
   "delivered_at": "2026-10-19T20:52:52+08:00",
   "accepted_at": "2026-10-19T21:01:23+08:00"
 }
