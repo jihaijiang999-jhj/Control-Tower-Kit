@@ -43,8 +43,12 @@ python tools/towerctl.py supervision-status
 ## 当前状态
 
 - Phase 3：`HANDOFF-PILOT-001` ACTIVE，controller `ctl-phase3-receiver-001`
-- `PILOT-001`：已合并，`POST_MERGE_VERIFIED`（merge `9fb5ba2`）
-- 已知缺口：见 `tower-dsh/AUDIT-2026-10-19.md`（门禁硬化 / handoff 参数化 / ledger 哈希链待修）
+- 任务：`PILOT-001` … `PILOT-005` 全部 `closed` 且 `POST_MERGE_VERIFIED`
+- 门禁：spec 强制、证据强制、reviewer 非空、merge 分支断言（PILOT-002）
+- post-merge：清洁检查先于写 review，可从 `CORRECTION_REQUIRED` 重试（PILOT-003）
+- handoff：按 task/envelope 参数化，无写死（PILOT-004）
+- ledger：SHA-256 哈希链 + 单写者锁 + `verify-ledger`（PILOT-005）
+- 剩余 backlog：见 `tower-dsh/AUDIT-2026-10-19.md` 未修 P1/P2（closeout 文案、程序性身份、路径过滤等）
 
 ## 边界
 

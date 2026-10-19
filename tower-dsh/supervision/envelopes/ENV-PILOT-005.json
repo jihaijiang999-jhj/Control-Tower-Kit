@@ -37,8 +37,10 @@
     }
   ],
   "envelope_head_sha": "3cb1b497bc57086641748d2f941a6b2a75364fbb",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "merge_commit": "05d91681bcbe6e11dfc392381be01a733f9612d2",
   "merged_at": "2026-10-19T17:31:22+08:00",
-  "supervisor": "sup-phase3-audit"
+  "supervisor": "sup-phase3-audit",
+  "post_merge_at": "2026-10-19T17:31:38+08:00",
+  "post_merge_note": "hash-chain ledger + lock + verify; 51 tests"
 }

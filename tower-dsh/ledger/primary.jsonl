@@ -51,3 +51,4 @@
 {"seq": 51, "at": "2026-10-19T17:31:13+08:00", "type": "CHECKBACK", "actor": "reviewer", "payload": {"task": "PILOT-005", "reviewer": "subagent:c7546d3e-2dfa-4815-9eca-607a14e9e34b", "verdict": "PASS"}}
 {"seq": 52, "at": "2026-10-19T17:31:13+08:00", "type": "ACCEPT", "actor": "primary", "payload": {"task": "PILOT-005", "decision": "D-PILOT-005"}}
 {"seq": 53, "at": "2026-10-19T17:31:14+08:00", "type": "CLOSEOUT", "actor": "primary", "payload": {"task": "PILOT-005", "closeout": "tasks/PILOT-005/CLOSEOUT.md"}}
+{"seq": 54, "at": "2026-10-19T17:31:44+08:00", "type": "TASK_NEXT", "actor": "primary", "payload": {"task": "PILOT-005", "next": "merged; audit recommendations complete"}, "prev_hash": "4b4ae627ea92bf01bdea3e8ad24694c7ae832a536a5305c4c05577d0679c3b66", "hash": "c334b425235c09171bc4bda5d645b33c3bf94762eb91721661989f0f61ce6bce"}
