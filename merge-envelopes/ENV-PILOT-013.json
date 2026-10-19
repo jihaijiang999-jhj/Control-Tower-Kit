@@ -1,0 +1,51 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-013",
+  "task": "PILOT-013",
+  "repository": "..",
+  "branch": "pilot/PILOT-013",
+  "base": "main",
+  "implementation_head_sha": "3bc20d6cd2124b5ad2a9d7cba85f788e14cad7c1",
+  "envelope_path": "merge-envelopes/ENV-PILOT-013.json",
+  "created_at": "2026-10-20T07:49:17+08:00",
+  "scope": "PILOT-013: hermetic gate tests (git identity injection)",
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-013/evidence/test_coverage.py",
+      "sha256": "10a0d589cad2cd203c388736b0492fd091ed84c7cd32b48e7b3f9dd0ff738f07"
+    },
+    {
+      "path": "tasks/PILOT-013/evidence/test_hardening2.py",
+      "sha256": "d576df377163ea28a2f78e6f7bfd406332eaed05e7627e96ec2afc8f3533d629"
+    },
+    {
+      "path": "tasks/PILOT-013/evidence/test_git_config_isolation.py",
+      "sha256": "9683dbb9c3e4a2bcf941220373b46fe81252b84155afc60401a7889101cc7891"
+    },
+    {
+      "path": "tasks/PILOT-013/evidence/test-output.txt",
+      "sha256": "33346e8384a5f0e0deee5bb586c4621fd65b40db85470379be060a76b2b35cd5"
+    },
+    {
+      "path": "tasks/PILOT-013/evidence/test-output-no-gitconfig.txt",
+      "sha256": "27527f2eaf77a8fe42d1c17c6b6a78b30a06a41a7ef7e73ef142489ab0297dcd"
+    },
+    {
+      "path": "tasks/PILOT-013/evidence/mutation-check.txt",
+      "sha256": "c3144e2b10de1f004fa3f9569ed00c3741745bb7a467cb6f4aada91a924b23ce"
+    },
+    {
+      "path": "tasks/PILOT-013/evidence/commit.txt",
+      "sha256": "8832e5aa3342f3d37f1282a62392822ce39dc09b96e528ea9ac520185e2c51db"
+    },
+    {
+      "path": "tasks/PILOT-013/evidence/diff.txt",
+      "sha256": "803b6c590a2ab83281ba9d60494d3b3a0002d5d4c4be7114e9afab494409d0bb"
+    }
+  ]
+}
