@@ -45,8 +45,10 @@
     }
   ],
   "envelope_head_sha": "eb543668129f66a16cbe7b82a9f40dcc76103480",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "merge_commit": "1028838d7f9671f3b4abfa65c3cd89c8fca02fbb",
   "merged_at": "2026-10-19T19:57:27+08:00",
-  "supervisor": "sup-phase3-audit"
+  "supervisor": "sup-phase3-audit",
+  "post_merge_at": "2026-10-19T19:57:57+08:00",
+  "post_merge_note": "clause coverage gate; 109 tests"
 }

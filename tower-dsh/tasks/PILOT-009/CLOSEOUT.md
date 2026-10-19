@@ -19,3 +19,15 @@
 ## Next
 
 merge/handoff decision (owner gate) — not performed in Phase 1
+
+## Post-merge addendum (2026-10-19)
+
+> 上文由 `close` 在合并前生成；“Merge: not performed”是当时事实，**不改写**。
+
+- Envelope: `ENV-PILOT-009`
+- Implementation head: `28f5b20904a862de5f59a17b4edf55d52f178b5e`
+- Merge commit: `1028838d7f9671f3b4abfa65c3cd89c8fca02fbb`
+- 合并门：10/10 PASS
+- Post-merge：`POST_MERGE_VERIFIED`（109 tests）
+- 交付：`spec-coverage` 上线；6 份 spec 共 56 条条款，27 条 tool-check 全部绑定测试（0 缺口），12 条 review-check、17 条 owner-gate
+- 已知非阻断：5 条绑定为部分断言；测试 ID 提取器对非 TestCase 类/继承方法有盲点（当前仓库未触发）
