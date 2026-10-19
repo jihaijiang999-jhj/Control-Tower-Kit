@@ -1,0 +1,43 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-007",
+  "task": "PILOT-007",
+  "repository": "..",
+  "branch": "pilot/PILOT-007",
+  "base": "main",
+  "implementation_head_sha": "05c5a46459ff3da78d8d7b18dcd4388cdb675ab1",
+  "envelope_path": "merge-envelopes/ENV-PILOT-007.json",
+  "created_at": "2026-10-19T18:35:42+08:00",
+  "scope": "PILOT-007: spec-lint for workflow specs",
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-007/evidence/towerctl.py",
+      "sha256": "680ad34fdd45817b1c89fb681dd5c3de3dca5addeacf9ec3b14b11e0121b9a70"
+    },
+    {
+      "path": "tasks/PILOT-007/evidence/spec_lint.py",
+      "sha256": "de0271210c017a44683389c1e2f47b90682447a794a8f2051f8bcdc82710d902"
+    },
+    {
+      "path": "tasks/PILOT-007/evidence/test_spec_lint.py",
+      "sha256": "796fa0fc3e1b373dbb3bbe52217d7cb566d45d2d9aab51245751866ae86c5a35"
+    },
+    {
+      "path": "tasks/PILOT-007/evidence/test-output.txt",
+      "sha256": "6d353fc7829443e5258aa4588fabbc26fe937fad28679187666f14669a8f4a99"
+    },
+    {
+      "path": "tasks/PILOT-007/evidence/commit.txt",
+      "sha256": "5d7816d733d0c57bdaf572fe4dca3b996ed406a14b6333473dae07c506e45663"
+    },
+    {
+      "path": "tasks/PILOT-007/evidence/diff.txt",
+      "sha256": "4f1dfa3dfd56bd9e61a0daf296cd5f3c20dc26beb5c93ea4e048ebab60958ba2"
+    }
+  ]
+}
