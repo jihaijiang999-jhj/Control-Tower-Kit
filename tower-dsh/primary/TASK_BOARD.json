@@ -51,7 +51,17 @@
       "reviewer": "subagent:c7546d3e-2dfa-4815-9eca-607a14e9e34b",
       "next": "merged; audit recommendations complete",
       "updated_at": "2026-10-19T17:31:44+08:00"
+    },
+    {
+      "id": "PILOT-006",
+      "title": "ledger 锁 Windows 竞态修复：PermissionError 视作锁竞争 + 并发压测",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:a7172926-6f3e-4ca4-a6ff-add402ef215b",
+      "reviewer": "subagent:5882dd69-c4a0-492d-b483-f76207104f76",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T17:50:43+08:00"
     }
   ],
-  "updated_at": "2026-10-19T17:31:44+08:00"
+  "updated_at": "2026-10-19T17:50:43+08:00"
 }

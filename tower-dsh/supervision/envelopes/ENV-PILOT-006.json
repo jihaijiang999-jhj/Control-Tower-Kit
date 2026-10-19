@@ -1,0 +1,44 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-006",
+  "task": "PILOT-006",
+  "repository": "..",
+  "branch": "pilot/PILOT-006",
+  "base": "main",
+  "implementation_head_sha": "bea3ba9bdf5171841bfc2fdf8424f7cb67164634",
+  "envelope_path": "merge-envelopes/ENV-PILOT-006.json",
+  "created_at": "2026-10-19T17:50:48+08:00",
+  "scope": "PILOT-006: fix Windows ledger lock race + stress tests",
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-006/evidence/towerctl.py",
+      "sha256": "7c47b80797d8fa6ad232d5347357b549ecfc825eaaa125bc2ba6d1363d3e150a"
+    },
+    {
+      "path": "tasks/PILOT-006/evidence/test_ledger_lock_windows.py",
+      "sha256": "9667edc3e7e23842d28ac9b0e0e822f756551cdae030f16d73e682d572170040"
+    },
+    {
+      "path": "tasks/PILOT-006/evidence/test-output.txt",
+      "sha256": "a1b78a2dcb9d21009ce5d057ffdb5a8e424e915e02bd5d1cbc8eab754553c903"
+    },
+    {
+      "path": "tasks/PILOT-006/evidence/commit.txt",
+      "sha256": "0a31d895f2c7534ce7b6742378b79a7469ff43f55a5b2f2736f818d9d3e2ce8e"
+    },
+    {
+      "path": "tasks/PILOT-006/evidence/diff.txt",
+      "sha256": "1655b9a10424b031a6cb9b1d0f995d9e0c69cb98fcdb765f0e44a00bb08c55de"
+    }
+  ],
+  "envelope_head_sha": "56d996e4b0cfdc6a0fe216d2241a897b0a3bde3e",
+  "status": "MERGED",
+  "merge_commit": "edbb8092cf8f894638e688d7122387492c614721",
+  "merged_at": "2026-10-19T17:50:48+08:00",
+  "supervisor": "sup-phase3-audit"
+}

@@ -1,0 +1,105 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-006",
+  "title": "ledger 锁 Windows 竞态修复：PermissionError 视作锁竞争 + 并发压测",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "Windows 上 O_CREAT|O_EXCL 返回 ERROR_ACCESS_DENIED(13) 时按“锁已被占用”处理并重试，而不是抛错",
+    "仅 Windows 生效；POSIX 上 PermissionError 仍视为真实错误",
+    "_release_lock_file 的 stat/unlink 容忍 OSError（含 PermissionError）",
+    "ledger_lock 取锁后 stat 失败时 identity=None，不崩溃",
+    "_clear_stale_lock 的 os.replace 容忍 PermissionError 并返回 False",
+    "新增 tools/tests/test_ledger_lock_windows.py：8 线程×5 连续 20 轮 0 失败；8 线程×20 共 160 条 seq 连续；超时与陈旧锁行为不回归"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-006/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-006/tower-dsh/tools/tests/test_ledger_lock_windows.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access"
+  ],
+  "acceptance": [
+    "python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 54",
+    "并发用例连续 20 轮（8 线程×5）零失败",
+    "8 线程×20 次 append 产生 160 条事件，seq 1..160 连续且链可验证",
+    "持锁超时仍 exit 2 / 抛 LedgerLockTimeout；陈旧锁仍可清理",
+    "既有 51 个用例全部仍通过",
+    "startup / wiring / handoff-check 不回归"
+  ],
+  "depends_on": [
+    "PILOT-005"
+  ],
+  "worktree": "pilot/worktrees/PILOT-006",
+  "spec_path": "pilot/PILOT-006.spec.json",
+  "spec_sha256": "eeec724f8e2bc91dff457cc79abe7d16ba0c4d91dd946f20a899da8275d22b83",
+  "spec_gate": "PASS",
+  "executor": "subagent:a7172926-6f3e-4ca4-a6ff-add402ef215b",
+  "dispatch": {
+    "executor": "subagent:a7172926-6f3e-4ca4-a6ff-add402ef215b",
+    "worktree": "pilot/worktrees/PILOT-006",
+    "at": "2026-10-19T17:34:01+08:00"
+  },
+  "evidence": [
+    {
+      "id": "E-001",
+      "path": "tasks/PILOT-006/evidence/towerctl.py",
+      "sha256": "7c47b80797d8fa6ad232d5347357b549ecfc825eaaa125bc2ba6d1363d3e150a",
+      "bytes": 90578,
+      "at": "2026-10-19T17:38:40+08:00"
+    },
+    {
+      "id": "E-002",
+      "path": "tasks/PILOT-006/evidence/test_ledger_lock_windows.py",
+      "sha256": "9667edc3e7e23842d28ac9b0e0e822f756551cdae030f16d73e682d572170040",
+      "bytes": 12360,
+      "at": "2026-10-19T17:38:40+08:00"
+    },
+    {
+      "id": "E-003",
+      "path": "tasks/PILOT-006/evidence/test-output.txt",
+      "sha256": "a1b78a2dcb9d21009ce5d057ffdb5a8e424e915e02bd5d1cbc8eab754553c903",
+      "bytes": 7990,
+      "at": "2026-10-19T17:38:40+08:00"
+    },
+    {
+      "id": "E-004",
+      "path": "tasks/PILOT-006/evidence/commit.txt",
+      "sha256": "0a31d895f2c7534ce7b6742378b79a7469ff43f55a5b2f2736f818d9d3e2ce8e",
+      "bytes": 123,
+      "at": "2026-10-19T17:38:40+08:00"
+    },
+    {
+      "id": "E-005",
+      "path": "tasks/PILOT-006/evidence/diff.txt",
+      "sha256": "1655b9a10424b031a6cb9b1d0f995d9e0c69cb98fcdb765f0e44a00bb08c55de",
+      "bytes": 16064,
+      "at": "2026-10-19T17:38:40+08:00"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:5882dd69-c4a0-492d-b483-f76207104f76",
+    "verdict": "PASS",
+    "note": "independent reviewer PASS: 58 tests; 20 rounds concurrency 0 failures (base 20/800); 5/5 evidence; lock semantics intact",
+    "at": "2026-10-19T17:50:43+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-006",
+    "actor": "owner",
+    "text": "owner approved all audit recommendations",
+    "at": "2026-10-19T17:50:43+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-006/CLOSEOUT.md",
+    "at": "2026-10-19T17:50:43+08:00"
+  },
+  "created_at": "2026-10-19T17:33:53+08:00",
+  "updated_at": "2026-10-19T17:50:43+08:00",
+  "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+  "delivered_at": "2026-10-19T17:38:40+08:00",
+  "accepted_at": "2026-10-19T17:50:43+08:00"
+}

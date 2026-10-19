@@ -1,0 +1,2 @@
+bea3ba9bdf5171841bfc2fdf8424f7cb67164634
+PILOT-006: fix Windows lock race (PermissionError as contention) + stress tests
