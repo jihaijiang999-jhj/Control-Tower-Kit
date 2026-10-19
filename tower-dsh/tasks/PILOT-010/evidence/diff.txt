@@ -1,0 +1,1402 @@
+diff --git a/tower-dsh/tools/tests/clause_bindings.py b/tower-dsh/tools/tests/clause_bindings.py
+index 7e32c11..6fd2bc8 100644
+--- a/tower-dsh/tools/tests/clause_bindings.py
++++ b/tower-dsh/tools/tests/clause_bindings.py
+@@ -108,17 +108,21 @@ BINDINGS = {
+     "WF-HANDOFF/INV-01": [
+         "test_coverage.HandoffInvariantTestCase.test_handoff_claim_rejects_source_controller",
+     ],
+-    # INV-02: HANDOFF.md / SELF-CHECK.md hashes match the package record.
++    # INV-02: HANDOFF.md / SELF-CHECK.md hashes match the package record;
++    # tampering with either file is detected (both assertions in one test).
+     "WF-HANDOFF/INV-02": [
+-        "test_coverage.HandoffInvariantTestCase.test_handoff_check_rejects_tampered_handoff_hash",
++        "test_coverage.HandoffInvariantTestCase.test_handoff_check_detects_tampered_handoff_and_selfcheck",
+     ],
+-    # INV-03: §0 anchors match the values captured at generation time.
++    # INV-03: §0 anchors match the values captured at generation time; the
++    # strengthened test drifts main SHA and queue status together.
+     "WF-HANDOFF/INV-03": [
+-        "test_coverage.HandoffInvariantTestCase.test_handoff_check_detects_section0_drift",
++        "test_coverage.HandoffInvariantTestCase.test_handoff_check_detects_multiple_section0_drifts",
+     ],
+-    # INV-04: claim -> receipt -> accept -> activate; no skipping.
++    # INV-04: claim -> receipt -> accept -> activate; no skipping.  Activate
++    # before accept and receipt/accept before claim both fail.
+     "WF-HANDOFF/INV-04": [
+         "test_coverage.HandoffInvariantTestCase.test_handoff_activate_requires_acceptance",
++        "test_coverage.HandoffInvariantTestCase.test_handoff_receipt_and_accept_before_claim_are_rejected",
+     ],
+ 
+     # -- POL-RED-LINES -----------------------------------------------------
+@@ -133,16 +137,19 @@ BINDINGS = {
+         "test_coverage.PolicyInvariantTestCase.test_merge_rejects_supervisor_equal_primary",
+     ],
+     # C-14: gate skipping is rejected (dispatch without spec gate, merge
+-    # without a queued entry).
++    # without a queued entry) and MERGED alone never counts as completion --
++    # only POST_MERGE_VERIFIED does.
+     "POL-RED-LINES/C-14": [
+         "test_gates.TowerGateTestCase.test_dispatch_rejects_missing_spec_gate",
+         "test_gates.TowerGateTestCase.test_merge_rejects_queue_entry_not_waiting",
++        "test_coverage.CompletionGateTestCase.test_merged_is_not_completion_until_post_merge_verified",
+     ],
+ 
+     # -- POL-CHANGE-LEVELS -------------------------------------------------
+-    # C-02: L1 changes need a task card, independent review and the merge /
+-    # post-merge gates.
++    # C-02: L1 changes need a task card, an independent reviewer (reviewer !=
++    # executor at the envelope gate) and the merge / post-merge gates.
+     "POL-CHANGE-LEVELS/C-02": [
++        "test_coverage.MergeInvariantTestCase.test_merge_check_requires_independent_reviewer",
+         "test_coverage.PolicyInvariantTestCase.test_envelope_new_requires_accepted_task_and_pass_review",
+         "test_post_merge.PostMergeTestCase.test_rejects_envelope_that_was_never_merged",
+     ],
+diff --git a/tower-dsh/tools/tests/test_coverage.py b/tower-dsh/tools/tests/test_coverage.py
+index 9b717d1..e6ac552 100644
+--- a/tower-dsh/tools/tests/test_coverage.py
++++ b/tower-dsh/tools/tests/test_coverage.py
+@@ -558,6 +558,189 @@ class MergeInvariantTestCase(unittest.TestCase):
+         self.write_record(status="closed", evidence=evidence)
+         self.assertFalse(self.check(env, "evidence hashes valid")["ok"])
+ 
++    # -- POL-CHANGE-LEVELS C-02: the envelope gate itself must require an
++    #    independent reviewer, not just a PASS verdict.
++    def test_merge_check_requires_independent_reviewer(self) -> None:
++        env = self.envelope()
++        (self.root / "supervision" / "envelopes").mkdir(parents=True,
++                                                        exist_ok=True)
++        write_json(self.root / "supervision" / "envelopes" / "ENV-1.json", env)
++        write_json(self.root / "supervision" / "MERGE_QUEUE.json", {
++            "schema": "tower/merge-queue@1",
++            "entries": [{
++                "envelope_id": "ENV-1", "task": MERGE_TASK,
++                "branch": "feature", "base": "main",
++                "status": "WAITING", "added_at": FIXED_TIME,
++            }],
++        })
++        independent = run_cli(self.root, "merge-check", "--envelope", "ENV-1")
++        self.assertEqual(independent.returncode, 0,
++                         msg=independent.stdout + independent.stderr)
++
++        # Same closed task + PASS verdict, but the reviewer is the executor.
++        self.write_record(status="closed",
++                          review={"reviewer": "exec-a", "verdict": "PASS"})
++        rejected = run_cli(self.root, "merge-check", "--envelope", "ENV-1")
++        self.assertEqual(rejected.returncode, 2,
++                         msg=rejected.stdout + rejected.stderr)
++        payload = json.loads(rejected.stdout)
++        self.assertIn("reviewer != executor",
++                      [error["name"] for error in payload["errors"]])
++
++
++# ---------------------------------------------------------------------------
++# POL-RED-LINES C-14 supplementary test: MERGED is not completion
++# ---------------------------------------------------------------------------
++class CompletionGateTestCase(unittest.TestCase):
++    """Only ``POST_MERGE_VERIFIED`` completes an L1 change.
++
++    A successful ``merge`` leaves the envelope ``MERGED``; a failed post-merge
++    verification downgrades it to ``CORRECTION_REQUIRED``; only a passing
++    ``post-merge`` records completion.  This is the C-14 "no completion before
++    POST_MERGE_VERIFIED" gate exercised through the real CLI.
++    """
++
++    TASK = "T-COMPLETE"
++    ENVELOPE = "ENV-COMPLETE"
++    ENVELOPE_PATH = f"merge-envelopes/{ENVELOPE}.json"
++    BRANCH = "feature/complete"
++
++    def setUp(self) -> None:
++        self._tmp = tempfile.TemporaryDirectory(
++            prefix="towerctl-completion-", ignore_cleanup_errors=True)
++        self.kit = Path(self._tmp.name) / "kit"
++        self.root = self.kit / "tower-dsh"
++        for directory in ("primary", "supervision/envelopes", "ledger",
++                          f"tasks/{self.TASK}/evidence", "specs"):
++            (self.root / directory).mkdir(parents=True, exist_ok=True)
++        (self.root / "ledger" / "primary.jsonl").touch()
++        proof = self.root / "tasks" / self.TASK / "evidence" / "proof.txt"
++        proof.write_text("proof\n", encoding="utf-8")
++        write_json(self.root / "tasks" / self.TASK / "record.json", {
++            "schema": "tower/task@1",
++            "id": self.TASK,
++            "title": "completion gate",
++            "status": "accepted",
++            "executor": "exec-a",
++            "review": {"reviewer": "rev-a", "verdict": "PASS"},
++            "evidence": [{
++                "id": "E-001",
++                "path": f"tasks/{self.TASK}/evidence/proof.txt",
++                "sha256": sha256_file(proof),
++                "bytes": proof.stat().st_size,
++                "at": FIXED_TIME,
++            }],
++        })
++        write_json(self.root / "primary" / "CURRENT_STATE.json", {
++            "schema": "tower/current-state@1",
++            "tower_id": "tower-dsh", "role": "primary",
++            "primary": {"id": "ctl-primary"}, "owner": {"name": "mac"},
++            "phase": "TEST",
++        })
++        write_json(self.root / "supervision" / "CURRENT_STATE.json", {
++            "schema": "tower/supervision-state@1",
++            "role": "supervision", "phase": "TEST",
++            "supervisor": {"id": "sup-1"},
++        })
++        write_json(self.root / "supervision" / "MERGE_QUEUE.json", {
++            "schema": "tower/merge-queue@1",
++            "entries": [{
++                "envelope_id": self.ENVELOPE, "task": self.TASK,
++                "branch": self.BRANCH, "base": "main",
++                "status": "WAITING", "added_at": FIXED_TIME,
++            }],
++        })
++        self.init_repo()
++        self.write_envelope()
++
++    def tearDown(self) -> None:
++        self._tmp.cleanup()
++
++    def git(self, *args: str) -> subprocess.CompletedProcess:
++        env = dict(os.environ)
++        env.update(GIT_IDENTITY)
++        return subprocess.run(["git", "-C", str(self.kit), *args],
++                              capture_output=True, text=True, encoding="utf-8",
++                              env=env)
++
++    def commit_all(self, message: str) -> str:
++        add = self.git("add", "-A")
++        self.assertEqual(add.returncode, 0, msg=add.stderr)
++        commit = self.git("-c", "commit.gpgsign=false", "commit", "-m", message)
++        self.assertEqual(commit.returncode, 0, msg=commit.stdout + commit.stderr)
++        return self.git("rev-parse", "HEAD").stdout.strip()
++
++    def init_repo(self) -> None:
++        self.kit.mkdir(parents=True, exist_ok=True)
++        self.assertEqual(self.git("init").returncode, 0)
++        self.assertEqual(
++            self.git("symbolic-ref", "HEAD", "refs/heads/main").returncode, 0)
++        (self.kit / "README.md").write_text("base\n", encoding="utf-8")
++        tests_dir = self.kit / "tests"
++        tests_dir.mkdir()
++        (tests_dir / "test_smoke.py").write_text(
++            "import unittest\n\n\n"
++            "class SmokeTest(unittest.TestCase):\n"
++            "    def test_smoke(self):\n"
++            "        self.assertTrue(True)\n",
++            encoding="utf-8",
++        )
++        (self.kit / "merge-envelopes").mkdir()
++        self.commit_all("base")
++        self.assertEqual(self.git("checkout", "-b", self.BRANCH).returncode, 0)
++        (self.kit / "feature.txt").write_text("implementation\n", encoding="utf-8")
++        self.implementation_head = self.commit_all("implementation")
++        write_json(self.kit / self.ENVELOPE_PATH, {"envelope_id": self.ENVELOPE})
++        self.envelope_head = self.commit_all("envelope")
++        self.assertEqual(self.git("checkout", "main").returncode, 0)
++
++    def write_envelope(self) -> None:
++        write_json(self.root / "supervision" / "envelopes"
++                   / f"{self.ENVELOPE}.json", {
++            "schema": "tower/merge-envelope@1",
++            "envelope_id": self.ENVELOPE,
++            "task": self.TASK,
++            "repository": "..",
++            "branch": self.BRANCH,
++            "base": "main",
++            "envelope_path": self.ENVELOPE_PATH,
++            "implementation_head_sha": self.implementation_head,
++            "envelope_head_sha": self.envelope_head,
++            "status": "DRAFT",
++        })
++
++    def envelope(self) -> dict:
++        return read_json(self.root / "supervision" / "envelopes"
++                         / f"{self.ENVELOPE}.json")
++
++    def queue_entry(self) -> dict:
++        queue = read_json(self.root / "supervision" / "MERGE_QUEUE.json")
++        return next(e for e in queue["entries"] if e["envelope_id"] == self.ENVELOPE)
++
++    def test_merged_is_not_completion_until_post_merge_verified(self) -> None:
++        merged = run_cli(self.root, "merge", "--envelope", self.ENVELOPE,
++                         "--role", "supervisor", "--supervisor", "sup-x")
++        self.assertEqual(merged.returncode, 0,
++                         msg=merged.stdout + merged.stderr)
++        # A merge alone is not completion.
++        self.assertEqual(self.envelope()["status"], "MERGED")
++        self.assertEqual(self.queue_entry()["status"], "MERGED")
++
++        self.commit_all("state after merge")
++        failed = run_cli(self.root, "post-merge", "--envelope", self.ENVELOPE,
++                         "--result", "FAIL")
++        self.assertEqual(failed.returncode, 2,
++                         msg=failed.stdout + failed.stderr)
++        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
++
++        self.commit_all("state after failed verification")
++        verified = run_cli(self.root, "post-merge", "--envelope", self.ENVELOPE,
++                           "--result", "PASS")
++        self.assertEqual(verified.returncode, 0,
++                         msg=verified.stdout + verified.stderr)
++        self.assertEqual(self.envelope()["status"], "POST_MERGE_VERIFIED")
++        self.assertEqual(self.queue_entry()["status"], "POST_MERGE_VERIFIED")
++
+ 
+ # ---------------------------------------------------------------------------
+ # WF-HANDOFF supplementary clause tests
+@@ -593,8 +776,17 @@ class HandoffInvariantTestCase(unittest.TestCase):
+         })
+         write_json(self.root / "primary" / "TASK_BOARD.json",
+                    {"schema": "tower/task-board@1", "tasks": []})
+-        write_json(self.root / "supervision" / "MERGE_QUEUE.json",
+-                   {"schema": "tower/merge-queue@1", "entries": []})
++        # A verified queue entry makes every §0 anchor available for drift:
++        # main_sha, worktree_head and queue status.
++        write_json(self.root / "supervision" / "MERGE_QUEUE.json", {
++            "schema": "tower/merge-queue@1",
++            "entries": [{
++                "envelope_id": "ENV-1", "task": "T-HANDOFF",
++                "branch": "main", "base": "main",
++                "status": "POST_MERGE_VERIFIED", "added_at": FIXED_TIME,
++                "merge_commit": "a" * 40,
++            }],
++        })
+ 
+         self.repo = self.root / "pilot" / "repo"
+         self.assertEqual(run_git(self.repo, "init").returncode, 0)
+@@ -652,6 +844,54 @@ class HandoffInvariantTestCase(unittest.TestCase):
+         self.commit_all("drift")
+         self.assertFalse(self.check(self.package(), "main SHA unchanged")["ok"])
+ 
++    # -- INV-02 (complete): BOTH package files are hash-checked ----------
++    def test_handoff_check_detects_tampered_handoff_and_selfcheck(self) -> None:
++        pkg = self.package()
++        self.assertTrue(self.check(pkg, "HANDOFF.md hash")["ok"],
++                        msg="fixture must start with intact hashes")
++        self.assertTrue(self.check(pkg, "SELF-CHECK.md hash")["ok"],
++                        msg="fixture must start with intact hashes")
++        for name in ("HANDOFF.md", "SELF-CHECK.md"):
++            path = self.package_dir() / name
++            path.write_text(path.read_text(encoding="utf-8") + "\ntampered\n",
++                            encoding="utf-8")
++        pkg = self.package()
++        self.assertFalse(self.check(pkg, "HANDOFF.md hash")["ok"])
++        self.assertFalse(self.check(pkg, "SELF-CHECK.md hash")["ok"])
++
++    # -- INV-03 (complete): several §0 anchors drift at once -------------
++    def test_handoff_check_detects_multiple_section0_drifts(self) -> None:
++        pkg = self.package()
++        self.assertTrue(self.check(pkg, "main SHA unchanged")["ok"],
++                        msg="fixture must start without drift")
++        self.assertTrue(self.check(pkg, "queue still POST_MERGE_VERIFIED")["ok"],
++                        msg="fixture must start without drift")
++        (self.repo / "drift.txt").write_text("drift\n", encoding="utf-8")
++        self.commit_all("drift")
++        queue_path = self.root / "supervision" / "MERGE_QUEUE.json"
++        queue = read_json(queue_path)
++        queue["entries"][0]["status"] = "WAITING"
++        write_json(queue_path, queue)
++        drifted = self.package()
++        self.assertFalse(self.check(drifted, "main SHA unchanged")["ok"])
++        self.assertFalse(self.check(drifted, "queue still POST_MERGE_VERIFIED")["ok"])
++
++    # -- INV-04 (complete): claim -> receipt -> accept order is enforced
++    def test_handoff_receipt_and_accept_before_claim_are_rejected(self) -> None:
++        receipt = run_cli(self.root, "handoff-receipt", "--package", PACKAGE,
++                          "--controller", "rev-1")
++        self.assertEqual(receipt.returncode, 2,
++                         msg=receipt.stdout + receipt.stderr)
++        self.assertIn("READY_FOR_RECEIVER", receipt.stdout)
++        self.assertFalse((self.package_dir() / "RECEIPT.md").exists())
++
++        accept = run_cli(self.root, "handoff-accept", "--package", PACKAGE,
++                         "--controller", "rev-1")
++        self.assertEqual(accept.returncode, 2, msg=accept.stdout + accept.stderr)
++        self.assertIn("READY_FOR_RECEIVER/RECEIVED", accept.stdout)
++        self.assertFalse((self.package_dir() / "ACCEPTANCE.json").exists())
++        self.assertEqual(self.package()["status"], "PREPARED")
++
+     # -- INV-04: activate requires a prior accept ------------------------
+     def test_handoff_activate_requires_acceptance(self) -> None:
+         cp = run_cli(self.root, "handoff-activate", "--package", PACKAGE,
+diff --git a/tower-dsh/tools/tests/test_hardening2.py b/tower-dsh/tools/tests/test_hardening2.py
+new file mode 100644
+index 0000000..3b32a4e
+--- /dev/null
++++ b/tower-dsh/tools/tests/test_hardening2.py
+@@ -0,0 +1,551 @@
++"""Hardening round 2 regression tests (PILOT-010).
++
++Covers four independent defects:
++
++* path-escape protection for ``--task`` / ``--package`` / ``--envelope`` /
++  ``--worktree`` / ``--spec`` / ``--file`` / ``--evidence`` and the envelope
++  ``repository`` field (``repository: ".."`` stays valid for the kit layout);
++* a single JSON object on stdout when ``merge-check`` runs against a missing
++  task record (``envelope_checks`` must never emit from inside a check);
++* closeout no longer claims "Merge: not performed" and points at the merge
++  queue / ``tasks/<id>/MERGE.md``; a successful post-merge writes that record;
++* the Windows ACL busy-wait: a persistent ``PermissionError`` with no lock file
++  must hit the deadline instead of spinning forever.
++
++Run from the tower root (``tower-dsh``)::
++
++    python -B -m unittest discover -s tools/tests -v
++"""
++from __future__ import annotations
++
++import hashlib
++import json
++import os
++import subprocess
++import sys
++import tempfile
++import time
++import unittest
++from pathlib import Path
++from unittest import mock
++
++TOOLS_DIR = Path(__file__).resolve().parents[1]
++TOWER_ROOT = TOOLS_DIR.parent
++TCLI = TOOLS_DIR / "towerctl.py"
++TASK_ID = "T-001"
++ENVELOPE_ID = "ENV-HARD-001"
++FIXED_TIME = "2026-10-19T00:00:00+08:00"
++
++sys.path.insert(0, str(TOOLS_DIR))
++import towerctl  # noqa: E402  (import after sys.path setup)
++
++GIT_IDENTITY = {
++    "GIT_AUTHOR_NAME": "Tower Test",
++    "GIT_AUTHOR_EMAIL": "tower@example.invalid",
++    "GIT_COMMITTER_NAME": "Tower Test",
++    "GIT_COMMITTER_EMAIL": "tower@example.invalid",
++}
++
++
++def sha256_file(path: Path) -> str:
++    return hashlib.sha256(path.read_bytes()).hexdigest()
++
++
++def write_json(path: Path, data) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
++                    encoding="utf-8")
++
++
++def read_json(path: Path):
++    return json.loads(path.read_text(encoding="utf-8"))
++
++
++def run_git(repo: Path, *args: str) -> subprocess.CompletedProcess:
++    env = dict(os.environ)
++    env.update(GIT_IDENTITY)
++    return subprocess.run(["git", "-C", str(repo), *args],
++                          capture_output=True, text=True, encoding="utf-8",
++                          env=env)
++
++
++def run_cli(root: Path, *args: str) -> subprocess.CompletedProcess:
++    env = dict(os.environ)
++    env["PYTHONIOENCODING"] = "utf-8"
++    env["PYTHONUTF8"] = "1"
++    return subprocess.run(
++        [sys.executable, "-B", str(TCLI), "--root", str(root), *args],
++        capture_output=True, text=True, encoding="utf-8", env=env,
++    )
++
++
++# ---------------------------------------------------------------------------
++# path confinement
++# ---------------------------------------------------------------------------
++class PathSafetyTestCase(unittest.TestCase):
++    """Ids and paths must never point outside the tower root."""
++
++    def setUp(self) -> None:
++        self._tmp = tempfile.TemporaryDirectory(
++            prefix="towerctl-hardening2-", ignore_cleanup_errors=True)
++        self.base = Path(self._tmp.name)
++        self.root = self.base / "tower"
++        self.outside = self.base / "outside"
++        for directory in ("primary", "supervision/envelopes", "ledger", "specs",
++                          "handoffs", f"tasks/{TASK_ID}/evidence",
++                          f"pilot/worktrees/{TASK_ID}", "pilot/repo", "outside"):
++            (self.root / directory).mkdir(parents=True, exist_ok=True)
++        self.outside.mkdir(parents=True, exist_ok=True)
++        (self.root / "ledger" / "primary.jsonl").touch()
++
++        self.spec_path = self.root / "specs" / "task.spec.json"
++        write_json(self.spec_path, {
++            "schema": "tower/spec@1",
++            "id": TASK_ID,
++            "title": "hardening 2",
++            "authority": "workspace_write",
++            "scope": ["exercise path guards"],
++            "worktree": f"pilot/worktrees/{TASK_ID}",
++            "allowed_paths": ["tools/towerctl.py"],
++            "forbidden": ["merge", "production access"],
++            "acceptance": ["tests pass"],
++        })
++        self.record = {
++            "schema": "tower/task@1",
++            "id": TASK_ID,
++            "title": "hardening 2",
++            "status": "ready",
++            "authority": "workspace_write",
++            "scope": ["exercise path guards"],
++            "allowed_paths": ["tools/towerctl.py"],
++            "forbidden": ["merge", "production access"],
++            "acceptance": ["tests pass"],
++            "depends_on": [],
++            "worktree": f"pilot/worktrees/{TASK_ID}",
++            "spec_path": "specs/task.spec.json",
++            "spec_sha256": sha256_file(self.spec_path),
++            "spec_gate": "PASS",
++            "executor": None,
++            "dispatch": None,
++            "evidence": [],
++            "review": None,
++            "decision": None,
++            "closeout": None,
++            "created_at": FIXED_TIME,
++            "updated_at": FIXED_TIME,
++            "next": "",
++        }
++        self.write_record()
++        (self.root / "tasks" / TASK_ID / "TASK.md").write_text(
++            f"# {TASK_ID} — hardening 2\n", encoding="utf-8")
++        write_json(self.root / "primary" / "TASK_BOARD.json",
++                   {"schema": "tower/task-board@1", "tasks": []})
++        write_json(self.root / "primary" / "CURRENT_STATE.json", {
++            "schema": "tower/current-state@1", "tower_id": "tower-dsh",
++            "role": "primary", "primary": {"id": "ctl-test"},
++            "owner": {"name": "mac"}, "phase": "TEST",
++        })
++        write_json(self.root / "supervision" / "CURRENT_STATE.json", {
++            "schema": "tower/supervision-state@1", "role": "supervision",
++            "phase": "TEST", "supervisor": {"id": "sup-test"},
++        })
++        write_json(self.root / "supervision" / "MERGE_QUEUE.json",
++                   {"schema": "tower/merge-queue@1", "entries": []})
++        self.artifact = (self.root / "pilot" / "worktrees" / TASK_ID / "ART.txt")
++        self.artifact.write_text("artifact inside the root\n", encoding="utf-8")
++        self.outside_evidence = self.outside / "evidence.txt"
++        self.outside_evidence.write_text("evidence outside the root\n",
++                                         encoding="utf-8")
++        self.outside_spec = self.outside / "task.spec.json"
++        write_json(self.outside_spec, {
++            "schema": "tower/spec@1",
++            "id": TASK_ID,
++            "title": "outside",
++            "authority": "workspace_write",
++            "scope": ["outside"],
++            "worktree": f"pilot/worktrees/{TASK_ID}",
++            "allowed_paths": ["tools/towerctl.py"],
++            "forbidden": ["merge", "production access"],
++            "acceptance": ["tests pass"],
++        })
++        self.outside_envelope = self.outside / "envelope.json"
++        write_json(self.outside_envelope, {
++            "envelope_id": "ENV-OUTSIDE", "task": TASK_ID})
++
++    def tearDown(self) -> None:
++        self._tmp.cleanup()
++
++    # -- helpers ---------------------------------------------------------
++    def write_record(self, **overrides) -> None:
++        data = dict(self.record)
++        data.update(overrides)
++        write_json(self.root / "tasks" / TASK_ID / "record.json", data)
++        self.record = data
++
++    def load_record(self) -> dict:
++        return read_json(self.root / "tasks" / TASK_ID / "record.json")
++
++    def write_envelope(self, name: str = ENVELOPE_ID, **overrides) -> Path:
++        envelope = {
++            "schema": "tower/merge-envelope@1",
++            "envelope_id": name,
++            "task": TASK_ID,
++            "repository": "pilot/repo",
++            "branch": "feature",
++            "base": "main",
++            "envelope_path": f"merge-envelopes/{name}.json",
++            "implementation_head_sha": "a" * 40,
++            "envelope_head_sha": "b" * 40,
++            "status": "DRAFT",
++        }
++        envelope.update(overrides)
++        path = self.root / "supervision" / "envelopes" / f"{name}.json"
++        write_json(path, envelope)
++        return path
++
++    def assert_fails(self, cp: subprocess.CompletedProcess, *keywords: str) -> None:
++        self.assertEqual(cp.returncode, 2,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        blob = (cp.stdout + cp.stderr).lower()
++        for keyword in keywords:
++            self.assertIn(keyword.lower(), blob,
++                          msg=f"missing {keyword!r} in stdout={cp.stdout}\n"
++                              f"stderr={cp.stderr}")
++
++    # -- 1. traversal in task ids ---------------------------------------
++    def test_task_id_traversal_is_rejected(self) -> None:
++        for bad in ("../x", "..\\x", "T/../../x"):
++            cp = run_cli(self.root, "check", "--task", bad, "--phase", "ready")
++            self.assert_fails(cp, "invalid id")
++
++    # -- 2. traversal in package ids ------------------------------------
++    def test_handoff_package_traversal_is_rejected(self) -> None:
++        cp = run_cli(self.root, "handoff-check", "--package", "../x")
++        self.assert_fails(cp, "invalid id")
++        cp = run_cli(self.root, "handoff-new", "--package", "../x")
++        self.assert_fails(cp, "invalid id")
++
++    # -- 3. a regex-valid id may still not contain '..' -----------------
++    def test_package_id_with_dotdot_segment_is_rejected(self) -> None:
++        cp = run_cli(self.root, "handoff-check", "--package", "A..B")
++        self.assert_fails(cp, "invalid id")
++        cp = run_cli(self.root, "handoff-new", "--package", "A..B")
++        self.assert_fails(cp, "invalid id")
++
++    # -- 4. traversal in envelope ids -----------------------------------
++    def test_envelope_id_traversal_is_rejected(self) -> None:
++        cp = run_cli(self.root, "merge-check", "--envelope", "../x")
++        self.assert_fails(cp, "invalid id")
++        cp = run_cli(self.root, "queue-add", "--envelope", "../x")
++        self.assert_fails(cp, "invalid id")
++        cp = run_cli(self.root, "merge-check", "--envelope", "A..B")
++        self.assert_fails(cp, "invalid id")
++
++    # -- 5. --worktree must stay inside the root ------------------------
++    def test_dispatch_rejects_worktree_outside_root(self) -> None:
++        for bad in (str(self.outside), "../outside"):
++            cp = run_cli(self.root, "dispatch", "--task", TASK_ID,
++                         "--executor", "exec-a", "--worktree", bad)
++            self.assert_fails(cp, "outside tower root")
++            self.assertEqual(self.load_record()["status"], "ready")
++
++    # -- 6. an in-root worktree still dispatches ------------------------
++    def test_dispatch_accepts_worktree_inside_root(self) -> None:
++        cp = run_cli(self.root, "dispatch", "--task", TASK_ID,
++                     "--executor", "exec-a",
++                     "--worktree", f"pilot/worktrees/{TASK_ID}")
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.load_record()["status"], "dispatched")
++
++    # -- 7. --evidence must stay inside the root ------------------------
++    def test_deliver_rejects_evidence_outside_root(self) -> None:
++        self.write_record(status="dispatched", executor="exec-a")
++        cp = run_cli(self.root, "deliver", "--task", TASK_ID,
++                     "--evidence", str(self.outside_evidence))
++        self.assert_fails(cp, "outside tower root")
++        self.assertEqual(self.load_record()["evidence"], [])
++        self.assertEqual(self.load_record()["status"], "dispatched")
++
++    # -- 8. in-root evidence keeps working (pilot/worktrees/...) --------
++    def test_deliver_accepts_evidence_inside_root(self) -> None:
++        self.write_record(status="dispatched", executor="exec-a")
++        cp = run_cli(self.root, "deliver", "--task", TASK_ID,
++                     "--evidence", str(self.artifact))
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        record = self.load_record()
++        self.assertEqual(record["status"], "delivered")
++        self.assertEqual(record["evidence"][0]["path"],
++                         f"tasks/{TASK_ID}/evidence/ART.txt")
++
++    # -- 8b. recorded evidence paths under pilot/worktrees stay valid ---
++    def test_evidence_path_under_pilot_worktrees_is_accepted(self) -> None:
++        record = {"evidence": [{
++            "id": "E-001",
++            "path": f"pilot/worktrees/{TASK_ID}/ART.txt",
++            "sha256": sha256_file(self.artifact),
++            "bytes": self.artifact.stat().st_size,
++            "at": FIXED_TIME,
++        }]}
++        self.assertEqual(towerctl.check_evidence(self.root, record), [])
++
++    # -- 9. --spec must stay inside the root ----------------------------
++    def test_task_new_rejects_spec_outside_root(self) -> None:
++        cp = run_cli(self.root, "task-new", "--spec", str(self.outside_spec))
++        self.assert_fails(cp, "outside tower root")
++        self.assertFalse((self.root / "tasks" / "T-OUTSIDE").exists())
++
++    # -- 10. spec.worktree must stay inside the root --------------------
++    def test_task_new_rejects_worktree_outside_root(self) -> None:
++        spec = read_json(self.spec_path)
++        spec["id"] = "T-NEW"
++        spec["worktree"] = "../.."
++        write_json(self.spec_path, spec)
++        cp = run_cli(self.root, "task-new", "--spec",
++                     str(self.root / "specs" / "task.spec.json"))
++        self.assert_fails(cp, "outside tower root")
++
++    # -- 11. --file must stay inside the root ---------------------------
++    def test_envelope_new_rejects_file_outside_root(self) -> None:
++        cp = run_cli(self.root, "envelope-new", "--task", TASK_ID,
++                     "--file", str(self.outside_envelope))
++        self.assert_fails(cp, "outside tower root")
++
++    # -- 12. a traversal --task is rejected before the envelope gate ----
++    def test_envelope_new_rejects_task_traversal(self) -> None:
++        cp = run_cli(self.root, "envelope-new", "--task", "../x",
++                     "--file", str(self.root / "specs" / "task.spec.json"))
++        self.assert_fails(cp, "invalid id")
++
++    # -- 13. repository outside root's parent is refused ----------------
++    def test_envelope_repository_outside_parent_is_rejected(self) -> None:
++        self.write_envelope("ENV-REPO", repository="../..")
++        cp = run_cli(self.root, "merge-check", "--envelope", "ENV-REPO")
++        self.assert_fails(cp, "outside tower root")
++
++    # -- 14. repository '..' (kit layout) is still allowed --------------
++    def test_envelope_repository_parent_is_allowed(self) -> None:
++        self.write_envelope("ENV-PARENT", repository="..")
++        cp = run_cli(self.root, "merge-check", "--envelope", "ENV-PARENT")
++        self.assertEqual(cp.returncode, 2,
++                         msg=f"git checks should still fail\n{cp.stdout}")
++        self.assertNotIn("outside tower root", cp.stdout.lower())
++        json.loads(cp.stdout)
++        self.assertEqual(
++            towerctl.ensure_within(self.root, self.base, allow_parent=True),
++            self.base.resolve())
++
++    # -- 15. missing record: exactly one JSON object, one task check ----
++    def test_merge_check_missing_record_emits_single_json_object(self) -> None:
++        self.write_envelope("ENV-MISSING", task="MISSING-001")
++        cp = run_cli(self.root, "merge-check", "--envelope", "ENV-MISSING")
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        payload = json.loads(cp.stdout)  # raises on a second JSON object
++        self.assertFalse(payload["ok"])
++        self.assertEqual(cp.stdout.count('"task record"'), 1)
++        self.assertNotIn("task accepted/closed", cp.stdout)
++        task_checks = [c for c in payload["errors"] if c["name"] == "task record"]
++        self.assertEqual(len(task_checks), 1)
++        self.assertFalse(task_checks[0]["ok"])
++
++    # -- 16. closeout points at the merge queue / MERGE.md --------------
++    def test_close_closeout_has_no_not_performed(self) -> None:
++        evidence = [{
++            "id": "E-001",
++            "path": f"pilot/worktrees/{TASK_ID}/ART.txt",
++            "sha256": sha256_file(self.artifact),
++            "bytes": self.artifact.stat().st_size,
++            "at": FIXED_TIME,
++        }]
++        self.write_record(status="accepted", executor="exec-a",
++                          review={"reviewer": "rev-a", "verdict": "PASS"},
++                          decision={"id": "D-1"}, evidence=evidence)
++        cp = run_cli(self.root, "close", "--task", TASK_ID)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        text = (self.root / "tasks" / TASK_ID / "CLOSEOUT.md").read_text(
++            encoding="utf-8")
++        self.assertNotIn("not performed", text.lower())
++        self.assertIn("supervision/MERGE_QUEUE.json", text)
++        self.assertIn(f"tasks/{TASK_ID}/MERGE.md", text)
++        self.assertIn("(owner gate)", text)
++        self.assertEqual(self.load_record()["status"], "closed")
++
++
++# ---------------------------------------------------------------------------
++# post-merge MERGE.md artefact
++# ---------------------------------------------------------------------------
++class PostMergeArtifactTestCase(unittest.TestCase):
++    """A verified merge writes ``tasks/<id>/MERGE.md`` for the closeout."""
++
++    TASK = "T-PM-001"
++    ENVELOPE = "ENV-PM-001"
++    ENVELOPE_PATH = f"merge-envelopes/{ENVELOPE}.json"
++    BRANCH = "feature/post-merge-artifact"
++
++    def setUp(self) -> None:
++        self._tmp = tempfile.TemporaryDirectory(
++            prefix="towerctl-merge-record-", ignore_cleanup_errors=True)
++        self.kit = Path(self._tmp.name) / "kit"
++        self.root = self.kit / "tower-dsh"
++        for directory in ("primary", "supervision/envelopes", "ledger",
++                          f"tasks/{self.TASK}/evidence"):
++            (self.root / directory).mkdir(parents=True, exist_ok=True)
++        (self.root / "ledger" / "primary.jsonl").touch()
++        (self.root / "ledger" / "supervision.jsonl").touch()
++        proof = self.root / "tasks" / self.TASK / "evidence" / "proof.txt"
++        proof.write_text("proof\n", encoding="utf-8")
++        write_json(self.root / "tasks" / self.TASK / "record.json", {
++            "schema": "tower/task@1",
++            "id": self.TASK,
++            "title": "post-merge artefact",
++            "status": "accepted",
++            "executor": "exec-a",
++            "review": {"reviewer": "rev-a", "verdict": "PASS"},
++            "evidence": [{
++                "id": "E-001",
++                "path": f"tasks/{self.TASK}/evidence/proof.txt",
++                "sha256": sha256_file(proof),
++                "bytes": proof.stat().st_size,
++                "at": FIXED_TIME,
++            }],
++        })
++        write_json(self.root / "primary" / "CURRENT_STATE.json", {
++            "schema": "tower/current-state@1", "tower_id": "tower-dsh",
++            "role": "primary", "primary": {"id": "ctl-primary"},
++            "owner": {"name": "mac"}, "phase": "TEST",
++        })
++        write_json(self.root / "supervision" / "CURRENT_STATE.json", {
++            "schema": "tower/supervision-state@1", "role": "supervision",
++            "phase": "TEST", "supervisor": {"id": "sup-1"},
++        })
++        write_json(self.root / "supervision" / "MERGE_QUEUE.json", {
++            "schema": "tower/merge-queue@1",
++            "entries": [{
++                "envelope_id": self.ENVELOPE, "task": self.TASK,
++                "branch": self.BRANCH, "base": "main",
++                "status": "WAITING", "added_at": FIXED_TIME,
++            }],
++        })
++        self.init_repo()
++        self.write_envelope()
++
++    def tearDown(self) -> None:
++        self._tmp.cleanup()
++
++    def commit_all(self, message: str) -> str:
++        add = run_git(self.kit, "add", "-A")
++        self.assertEqual(add.returncode, 0, msg=add.stderr)
++        commit = run_git(self.kit, "-c", "commit.gpgsign=false",
++                         "commit", "-m", message)
++        self.assertEqual(commit.returncode, 0, msg=commit.stdout + commit.stderr)
++        return run_git(self.kit, "rev-parse", "HEAD").stdout.strip()
++
++    def init_repo(self) -> None:
++        self.kit.mkdir(parents=True, exist_ok=True)
++        self.assertEqual(run_git(self.kit, "init").returncode, 0)
++        self.assertEqual(
++            run_git(self.kit, "symbolic-ref", "HEAD", "refs/heads/main").returncode,
++            0)
++        (self.kit / "README.md").write_text("base\n", encoding="utf-8")
++        tests_dir = self.kit / "tests"
++        tests_dir.mkdir()
++        (tests_dir / "test_smoke.py").write_text(
++            "import unittest\n\n\n"
++            "class SmokeTest(unittest.TestCase):\n"
++            "    def test_smoke(self):\n"
++            "        self.assertTrue(True)\n",
++            encoding="utf-8",
++        )
++        (self.kit / "merge-envelopes").mkdir()
++        self.commit_all("base")
++        self.assertEqual(
++            run_git(self.kit, "checkout", "-b", self.BRANCH).returncode, 0)
++        (self.kit / "feature.txt").write_text("implementation\n", encoding="utf-8")
++        self.implementation_head = self.commit_all("implementation")
++        write_json(self.kit / self.ENVELOPE_PATH, {"envelope_id": self.ENVELOPE})
++        self.envelope_head = self.commit_all("envelope")
++        self.assertEqual(run_git(self.kit, "checkout", "main").returncode, 0)
++
++    def write_envelope(self) -> None:
++        write_json(self.root / "supervision" / "envelopes"
++                   / f"{self.ENVELOPE}.json", {
++            "schema": "tower/merge-envelope@1",
++            "envelope_id": self.ENVELOPE,
++            "task": self.TASK,
++            "repository": "..",
++            "branch": self.BRANCH,
++            "base": "main",
++            "envelope_path": self.ENVELOPE_PATH,
++            "implementation_head_sha": self.implementation_head,
++            "envelope_head_sha": self.envelope_head,
++            "status": "DRAFT",
++        })
++
++    def test_post_merge_success_writes_merge_md(self) -> None:
++        merged = run_cli(self.root, "merge", "--envelope", self.ENVELOPE,
++                         "--role", "supervisor", "--supervisor", "sup-x")
++        self.assertEqual(merged.returncode, 0,
++                         msg=merged.stdout + merged.stderr)
++        self.commit_all("state after merge")
++        verified = run_cli(self.root, "post-merge", "--envelope", self.ENVELOPE,
++                           "--result", "PASS")
++        self.assertEqual(verified.returncode, 0,
++                         msg=verified.stdout + verified.stderr)
++        payload = json.loads(verified.stdout)
++        merge_md = self.root / "tasks" / self.TASK / "MERGE.md"
++        self.assertTrue(merge_md.exists(), msg=payload)
++        self.assertEqual(payload["merge_record"],
++                         f"tasks/{self.TASK}/MERGE.md")
++        text = merge_md.read_text(encoding="utf-8")
++        envelope = read_json(self.root / "supervision" / "envelopes"
++                             / f"{self.ENVELOPE}.json")
++        self.assertIn(f"`{self.ENVELOPE}`", text)
++        self.assertIn(self.implementation_head, text)
++        self.assertIn(envelope["merge_commit"], text)
++        self.assertIn("POST_MERGE_VERIFIED", text)
++        self.assertIn("Post-merge checks: 4/4", text)
++        self.assertIn("Verified at:", text)
++
++
++# ---------------------------------------------------------------------------
++# ledger lock deadline (Windows ACL busy-wait)
++# ---------------------------------------------------------------------------
++class LedgerLockDeadlineTestCase(unittest.TestCase):
++    def setUp(self) -> None:
++        self._tmp = tempfile.TemporaryDirectory(
++            prefix="towerctl-lock-deadline-", ignore_cleanup_errors=True)
++        self.root = Path(self._tmp.name)
++        (self.root / "ledger").mkdir(parents=True, exist_ok=True)
++        self.lock = self.root / "ledger" / ".lock"
++
++    def tearDown(self) -> None:
++        self._tmp.cleanup()
++
++    @unittest.skipUnless(os.name == "nt", "Windows ACL PermissionError path")
++    def test_persistent_permission_error_without_lock_hits_deadline(self) -> None:
++        with mock.patch.object(towerctl.os, "open",
++                               side_effect=PermissionError(13, "denied")):
++            started = time.monotonic()
++            with self.assertRaises(towerctl.LedgerLockTimeout):
++                towerctl._acquire_lock_file(self.lock, 0.2, 60.0)
++            elapsed = time.monotonic() - started
++        self.assertFalse(self.lock.exists())
++        self.assertGreaterEqual(elapsed, 0.1,
++                                "the deadline must be a real wait, not a guess")
++        self.assertLess(elapsed, 3.0,
++                        f"busy-waited for {elapsed:.1f}s instead of timing out")
++
++    def test_normal_contention_is_not_an_immediate_timeout(self) -> None:
++        self.lock.write_text("held by someone else\n", encoding="utf-8")
++        started = time.monotonic()
++        with self.assertRaises(towerctl.LedgerLockTimeout):
++            towerctl._acquire_lock_file(self.lock, 0.3, 60.0)
++        elapsed = time.monotonic() - started
++        self.assertGreaterEqual(elapsed, 0.2,
++                                "a fresh lock is contention, not a timeout")
++        self.assertLess(elapsed, 2.0)
++        self.assertTrue(self.lock.exists(),
++                        "someone else's lock must never be removed")
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tower-dsh/tools/towerctl.py b/tower-dsh/tools/towerctl.py
+index 6cf86fc..c0da843 100644
+--- a/tower-dsh/tools/towerctl.py
++++ b/tower-dsh/tools/towerctl.py
+@@ -25,6 +25,10 @@ import spec_lint
+ 
+ DEFAULT_ROOT = Path(__file__).resolve().parents[1]
+ TASK_ID_RE = re.compile(r"^[A-Z0-9][A-Z0-9-]{1,40}$")
++# Package / envelope ids double as directory and file names, so they are
++# restricted to a conservative filename-safe alphabet and may never contain
++# ``..`` (which the character class alone would allow).
++PACKAGE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+ 
+ 
+ def now() -> str:
+@@ -68,6 +72,65 @@ def rel(root: Path, path: Path) -> str:
+         return str(path.resolve())
+ 
+ 
++def is_safe_id(value, pattern: re.Pattern) -> bool:
++    """True when ``value`` is a filename-safe id for ``pattern``.
++
++    Rejects empty values, embedded ``..`` and anything the pattern does not
++    match.  ``..`` is rejected explicitly because a package/envelope alphabet
++    that allows ``.`` would otherwise accept ``A..B``.
++    """
++    text = str(value or "")
++    return bool(text) and ".." not in text and bool(pattern.match(text))
++
++
++def check_task_id(value, label: str = "task") -> str:
++    """Validate a task id or exit 2 with an ``invalid id`` error."""
++    if not is_safe_id(value, TASK_ID_RE):
++        fail([f"invalid id: {value!r} "
++              f"({label} id must match {TASK_ID_RE.pattern})"])
++    return str(value)
++
++
++def check_package_id(value, label: str = "package") -> str:
++    """Validate a package/envelope id or exit 2 with an ``invalid id`` error."""
++    if not is_safe_id(value, PACKAGE_ID_RE):
++        fail([f"invalid id: {value!r} ({label} id must match "
++              f"{PACKAGE_ID_RE.pattern} and must not contain '..')"])
++    return str(value)
++
++
++def ensure_within(root: Path, path: Path, *, allow_parent: bool = False,
++                  label: str = "path") -> Path:
++    """Resolve ``path`` and require it to stay inside ``root``.
++
++    ``allow_parent`` additionally accepts exactly ``root``'s parent, which is
++    what the kit layout uses for ``repository: ".."``.  Anything else exits 2
++    with an ``outside tower root`` error so no command can be steered at an
++    arbitrary filesystem location.
++    """
++    root_resolved = Path(root).resolve()
++    resolved = Path(path).resolve()
++    if resolved == root_resolved or root_resolved in resolved.parents:
++        return resolved
++    if allow_parent and resolved == root_resolved.parent:
++        return resolved
++    fail([f"{label} outside tower root: {resolved} (root: {root_resolved})"])
++
++
++def resolve_input_within(root: Path, value: str, label: str) -> Path:
++    """Resolve ``--spec`` / ``--file`` / ``--evidence`` and confine it to root."""
++    raw = Path(value)
++    candidate = raw if raw.is_absolute() else root / raw
++    return ensure_within(root, candidate, label=label)
++
++
++def resolve_repository(root: Path, value) -> Path:
++    """Resolve an envelope ``repository`` inside root, or root's parent."""
++    raw = Path(str(value or "pilot/repo"))
++    candidate = raw if raw.is_absolute() else root / raw
++    return ensure_within(root, candidate, allow_parent=True, label="repository")
++
++
+ GENESIS_PREV_HASH = "GENESIS"
+ LEDGER_FILES = {"primary": "primary.jsonl", "supervision": "supervision.jsonl"}
+ LEDGER_LOCK_TIMEOUT = 10.0
+@@ -201,6 +264,14 @@ def _acquire_lock_file(path: Path, timeout: float, stale_after: float) -> None:
+                 os.close(fd)
+             return
+         if _clear_stale_lock(path, stale_after):
++            # "Nothing to clear" must still honour the deadline.  A persistent
++            # PermissionError against a path that does not exist (Windows ACL /
++            # pending-delete) makes _clear_stale_lock() return True forever;
++            # without this check the caller would spin instead of timing out.
++            if time.monotonic() >= deadline:
++                raise LedgerLockTimeout(
++                    f"ledger write lock busy for more than {timeout:g}s: {path}")
++            time.sleep(LEDGER_LOCK_POLL_INTERVAL)
+             continue
+         if time.monotonic() >= deadline:
+             raise LedgerLockTimeout(
+@@ -288,7 +359,7 @@ def append_supervision_ledger(root: Path, event_type: str, actor: str,
+ 
+ 
+ def task_dir(root: Path, tid: str) -> Path:
+-    return root / "tasks" / tid
++    return root / "tasks" / check_task_id(tid)
+ 
+ 
+ def task_record_path(root: Path, tid: str) -> Path:
+@@ -351,13 +422,20 @@ def check_evidence(root: Path, record: dict) -> list[str]:
+     if not evidence:
+         errors.append("no evidence recorded")
+     for e in evidence:
+-        path = root / e.get("path", "")
+-        if not e.get("path") or not path.exists():
++        raw = e.get("path") or ""
++        if not raw:
+             errors.append(f"evidence missing: {e.get('path')}")
+             continue
++        # Evidence paths are recorded relative to the tower root.  Confining
++        # them keeps a forged record from hashing an arbitrary host file while
++        # still accepting in-root paths such as pilot/worktrees/...
++        path = ensure_within(root, root / raw, label="evidence")
++        if not path.exists():
++            errors.append(f"evidence missing: {raw}")
++            continue
+         actual = sha256_file(path)
+         if actual != e.get("sha256"):
+-            errors.append(f"evidence hash mismatch: {e.get('path')}")
++            errors.append(f"evidence hash mismatch: {raw}")
+     return errors
+ 
+ 
+@@ -498,7 +576,7 @@ def envelope_checks(root: Path, env: dict) -> list[dict]:
+     def add(name: str, ok: bool, detail: str) -> None:
+         checks.append({"name": name, "ok": bool(ok), "detail": detail})
+ 
+-    repo = root / env.get("repository", "pilot/repo")
++    repo = resolve_repository(root, env.get("repository"))
+     add("repository exists", repo.exists(), str(repo))
+     if not repo.exists():
+         return checks
+@@ -519,8 +597,16 @@ def envelope_checks(root: Path, env: dict) -> list[dict]:
+         add(f"base {base} is ancestor of implementation", ancestor, f"{base}..{a}")
+     except Exception as exc:
+         add("git checks", False, str(exc))
+-    try:
+-        rec = load_record(root, env.get("task", ""))
++    # Never call load_record() here: it emits a JSON object and raises
++    # SystemExit, which would print one payload from inside the check list and
++    # a second one from the caller.  A missing/invalid record is one failed
++    # check instead, so merge-check always emits exactly one JSON object.
++    task = str(env.get("task") or "")
++    rec = _optional_task_record(root, task)
++    if rec is None:
++        add("task record", False, f"task record missing: {task or '(empty)'}")
++    else:
++        add("task record", True, task)
+         add("task accepted/closed", rec.get("status") in ("accepted", "closed"),
+             str(rec.get("status")))
+         review = rec.get("review") or {}
+@@ -529,8 +615,6 @@ def envelope_checks(root: Path, env: dict) -> list[dict]:
+             f"{review.get('reviewer')} vs {rec.get('executor')}")
+         ev_errors = check_evidence(root, rec)
+         add("evidence hashes valid", not ev_errors, "; ".join(ev_errors) or "ok")
+-    except SystemExit:
+-        add("task record", False, "task record missing")
+     return checks
+ 
+ 
+@@ -664,14 +748,14 @@ def validate_spec(spec: dict) -> list[str]:
+ 
+ 
+ def cmd_task_new(root: Path, args) -> None:
+-    spec_path = resolve_input(root, args.spec)
++    spec_path = resolve_input_within(root, args.spec, "spec")
+     if not spec_path.exists():
+         fail([f"spec not found: {spec_path}"])
+     spec = jload(spec_path)
+     tid = str(spec.get("id", ""))
+     errors = []
+     if not TASK_ID_RE.match(tid):
+-        errors.append(f"invalid task id: {tid}")
++        errors.append(f"invalid id: {tid!r} (task id must match {TASK_ID_RE.pattern})")
+     for field in ["title", "authority", "scope", "allowed_paths", "forbidden", "acceptance"]:
+         if not spec.get(field):
+             errors.append(f"spec.{field} required")
+@@ -680,8 +764,10 @@ def cmd_task_new(root: Path, args) -> None:
+     worktree = spec.get("worktree")
+     if not worktree:
+         errors.append("spec.worktree required")
+-    elif not (root / worktree).exists():
+-        errors.append(f"worktree missing: {worktree}")
++    else:
++        worktree_path = ensure_within(root, root / worktree, label="worktree")
++        if not worktree_path.exists():
++            errors.append(f"worktree missing: {worktree}")
+     if errors:
+         fail(errors)
+     tdir = task_dir(root, tid)
+@@ -835,7 +921,10 @@ def cmd_dispatch(root: Path, args) -> None:
+     if rec.get("status") not in ("ready", "rework"):
+         fail([f"task status {rec.get('status')} cannot dispatch"])
+     worktree = args.worktree or rec.get("worktree")
+-    if not worktree or not (root / worktree).exists():
++    if not worktree:
++        fail(["worktree missing: (empty)"])
++    worktree_path = ensure_within(root, root / worktree, label="worktree")
++    if not worktree_path.exists():
+         fail([f"worktree missing: {worktree}"])
+     task_md = task_dir(root, args.task) / "TASK.md"
+     if not task_md.exists():
+@@ -864,7 +953,7 @@ def cmd_deliver(root: Path, args) -> None:
+     evdir.mkdir(parents=True, exist_ok=True)
+     existing = {e.get("path") for e in rec.get("evidence", [])}
+     for value in args.evidence:
+-        src = resolve_input(root, value)
++        src = resolve_input_within(root, value, "evidence")
+         if not src.exists() or not src.is_file():
+             fail([f"evidence not found: {value}"])
+         dest = evdir / src.name
+@@ -958,12 +1047,15 @@ def cmd_close(root: Path, args) -> None:
+     if errors:
+         fail(errors)
+     closeout = tdir / "CLOSEOUT.md"
+-    next_text = "merge/handoff decision (owner gate) — not performed in Phase 1"
++    merge_ref = f"tasks/{rec['id']}/MERGE.md"
++    next_text = ("merge/handoff decision (owner gate) — see "
++                 f"supervision/MERGE_QUEUE.json and {merge_ref}")
+     lines = [f"# {rec['id']} — Closeout", "", f"- Status: `closed`",
+              f"- Executor: `{rec.get('executor')}`",
+              f"- Reviewer: `{(rec.get('review') or {}).get('reviewer')}`",
+              f"- Decision: `{rec.get('decision', {}).get('id')}`",
+-             "- Merge: **not performed** (first version; merge is a separate owner gate)", "",
++             "- Merge: see supervision/MERGE_QUEUE.json and "
++             f"{merge_ref} (owner gate)", "",
+              "## Evidence", ""]
+     lines += [f"- `{e['path']}` `{e['sha256']}`" for e in rec.get("evidence", [])]
+     lines += ["", "## Next", "", next_text]
+@@ -1135,16 +1227,26 @@ def _optional_git_status(repo: Path | None) -> str:
+     return cp.stdout.strip() or "clean"
+ 
+ 
+-def _load_optional_record(root: Path, task_id: str) -> dict:
+-    if not task_id:
+-        return {}
++def _optional_task_record(root: Path, task_id: str) -> dict | None:
++    """Best-effort record load that never emits / exits.
++
++    Used by checks that must report a missing or malformed record as data
++    (``envelope_checks``), not as a second JSON payload.
++    """
++    if not is_safe_id(task_id, TASK_ID_RE):
++        return None
+     path = task_record_path(root, task_id)
+     if not path.exists():
+-        return {}
++        return None
+     try:
+-        return jload(path)
++        data = jload(path)
+     except Exception:
+-        return {}
++        return None
++    return data if isinstance(data, dict) else None
++
++
++def _load_optional_record(root: Path, task_id: str) -> dict:
++    return _optional_task_record(root, task_id) or {}
+ 
+ 
+ def match_task_by_evidence(root: Path, state: dict) -> str | None:
+@@ -1302,7 +1404,11 @@ def handoff_checks(root: Path, package_id: str, pkg: dict) -> list[dict]:
+ 
+ 
+ def cmd_handoff_new(root: Path, args) -> None:
+-    package_id = args.package
++    package_id = check_package_id(args.package, "package")
++    if args.task:
++        check_task_id(args.task, "task")
++    if args.envelope:
++        check_package_id(args.envelope, "envelope")
+     pkgdir = root / "handoffs" / package_id
+     if pkgdir.exists():
+         fail([f"handoff package already exists: {package_id}"])
+@@ -1489,12 +1595,13 @@ NONE（无阻断性漂移；证据锚点：package {len(snap['evidence'])} 项
+ 
+ 
+ def cmd_handoff_check(root: Path, args) -> None:
+-    pkgdir = root / "handoffs" / args.package
++    package_id = check_package_id(args.package, "package")
++    pkgdir = root / "handoffs" / package_id
+     pkg_path = pkgdir / "package.json"
+     if not pkg_path.exists():
+         fail([f"package not found: {args.package}"])
+     pkg = jload(pkg_path)
+-    checks = handoff_checks(root, args.package, pkg)
++    checks = handoff_checks(root, package_id, pkg)
+     if not all(c["ok"] for c in checks):
+         emit({"ok": False, "package": args.package,
+               "errors": [c for c in checks if not c["ok"]]}, 2)
+@@ -1502,14 +1609,15 @@ def cmd_handoff_check(root: Path, args) -> None:
+ 
+ 
+ def cmd_handoff_claim(root: Path, args) -> None:
+-    pkgdir = root / "handoffs" / args.package
++    package_id = check_package_id(args.package, "package")
++    pkgdir = root / "handoffs" / package_id
+     pkg_path = pkgdir / "package.json"
+     if not pkg_path.exists():
+         fail([f"package not found: {args.package}"])
+     pkg = jload(pkg_path)
+     if args.controller == pkg.get("source_controller"):
+         fail(["receiver must differ from source controller"])
+-    checks = handoff_checks(root, args.package, pkg)
++    checks = handoff_checks(root, package_id, pkg)
+     if not all(c["ok"] for c in checks):
+         emit({"ok": False, "package": args.package,
+               "errors": [c for c in checks if not c["ok"]]}, 2)
+@@ -1531,7 +1639,8 @@ def cmd_handoff_claim(root: Path, args) -> None:
+ 
+ 
+ def cmd_handoff_accept(root: Path, args) -> None:
+-    pkgdir = root / "handoffs" / args.package
++    package_id = check_package_id(args.package, "package")
++    pkgdir = root / "handoffs" / package_id
+     pkg_path = pkgdir / "package.json"
+     if not pkg_path.exists():
+         fail([f"package not found: {args.package}"])
+@@ -1567,7 +1676,8 @@ def cmd_handoff_accept(root: Path, args) -> None:
+ 
+ 
+ def cmd_handoff_receipt(root: Path, args) -> None:
+-    pkgdir = root / "handoffs" / args.package
++    package_id = check_package_id(args.package, "package")
++    pkgdir = root / "handoffs" / package_id
+     pkg_path = pkgdir / "package.json"
+     if not pkg_path.exists():
+         fail([f"package not found: {args.package}"])
+@@ -1613,7 +1723,8 @@ def cmd_handoff_receipt(root: Path, args) -> None:
+ 
+ 
+ def cmd_handoff_activate(root: Path, args) -> None:
+-    pkgdir = root / "handoffs" / args.package
++    package_id = check_package_id(args.package, "package")
++    pkgdir = root / "handoffs" / package_id
+     pkg_path = pkgdir / "package.json"
+     if not pkg_path.exists():
+         fail([f"package not found: {args.package}"])
+@@ -1685,7 +1796,8 @@ def cmd_supervision_init(root: Path, args) -> None:
+ 
+ 
+ def cmd_envelope_new(root: Path, args) -> None:
+-    file = resolve_input(root, args.file)
++    task_id = check_task_id(args.task, "task")
++    file = resolve_input_within(root, args.file, "envelope file")
+     if not file.exists():
+         fail([f"envelope file not found: {file}"])
+     env = jload(file)
+@@ -1693,14 +1805,16 @@ def cmd_envelope_new(root: Path, args) -> None:
+     task = env.get("task")
+     if not env_id or not task:
+         fail(["envelope_id and task are required"])
+-    if env.get("task") != args.task:
+-        fail([f"envelope task {env.get('task')} != --task {args.task}"])
+-    rec = load_record(root, args.task)
++    env_id = check_package_id(env_id, "envelope")
++    task = check_task_id(task, "task")
++    if task != task_id:
++        fail([f"envelope task {task} != --task {task_id}"])
++    rec = load_record(root, task_id)
+     if rec.get("status") not in ("accepted", "closed"):
+         fail([f"task status {rec.get('status')} cannot submit envelope"])
+     if not (rec.get("review") or {}).get("verdict") == "PASS":
+         fail(["task has no PASS review"])
+-    repo = root / env.get("repository", "pilot/repo")
++    repo = resolve_repository(root, env.get("repository"))
+     if not repo.exists():
+         fail([f"repository missing: {repo}"])
+     branch = env.get("branch")
+@@ -1735,15 +1849,16 @@ def cmd_envelope_new(root: Path, args) -> None:
+ 
+ 
+ def cmd_queue_add(root: Path, args) -> None:
+-    env_path = root / "supervision" / "envelopes" / f"{args.envelope}.json"
++    envelope_id = check_package_id(args.envelope, "envelope")
++    env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
+     if not env_path.exists():
+         fail([f"envelope not found: {args.envelope}"])
+     env = jload(env_path)
+     queue = load_queue(root)
+-    if any(e.get("envelope_id") == args.envelope for e in queue.get("entries", [])):
++    if any(e.get("envelope_id") == envelope_id for e in queue.get("entries", [])):
+         fail([f"envelope already queued: {args.envelope}"])
+     queue.setdefault("entries", []).append({
+-        "envelope_id": args.envelope,
++        "envelope_id": envelope_id,
+         "task": env.get("task"),
+         "branch": env.get("branch"),
+         "base": env.get("base", "main"),
+@@ -1757,14 +1872,15 @@ def cmd_queue_add(root: Path, args) -> None:
+ 
+ 
+ def cmd_merge_check(root: Path, args) -> None:
+-    env_path = root / "supervision" / "envelopes" / f"{args.envelope}.json"
++    envelope_id = check_package_id(args.envelope, "envelope")
++    env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
+     if not env_path.exists():
+         fail([f"envelope not found: {args.envelope}"])
+     env = jload(env_path)
+     checks = envelope_checks(root, env)
+     queue = load_queue(root)
+     entry = next((e for e in queue.get("entries", [])
+-                  if e.get("envelope_id") == args.envelope), None)
++                  if e.get("envelope_id") == envelope_id), None)
+     checks.append({"name": "queued", "ok": entry is not None,
+                    "detail": entry.get("status") if entry else "missing"})
+     if not all(c["ok"] for c in checks):
+@@ -1776,11 +1892,12 @@ def cmd_merge_check(root: Path, args) -> None:
+ def cmd_merge(root: Path, args) -> None:
+     if args.role != "supervisor":
+         fail(["merge requires --role supervisor"])
++    envelope_id = check_package_id(args.envelope, "envelope")
+     supervision = load_supervision(root)
+     primary = jload(root / "primary" / "CURRENT_STATE.json").get("primary", {})
+     if args.supervisor == primary.get("id"):
+         fail(["primary cannot merge; supervisor must differ"])
+-    env_path = root / "supervision" / "envelopes" / f"{args.envelope}.json"
++    env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
+     if not env_path.exists():
+         fail([f"envelope not found: {args.envelope}"])
+     env = jload(env_path)
+@@ -1788,7 +1905,7 @@ def cmd_merge(root: Path, args) -> None:
+         fail([f"envelope already {env.get('status')}"])
+     queue = load_queue(root)
+     entry = next((e for e in queue.get("entries", [])
+-                  if e.get("envelope_id") == args.envelope), None)
++                  if e.get("envelope_id") == envelope_id), None)
+     if entry is None:
+         fail([f"envelope not queued: {args.envelope}"])
+     if entry.get("status") not in ("WAITING", "CORRECTION_REQUIRED"):
+@@ -1797,7 +1914,7 @@ def cmd_merge(root: Path, args) -> None:
+             "only a waiting or corrected entry may merge"
+         ])
+     base = env.get("base", "main")
+-    repo = root / env.get("repository", "pilot/repo")
++    repo = resolve_repository(root, env.get("repository"))
+     try:
+         current_branch = git_ok(repo, "rev-parse", "--abbrev-ref", "HEAD")
+     except Exception as exc:
+@@ -1861,8 +1978,44 @@ def cmd_merge(root: Path, args) -> None:
+           "merge_commit": merge_commit})
+ 
+ 
++def write_task_merge_record(root: Path, env: dict, envelope_id: str,
++                            checks: list[dict]) -> Path | None:
++    """Write ``tasks/<id>/MERGE.md`` for a verified merge.
++
++    The closeout points at this file; it records the envelope, the
++    implementation head, the merge commit, the verification time and the
++    post-merge checks (4/4 on success) so a task's completion is evidenced by
++    ``POST_MERGE_VERIFIED`` rather than by the merge alone.
++    """
++    task_id = str(env.get("task") or "")
++    if not is_safe_id(task_id, TASK_ID_RE):
++        return None
++    tdir = task_dir(root, task_id)
++    tdir.mkdir(parents=True, exist_ok=True)
++    passed = sum(1 for check in checks if check["ok"])
++    verified_at = env.get("post_merge_at") or now()
++    lines = [
++        f"# {task_id} — Merge record", "",
++        f"- Envelope: `{envelope_id}`",
++        f"- Implementation head: `{env.get('implementation_head_sha') or ''}`",
++        f"- Envelope head: `{env.get('envelope_head_sha') or ''}`",
++        f"- Merge commit: `{env.get('merge_commit') or ''}`",
++        f"- Base: `{env.get('base', 'main')}`",
++        "- Status: `POST_MERGE_VERIFIED`",
++        f"- Verified at: {verified_at}",
++        f"- Post-merge checks: {passed}/{len(checks)}",
++        "", "## Checks", "",
++    ]
++    lines += [f"- [{'x' if check['ok'] else ' '}] {check['name']} — {check['detail']}"
++              for check in checks]
++    path = tdir / "MERGE.md"
++    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
++    return path
++
++
+ def cmd_post_merge(root: Path, args) -> None:
+-    env_path = root / "supervision" / "envelopes" / f"{args.envelope}.json"
++    envelope_id = check_package_id(args.envelope, "envelope")
++    env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
+     if not env_path.exists():
+         fail([f"envelope not found: {args.envelope}"])
+     env = jload(env_path)
+@@ -1876,7 +2029,7 @@ def cmd_post_merge(root: Path, args) -> None:
+             f"envelope status {status} is not MERGED or CORRECTION_REQUIRED; "
+             "post-merge only runs after a successful merge"
+         ])
+-    repo = root / env.get("repository", "pilot/repo")
++    repo = resolve_repository(root, env.get("repository"))
+     base = env.get("base", "main")
+     a = env.get("implementation_head_sha")
+     envelope_path = env.get("envelope_path")
+@@ -1926,10 +2079,17 @@ def cmd_post_merge(root: Path, args) -> None:
+         if entry is not None:
+             entry["status"] = "POST_MERGE_VERIFIED"
+             save_queue(root, queue)
++        merge_record = write_task_merge_record(root, env, envelope_id, checks)
+         append_supervision_ledger(root, "POST_MERGE_VERIFIED", "supervision",
+-                                  {"envelope": args.envelope, "checks": checks})
+-        emit({"ok": True, "envelope": args.envelope, "status": "POST_MERGE_VERIFIED",
+-              "checks": checks, "review": rel(root, review_file)})
++                                  {"envelope": args.envelope, "checks": checks,
++                                   "merge_record": rel(root, merge_record)
++                                   if merge_record is not None else ""})
++        payload = {"ok": True, "envelope": args.envelope,
++                   "status": "POST_MERGE_VERIFIED", "checks": checks,
++                   "review": rel(root, review_file)}
++        if merge_record is not None:
++            payload["merge_record"] = rel(root, merge_record)
++        emit(payload)
+     env["status"] = "CORRECTION_REQUIRED"
+     jdump(env_path, env)
+     if entry is not None:

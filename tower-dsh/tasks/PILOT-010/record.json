@@ -1,0 +1,126 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-010",
+  "title": "硬化 2：路径越界防护、单 JSON 输出、closeout 文案、ACL 忙等、覆盖补强",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "所有 task/package/envelope ID 做格式校验，拒绝 ../ 与路径分隔符",
+    "worktree / spec / envelope file / evidence 路径必须落在 tower root 内；repository 允许 root 或 root 的父目录",
+    "envelope_checks 不再捕获 SystemExit，缺任务 record 时只输出一个 JSON 对象",
+    "close 不再写死 “Merge: not performed”；改指向 MERGE_QUEUE 与任务级 MERGE.md",
+    "post-merge 成功后写 tasks/<id>/MERGE.md（信封、merge commit、验证结果）",
+    "ledger 锁：持续 PermissionError 且 .lock 不存在时，到 deadline 必须抛 LedgerLockTimeout，不得忙等",
+    "补强 5 条部分绑定：WF-HANDOFF/INV-02/03/04、POL-RED-LINES/C-14、POL-CHANGE-LEVELS/C-02",
+    "新增 tools/tests/test_hardening2.py 覆盖以上行为"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-010/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-010/tower-dsh/tools/tests/test_hardening2.py",
+    "pilot/worktrees/PILOT-010/tower-dsh/tools/tests/test_coverage.py",
+    "pilot/worktrees/PILOT-010/tower-dsh/tools/tests/clause_bindings.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access"
+  ],
+  "acceptance": [
+    "python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 125",
+    "--task ../x、--package ../x、--envelope ../x 均 exit 2，错误信息含 invalid id",
+    "worktree / spec / evidence 位于 tower root 之外时 exit 2",
+    "repository 指向 root 与 root 父目录以外时 exit 2；现有 kit 布局 repository=.. 仍可用",
+    "缺任务 record 时 envelope_checks / merge-check 的 stdout 恰好是一个 JSON 对象（可 json.loads）",
+    "close 生成的 CLOSEOUT.md 不含 “Merge: not performed”",
+    "post-merge 成功后存在 tasks/<id>/MERGE.md，且含 merge commit 与 POST_MERGE_VERIFIED",
+    "持续 PermissionError 场景在 deadline 内抛 LedgerLockTimeout（不得挂死）",
+    "spec-coverage 仍为 27/27、gaps=0；startup / wiring / handoff-check / spec-lint / strict 不回归"
+  ],
+  "depends_on": [
+    "PILOT-009"
+  ],
+  "worktree": "pilot/worktrees/PILOT-010",
+  "spec_path": "pilot/PILOT-010.spec.json",
+  "spec_sha256": "fd48b79408ebd615aeea09e68a2bae46b0b27bf0ab0553d749aa3c7b9ca18c73",
+  "spec_gate": "PASS",
+  "executor": "subagent:b570c09a-fccf-4e18-a4f1-4d134b06f186",
+  "dispatch": {
+    "executor": "subagent:b570c09a-fccf-4e18-a4f1-4d134b06f186",
+    "worktree": "pilot/worktrees/PILOT-010",
+    "at": "2026-10-19T20:38:57+08:00"
+  },
+  "evidence": [
+    {
+      "id": "E-001",
+      "path": "tasks/PILOT-010/evidence/towerctl.py",
+      "sha256": "2823da2c1dd018a3f5e2950e5b306efdc73d9111adbac824508ac1ba06be1a8a",
+      "bytes": 100084,
+      "at": "2026-10-19T20:52:52+08:00"
+    },
+    {
+      "id": "E-002",
+      "path": "tasks/PILOT-010/evidence/test_hardening2.py",
+      "sha256": "726a87a871275cae0ebbc45ec68405f192b94b85d0c962c8ef34a1f36f53930a",
+      "bytes": 25167,
+      "at": "2026-10-19T20:52:52+08:00"
+    },
+    {
+      "id": "E-003",
+      "path": "tasks/PILOT-010/evidence/test_coverage.py",
+      "sha256": "3cd2f9436906684b959fce58c08cce0d04a3c530d2324dff861615b59f25bb1d",
+      "bytes": 45643,
+      "at": "2026-10-19T20:52:52+08:00"
+    },
+    {
+      "id": "E-004",
+      "path": "tasks/PILOT-010/evidence/clause_bindings.py",
+      "sha256": "4fa325e937d8a312f044b528520048606d1e106e1b98943bfa348a39c066b3bc",
+      "bytes": 8721,
+      "at": "2026-10-19T20:52:52+08:00"
+    },
+    {
+      "id": "E-005",
+      "path": "tasks/PILOT-010/evidence/test-output.txt",
+      "sha256": "047917b0b216bc6c7283290a369323aeab8508531822fa2645e380dbe1543e0f",
+      "bytes": 17783,
+      "at": "2026-10-19T20:52:52+08:00"
+    },
+    {
+      "id": "E-006",
+      "path": "tasks/PILOT-010/evidence/commit.txt",
+      "sha256": "c614977c94faa31a9a1c624af35bff9b6fb824c0b30e1ba46274916d14dc2910",
+      "bytes": 112,
+      "at": "2026-10-19T20:52:52+08:00"
+    },
+    {
+      "id": "E-007",
+      "path": "tasks/PILOT-010/evidence/diff.txt",
+      "sha256": "60c84485b0f854c03744cca017fd17446b9151d3f0be2db5e39d4d36be747e07",
+      "bytes": 67709,
+      "at": "2026-10-19T20:52:52+08:00"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:92bab935-b241-4a3e-aa17-58d68106244e",
+    "verdict": "PASS",
+    "note": "independent reviewer PASS: 134 tests; 9/9 acceptance; 7/7 evidence; path traversal 6/6; single JSON; MERGE.md; ACL deadline; coverage 27/27",
+    "at": "2026-10-19T21:01:23+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-010",
+    "actor": "owner",
+    "text": "owner approved hardening 2",
+    "at": "2026-10-19T21:01:23+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-010/CLOSEOUT.md",
+    "at": "2026-10-19T21:01:23+08:00"
+  },
+  "created_at": "2026-10-19T20:38:35+08:00",
+  "updated_at": "2026-10-19T21:01:23+08:00",
+  "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+  "delivered_at": "2026-10-19T20:52:52+08:00",
+  "accepted_at": "2026-10-19T21:01:23+08:00"
+}

@@ -1,0 +1,43 @@
+# PILOT-010 — 硬化 2：路径越界防护、单 JSON 输出、closeout 文案、ACL 忙等、覆盖补强
+
+- Status: `ready`
+- Authority: `workspace_write`
+- Worktree: `pilot/worktrees/PILOT-010`
+
+## Scope
+
+- 所有 task/package/envelope ID 做格式校验，拒绝 ../ 与路径分隔符
+- worktree / spec / envelope file / evidence 路径必须落在 tower root 内；repository 允许 root 或 root 的父目录
+- envelope_checks 不再捕获 SystemExit，缺任务 record 时只输出一个 JSON 对象
+- close 不再写死 “Merge: not performed”；改指向 MERGE_QUEUE 与任务级 MERGE.md
+- post-merge 成功后写 tasks/<id>/MERGE.md（信封、merge commit、验证结果）
+- ledger 锁：持续 PermissionError 且 .lock 不存在时，到 deadline 必须抛 LedgerLockTimeout，不得忙等
+- 补强 5 条部分绑定：WF-HANDOFF/INV-02/03/04、POL-RED-LINES/C-14、POL-CHANGE-LEVELS/C-02
+- 新增 tools/tests/test_hardening2.py 覆盖以上行为
+
+## Allowed paths
+
+- `pilot/worktrees/PILOT-010/tower-dsh/tools/towerctl.py`
+- `pilot/worktrees/PILOT-010/tower-dsh/tools/tests/test_hardening2.py`
+- `pilot/worktrees/PILOT-010/tower-dsh/tools/tests/test_coverage.py`
+- `pilot/worktrees/PILOT-010/tower-dsh/tools/tests/clause_bindings.py`
+
+## Forbidden
+
+- network
+- external dependencies
+- changes outside the task worktree
+- merge
+- production access
+
+## Acceptance
+
+- python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 125
+- --task ../x、--package ../x、--envelope ../x 均 exit 2，错误信息含 invalid id
+- worktree / spec / evidence 位于 tower root 之外时 exit 2
+- repository 指向 root 与 root 父目录以外时 exit 2；现有 kit 布局 repository=.. 仍可用
+- 缺任务 record 时 envelope_checks / merge-check 的 stdout 恰好是一个 JSON 对象（可 json.loads）
+- close 生成的 CLOSEOUT.md 不含 “Merge: not performed”
+- post-merge 成功后存在 tasks/<id>/MERGE.md，且含 merge commit 与 POST_MERGE_VERIFIED
+- 持续 PermissionError 场景在 deadline 内抛 LedgerLockTimeout（不得挂死）
+- spec-coverage 仍为 27/27、gaps=0；startup / wiring / handoff-check / spec-lint / strict 不回归

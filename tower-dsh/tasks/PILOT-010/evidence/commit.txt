@@ -1,0 +1,2 @@
+b4394ff77b03179c1c8ae79ad1a97122f4fdc1b9
+PILOT-010: hardening 2 (paths, single JSON, closeout, ACL, coverage)

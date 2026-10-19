@@ -91,7 +91,17 @@
       "reviewer": "subagent:f443bad6-ba3a-4f69-b7a2-25f95ae18b85",
       "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
       "updated_at": "2026-10-19T19:57:16+08:00"
+    },
+    {
+      "id": "PILOT-010",
+      "title": "硬化 2：路径越界防护、单 JSON 输出、closeout 文案、ACL 忙等、覆盖补强",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:b570c09a-fccf-4e18-a4f1-4d134b06f186",
+      "reviewer": "subagent:92bab935-b241-4a3e-aa17-58d68106244e",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T21:01:23+08:00"
     }
   ],
-  "updated_at": "2026-10-19T19:57:16+08:00"
+  "updated_at": "2026-10-19T21:01:23+08:00"
 }
