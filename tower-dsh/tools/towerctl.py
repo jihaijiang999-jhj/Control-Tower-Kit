@@ -25,6 +25,10 @@ import spec_lint
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 TASK_ID_RE = re.compile(r"^[A-Z0-9][A-Z0-9-]{1,40}$")
+# Package / envelope ids double as directory and file names, so they are
+# restricted to a conservative filename-safe alphabet and may never contain
+# ``..`` (which the character class alone would allow).
+PACKAGE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 
 def now() -> str:
@@ -66,6 +70,65 @@ def rel(root: Path, path: Path) -> str:
         return path.resolve().relative_to(root.resolve()).as_posix()
     except ValueError:
         return str(path.resolve())
+
+
+def is_safe_id(value, pattern: re.Pattern) -> bool:
+    """True when ``value`` is a filename-safe id for ``pattern``.
+
+    Rejects empty values, embedded ``..`` and anything the pattern does not
+    match.  ``..`` is rejected explicitly because a package/envelope alphabet
+    that allows ``.`` would otherwise accept ``A..B``.
+    """
+    text = str(value or "")
+    return bool(text) and ".." not in text and bool(pattern.match(text))
+
+
+def check_task_id(value, label: str = "task") -> str:
+    """Validate a task id or exit 2 with an ``invalid id`` error."""
+    if not is_safe_id(value, TASK_ID_RE):
+        fail([f"invalid id: {value!r} "
+              f"({label} id must match {TASK_ID_RE.pattern})"])
+    return str(value)
+
+
+def check_package_id(value, label: str = "package") -> str:
+    """Validate a package/envelope id or exit 2 with an ``invalid id`` error."""
+    if not is_safe_id(value, PACKAGE_ID_RE):
+        fail([f"invalid id: {value!r} ({label} id must match "
+              f"{PACKAGE_ID_RE.pattern} and must not contain '..')"])
+    return str(value)
+
+
+def ensure_within(root: Path, path: Path, *, allow_parent: bool = False,
+                  label: str = "path") -> Path:
+    """Resolve ``path`` and require it to stay inside ``root``.
+
+    ``allow_parent`` additionally accepts exactly ``root``'s parent, which is
+    what the kit layout uses for ``repository: ".."``.  Anything else exits 2
+    with an ``outside tower root`` error so no command can be steered at an
+    arbitrary filesystem location.
+    """
+    root_resolved = Path(root).resolve()
+    resolved = Path(path).resolve()
+    if resolved == root_resolved or root_resolved in resolved.parents:
+        return resolved
+    if allow_parent and resolved == root_resolved.parent:
+        return resolved
+    fail([f"{label} outside tower root: {resolved} (root: {root_resolved})"])
+
+
+def resolve_input_within(root: Path, value: str, label: str) -> Path:
+    """Resolve ``--spec`` / ``--file`` / ``--evidence`` and confine it to root."""
+    raw = Path(value)
+    candidate = raw if raw.is_absolute() else root / raw
+    return ensure_within(root, candidate, label=label)
+
+
+def resolve_repository(root: Path, value) -> Path:
+    """Resolve an envelope ``repository`` inside root, or root's parent."""
+    raw = Path(str(value or "pilot/repo"))
+    candidate = raw if raw.is_absolute() else root / raw
+    return ensure_within(root, candidate, allow_parent=True, label="repository")
 
 
 GENESIS_PREV_HASH = "GENESIS"
@@ -201,6 +264,14 @@ def _acquire_lock_file(path: Path, timeout: float, stale_after: float) -> None:
                 os.close(fd)
             return
         if _clear_stale_lock(path, stale_after):
+            # "Nothing to clear" must still honour the deadline.  A persistent
+            # PermissionError against a path that does not exist (Windows ACL /
+            # pending-delete) makes _clear_stale_lock() return True forever;
+            # without this check the caller would spin instead of timing out.
+            if time.monotonic() >= deadline:
+                raise LedgerLockTimeout(
+                    f"ledger write lock busy for more than {timeout:g}s: {path}")
+            time.sleep(LEDGER_LOCK_POLL_INTERVAL)
             continue
         if time.monotonic() >= deadline:
             raise LedgerLockTimeout(
@@ -288,7 +359,7 @@ def append_supervision_ledger(root: Path, event_type: str, actor: str,
 
 
 def task_dir(root: Path, tid: str) -> Path:
-    return root / "tasks" / tid
+    return root / "tasks" / check_task_id(tid)
 
 
 def task_record_path(root: Path, tid: str) -> Path:
@@ -351,13 +422,20 @@ def check_evidence(root: Path, record: dict) -> list[str]:
     if not evidence:
         errors.append("no evidence recorded")
     for e in evidence:
-        path = root / e.get("path", "")
-        if not e.get("path") or not path.exists():
+        raw = e.get("path") or ""
+        if not raw:
             errors.append(f"evidence missing: {e.get('path')}")
+            continue
+        # Evidence paths are recorded relative to the tower root.  Confining
+        # them keeps a forged record from hashing an arbitrary host file while
+        # still accepting in-root paths such as pilot/worktrees/...
+        path = ensure_within(root, root / raw, label="evidence")
+        if not path.exists():
+            errors.append(f"evidence missing: {raw}")
             continue
         actual = sha256_file(path)
         if actual != e.get("sha256"):
-            errors.append(f"evidence hash mismatch: {e.get('path')}")
+            errors.append(f"evidence hash mismatch: {raw}")
     return errors
 
 
@@ -498,7 +576,7 @@ def envelope_checks(root: Path, env: dict) -> list[dict]:
     def add(name: str, ok: bool, detail: str) -> None:
         checks.append({"name": name, "ok": bool(ok), "detail": detail})
 
-    repo = root / env.get("repository", "pilot/repo")
+    repo = resolve_repository(root, env.get("repository"))
     add("repository exists", repo.exists(), str(repo))
     if not repo.exists():
         return checks
@@ -519,8 +597,16 @@ def envelope_checks(root: Path, env: dict) -> list[dict]:
         add(f"base {base} is ancestor of implementation", ancestor, f"{base}..{a}")
     except Exception as exc:
         add("git checks", False, str(exc))
-    try:
-        rec = load_record(root, env.get("task", ""))
+    # Never call load_record() here: it emits a JSON object and raises
+    # SystemExit, which would print one payload from inside the check list and
+    # a second one from the caller.  A missing/invalid record is one failed
+    # check instead, so merge-check always emits exactly one JSON object.
+    task = str(env.get("task") or "")
+    rec = _optional_task_record(root, task)
+    if rec is None:
+        add("task record", False, f"task record missing: {task or '(empty)'}")
+    else:
+        add("task record", True, task)
         add("task accepted/closed", rec.get("status") in ("accepted", "closed"),
             str(rec.get("status")))
         review = rec.get("review") or {}
@@ -529,8 +615,6 @@ def envelope_checks(root: Path, env: dict) -> list[dict]:
             f"{review.get('reviewer')} vs {rec.get('executor')}")
         ev_errors = check_evidence(root, rec)
         add("evidence hashes valid", not ev_errors, "; ".join(ev_errors) or "ok")
-    except SystemExit:
-        add("task record", False, "task record missing")
     return checks
 
 
@@ -664,14 +748,14 @@ def validate_spec(spec: dict) -> list[str]:
 
 
 def cmd_task_new(root: Path, args) -> None:
-    spec_path = resolve_input(root, args.spec)
+    spec_path = resolve_input_within(root, args.spec, "spec")
     if not spec_path.exists():
         fail([f"spec not found: {spec_path}"])
     spec = jload(spec_path)
     tid = str(spec.get("id", ""))
     errors = []
     if not TASK_ID_RE.match(tid):
-        errors.append(f"invalid task id: {tid}")
+        errors.append(f"invalid id: {tid!r} (task id must match {TASK_ID_RE.pattern})")
     for field in ["title", "authority", "scope", "allowed_paths", "forbidden", "acceptance"]:
         if not spec.get(field):
             errors.append(f"spec.{field} required")
@@ -680,8 +764,10 @@ def cmd_task_new(root: Path, args) -> None:
     worktree = spec.get("worktree")
     if not worktree:
         errors.append("spec.worktree required")
-    elif not (root / worktree).exists():
-        errors.append(f"worktree missing: {worktree}")
+    else:
+        worktree_path = ensure_within(root, root / worktree, label="worktree")
+        if not worktree_path.exists():
+            errors.append(f"worktree missing: {worktree}")
     if errors:
         fail(errors)
     tdir = task_dir(root, tid)
@@ -835,7 +921,10 @@ def cmd_dispatch(root: Path, args) -> None:
     if rec.get("status") not in ("ready", "rework"):
         fail([f"task status {rec.get('status')} cannot dispatch"])
     worktree = args.worktree or rec.get("worktree")
-    if not worktree or not (root / worktree).exists():
+    if not worktree:
+        fail(["worktree missing: (empty)"])
+    worktree_path = ensure_within(root, root / worktree, label="worktree")
+    if not worktree_path.exists():
         fail([f"worktree missing: {worktree}"])
     task_md = task_dir(root, args.task) / "TASK.md"
     if not task_md.exists():
@@ -864,7 +953,7 @@ def cmd_deliver(root: Path, args) -> None:
     evdir.mkdir(parents=True, exist_ok=True)
     existing = {e.get("path") for e in rec.get("evidence", [])}
     for value in args.evidence:
-        src = resolve_input(root, value)
+        src = resolve_input_within(root, value, "evidence")
         if not src.exists() or not src.is_file():
             fail([f"evidence not found: {value}"])
         dest = evdir / src.name
@@ -958,12 +1047,15 @@ def cmd_close(root: Path, args) -> None:
     if errors:
         fail(errors)
     closeout = tdir / "CLOSEOUT.md"
-    next_text = "merge/handoff decision (owner gate) — not performed in Phase 1"
+    merge_ref = f"tasks/{rec['id']}/MERGE.md"
+    next_text = ("merge/handoff decision (owner gate) — see "
+                 f"supervision/MERGE_QUEUE.json and {merge_ref}")
     lines = [f"# {rec['id']} — Closeout", "", f"- Status: `closed`",
              f"- Executor: `{rec.get('executor')}`",
              f"- Reviewer: `{(rec.get('review') or {}).get('reviewer')}`",
              f"- Decision: `{rec.get('decision', {}).get('id')}`",
-             "- Merge: **not performed** (first version; merge is a separate owner gate)", "",
+             "- Merge: see supervision/MERGE_QUEUE.json and "
+             f"{merge_ref} (owner gate)", "",
              "## Evidence", ""]
     lines += [f"- `{e['path']}` `{e['sha256']}`" for e in rec.get("evidence", [])]
     lines += ["", "## Next", "", next_text]
@@ -1135,16 +1227,26 @@ def _optional_git_status(repo: Path | None) -> str:
     return cp.stdout.strip() or "clean"
 
 
-def _load_optional_record(root: Path, task_id: str) -> dict:
-    if not task_id:
-        return {}
+def _optional_task_record(root: Path, task_id: str) -> dict | None:
+    """Best-effort record load that never emits / exits.
+
+    Used by checks that must report a missing or malformed record as data
+    (``envelope_checks``), not as a second JSON payload.
+    """
+    if not is_safe_id(task_id, TASK_ID_RE):
+        return None
     path = task_record_path(root, task_id)
     if not path.exists():
-        return {}
+        return None
     try:
-        return jload(path)
+        data = jload(path)
     except Exception:
-        return {}
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _load_optional_record(root: Path, task_id: str) -> dict:
+    return _optional_task_record(root, task_id) or {}
 
 
 def match_task_by_evidence(root: Path, state: dict) -> str | None:
@@ -1302,7 +1404,11 @@ def handoff_checks(root: Path, package_id: str, pkg: dict) -> list[dict]:
 
 
 def cmd_handoff_new(root: Path, args) -> None:
-    package_id = args.package
+    package_id = check_package_id(args.package, "package")
+    if args.task:
+        check_task_id(args.task, "task")
+    if args.envelope:
+        check_package_id(args.envelope, "envelope")
     pkgdir = root / "handoffs" / package_id
     if pkgdir.exists():
         fail([f"handoff package already exists: {package_id}"])
@@ -1489,12 +1595,13 @@ NONE（无阻断性漂移；证据锚点：package {len(snap['evidence'])} 项�
 
 
 def cmd_handoff_check(root: Path, args) -> None:
-    pkgdir = root / "handoffs" / args.package
+    package_id = check_package_id(args.package, "package")
+    pkgdir = root / "handoffs" / package_id
     pkg_path = pkgdir / "package.json"
     if not pkg_path.exists():
         fail([f"package not found: {args.package}"])
     pkg = jload(pkg_path)
-    checks = handoff_checks(root, args.package, pkg)
+    checks = handoff_checks(root, package_id, pkg)
     if not all(c["ok"] for c in checks):
         emit({"ok": False, "package": args.package,
               "errors": [c for c in checks if not c["ok"]]}, 2)
@@ -1502,14 +1609,15 @@ def cmd_handoff_check(root: Path, args) -> None:
 
 
 def cmd_handoff_claim(root: Path, args) -> None:
-    pkgdir = root / "handoffs" / args.package
+    package_id = check_package_id(args.package, "package")
+    pkgdir = root / "handoffs" / package_id
     pkg_path = pkgdir / "package.json"
     if not pkg_path.exists():
         fail([f"package not found: {args.package}"])
     pkg = jload(pkg_path)
     if args.controller == pkg.get("source_controller"):
         fail(["receiver must differ from source controller"])
-    checks = handoff_checks(root, args.package, pkg)
+    checks = handoff_checks(root, package_id, pkg)
     if not all(c["ok"] for c in checks):
         emit({"ok": False, "package": args.package,
               "errors": [c for c in checks if not c["ok"]]}, 2)
@@ -1531,7 +1639,8 @@ def cmd_handoff_claim(root: Path, args) -> None:
 
 
 def cmd_handoff_accept(root: Path, args) -> None:
-    pkgdir = root / "handoffs" / args.package
+    package_id = check_package_id(args.package, "package")
+    pkgdir = root / "handoffs" / package_id
     pkg_path = pkgdir / "package.json"
     if not pkg_path.exists():
         fail([f"package not found: {args.package}"])
@@ -1567,7 +1676,8 @@ def cmd_handoff_accept(root: Path, args) -> None:
 
 
 def cmd_handoff_receipt(root: Path, args) -> None:
-    pkgdir = root / "handoffs" / args.package
+    package_id = check_package_id(args.package, "package")
+    pkgdir = root / "handoffs" / package_id
     pkg_path = pkgdir / "package.json"
     if not pkg_path.exists():
         fail([f"package not found: {args.package}"])
@@ -1613,7 +1723,8 @@ def cmd_handoff_receipt(root: Path, args) -> None:
 
 
 def cmd_handoff_activate(root: Path, args) -> None:
-    pkgdir = root / "handoffs" / args.package
+    package_id = check_package_id(args.package, "package")
+    pkgdir = root / "handoffs" / package_id
     pkg_path = pkgdir / "package.json"
     if not pkg_path.exists():
         fail([f"package not found: {args.package}"])
@@ -1685,7 +1796,8 @@ def cmd_supervision_init(root: Path, args) -> None:
 
 
 def cmd_envelope_new(root: Path, args) -> None:
-    file = resolve_input(root, args.file)
+    task_id = check_task_id(args.task, "task")
+    file = resolve_input_within(root, args.file, "envelope file")
     if not file.exists():
         fail([f"envelope file not found: {file}"])
     env = jload(file)
@@ -1693,14 +1805,16 @@ def cmd_envelope_new(root: Path, args) -> None:
     task = env.get("task")
     if not env_id or not task:
         fail(["envelope_id and task are required"])
-    if env.get("task") != args.task:
-        fail([f"envelope task {env.get('task')} != --task {args.task}"])
-    rec = load_record(root, args.task)
+    env_id = check_package_id(env_id, "envelope")
+    task = check_task_id(task, "task")
+    if task != task_id:
+        fail([f"envelope task {task} != --task {task_id}"])
+    rec = load_record(root, task_id)
     if rec.get("status") not in ("accepted", "closed"):
         fail([f"task status {rec.get('status')} cannot submit envelope"])
     if not (rec.get("review") or {}).get("verdict") == "PASS":
         fail(["task has no PASS review"])
-    repo = root / env.get("repository", "pilot/repo")
+    repo = resolve_repository(root, env.get("repository"))
     if not repo.exists():
         fail([f"repository missing: {repo}"])
     branch = env.get("branch")
@@ -1735,15 +1849,16 @@ def cmd_envelope_new(root: Path, args) -> None:
 
 
 def cmd_queue_add(root: Path, args) -> None:
-    env_path = root / "supervision" / "envelopes" / f"{args.envelope}.json"
+    envelope_id = check_package_id(args.envelope, "envelope")
+    env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
     if not env_path.exists():
         fail([f"envelope not found: {args.envelope}"])
     env = jload(env_path)
     queue = load_queue(root)
-    if any(e.get("envelope_id") == args.envelope for e in queue.get("entries", [])):
+    if any(e.get("envelope_id") == envelope_id for e in queue.get("entries", [])):
         fail([f"envelope already queued: {args.envelope}"])
     queue.setdefault("entries", []).append({
-        "envelope_id": args.envelope,
+        "envelope_id": envelope_id,
         "task": env.get("task"),
         "branch": env.get("branch"),
         "base": env.get("base", "main"),
@@ -1757,14 +1872,15 @@ def cmd_queue_add(root: Path, args) -> None:
 
 
 def cmd_merge_check(root: Path, args) -> None:
-    env_path = root / "supervision" / "envelopes" / f"{args.envelope}.json"
+    envelope_id = check_package_id(args.envelope, "envelope")
+    env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
     if not env_path.exists():
         fail([f"envelope not found: {args.envelope}"])
     env = jload(env_path)
     checks = envelope_checks(root, env)
     queue = load_queue(root)
     entry = next((e for e in queue.get("entries", [])
-                  if e.get("envelope_id") == args.envelope), None)
+                  if e.get("envelope_id") == envelope_id), None)
     checks.append({"name": "queued", "ok": entry is not None,
                    "detail": entry.get("status") if entry else "missing"})
     if not all(c["ok"] for c in checks):
@@ -1776,11 +1892,12 @@ def cmd_merge_check(root: Path, args) -> None:
 def cmd_merge(root: Path, args) -> None:
     if args.role != "supervisor":
         fail(["merge requires --role supervisor"])
+    envelope_id = check_package_id(args.envelope, "envelope")
     supervision = load_supervision(root)
     primary = jload(root / "primary" / "CURRENT_STATE.json").get("primary", {})
     if args.supervisor == primary.get("id"):
         fail(["primary cannot merge; supervisor must differ"])
-    env_path = root / "supervision" / "envelopes" / f"{args.envelope}.json"
+    env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
     if not env_path.exists():
         fail([f"envelope not found: {args.envelope}"])
     env = jload(env_path)
@@ -1788,7 +1905,7 @@ def cmd_merge(root: Path, args) -> None:
         fail([f"envelope already {env.get('status')}"])
     queue = load_queue(root)
     entry = next((e for e in queue.get("entries", [])
-                  if e.get("envelope_id") == args.envelope), None)
+                  if e.get("envelope_id") == envelope_id), None)
     if entry is None:
         fail([f"envelope not queued: {args.envelope}"])
     if entry.get("status") not in ("WAITING", "CORRECTION_REQUIRED"):
@@ -1797,7 +1914,7 @@ def cmd_merge(root: Path, args) -> None:
             "only a waiting or corrected entry may merge"
         ])
     base = env.get("base", "main")
-    repo = root / env.get("repository", "pilot/repo")
+    repo = resolve_repository(root, env.get("repository"))
     try:
         current_branch = git_ok(repo, "rev-parse", "--abbrev-ref", "HEAD")
     except Exception as exc:
@@ -1861,8 +1978,44 @@ def cmd_merge(root: Path, args) -> None:
           "merge_commit": merge_commit})
 
 
+def write_task_merge_record(root: Path, env: dict, envelope_id: str,
+                            checks: list[dict]) -> Path | None:
+    """Write ``tasks/<id>/MERGE.md`` for a verified merge.
+
+    The closeout points at this file; it records the envelope, the
+    implementation head, the merge commit, the verification time and the
+    post-merge checks (4/4 on success) so a task's completion is evidenced by
+    ``POST_MERGE_VERIFIED`` rather than by the merge alone.
+    """
+    task_id = str(env.get("task") or "")
+    if not is_safe_id(task_id, TASK_ID_RE):
+        return None
+    tdir = task_dir(root, task_id)
+    tdir.mkdir(parents=True, exist_ok=True)
+    passed = sum(1 for check in checks if check["ok"])
+    verified_at = env.get("post_merge_at") or now()
+    lines = [
+        f"# {task_id} — Merge record", "",
+        f"- Envelope: `{envelope_id}`",
+        f"- Implementation head: `{env.get('implementation_head_sha') or ''}`",
+        f"- Envelope head: `{env.get('envelope_head_sha') or ''}`",
+        f"- Merge commit: `{env.get('merge_commit') or ''}`",
+        f"- Base: `{env.get('base', 'main')}`",
+        "- Status: `POST_MERGE_VERIFIED`",
+        f"- Verified at: {verified_at}",
+        f"- Post-merge checks: {passed}/{len(checks)}",
+        "", "## Checks", "",
+    ]
+    lines += [f"- [{'x' if check['ok'] else ' '}] {check['name']} — {check['detail']}"
+              for check in checks]
+    path = tdir / "MERGE.md"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
 def cmd_post_merge(root: Path, args) -> None:
-    env_path = root / "supervision" / "envelopes" / f"{args.envelope}.json"
+    envelope_id = check_package_id(args.envelope, "envelope")
+    env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
     if not env_path.exists():
         fail([f"envelope not found: {args.envelope}"])
     env = jload(env_path)
@@ -1876,7 +2029,7 @@ def cmd_post_merge(root: Path, args) -> None:
             f"envelope status {status} is not MERGED or CORRECTION_REQUIRED; "
             "post-merge only runs after a successful merge"
         ])
-    repo = root / env.get("repository", "pilot/repo")
+    repo = resolve_repository(root, env.get("repository"))
     base = env.get("base", "main")
     a = env.get("implementation_head_sha")
     envelope_path = env.get("envelope_path")
@@ -1926,10 +2079,17 @@ def cmd_post_merge(root: Path, args) -> None:
         if entry is not None:
             entry["status"] = "POST_MERGE_VERIFIED"
             save_queue(root, queue)
+        merge_record = write_task_merge_record(root, env, envelope_id, checks)
         append_supervision_ledger(root, "POST_MERGE_VERIFIED", "supervision",
-                                  {"envelope": args.envelope, "checks": checks})
-        emit({"ok": True, "envelope": args.envelope, "status": "POST_MERGE_VERIFIED",
-              "checks": checks, "review": rel(root, review_file)})
+                                  {"envelope": args.envelope, "checks": checks,
+                                   "merge_record": rel(root, merge_record)
+                                   if merge_record is not None else ""})
+        payload = {"ok": True, "envelope": args.envelope,
+                   "status": "POST_MERGE_VERIFIED", "checks": checks,
+                   "review": rel(root, review_file)}
+        if merge_record is not None:
+            payload["merge_record"] = rel(root, merge_record)
+        emit(payload)
     env["status"] = "CORRECTION_REQUIRED"
     jdump(env_path, env)
     if entry is not None:
