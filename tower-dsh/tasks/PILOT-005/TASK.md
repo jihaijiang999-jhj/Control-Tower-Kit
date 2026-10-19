@@ -1,0 +1,38 @@
+# PILOT-005 — ledger 哈希链 + 单写者锁 + verify-ledger 命令
+
+- Status: `ready`
+- Authority: `workspace_write`
+- Worktree: `pilot/worktrees/PILOT-005`
+
+## Scope
+
+- append_ledger / append_supervision_ledger 为事件写入 prev_hash 与 hash（canonical JSON + SHA-256）
+- 兼容历史无哈希行：新事件以“上一行 raw bytes 的 SHA-256”作为 legacy 锚点
+- 新增 verify-ledger 命令，校验 primary/supervision/all 的哈希链、seq 连续、JSON 合法
+- verify 输出 legacy_unhashed 数量，并区分 legacy 前缀与断裂
+- 写入路径加跨平台单写者锁（O_CREAT|O_EXCL 锁文件 + 超时 + 陈旧锁清理）
+- 并发 append 不得产生重复 seq 或断链
+- 新增 tools/tests/test_ledger_chain.py 覆盖哈希链、篡改、legacy、并发、锁
+
+## Allowed paths
+
+- `pilot/worktrees/PILOT-005/tower-dsh/tools/towerctl.py`
+- `pilot/worktrees/PILOT-005/tower-dsh/tools/tests/test_ledger_chain.py`
+
+## Forbidden
+
+- network
+- external dependencies
+- changes outside the task worktree
+- merge
+- production access
+
+## Acceptance
+
+- python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 46
+- 新写入事件包含 prev_hash 与 hash，且 verify-ledger 返回 ok
+- 内容篡改、hash 篡改、prev_hash 篡改、seq 断号均被 verify-ledger 检出（exit 2）
+- 历史无哈希行被计为 legacy_unhashed 且不导致失败
+- 8 线程各追加 5 条事件后 seq 连续 1..40 且链可验证
+- 陈旧锁文件可被清理，正常锁不会永久阻塞
+- 既有 startup / wiring / handoff-check --package HANDOFF-PILOT-001 不回归

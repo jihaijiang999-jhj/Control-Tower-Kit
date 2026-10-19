@@ -41,7 +41,17 @@
       "reviewer": "subagent:3866b916-9dd7-41f6-adce-e6ea1fdf6a40",
       "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
       "updated_at": "2026-10-19T17:21:39+08:00"
+    },
+    {
+      "id": "PILOT-005",
+      "title": "ledger 哈希链 + 单写者锁 + verify-ledger 命令",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:3acc8111-e88b-46bd-b4a7-de18648f161f",
+      "reviewer": "subagent:c7546d3e-2dfa-4815-9eca-607a14e9e34b",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T17:31:14+08:00"
     }
   ],
-  "updated_at": "2026-10-19T17:21:39+08:00"
+  "updated_at": "2026-10-19T17:31:14+08:00"
 }

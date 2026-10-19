@@ -1,0 +1,107 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-005",
+  "title": "ledger 哈希链 + 单写者锁 + verify-ledger 命令",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "append_ledger / append_supervision_ledger 为事件写入 prev_hash 与 hash（canonical JSON + SHA-256）",
+    "兼容历史无哈希行：新事件以“上一行 raw bytes 的 SHA-256”作为 legacy 锚点",
+    "新增 verify-ledger 命令，校验 primary/supervision/all 的哈希链、seq 连续、JSON 合法",
+    "verify 输出 legacy_unhashed 数量，并区分 legacy 前缀与断裂",
+    "写入路径加跨平台单写者锁（O_CREAT|O_EXCL 锁文件 + 超时 + 陈旧锁清理）",
+    "并发 append 不得产生重复 seq 或断链",
+    "新增 tools/tests/test_ledger_chain.py 覆盖哈希链、篡改、legacy、并发、锁"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-005/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-005/tower-dsh/tools/tests/test_ledger_chain.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access"
+  ],
+  "acceptance": [
+    "python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 46",
+    "新写入事件包含 prev_hash 与 hash，且 verify-ledger 返回 ok",
+    "内容篡改、hash 篡改、prev_hash 篡改、seq 断号均被 verify-ledger 检出（exit 2）",
+    "历史无哈希行被计为 legacy_unhashed 且不导致失败",
+    "8 线程各追加 5 条事件后 seq 连续 1..40 且链可验证",
+    "陈旧锁文件可被清理，正常锁不会永久阻塞",
+    "既有 startup / wiring / handoff-check --package HANDOFF-PILOT-001 不回归"
+  ],
+  "depends_on": [
+    "PILOT-002"
+  ],
+  "worktree": "pilot/worktrees/PILOT-005",
+  "spec_path": "pilot/PILOT-005.spec.json",
+  "spec_sha256": "eac5aae87f27c79c4c8069f7ec3c6c773df6ba975512875f80d6f07ea8ab3ab8",
+  "spec_gate": "PASS",
+  "executor": "subagent:3acc8111-e88b-46bd-b4a7-de18648f161f",
+  "dispatch": {
+    "executor": "subagent:3acc8111-e88b-46bd-b4a7-de18648f161f",
+    "worktree": "pilot/worktrees/PILOT-005",
+    "at": "2026-10-19T17:22:51+08:00"
+  },
+  "evidence": [
+    {
+      "id": "E-001",
+      "path": "tasks/PILOT-005/evidence/towerctl.py",
+      "sha256": "e0b22b41a9d23b9f8229229d121078f13523d496f8d81bc40c730c7e3cd2457c",
+      "bytes": 89623,
+      "at": "2026-10-19T17:26:59+08:00"
+    },
+    {
+      "id": "E-002",
+      "path": "tasks/PILOT-005/evidence/test_ledger_chain.py",
+      "sha256": "81314f08287a38771723b47164e23916e70366e0aeb0e5672ddd075cd9dd7ad6",
+      "bytes": 11130,
+      "at": "2026-10-19T17:26:59+08:00"
+    },
+    {
+      "id": "E-003",
+      "path": "tasks/PILOT-005/evidence/test-output.txt",
+      "sha256": "070ad7d013d0788e37ebb12ee019ba8e6bbe64cab3676397e0ffb8946ab6528e",
+      "bytes": 6843,
+      "at": "2026-10-19T17:26:59+08:00"
+    },
+    {
+      "id": "E-004",
+      "path": "tasks/PILOT-005/evidence/commit.txt",
+      "sha256": "c9a782eee2c421a09ad6a56eaee9720aeccc64774844c53be44b02f808867a9a",
+      "bytes": 102,
+      "at": "2026-10-19T17:26:59+08:00"
+    },
+    {
+      "id": "E-005",
+      "path": "tasks/PILOT-005/evidence/diff.txt",
+      "sha256": "06ca1de7affd0f7023bd1f876b38413d6e28e20966155c6c1b364f7e679aeb34",
+      "bytes": 24673,
+      "at": "2026-10-19T17:26:59+08:00"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:c7546d3e-2dfa-4815-9eca-607a14e9e34b",
+    "verdict": "PASS",
+    "note": "independent reviewer PASS: 51 tests; 7/7 acceptance; 5/5 evidence; hash chain/tamper/legacy/concurrency/lock verified; real logs verify ok",
+    "at": "2026-10-19T17:31:13+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-005",
+    "actor": "owner",
+    "text": "owner approved all audit recommendations",
+    "at": "2026-10-19T17:31:13+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-005/CLOSEOUT.md",
+    "at": "2026-10-19T17:31:14+08:00"
+  },
+  "created_at": "2026-10-19T17:22:38+08:00",
+  "updated_at": "2026-10-19T17:31:14+08:00",
+  "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+  "delivered_at": "2026-10-19T17:26:59+08:00",
+  "accepted_at": "2026-10-19T17:31:13+08:00"
+}

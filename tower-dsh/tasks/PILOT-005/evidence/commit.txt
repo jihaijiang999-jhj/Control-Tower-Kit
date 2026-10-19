@@ -1,0 +1,2 @@
+e11d838ffaa7afb792714bc965b0a273418ef841
+PILOT-005: hash-chain ledger + writer lock + verify-ledger

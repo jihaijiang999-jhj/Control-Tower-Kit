@@ -43,3 +43,11 @@
 {"seq": 43, "at": "2026-10-19T17:21:39+08:00", "type": "CHECKBACK", "actor": "reviewer", "payload": {"task": "PILOT-004", "reviewer": "subagent:3866b916-9dd7-41f6-adce-e6ea1fdf6a40", "verdict": "PASS"}}
 {"seq": 44, "at": "2026-10-19T17:21:39+08:00", "type": "ACCEPT", "actor": "primary", "payload": {"task": "PILOT-004", "decision": "D-PILOT-004"}}
 {"seq": 45, "at": "2026-10-19T17:21:39+08:00", "type": "CLOSEOUT", "actor": "primary", "payload": {"task": "PILOT-004", "closeout": "tasks/PILOT-004/CLOSEOUT.md"}}
+{"seq": 46, "at": "2026-10-19T17:22:38+08:00", "type": "TASK_NEW", "actor": "primary", "payload": {"task": "PILOT-005", "title": "ledger 哈希链 + 单写者锁 + verify-ledger 命令"}}
+{"seq": 47, "at": "2026-10-19T17:22:38+08:00", "type": "SPEC_APPROVED", "actor": "mac", "payload": {"task": "PILOT-005", "by": "mac", "note": "owner approved all audit recommendations"}}
+{"seq": 48, "at": "2026-10-19T17:22:38+08:00", "type": "CHECK", "actor": "primary", "payload": {"task": "PILOT-005", "phase": "spec", "ok": true}}
+{"seq": 49, "at": "2026-10-19T17:22:51+08:00", "type": "DISPATCH", "actor": "primary", "payload": {"task": "PILOT-005", "executor": "subagent:3acc8111-e88b-46bd-b4a7-de18648f161f", "worktree": "pilot/worktrees/PILOT-005"}}
+{"seq": 50, "at": "2026-10-19T17:26:59+08:00", "type": "DELIVER", "actor": "executor", "payload": {"task": "PILOT-005", "evidence": 5}}
+{"seq": 51, "at": "2026-10-19T17:31:13+08:00", "type": "CHECKBACK", "actor": "reviewer", "payload": {"task": "PILOT-005", "reviewer": "subagent:c7546d3e-2dfa-4815-9eca-607a14e9e34b", "verdict": "PASS"}}
+{"seq": 52, "at": "2026-10-19T17:31:13+08:00", "type": "ACCEPT", "actor": "primary", "payload": {"task": "PILOT-005", "decision": "D-PILOT-005"}}
+{"seq": 53, "at": "2026-10-19T17:31:14+08:00", "type": "CLOSEOUT", "actor": "primary", "payload": {"task": "PILOT-005", "closeout": "tasks/PILOT-005/CLOSEOUT.md"}}
