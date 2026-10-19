@@ -19,3 +19,13 @@
 ## Next
 
 merge/handoff decision (owner gate) — not performed in Phase 1
+
+## Bootstrap note (2026-10-19)
+
+> 本卡的 `close` 执行于 PILOT-010 合并**之前**，用的是旧版 `towerctl`，因此上面仍写着
+> “Merge: not performed”。这是自举顺序，不是现状。新版 closeout 从下一张卡起生效。
+
+- 权威合并记录：`tasks/PILOT-010/MERGE.md`
+- Envelope：`ENV-PILOT-010`
+- Merge commit：`87bd88c40950a4ef141907f837a5a8b8ea2724d2`
+- Post-merge：`POST_MERGE_VERIFIED`（134 tests）

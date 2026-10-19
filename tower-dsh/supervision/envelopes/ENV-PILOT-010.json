@@ -45,8 +45,10 @@
     }
   ],
   "envelope_head_sha": "6e00d6975540dfc3df8d29ec7083d6960ff637df",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "merge_commit": "87bd88c40950a4ef141907f837a5a8b8ea2724d2",
   "merged_at": "2026-10-19T21:01:28+08:00",
-  "supervisor": "sup-phase3-audit"
+  "supervisor": "sup-phase3-audit",
+  "post_merge_at": "2026-10-19T21:02:08+08:00",
+  "post_merge_note": "hardening 2; 134 tests"
 }

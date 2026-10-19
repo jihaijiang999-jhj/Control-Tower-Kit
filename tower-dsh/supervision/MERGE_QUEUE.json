@@ -87,10 +87,10 @@
       "task": "PILOT-010",
       "branch": "pilot/PILOT-010",
       "base": "main",
-      "status": "MERGED",
+      "status": "POST_MERGE_VERIFIED",
       "added_at": "2026-10-19T21:01:28+08:00",
       "merge_commit": "87bd88c40950a4ef141907f837a5a8b8ea2724d2"
     }
   ],
-  "updated_at": "2026-10-19T21:01:28+08:00"
+  "updated_at": "2026-10-19T21:02:08+08:00"
 }
