@@ -111,7 +111,17 @@
       "reviewer": "subagent:rev-pilot-011",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-011/MERGE.md",
       "updated_at": "2026-10-20T01:50:28+08:00"
+    },
+    {
+      "id": "PILOT-012",
+      "title": "把验证搬到服务端：GitHub Actions 门禁 workflow + CODEOWNERS + 自测",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-012",
+      "reviewer": "subagent:rev-pilot-012",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-012/MERGE.md",
+      "updated_at": "2026-10-20T07:29:29+08:00"
     }
   ],
-  "updated_at": "2026-10-20T01:50:28+08:00"
+  "updated_at": "2026-10-20T07:29:29+08:00"
 }

@@ -1,0 +1,52 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-012",
+  "task": "PILOT-012",
+  "repository": "..",
+  "branch": "pilot/PILOT-012",
+  "base": "main",
+  "implementation_head_sha": "cde8f1d884bd98319f281be130887b3dbf654118",
+  "envelope_path": "merge-envelopes/ENV-PILOT-012.json",
+  "created_at": "2026-10-20T07:29:33+08:00",
+  "scope": "PILOT-012: server-side gate workflow + CODEOWNERS",
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-012/evidence/tower-gate.yml",
+      "sha256": "6437fdec279332d35705cead409105eab03cafc1af90d90167062dcd5f632318"
+    },
+    {
+      "path": "tasks/PILOT-012/evidence/CODEOWNERS",
+      "sha256": "2ab00899a0d4d44e956baf2071a74f83c966811c4fad2c0d634cd51aeb82e31f"
+    },
+    {
+      "path": "tasks/PILOT-012/evidence/test_ci_gate.py",
+      "sha256": "844613f464b7c7534be876de8b4c45ccb33ce16451245b01877dcb55af7d2e93"
+    },
+    {
+      "path": "tasks/PILOT-012/evidence/test-output.txt",
+      "sha256": "8906c712d4947ec1fc792bc1c6721a1a3a5acb32da22be87902fa563bf1c2bf8"
+    },
+    {
+      "path": "tasks/PILOT-012/evidence/commit.txt",
+      "sha256": "7b2f8d0778e0cd2a28814f31c42681c5cbd257833a96e8cb89d00646f69f0e9c"
+    },
+    {
+      "path": "tasks/PILOT-012/evidence/diff.txt",
+      "sha256": "457f9ade57c6aef161ff438176c7f4209eb050159dea3bec00ae2b7fe31be5f1"
+    },
+    {
+      "path": "tasks/PILOT-012/evidence/yaml-check.txt",
+      "sha256": "70754e7ae57f7582fc6c1082db7b8fab9bb79e0be5b174adb66da453355907fe"
+    }
+  ],
+  "envelope_head_sha": "7f600bc0d80a29fdc57b4108918af5fc91afab29",
+  "status": "MERGED",
+  "merge_commit": "bc4be8869ec659bd2714a6137db4e77c3319efdd",
+  "merged_at": "2026-10-20T07:29:38+08:00",
+  "supervisor": "sup-pilot-012-verify"
+}

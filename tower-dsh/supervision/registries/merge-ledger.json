@@ -99,6 +99,15 @@
       "merge_commit": "6a849b941519d6c8ec6e91a864423e903f9f607a",
       "supervisor": "sup-pilot-011-verify",
       "at": "2026-10-20T01:51:03+08:00"
+    },
+    {
+      "envelope_id": "ENV-PILOT-012",
+      "task": "PILOT-012",
+      "implementation_head_sha": "cde8f1d884bd98319f281be130887b3dbf654118",
+      "envelope_head_sha": "7f600bc0d80a29fdc57b4108918af5fc91afab29",
+      "merge_commit": "bc4be8869ec659bd2714a6137db4e77c3319efdd",
+      "supervisor": "sup-pilot-012-verify",
+      "at": "2026-10-20T07:29:38+08:00"
     }
   ]
 }

@@ -1,0 +1,124 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-012",
+  "title": "把验证搬到服务端：GitHub Actions 门禁 workflow + CODEOWNERS + 自测",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "新增 .github/workflows/tower-gate.yml：触发 pull_request、push 到 main、workflow_dispatch",
+    "运行环境固定 windows-latest + Python 3.12（本塔唯一已验证环境），不使用第三方 action 以外的依赖",
+    "workflow 依次执行：全量单元测试、spec-lint --strict、spec-coverage、verify-ledger、status（status 只记录 authority_dirty 不判红）",
+    "所有 towerctl 步骤在 tower-dsh 工作目录下执行（working-directory）",
+    "新增 .github/CODEOWNERS，把仓库默认 owner 指向 mac 的 GitHub 账号，为将来的 required review 铺路",
+    "新增 tower-dsh/tools/tests/test_ci_gate.py：把 workflow 与 CODEOWNERS 的关键内容断言固化成回归测试",
+    "不修改 towerctl.py，不修改任何既有测试，不引入网络依赖"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-012/.github/workflows/tower-gate.yml",
+    "pilot/worktrees/PILOT-012/.github/CODEOWNERS",
+    "pilot/worktrees/PILOT-012/tower-dsh/tools/tests/test_ci_gate.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "changing towerctl.py or existing tests"
+  ],
+  "acceptance": [
+    "python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 150",
+    ".github/workflows/tower-gate.yml 存在，且包含 pull_request、push、main、windows-latest、3.12 五个关键标识",
+    "workflow 包含 unittest discover -s tools/tests、spec-lint --strict、spec-coverage、verify-ledger 四条命令",
+    "workflow 中所有 towerctl 与测试命令都在 working-directory: tower-dsh 下执行（或显式 cd）",
+    ".github/CODEOWNERS 存在且包含 @jihaijiang999-jhj",
+    "新增的 test_ci_gate.py 不访问网络、不依赖真实 GitHub，只读仓库内文件",
+    "spec-coverage 仍 27/27、tool_gaps 为空；spec-lint --strict 仍 6/6 通过",
+    "git diff --name-only main..HEAD 恰好是三个 allowed 文件"
+  ],
+  "depends_on": [
+    "PILOT-011"
+  ],
+  "worktree": "pilot/worktrees/PILOT-012",
+  "spec_path": "pilot/PILOT-012.spec.json",
+  "spec_sha256": "f8c29e38a1d659fc50f15f126e2729a3e515121554e7aaff353a9f00a3ab1b42",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-pilot-012",
+  "dispatch": {
+    "executor": "subagent:exec-pilot-012",
+    "worktree": "pilot/worktrees/PILOT-012",
+    "at": "2026-10-20T07:22:23+08:00"
+  },
+  "evidence": [
+    {
+      "id": "E-001",
+      "path": "tasks/PILOT-012/evidence/tower-gate.yml",
+      "sha256": "6437fdec279332d35705cead409105eab03cafc1af90d90167062dcd5f632318",
+      "bytes": 976,
+      "at": "2026-10-20T07:25:53+08:00"
+    },
+    {
+      "id": "E-002",
+      "path": "tasks/PILOT-012/evidence/CODEOWNERS",
+      "sha256": "2ab00899a0d4d44e956baf2071a74f83c966811c4fad2c0d634cd51aeb82e31f",
+      "bytes": 102,
+      "at": "2026-10-20T07:25:53+08:00"
+    },
+    {
+      "id": "E-003",
+      "path": "tasks/PILOT-012/evidence/test_ci_gate.py",
+      "sha256": "844613f464b7c7534be876de8b4c45ccb33ce16451245b01877dcb55af7d2e93",
+      "bytes": 8235,
+      "at": "2026-10-20T07:25:53+08:00"
+    },
+    {
+      "id": "E-004",
+      "path": "tasks/PILOT-012/evidence/test-output.txt",
+      "sha256": "8906c712d4947ec1fc792bc1c6721a1a3a5acb32da22be87902fa563bf1c2bf8",
+      "bytes": 42868,
+      "at": "2026-10-20T07:25:53+08:00"
+    },
+    {
+      "id": "E-005",
+      "path": "tasks/PILOT-012/evidence/commit.txt",
+      "sha256": "7b2f8d0778e0cd2a28814f31c42681c5cbd257833a96e8cb89d00646f69f0e9c",
+      "bytes": 45,
+      "at": "2026-10-20T07:25:53+08:00"
+    },
+    {
+      "id": "E-006",
+      "path": "tasks/PILOT-012/evidence/diff.txt",
+      "sha256": "457f9ade57c6aef161ff438176c7f4209eb050159dea3bec00ae2b7fe31be5f1",
+      "bytes": 10334,
+      "at": "2026-10-20T07:25:53+08:00"
+    },
+    {
+      "id": "E-007",
+      "path": "tasks/PILOT-012/evidence/yaml-check.txt",
+      "sha256": "70754e7ae57f7582fc6c1082db7b8fab9bb79e0be5b174adb66da453355907fe",
+      "bytes": 610,
+      "at": "2026-10-20T07:25:53+08:00"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-pilot-012",
+    "verdict": "PASS",
+    "note": "8/8 AC 实测通过：156 tests OK；workflow 触发/环境/四条硬命令/working-directory/continue-on-error 单一性均核实；变异测试证明删命令、改 runner、去 working-directory、降 Python 版本、移动 continue-on-error、去 --strict 都会红；7 份证据哈希一致。已知盲区：注释掉 run 行/if:false/|| true 抓不到（当前 workflow 无此问题）；GitHub 端实际执行未实测（无 push）。",
+    "at": "2026-10-20T07:29:29+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-012",
+    "actor": "owner",
+    "text": "owner approved CI gate scope; review PASS",
+    "at": "2026-10-20T07:29:29+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-012/CLOSEOUT.md",
+    "at": "2026-10-20T07:29:29+08:00"
+  },
+  "created_at": "2026-10-20T07:22:23+08:00",
+  "updated_at": "2026-10-20T07:29:29+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-012/MERGE.md",
+  "delivered_at": "2026-10-20T07:25:53+08:00",
+  "accepted_at": "2026-10-20T07:29:29+08:00"
+}

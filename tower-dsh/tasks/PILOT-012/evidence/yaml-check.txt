@@ -1,0 +1,14 @@
+﻿workflow: .github/workflows/tower-gate.yml
+parser: python -c "yaml.safe_load(path.read_text(encoding='utf-8'))"
+result: OK (no exception); top-level type dict
+top-level keys (repr): ['name', 'permissions', 'True', 'jobs']
+note: unquoted `on:` is parsed as boolean True by PyYAML (YAML 1.1);
+      GitHub Actions uses YAML 1.2 and treats it as the string "on".
+name: tower-gate
+jobs: ['gate']
+gate.runs-on: windows-latest
+gate.defaults.run.working-directory: tower-dsh
+gate.steps count: 7
+triggers (via key True): ['pull_request', 'push', 'workflow_dispatch']
+push.branches: ['main']
+python-version: "3.12"

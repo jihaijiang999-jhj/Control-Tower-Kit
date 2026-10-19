@@ -1,0 +1,239 @@
+﻿diff --git a/.github/CODEOWNERS b/.github/CODEOWNERS
+new file mode 100644
+index 0000000..e8b8510
+--- /dev/null
++++ b/.github/CODEOWNERS
+@@ -0,0 +1,2 @@
++# Default owner for the whole tower repository (foundation for required review).
++* @jihaijiang999-jhj
+diff --git a/.github/workflows/tower-gate.yml b/.github/workflows/tower-gate.yml
+new file mode 100644
+index 0000000..b1b266b
+--- /dev/null
++++ b/.github/workflows/tower-gate.yml
+@@ -0,0 +1,43 @@
++name: tower-gate
++
++on:
++  pull_request:
++  push:
++    branches: [main]
++  workflow_dispatch:
++
++permissions:
++  contents: read
++
++jobs:
++  gate:
++    name: tower gate
++    runs-on: windows-latest
++    defaults:
++      run:
++        working-directory: tower-dsh
++    steps:
++      - name: Checkout repository
++        uses: actions/checkout@v4
++
++      - name: Set up Python 3.12
++        uses: actions/setup-python@v5
++        with:
++          python-version: "3.12"
++
++      - name: Unit tests
++        run: python -B -m unittest discover -s tools/tests -v
++
++      - name: Spec lint (strict)
++        run: python tools/towerctl.py spec-lint --strict
++
++      - name: Spec coverage
++        run: python tools/towerctl.py spec-coverage
++
++      - name: Verify ledger chain
++        run: python tools/towerctl.py verify-ledger
++
++      # Informational only: record authority drift, never fail the gate.
++      - name: Status (record only)
++        continue-on-error: true
++        run: python tools/towerctl.py status
+diff --git a/tower-dsh/tools/tests/test_ci_gate.py b/tower-dsh/tools/tests/test_ci_gate.py
+new file mode 100644
+index 0000000..2e217e6
+--- /dev/null
++++ b/tower-dsh/tools/tests/test_ci_gate.py
+@@ -0,0 +1,176 @@
++"""Server-side gate regression tests (PILOT-012).
++
++The tower's verification used to live only in local habits.  ``PILOT-012``
++moves it into GitHub Actions and pins the contract down with these tests:
++``.github/workflows/tower-gate.yml`` must keep running the four hard gates on
++``windows-latest`` / Python 3.12 under ``tower-dsh``, must keep ``status``
++informational, and ``.github/CODEOWNERS`` must keep a default owner.
++
++These tests only read files inside the repository.  They never touch the
++network, never call ``gh`` and never depend on the live working-tree state, so
++they run unchanged locally and in CI.
++
++Run from the tower root (``tower-dsh``)::
++
++    python -B -m unittest discover -s tools/tests -v
++"""
++from __future__ import annotations
++
++import re
++import unittest
++from pathlib import Path
++
++# <repo>/tower-dsh/tools/tests/test_ci_gate.py -> <repo>
++REPO_ROOT = Path(__file__).resolve().parents[3]
++WORKFLOW = REPO_ROOT / ".github" / "workflows" / "tower-gate.yml"
++CODEOWNERS = REPO_ROOT / ".github" / "CODEOWNERS"
++
++CHECKOUT = "actions/checkout@v4"
++SETUP_PYTHON = "actions/setup-python@v5"
++PYTHON_VERSION = 'python-version: "3.12"'
++WORKING_DIRECTORY = "working-directory: tower-dsh"
++CONTINUE_ON_ERROR = "continue-on-error: true"
++
++COMMANDS = {
++    "unit tests": "python -B -m unittest discover -s tools/tests -v",
++    "spec lint": "python tools/towerctl.py spec-lint --strict",
++    "spec coverage": "python tools/towerctl.py spec-coverage",
++    "verify ledger": "python tools/towerctl.py verify-ledger",
++    "status": "python tools/towerctl.py status",
++}
++HARD_GATE_COMMANDS = [COMMANDS[name] for name in
++                      ("unit tests", "spec lint", "spec coverage", "verify ledger")]
++
++STEP_RE = re.compile(r"(?m)^\s*-\s+name:")
++
++
++def read_text(path: Path) -> str:
++    """Read a repository file, failing loudly when it is missing."""
++    if not path.is_file():
++        raise AssertionError(f"missing required file: {path}")
++    return path.read_text(encoding="utf-8")
++
++
++def step_blocks(workflow: str) -> list[str]:
++    """Split the workflow into per-step chunks, each starting at ``- name:``."""
++    starts = [match.start() for match in STEP_RE.finditer(workflow)]
++    return [workflow[start:starts[index + 1] if index + 1 < len(starts) else len(workflow)]
++            for index, start in enumerate(starts)]
++
++
++class CiGateWorkflowTestCase(unittest.TestCase):
++    """``.github/workflows/tower-gate.yml`` contract."""
++
++    def setUp(self) -> None:
++        self.workflow = read_text(WORKFLOW)
++        self.steps = step_blocks(self.workflow)
++
++    # -- 1. the file itself ----------------------------------------------
++    def test_workflow_exists_and_is_not_empty(self) -> None:
++        self.assertTrue(WORKFLOW.is_file(), msg=f"workflow missing at {WORKFLOW}")
++        self.assertGreater(len(self.workflow.strip()), 0,
++                           msg=f"workflow at {WORKFLOW} is empty")
++        self.assertIn("name: tower-gate", self.workflow,
++                      msg=f"workflow name missing, head={self.workflow[:200]!r}")
++
++    # -- 2. triggers ------------------------------------------------------
++    def test_workflow_triggers_are_all_present(self) -> None:
++        for trigger in ("pull_request", "push", "workflow_dispatch"):
++            self.assertIn(trigger, self.workflow,
++                          msg=f"trigger {trigger!r} missing from workflow:\n{self.workflow}")
++        self.assertRegex(
++            self.workflow, r"(?m)^\s*branches:\s*\[?\s*main\s*\]?\s*$",
++            msg=f"push branch filter for main missing:\n{self.workflow}")
++
++    # -- 3. runtime -------------------------------------------------------
++    def test_workflow_runs_on_windows_with_python_312(self) -> None:
++        self.assertIn("runs-on: windows-latest", self.workflow,
++                      msg=f"windows-latest runner missing:\n{self.workflow}")
++        self.assertIn(PYTHON_VERSION, self.workflow,
++                      msg=f"python-version 3.12 missing:\n{self.workflow}")
++        self.assertNotIn("ubuntu-", self.workflow.lower(),
++                         msg=f"workflow must not use an ubuntu runner:\n{self.workflow}")
++
++    # -- 4. the four hard gates plus the informational status ------------
++    def test_all_gate_commands_are_present(self) -> None:
++        for label, command in COMMANDS.items():
++            self.assertIn(command, self.workflow,
++                          msg=f"{label} command {command!r} missing from workflow:\n"
++                              f"{self.workflow}")
++
++    def test_gate_commands_run_in_order(self) -> None:
++        positions = [self.workflow.index(command) for command in COMMANDS.values()]
++        self.assertEqual(
++            positions, sorted(positions),
++            msg="workflow steps are out of order; commands found at "
++                f"{dict(zip(COMMANDS, positions))}:\n{self.workflow}")
++
++    # -- 5. every command runs inside tower-dsh ---------------------------
++    def test_workflow_uses_tower_dsh_working_directory(self) -> None:
++        matches = re.findall(r"(?m)^\s*working-directory:\s*(\S+)\s*$", self.workflow)
++        self.assertIn("tower-dsh", matches,
++                      msg=f"working-directory: tower-dsh missing, found {matches!r}:\n"
++                          f"{self.workflow}")
++
++    # -- 6. status records, everything else fails the build ---------------
++    def test_continue_on_error_only_covers_the_status_step(self) -> None:
++        self.assertEqual(
++            self.workflow.count("continue-on-error"), 1,
++            msg="continue-on-error must appear exactly once:\n" + self.workflow)
++
++        status_command = COMMANDS["status"]
++        status_blocks = [block for block in self.steps if status_command in block]
++        self.assertEqual(len(status_blocks), 1,
++                         msg=f"expected one status step, found {len(status_blocks)}:\n"
++                             f"{self.workflow}")
++
++        status_block = status_blocks[0]
++        self.assertIn(CONTINUE_ON_ERROR, status_block,
++                      msg=f"status step is missing continue-on-error:\n{status_block}")
++        self.assertIn(status_command, status_block,
++                      msg=f"status step lost its command:\n{status_block}")
++
++        for block in self.steps:
++            if block is status_block:
++                continue
++            self.assertNotIn(
++                "continue-on-error", block,
++                msg=f"only the status step may continue on error:\n{block}")
++
++        for command in HARD_GATE_COMMANDS:
++            matching = [block for block in self.steps if command in block]
++            self.assertEqual(len(matching), 1,
++                             msg=f"expected exactly one step running {command!r}, "
++                                 f"found {len(matching)}:\n{self.workflow}")
++            self.assertNotIn("continue-on-error", matching[0],
++                             msg=f"hard gate step must fail the build:\n{matching[0]}")
++
++    # -- 7. actions -------------------------------------------------------
++    def test_workflow_checks_out_before_setting_up_python(self) -> None:
++        for action in (CHECKOUT, SETUP_PYTHON):
++            self.assertIn(action, self.workflow,
++                          msg=f"{action} missing:\n{self.workflow}")
++        self.assertLess(self.workflow.index(CHECKOUT),
++                        self.workflow.index(SETUP_PYTHON),
++                        msg=f"checkout must precede setup-python:\n{self.workflow}")
++
++    def test_workflow_requests_read_only_permissions(self) -> None:
++        self.assertRegex(
++            self.workflow, r"(?m)^permissions:\s*$\n(?:\s+.*\n)*?\s+contents:\s*read\s*$",
++            msg=f"permissions: contents: read missing:\n{self.workflow}")
++
++
++class CodeownersTestCase(unittest.TestCase):
++    """``.github/CODEOWNERS`` contract."""
++
++    def test_codeowners_has_default_owner(self) -> None:
++        codeowners = read_text(CODEOWNERS)
++        self.assertIn("@jihaijiang999-jhj", codeowners,
++                      msg=f"default owner missing from CODEOWNERS:\n{codeowners}")
++        self.assertRegex(
++            codeowners, r"(?m)^\*\s+@jihaijiang999-jhj\s*$",
++            msg=f"wildcard ownership line missing/invalid:\n{codeowners}")
++
++
++if __name__ == "__main__":
++    unittest.main()
