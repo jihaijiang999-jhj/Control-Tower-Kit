@@ -1,0 +1,44 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-004",
+  "task": "PILOT-004",
+  "repository": "..",
+  "branch": "pilot/PILOT-004",
+  "base": "main",
+  "implementation_head_sha": "ba8b3d83b740fd4481ba7365335daf643d1f1f48",
+  "envelope_path": "merge-envelopes/ENV-PILOT-004.json",
+  "created_at": "2026-10-19T17:21:48+08:00",
+  "scope": "PILOT-004: parameterize handoff generation and checks",
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-004/evidence/towerctl.py",
+      "sha256": "6e550bd59c6f75e297c00635ee0c2813b3401b61fc3cb17dc97b7530753f6c15"
+    },
+    {
+      "path": "tasks/PILOT-004/evidence/test_handoff_generic.py",
+      "sha256": "158430f57e865df644f45697ac4224199edfc964eacb87ec8c6302ec3688bed6"
+    },
+    {
+      "path": "tasks/PILOT-004/evidence/test-output.txt",
+      "sha256": "d89a3383d4872a6582309161f66f4ae726f06c35ee6b5cd87c24754b8b432c02"
+    },
+    {
+      "path": "tasks/PILOT-004/evidence/commit.txt",
+      "sha256": "c0890cca2042e89d94c95895813e3f05c4bdcdb3ebfd5e3f64715b6638555a2f"
+    },
+    {
+      "path": "tasks/PILOT-004/evidence/diff.txt",
+      "sha256": "4bcb311a6f5a690d228bbcaf00e13ee216b3dc03eeedb931db3efef14dbc9c2d"
+    }
+  ],
+  "envelope_head_sha": "9278747ca7150ad623c7a8f0d6a59265147f1e2b",
+  "status": "MERGED",
+  "merge_commit": "a507504b8a3cd99e40dffc93cbfd8e422176002f",
+  "merged_at": "2026-10-19T17:21:53+08:00",
+  "supervisor": "sup-phase3-audit"
+}

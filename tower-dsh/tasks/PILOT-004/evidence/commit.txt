@@ -1,0 +1,2 @@
+ba8b3d83b740fd4481ba7365335daf643d1f1f48
+PILOT-004: parameterize handoff generation and checks

@@ -31,7 +31,17 @@
       "reviewer": "subagent:70e01687-6426-4ff7-ac79-1d6d24c0d10e",
       "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
       "updated_at": "2026-10-19T16:57:25+08:00"
+    },
+    {
+      "id": "PILOT-004",
+      "title": "handoff 参数化：去写死 PILOT-001，改为按 task/envelope 生成与校验",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:a9bf21b3-8952-4466-a4d1-3c0ab3444354",
+      "reviewer": "subagent:3866b916-9dd7-41f6-adce-e6ea1fdf6a40",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T17:21:39+08:00"
     }
   ],
-  "updated_at": "2026-10-19T16:57:25+08:00"
+  "updated_at": "2026-10-19T17:21:39+08:00"
 }

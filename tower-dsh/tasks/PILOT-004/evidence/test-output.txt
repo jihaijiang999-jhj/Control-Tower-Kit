@@ -1,0 +1,45 @@
+test_accept_rejects_evidence_hash_mismatch (test_gates.TowerGateTestCase.test_accept_rejects_evidence_hash_mismatch) ... ok
+test_accept_rejects_missing_evidence (test_gates.TowerGateTestCase.test_accept_rejects_missing_evidence) ... ok
+test_accept_then_close_happy_path (test_gates.TowerGateTestCase.test_accept_then_close_happy_path) ... ok
+test_check_ready_rejects_legacy_card_without_spec_path (test_gates.TowerGateTestCase.test_check_ready_rejects_legacy_card_without_spec_path) ... ok
+test_check_ready_rejects_spec_changed_after_gate_pass (test_gates.TowerGateTestCase.test_check_ready_rejects_spec_changed_after_gate_pass) ... ok
+test_check_review_rejects_empty_reviewer (test_gates.TowerGateTestCase.test_check_review_rejects_empty_reviewer) ... ok
+test_check_spec_passes_and_records_gate_for_valid_spec (test_gates.TowerGateTestCase.test_check_spec_passes_and_records_gate_for_valid_spec) ... ok
+test_check_spec_rejects_legacy_card_without_spec_path (test_gates.TowerGateTestCase.test_check_spec_rejects_legacy_card_without_spec_path) ... ok
+test_checkback_normalizes_reviewer (test_gates.TowerGateTestCase.test_checkback_normalizes_reviewer) ... ok
+test_checkback_rejects_reviewer_equal_to_executor (test_gates.TowerGateTestCase.test_checkback_rejects_reviewer_equal_to_executor) ... ok
+test_checkback_rejects_whitespace_only_reviewer (test_gates.TowerGateTestCase.test_checkback_rejects_whitespace_only_reviewer) ... ok
+test_close_rejects_evidence_hash_mismatch (test_gates.TowerGateTestCase.test_close_rejects_evidence_hash_mismatch) ... ok
+test_close_rejects_missing_task_md (test_gates.TowerGateTestCase.test_close_rejects_missing_task_md) ... ok
+test_dispatch_rejects_legacy_card_without_spec_path (test_gates.TowerGateTestCase.test_dispatch_rejects_legacy_card_without_spec_path) ... ok
+test_dispatch_rejects_missing_spec_gate (test_gates.TowerGateTestCase.test_dispatch_rejects_missing_spec_gate) ... ok
+test_dispatch_rejects_missing_task_md (test_gates.TowerGateTestCase.test_dispatch_rejects_missing_task_md) ... ok
+test_dispatch_rejects_spec_changed_after_task_new (test_gates.TowerGateTestCase.test_dispatch_rejects_spec_changed_after_task_new) ... ok
+test_dispatch_succeeds_when_spec_gate_is_fresh (test_gates.TowerGateTestCase.test_dispatch_succeeds_when_spec_gate_is_fresh) ... ok
+test_merge_rejects_current_branch_not_envelope_base (test_gates.TowerGateTestCase.test_merge_rejects_current_branch_not_envelope_base) ... ok
+test_merge_rejects_queue_entry_not_waiting (test_gates.TowerGateTestCase.test_merge_rejects_queue_entry_not_waiting) ... ok
+test_default_envelope_uses_newest_added (test_handoff_generic.HandoffGenericTestCase.test_default_envelope_uses_newest_added) ... ok
+test_default_task_uses_newest_open_task (test_handoff_generic.HandoffGenericTestCase.test_default_task_uses_newest_open_task) ... ok
+test_default_task_uses_single_open_task (test_handoff_generic.HandoffGenericTestCase.test_default_task_uses_single_open_task) ... ok
+test_explicit_envelope_is_selected (test_handoff_generic.HandoffGenericTestCase.test_explicit_envelope_is_selected) ... ok
+test_explicit_task_drives_sections_0_3_4_7 (test_handoff_generic.HandoffGenericTestCase.test_explicit_task_drives_sections_0_3_4_7) ... ok
+test_explicit_unknown_envelope_fails (test_handoff_generic.HandoffGenericTestCase.test_explicit_unknown_envelope_fails) ... ok
+test_generated_package_passes_handoff_check (test_handoff_generic.HandoffGenericTestCase.test_generated_package_passes_handoff_check) ... ok
+test_handoff_check_uses_package_task_and_envelope (test_handoff_generic.HandoffGenericTestCase.test_handoff_check_uses_package_task_and_envelope) ... ok
+test_legacy_package_matches_task_by_evidence_hashes (test_handoff_generic.HandoffGenericTestCase.test_legacy_package_matches_task_by_evidence_hashes) ... ok
+test_missing_git_paths_yield_empty_hashes (test_handoff_generic.HandoffGenericTestCase.test_missing_git_paths_yield_empty_hashes) ... ok
+test_profile_worktree_is_not_reused_for_another_task (test_handoff_generic.HandoffGenericTestCase.test_profile_worktree_is_not_reused_for_another_task) ... ok
+test_section1_reflects_live_state_without_phase2_text (test_handoff_generic.HandoffGenericTestCase.test_section1_reflects_live_state_without_phase2_text) ... ok
+test_section4_lists_all_open_tasks (test_handoff_generic.HandoffGenericTestCase.test_section4_lists_all_open_tasks) ... ok
+test_section4_reports_no_open_tasks (test_handoff_generic.HandoffGenericTestCase.test_section4_reports_no_open_tasks) ... ok
+test_fail_is_retryable_after_correction (test_post_merge.PostMergeTestCase.test_fail_is_retryable_after_correction) ... ok
+test_failure_appends_ledger_event (test_post_merge.PostMergeTestCase.test_failure_appends_ledger_event) ... ok
+test_preexisting_review_file_does_not_fail_clean_check (test_post_merge.PostMergeTestCase.test_preexisting_review_file_does_not_fail_clean_check) ... ok
+test_rejects_envelope_that_was_never_merged (test_post_merge.PostMergeTestCase.test_rejects_envelope_that_was_never_merged) ... ok
+test_success_appends_ledger_event (test_post_merge.PostMergeTestCase.test_success_appends_ledger_event) ... ok
+test_unrelated_dirty_file_still_blocks (test_post_merge.PostMergeTestCase.test_unrelated_dirty_file_still_blocks) ... ok
+
+----------------------------------------------------------------------
+Ran 40 tests in 11.433s
+
+OK
