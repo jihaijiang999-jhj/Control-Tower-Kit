@@ -1,0 +1,196 @@
+# tower-dsh 控制塔地图 / 画像
+
+> 生成者：`ctl-yingxian-qa-001`（接续 controller）· 生成时刻：2026-10-19T23:5x +08:00
+> 性质：**只读快照**。不替代 `tower-dsh/primary/CURRENT_STATE.json`，不构成状态。
+> 修订：2026-10-20T00:5x —— §6 由"漂移"改为"已闭合"，§1 phase 按实值更正，§8 口径同步。
+> 依据：`startup` / `wiring` / `status` / `handoff-check` / `spec-coverage` / `verify-ledger` 实跑输出 + 代码通读 + git 实值 + 一次测试复跑。
+> 标注约定：`[证]` 有可执行证据 / `[声]` 仅文档或口头声明 / `[无]` 未做 / `⊙` 单点 / `∅` 空白。
+
+---
+
+## 0. 一句话读数
+
+**木塔能证明"发生过什么"，能查"现在是什么"，但不能推导"现在必须成立什么"。**
+
+- 过程层已经硬化（spec 冻结、证据强制、merge 分支断言、账本哈希链都是真门，`exit 2` 不是建议）；
+- 对象层是空的（56 条条款全是"塔怎么管自己"，没有一条是"被迭代系统必须永远成立什么"）；
+- 账本只有一个读消费者（`check --phase spec` 查 `SPEC_APPROVED`），其余全是写——历史存在，但不约束现在。
+
+---
+
+## 1. 主图：组件与权威归属
+
+```text
+                    ┌──────────────────────────────────────────────────────────┐
+                    │  OWNER  mac          四闸：merge / 外部调用 /             │
+                    │                     部署·生产数据 / L0 文档写 main       │
+                    │                            ⊙O                             │
+                    └───────┬──────────────────────────────┬───────────────────┘
+              E1 授权(口头)  │                              │  E2 裁决/接受(口头)
+              无命令、无签名  ▼                              ▼  无命令、无签名
+        ┌───────────────────────────────┐        ┌────────────────────────────────┐
+        │ PRIMARY                       │        │ SUPERVISION                    │
+        │ id: ctl-yingxian-qa-001       │  E7    │ id: sup-phase2-pilot           │
+        │ phase: HANDOFF_ACTIVE         │───────▶│ phase: PHASE_2_PILOT_VERIFIED  │
+        │ 职责: spec/routing/gates/     │信封 +  │ 职责: 独立验收/串行队列/       │
+        │       evidence/closeout       │入队    │       merge/post-merge/纠正    │
+        │ 工具: tools/towerctl.py ⊙T    │        │ 队列: MERGE_QUEUE.json ⊙Q      │
+        └──┬────────┬────────┬──────────┘        └────┬─────────────────┬─────────┘
+     E3    │   E4   │   E5   │                        │ E8 merge        │ E9
+   spec冻结│ 三写    │ 事件    │                        ▼                 ▼
+           ▼        ▼        ▼                  ┌──────────────┐  ┌──────────────┐
+    ┌──────────┐ ┌────────┐ ┌──────────┐        │ pilot/repo   │  │ merge-       │
+    │ spec     │ │ record │ │ ledger   │        │ main (base)  │  │ ledger.json  │
+    │ *.spec   │ │ board  │ │ *.jsonl  │        └──────┬───────┘  └──────────────┘
+    │ .json    │ │ state  │ │ 哈希链 ⊙L│               │ E10 post-merge
+    └──────────┘ └────────┘ └──────────┘               ▼
+                                     ┌──────────────────────────────┐
+                                     │ supervision/reviews/*.txt    │
+                                     │ tasks/<id>/MERGE.md          │
+                                     └──────────────────────────────┘
+
+    旁路（横向，不属于主脊）：
+    ┌────────────┐   E11 handoff    ┌──────────────────────────────┐
+    │ handoffs/  │◀────────────────▶│ handoff-new/claim/receipt/   │
+    │ <pkg>/     │                  │ accept/activate              │
+    └────────────┘                  │ 写 CURRENT_STATE + ledger    │
+                                    └──────────────────────────────┘
+    ┌────────────────────────────────────────────────────────────────────────────┐
+    │ GIT：workspace 根 = Control-Tower-Kit 仓（origin: github/…/Control-Tower-   │
+    │ Kit.git），跟踪 199 个 tower-dsh 文件；但 towerctl 不提交 ⊙C（见 §4）      │
+    └────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. 边表（每条边：方向 / 触发 / 失败后果）
+
+| # | 从 → 到 | 流动的东西 | 触发命令 | 失败后果 | 门 |
+|---|---|---|---|---|---|
+| E1 | owner → primary | 授权（口头） | 无 | 越权即红线 `C-01`/`C-04`，但**无法证伪** | `[声]` owner-gate |
+| E2 | owner → primary | 接受裁决 | `accept --decision <id>` | `--decision` 只是字符串，无人签名，可自填 | `[声]` |
+| E3 | `pilot/<ID>.spec.json` → `record.spec_sha256` | 冻结的 spec 哈希 | `task-new` | 改 spec 即 gate 失效（每次实时复算，`towerctl.py:442-470`） | `[证]` |
+| E4 | spec 批准 → `ledger` | `SPEC_APPROVED` 事件 | `spec-approve --by <name>` | `--by` 是裸字符串；事件行可手写伪造（P1-11 仍在） | `[声]` |
+| E5 | `check` → `record.spec_gate` → `dispatch` | PASS 字段 | `check --phase spec` → `dispatch` | 未 PASS 时 `dispatch` exit 2（PILOT-002 已修 P0-1） | `[证]` |
+| E6 | primary → record / board / ledger | 三处并行写 | `dispatch`/`deliver`/`checkback`/`accept`/`close` | 中途异常则三处漂移；**无重建、无比对、无自愈** | `[无]` |
+| E7 | primary → supervision | 信封 + 入队 | `envelope-new` / `queue-add` | primary 写 supervision 账本（`towerctl.py:1846`）——**单写者破口**；设计上 primary 不 merge 但能写对方账本 | `[证]` 有断言 `supervisor != primary` |
+| E8 | supervision → pilot/repo | 真 `git merge --no-ff` | `merge --role supervisor --envelope` | 当前分支 ≠ base → `CORRECTION_REQUIRED`（P0-3 已修，`1919-1936`） | `[证]` |
+| E9 | merge → 队列 / 信封 / 合并账本 | 状态 + merge commit | 同上 | merge 成功后写三处；若写错，队列与账本分叉 | `[证]` 部分 |
+| E10 | post-merge → reviews / MERGE.md / queue | 验证结论 | `post-merge --result PASS` | 4 项检查；**测试只看 exit code，空测试集也 PASS** | `[证]` + `[无]` 计数门 |
+| E11 | handoff 命令 → 包 / CURRENT_STATE / ledger | 交接状态机 | `handoff-new/claim/receipt/accept/activate` | 写 state 后**不提交**（本次实例：3 M + 4 ??，见 §6） | `[证]` 21 项 check |
+| E12 | executor → worktree 文件 | 实现 | 人工 / subagent | `allowed_paths` 只存不验（P1-1 仍未做 `git diff` 校验） | `[无]` |
+| E13 | executor → `tasks/<id>/evidence/` | 证据副本 + SHA-256 | `deliver` | CRLF / git blob 语义未定；复核者可能误报 | `[证]` 哈希，`[声]` 语义 |
+| E14 | ledger → ??? | 历史 | — | 只有 `check --phase spec` 读一次；**其余无消费者** | `[无]` |
+| E15 | 塔 → git | 提交 | **无命令，靠人** | 真相可不在历史里（见 §6） | `[无]` |
+
+---
+
+## 3. 单点（只有一个人 / 一个文件 / 一个命令的地方）
+
+| # | 单点 | 位置 | 为什么是单点 | 断了会怎样 |
+|---|---|---|---|---|
+| ⊙O | owner `mac` | `primary/CURRENT_STATE.json:owner` | 四闸全归一人，且授权是口头 | 无人可批 = 全塔只读 |
+| ⊙T | `tools/towerctl.py` | 2 394 行 / **33 个子命令** | 唯一状态写者；没有任何第二实现 | 工具坏 = 全塔停摆，且状态无法恢复 |
+| ⊙Q | `supervision/MERGE_QUEUE.json` | `supervision/` | 唯一合并队列 | 丢失即无法判断在途合并 |
+| ⊙L | `ledger/.lock` | `ledger/` | 串行化并发写 | 竞争写 = 断号/丢事件 |
+| ⊙S | `sup-phase2-pilot` | `supervision/CURRENT_STATE.json` | 只有一个 supervisor 会话；`--role supervisor` 是字符串 | 任何人带参数即可 merge（P1-6） |
+| ⊙C | 手工 commit | 无 | 状态写完后无自动提交步骤 | 本次 handoff 产生 7 个未提交改动；已由 `26d2f6f` 人工闭合（§6），但机制仍在 |
+| ⊙E | `%TEMP%` ACL | `%TEMP%\dsh-*\` | 134 个测试先在临时目录建塔 | ACL 一变，全套回归 0.056 s 全 ERROR（§5） |
+| ⊙P | Python 3.12.10 + Windows | `HANDOFF.md §3` | 唯一已验环境 | 换环境即"绿"不可复现 |
+| ⊙G | `spec_gate` 单字段 | `record.json` | 一个字段决定 `dispatch` 放行 | 该字段被误写 = 绕过第一道闸 |
+
+---
+
+## 4. 空白（`∅` 未做 / 没有）
+
+### 4.1 本塔已知（`NEXT-WINDOW.md` backpack + `AUDIT`）
+
+| # | 空白 | 现状证据 | 后果 |
+|---|---|---|---|
+| ∅1 | 远端 PR / 分支保护 | 本地 `git merge --no-ff`；无服务端保护 | 无第二人复核闸，无强制 CI |
+| ∅2 | Console / presets（Phase 4） | 无代码 | 操作全靠 CLI |
+| ∅3 | 多任务并发 | 队列只校验 `entry.status`，不排斥并发 `MERGING`（P1-14） | 并发合并可能写坏 base |
+| ∅4 | 真实项目 pilot | 只有 `pilot/repo` 玩具项目（10 个 worktree） | 未证过接第二个项目 |
+
+### 4.2 本次新增（对照 K3 控制塔后识别，按重要性排序）
+
+| # | 空白 | K3 塔有什么 | 木塔现状 | 补法（可执行物，非文档） |
+|---|---|---|---|---|
+| ∅5 | **对象层画像**（系统事实冻结） | `_k3-ops/db-profile/database-profile-v1.md`：冻结 PG 18.x 精确 minor、Prisma Rust-free、池化位置、唯一迁移路径、`db push` 禁止；状态行明写"不授权依赖/schema/迁移/供给" | 只有元层 spec（塔怎么管自己）；没有一条关于被迭代系统 | `state/PROFILE-<object>.md`，每条不变量配一个 `probe` 命令，`towerctl profile-check` 失败 exit 2 |
+| ∅6 | **锚点 + 趋势 diff + 熔断** | `architecture-trend-governance.md`：逻辑超长 266 / 页面 3 / CLI 4 / 已知环 2 / 🟡 2；周测只报 diff；新增环>0 或 🟡>10 即停新功能 | 只有"134 测试全绿"一个快照，无趋势、无阈值、无熔断 | `state/BASELINE.json` + `towerctl trend-diff`（每周/每 merge 出 diff）+ 阈值与"停新功能"动作 |
+| ∅7 | **授权态单写者** | `SeeMake-Control-Tower-Authority-State.md`：Active Tower / Single Writer / 保留闸 / repo+queue 锚点 | `--role supervisor` 是参数，不是身份；`CURRENT_STATE.primary` 只有一个字符串 | `state/AUTHORITY.json` + `towerctl authority-check`（写者≠活性塔即拒写） |
+| ∅8 | **判例集** | `rules-ref/治理判例集.md`：一次裁决 → 以后可引用的规则 | 5 条散在 `HANDOFF.md §6` | ledger 增加 `PRECEDENT` 事件 + `towerctl precedent --list` |
+| ∅9 | **包号防呆** | `_k3-ops/CURRENT`：包号比你所持新即停手 | `handoff-check` 只在 claim 时跑一次 §0 漂移 | 根目录 `CURRENT` + `startup` 强制比对 |
+| ∅10 | **状态重放** | （K3 也没有；木塔本可领先） | 状态是并行写，不是 `f(ledger)` | `towerctl state-verify`：从 ledger 重放 → 与 board/record/state 逐字段比对 |
+| ∅11 | **测试计数门** | （K3 也没有） | `post-merge` 只认 exit code，空 `tests/` 也 PASS | 解析 `Ran N tests`，要求 `N >= baseline`（baseline 存进 envelope） |
+| ∅12 | **证据可复现** | — | 134 测试依赖 `%TEMP%` ACL 与 Windows | 测试强制 `TMPDIR` 沙箱内建塔 + 干净环境复跑清单 |
+
+---
+
+## 5. 已证明 / 仅声明 / 未做（用数字说话）
+
+| 能力 | 判定 | 证据 |
+|---|---|---|
+| spec 冻结（改 spec 即失效） | `[证]` | `spec_gate_errors` 每次实时复算 SHA-256（`towerctl.py:442-470`） |
+| `dispatch` 前置 spec 门 | `[证]` | `cmd_dispatch:932-934`；PILOT-002 回归测试 |
+| accept / close 强证据 | `[证]` | `cmd_accept:1022`、`cmd_close:1046` 内联 `check_evidence` |
+| reviewer 非空且 ≠ executor | `[证]` | `cmd_checkback:992-996` |
+| merge 分支断言 | `[证]` | `cmd_merge:1919-1936`，不符即 `CORRECTION_REQUIRED` |
+| post-merge 四检 | `[证]` | 测试 / 实现是祖先 / 信封在 base / 工作树干净（`2058-2070`） |
+| 路径越界防护 | `[证]` | `ensure_within` 覆盖 evidence / worktree / package / envelope / repository |
+| ledger 哈希链 | `[证]` | `verify-ledger` → primary 103 事件、supervision 54，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
+| 条款→测试绑定 | `[证]` | `spec-coverage`：6 份规范 / 56 条款 / tool-check 27 / covered **27** / gaps 0 |
+| **134 个测试全绿** | **`[声]` 本次未复现** | 复跑 `python -B -m unittest discover -s tools/tests` → `Ran 134 tests in 0.056s` / `FAILED (errors=134)`，根因 `PermissionError WinError 5` 建 `%TEMP%\dsh-*\kit` 被拒——**环境层先失败，断言层没跑起来** |
+| 29 条条款靠人 | `[声]` | 12 `review-check` + 17 `owner-gate`（`spec-coverage.manual` / `.owner`） |
+| "每次迭代全局正确" | `[无]` | 无对象层不变量、无趋势锚点、无状态重放 |
+| 10 个任务 / 10 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`；pilot repo main `9fb5ba2…835db2` |
+
+---
+
+## 6. 生成时刻的漂移（已闭合）
+
+**观测（23:5x）**：`handoff-activate` 成功后，权威状态**未提交**——
+
+```text
+ M tower-dsh/ledger/primary.jsonl
+ M tower-dsh/primary/CURRENT_STATE.json
+ M tower-dsh/handoffs/HANDOFF-PILOT-002/package.json
+?? tower-dsh/handoffs/HANDOFF-PILOT-002/CLAIM.json
+?? tower-dsh/handoffs/HANDOFF-PILOT-002/RECEIPT.md
+?? tower-dsh/handoffs/HANDOFF-PILOT-002/ACCEPTANCE.json
+?? tower-dsh/handoffs/HANDOFF-PILOT-002/ACTIVATION.json
+```
+
+含义：那一刻的"真相"只在工作区；任何人 clone `Control-Tower-Kit` 得到的仍是 `ctl-phase3-receiver-001` 当 controller。
+
+**闭合（00:5x，owner 逐次授权）**：`26d2f6f` `state: HANDOFF-PILOT-002 ACTIVE (ctl-yingxian-qa-001)`，7 files / +401 / −10，内容恰为上述三改四增，无手改、无夹带。ledger 以 seq 100–103 接入哈希链（`fd132d…` → `fbe0ae…` → `75fb59…` → `a26a211…` → `a5622e4…`），`verify-ledger` 0 error。
+
+**残余**：闭合靠的是人记得提交，不是工具保证（⊙C / ∅10 仍未解）。本文件以独立 `docs:` 提交入库——地图是投影，不与状态混在一次提交里。
+
+**同时更正**：`handoff-activate` 把 phase 从 `READY_FOR_PRACTICE` 改为 `HANDOFF_ACTIVE`、`next_action` 改为 `resume from handoffs/HANDOFF-PILOT-002/HANDOFF.md`；§1 主图已按实值更新。
+
+---
+
+## 7. 与 K3 塔的能力对照（一页）
+
+| 维度 | K3 / SeeMake 塔 | tower-dsh | 谁更强 |
+|---|---|---|---|
+| 项目状态 | `CURRENT`（包号禁令）+ Authority State + v37 包 | `CURRENT_STATE.json` + handoff 包 | K3：多一层窗防呆 |
+| 系统事实冻结 | 画像族：DB / 队列 / 存储 / 部署 / 多用户 / 实施 | **无** | K3 |
+| 不变量可执行性 | 画像多为散文 + 基线与采集脚本 | 27/27 tool-check 有测试、门是 `exit 2` | **木塔** |
+| 趋势治理 | 锚点 + 周测 diff + 熔断 + 重锚 | **无** | K3 |
+| 版本控制 | `_k3-ops/` **永不入 git** | 塔在 `Control-Tower-Kit` 仓（199 文件） | **木塔** |
+| 独立性 | 四重**同身份**评审 | 独立 subagent reviewer，`reviewer != executor` 硬断言 | **木塔** |
+| 决策证据 | owner 向量 + 题包 SHA-256 | 证据 SHA-256 + ledger 哈希链 | 平（木塔链更强，K3 题包公理化更强） |
+| 交接 | v37 包 + CURRENT 防呆 | v2.1 五步状态机 + 21 项 check | 木塔流程更严，K3 防呆更实用 |
+| 判例 | `治理判例集.md` | 5 条散在 handoff §6 | K3 |
+
+---
+
+## 8. 这张图自己的边界
+
+- **只读快照**：生成期间不写状态、不 merge、不碰生产、不外部调用；唯一写入是本文件。其后按 owner 逐次授权提交了 handoff 状态（`26d2f6f`，见 §6）——那是状态的提交，不是地图的改写。
+- **数字口径**：任务/信封数来自 `status`；条款数来自 `spec-coverage`；账本数来自 `verify-ledger`；测试结论来自 2026-10-19 23:3x 的一次复跑（环境异常，已如实记录，不伪装成绿）。
+- **会过期的部分**：§5 的测试结论、§6 的漂移清单——两者都应在下一次 `startup` 时重算。
+- **刷新触发**：phase 变更 / 新增任务卡 / 门禁代码（`towerctl.py`）变更 / 新 handoff 包 / 接入真实项目 —— 任一发生即重画。
+- **不做什么**：不代替 `CURRENT_STATE.json`，不充当授权记录，不作为"完成"证据。地图是投影，不是真相。
