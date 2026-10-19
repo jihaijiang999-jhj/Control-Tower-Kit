@@ -37,8 +37,10 @@
     }
   ],
   "envelope_head_sha": "608d082259fe26305b251110b61b30b1871eae7d",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "merge_commit": "6a849b941519d6c8ec6e91a864423e903f9f607a",
   "merged_at": "2026-10-20T01:51:03+08:00",
-  "supervisor": "sup-pilot-011-verify"
+  "supervisor": "sup-pilot-011-verify",
+  "post_merge_at": "2026-10-20T01:51:47+08:00",
+  "post_merge_note": "authority drift surfacing; 146 tests"
 }
