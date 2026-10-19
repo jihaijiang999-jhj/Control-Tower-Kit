@@ -171,6 +171,37 @@ def check_evidence(root: Path, record: dict) -> list[str]:
     return errors
 
 
+def spec_gate_errors(root: Path, rec: dict) -> list[str]:
+    """Re-check the spec gate against the live spec file.
+
+    The recorded ``spec_sha256`` is compared with the file on disk every time
+    the gate is consulted, so editing a spec after ``task-new`` invalidates a
+    previously recorded ``spec_gate: PASS``.  A task card without ``spec_path``
+    is no longer exempt: without an unchanged spec file the gate cannot pass.
+    """
+    errors: list[str] = []
+    spec_path = rec.get("spec_path")
+    if not spec_path:
+        errors.append("task card has no spec_path (legacy task card); spec gate cannot pass")
+        return errors
+    full = root / spec_path
+    if not full.exists():
+        errors.append(f"spec file missing: {spec_path}")
+        return errors
+    recorded = rec.get("spec_sha256")
+    actual = sha256_file(full)
+    if recorded != actual:
+        errors.append(
+            "spec file changed since task-new "
+            f"(spec_sha256 mismatch: recorded {recorded}, current {actual}); "
+            "spec_gate is invalid, rebuild the task card"
+        )
+        return errors
+    if rec.get("spec_gate") != "PASS":
+        errors.append("spec gate not passed; run check --phase spec first")
+    return errors
+
+
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["git", "-C", str(repo), *args],
@@ -476,7 +507,10 @@ def cmd_check(root: Path, args) -> None:
     if phase == "spec":
         spec_path = rec.get("spec_path")
         if not spec_path:
-            errors.append("task card has no spec_path (legacy task, spec gate not applicable)")
+            errors.append(
+                "task card has no spec_path; legacy task cards are no longer exempt "
+                "from the spec gate, rebuild the card from a spec"
+            )
         else:
             full = root / spec_path
             if not full.exists():
@@ -499,8 +533,7 @@ def cmd_check(root: Path, args) -> None:
             errors.append("TASK.md missing")
         if not (root / rec.get("worktree", "")).exists():
             errors.append("worktree missing")
-        if rec.get("spec_path") and rec.get("spec_gate") != "PASS":
-            errors.append("spec gate not passed; run check --phase spec first")
+        errors += spec_gate_errors(root, rec)
     elif phase == "dispatch":
         if rec.get("status") != "dispatched":
             errors.append(f"status is {rec.get('status')}, expected dispatched")
@@ -518,7 +551,10 @@ def cmd_check(root: Path, args) -> None:
         review = rec.get("review") or {}
         if review.get("verdict") != "PASS":
             errors.append("review verdict is not PASS")
-        if review.get("reviewer") and review.get("reviewer") == rec.get("executor"):
+        reviewer = (review.get("reviewer") or "").strip()
+        if not reviewer:
+            errors.append("reviewer missing or empty in review record")
+        elif reviewer == (rec.get("executor") or "").strip():
             errors.append("reviewer equals executor")
         errors += check_evidence(root, rec)
     elif phase == "accept":
@@ -554,6 +590,12 @@ def cmd_dispatch(root: Path, args) -> None:
     worktree = args.worktree or rec.get("worktree")
     if not worktree or not (root / worktree).exists():
         fail([f"worktree missing: {worktree}"])
+    task_md = task_dir(root, args.task) / "TASK.md"
+    if not task_md.exists():
+        fail([f"TASK.md missing: {rel(root, task_md)}; cannot dispatch without a task card"])
+    gate_errors = spec_gate_errors(root, rec)
+    if gate_errors:
+        fail(gate_errors)
     rec["executor"] = args.executor
     rec["dispatch"] = {"executor": args.executor, "worktree": worktree, "at": now()}
     rec["status"] = "dispatched"
@@ -611,9 +653,12 @@ def cmd_checkback(root: Path, args) -> None:
     rec = load_record(root, args.task)
     if rec.get("status") not in ("delivered", "reviewed", "rework"):
         fail([f"task status {rec.get('status')} cannot checkback"])
-    if args.reviewer == rec.get("executor"):
+    reviewer = (args.reviewer or "").strip()
+    if not reviewer:
+        fail(["reviewer must be non-empty (whitespace-only is not a reviewer)"])
+    if reviewer == (rec.get("executor") or "").strip():
         fail(["reviewer must differ from executor"])
-    rec["review"] = {"reviewer": args.reviewer, "verdict": args.verdict,
+    rec["review"] = {"reviewer": reviewer, "verdict": args.verdict,
                      "note": args.note or "", "at": now()}
     rec["status"] = "reviewed" if args.verdict == "PASS" else "rework"
     rec["next"] = "等待 accept" if args.verdict == "PASS" else "返工"
@@ -621,13 +666,13 @@ def cmd_checkback(root: Path, args) -> None:
     update_board(root, rec)
     tdir = task_dir(root, args.task)
     lines = [f"# {rec['id']} — Independent Checkback", "",
-             f"- Reviewer: `{args.reviewer}`", f"- Verdict: **{args.verdict}**",
+             f"- Reviewer: `{reviewer}`", f"- Verdict: **{args.verdict}**",
              f"- At: {rec['review']['at']}", "", "## Note", "", args.note or "(none)", "",
              "## Evidence checked", ""]
     lines += [f"- `{e['path']}` `{e['sha256']}`" for e in rec.get("evidence", [])]
     (tdir / "REVIEW.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     append_ledger(root, "CHECKBACK", "reviewer",
-                  {"task": args.task, "reviewer": args.reviewer, "verdict": args.verdict})
+                  {"task": args.task, "reviewer": reviewer, "verdict": args.verdict})
     emit({"ok": True, "task": args.task, "status": rec["status"], "verdict": args.verdict})
 
 
@@ -638,6 +683,9 @@ def cmd_accept(root: Path, args) -> None:
         fail(["cannot accept without PASS checkback"])
     if rec.get("status") not in ("reviewed", "accepted"):
         fail([f"task status {rec.get('status')} cannot accept"])
+    evidence_errors = check_evidence(root, rec)
+    if evidence_errors:
+        fail(evidence_errors)
     rec["decision"] = {"id": args.decision, "actor": "owner",
                        "text": args.note or "owner authorized pilot acceptance",
                        "at": now()}
@@ -656,6 +704,12 @@ def cmd_close(root: Path, args) -> None:
     if rec.get("status") != "accepted":
         fail([f"task status {rec.get('status')} cannot close"])
     tdir = task_dir(root, args.task)
+    errors: list[str] = []
+    if not (tdir / "TASK.md").exists():
+        errors.append("TASK.md missing; cannot close a task without its task card")
+    errors += check_evidence(root, rec)
+    if errors:
+        fail(errors)
     closeout = tdir / "CLOSEOUT.md"
     next_text = "merge/handoff decision (owner gate) — not performed in Phase 1"
     lines = [f"# {rec['id']} — Closeout", "", f"- Status: `closed`",
@@ -1219,6 +1273,32 @@ def cmd_merge(root: Path, args) -> None:
                   if e.get("envelope_id") == args.envelope), None)
     if entry is None:
         fail([f"envelope not queued: {args.envelope}"])
+    if entry.get("status") not in ("WAITING", "CORRECTION_REQUIRED"):
+        fail([
+            f"queue entry status {entry.get('status')} is not WAITING/CORRECTION_REQUIRED; "
+            "only a waiting or corrected entry may merge"
+        ])
+    base = env.get("base", "main")
+    repo = root / env.get("repository", "pilot/repo")
+    try:
+        current_branch = git_ok(repo, "rev-parse", "--abbrev-ref", "HEAD")
+    except Exception as exc:
+        entry["status"] = "CORRECTION_REQUIRED"
+        save_queue(root, queue)
+        append_supervision_ledger(root, "MERGE_BLOCKED", "supervision",
+                                  {"envelope": args.envelope, "base": base,
+                                   "reason": f"branch check failed: {exc}"})
+        fail([f"cannot verify current branch against envelope base {base}: {exc}"])
+    if current_branch != base:
+        entry["status"] = "CORRECTION_REQUIRED"
+        save_queue(root, queue)
+        append_supervision_ledger(root, "MERGE_BLOCKED", "supervision",
+                                  {"envelope": args.envelope, "base": base,
+                                   "current_branch": current_branch})
+        fail([
+            f"current branch {current_branch} != envelope base {base}; "
+            "checkout the envelope.base branch before merging"
+        ])
     checks = envelope_checks(root, env)
     checks.append({"name": "queued", "ok": entry is not None,
                    "detail": entry.get("status") if entry else "missing"})
@@ -1234,7 +1314,6 @@ def cmd_merge(root: Path, args) -> None:
     save_queue(root, queue)
     append_supervision_ledger(root, "MERGE_START", "supervision",
                               {"envelope": args.envelope, "supervisor": args.supervisor})
-    repo = root / env.get("repository", "pilot/repo")
     cp = git(repo, "merge", "--no-ff", "-m",
              f"merge: {env.get('task')} ({args.envelope})", env.get("branch", ""))
     if cp.returncode != 0:
