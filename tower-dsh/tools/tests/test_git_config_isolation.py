@@ -1,0 +1,96 @@
+"""CLI subprocesses must carry an explicit git identity (PILOT-013).
+
+The gate tests drive ``towerctl merge``, which internally runs ``git merge``.
+On a clean CI runner there is no global ``user.name`` / ``user.email``, so the
+child CLI process only succeeds if it is handed an identity.  The ``run_git``
+helpers in ``test_coverage`` / ``test_hardening2`` always did; their
+``run_cli`` helpers did not, which is why the two merge tests failed on the
+first GitHub Actions run while staying green on a developer machine.
+
+This module pins the contract down: it intercepts the exact ``env`` that
+``run_cli`` passes to ``subprocess.run`` and asserts the four git identity
+variables are present and non-empty.
+
+Run from the tower root (``tower-dsh``)::
+
+    python -B -m unittest discover -s tools/tests -v
+"""
+from __future__ import annotations
+
+import sys
+import unittest
+from pathlib import Path
+from unittest import mock
+
+# ``discover -s tools/tests`` already puts this directory on sys.path; the
+# insert keeps the module importable when run directly.
+TESTS_DIR = Path(__file__).resolve().parent
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
+
+import test_coverage  # noqa: E402  (import after sys.path setup)
+import test_hardening2  # noqa: E402  (import after sys.path setup)
+
+IDENTITY_KEYS = (
+    "GIT_AUTHOR_NAME",
+    "GIT_AUTHOR_EMAIL",
+    "GIT_COMMITTER_NAME",
+    "GIT_COMMITTER_EMAIL",
+)
+
+
+def capture_run_cli_env(module, root: Path) -> dict:
+    """Return the ``env`` dict that ``module.run_cli`` hands to subprocess.run."""
+    calls: list[dict] = []
+
+    def fake_run(*args, **kwargs):
+        calls.append(kwargs.get("env"))
+        return mock.Mock(returncode=0, stdout="", stderr="")
+
+    with mock.patch.object(module.subprocess, "run", side_effect=fake_run):
+        module.run_cli(root, "status")
+
+    if len(calls) != 1:
+        raise AssertionError(
+            f"expected exactly one subprocess.run call, got {len(calls)}")
+    return calls[0]
+
+
+class RunCliIdentityAssertions:
+    """Shared assertions; subclasses point at the module under test.
+
+    A plain mixin (not a ``TestCase``) so it is not collected on its own.
+    """
+
+    module = None
+
+    def test_run_cli_passes_git_identity(self) -> None:
+        env = capture_run_cli_env(self.module, Path("."))
+
+        self.assertIsInstance(env, dict)
+        missing = [key for key in IDENTITY_KEYS
+                   if not env.get(key)]
+        self.assertEqual(
+            [], missing,
+            msg=("run_cli env is missing non-empty git identity keys "
+                 f"{missing}; env keys present: {sorted(env)}"),
+        )
+        for key in IDENTITY_KEYS:
+            self.assertEqual(
+                self.module.GIT_IDENTITY[key], env[key],
+                msg=(f"run_cli env[{key}] must reuse "
+                     f"{self.module.__name__}.GIT_IDENTITY; "
+                     f"env keys present: {sorted(env)}"),
+            )
+
+
+class CoverageRunCliIdentityTestCase(RunCliIdentityAssertions, unittest.TestCase):
+    module = test_coverage
+
+
+class Hardening2RunCliIdentityTestCase(RunCliIdentityAssertions, unittest.TestCase):
+    module = test_hardening2
+
+
+if __name__ == "__main__":
+    unittest.main()
