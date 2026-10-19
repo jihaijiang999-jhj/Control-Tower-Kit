@@ -1,0 +1,14 @@
+{
+  "schema": "tower/merge-ledger@1",
+  "entries": [
+    {
+      "envelope_id": "ENV-PILOT-001",
+      "task": "PILOT-001",
+      "implementation_head_sha": "c8af539afbba4666d7cbdc6a5f5eb21538e14709",
+      "envelope_head_sha": "ed28ac618f524db7d5db426db3839cd185a6da11",
+      "merge_commit": "9fb5ba243f5cf03f7ccafb0eb381793770835db2",
+      "supervisor": "sup-phase2-pilot",
+      "at": "2026-10-19T12:29:08+08:00"
+    }
+  ]
+}

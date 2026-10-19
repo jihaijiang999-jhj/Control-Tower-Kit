@@ -1,0 +1,15 @@
+{
+  "schema": "tower/merge-queue@1",
+  "entries": [
+    {
+      "envelope_id": "ENV-PILOT-001",
+      "task": "PILOT-001",
+      "branch": "pilot/PILOT-001",
+      "base": "main",
+      "status": "POST_MERGE_VERIFIED",
+      "added_at": "2026-10-19T12:28:42+08:00",
+      "merge_commit": "9fb5ba243f5cf03f7ccafb0eb381793770835db2"
+    }
+  ],
+  "updated_at": "2026-10-19T12:29:11+08:00"
+}

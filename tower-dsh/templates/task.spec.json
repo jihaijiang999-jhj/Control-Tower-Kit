@@ -1,0 +1,26 @@
+{
+  "schema": "tower/spec@1",
+  "id": "PROJ-NNN",
+  "title": "一句话说明任务目标",
+  "authority": "workspace_write",
+  "scope": [
+    "要做什么，逐条列出，每条可独立验证",
+    "不做什么也尽量写进 forbidden"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PROJ-NNN/允许写入的文件，逐文件列出"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access"
+  ],
+  "acceptance": [
+    "每条都是可执行的验收条件：能跑、能测、能核哈希",
+    "禁止『基本完成』『大致可用』这类不可测表述"
+  ],
+  "depends_on": [],
+  "worktree": "pilot/worktrees/PROJ-NNN"
+}

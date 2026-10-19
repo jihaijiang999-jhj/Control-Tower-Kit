@@ -1,0 +1,12 @@
+{
+  "schema": "tower/supervision-state@1",
+  "tower_id": "tower-dsh",
+  "role": "supervision",
+  "phase": "PHASE_2_PILOT_VERIFIED",
+  "supervisor": {
+    "id": "sup-phase2-pilot",
+    "session": "phase2-pilot"
+  },
+  "next_action": "Phase 3: project-handoff v2.1",
+  "updated_at": "2026-10-19T12:29:34+08:00"
+}

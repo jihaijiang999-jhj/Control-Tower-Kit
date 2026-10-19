@@ -1,0 +1,81 @@
+# PILOT-001 — Independent Review Output
+
+- Reviewer: `subagent:aed01de9-71f1-46cd-ace8-84b720a3e01f`
+- Worktree: `pilot/worktrees/PILOT-001`
+- Commit reviewed: `c8af539afbba4666d7cbdc6a5f5eb21538e14709`
+- Verdict: **PASS**
+
+## Acceptance Checklist
+
+| # | Criterion | Result | Evidence |
+|---|---|---|---|
+| 1 | append_event builds prev_hash/hash chain | PASS | seq 1,2,3; first prev_hash `GENESIS`; later prev_hash = previous hash; independently recomputed SHA-256 matched |
+| 2 | verify_chain ok=true for valid chain | PASS | `{'ok': True, 'count': 3, 'errors': []}` |
+| 3 | content tamper detected | PASS | `HASH_MISMATCH` |
+| 3 | prev_hash tamper detected | PASS | `PREV_HASH_MISMATCH`, `HASH_MISMATCH` |
+| 3 | seq tamper detected | PASS | `SEQ_GAP`, `HASH_MISMATCH` |
+| 3 | hash tamper detected | PASS | `HASH_MISMATCH`, `PREV_HASH_MISMATCH` |
+| 3 | invalid JSON detected | PASS | `JSON_INVALID` |
+| 4 | unittest suite passes | PASS | exit 0, 14 tests, OK |
+| 5 | README has run command | PASS | `python -m unittest discover -s tests -v` |
+
+## Test Output (exit 0)
+
+```text
+test_append_to_file_without_trailing_newline ... ok
+test_at_is_added_only_when_absent ... ok
+test_content_tamper_detected ... ok
+test_duplicate_seq_detected ... ok
+test_empty_or_missing_chain_is_valid ... ok
+test_first_record_must_be_genesis ... ok
+test_hash_tamper_detected ... ok
+test_invalid_json_line_detected ... ok
+test_missing_field_detected ... ok
+test_prev_hash_tamper_detected ... ok
+test_seq_gap_detected ... ok
+test_unicode_payload_is_not_escaped ... ok
+test_valid_chain_appends_and_verifies ... ok
+test_verification_is_read_only ... ok
+----------------------------------------------------------------------
+Ran 14 tests in 0.204s
+OK
+```
+
+## Independent Tamper Probe (`%TEMP%`, exit 0)
+
+```text
+[PASS] 3 records appended (len=3)
+[PASS] seq is 1,2,3
+[PASS] first prev_hash == GENESIS
+[PASS] second prev_hash == first hash
+[PASS] third prev_hash == second hash
+[PASS] each hash matches independent SHA-256 (64 hex)
+[PASS] each at is tz-aware
+[PASS] valid chain ok=True count=3
+[PASS] payload tamper -> HASH_MISMATCH
+[PASS] prev_hash tamper -> PREV_HASH_MISMATCH/HASH_MISMATCH
+[PASS] seq tamper -> SEQ_GAP/HASH_MISMATCH
+[PASS] hash tamper -> HASH_MISMATCH/PREV_HASH_MISMATCH
+[PASS] invalid JSON -> JSON_INVALID
+[PASS] verify_chain does not modify the file
+PROBE RESULT: PASS
+```
+
+## SHA-256
+
+| File | SHA-256 |
+|---|---|
+| `ledger_chain.py` | `38ced80e191785ff9c1d3901cf1562c729709522c313436bf63c02029d8a131c` |
+| `tests/test_ledger_chain.py` | `57ae95aa6ec05e40468a77a0d589dfb4ffbb0ff5028d8c590293800d6943b70e` |
+| `README.md` | `968b351f87e5ee7b6724b2585aa12147bd88b2073789c62de5e79fbb364ef3dd` |
+
+## Git / Scope
+
+`git status --short --untracked-files=all --ignored` = empty (clean). HEAD `c8af539` touches exactly `M README.md`, `A ledger_chain.py`, `A tests/test_ledger_chain.py`; all within allowed set. No merge, no `__pycache__`.
+
+## Non-blocking Findings
+
+- Hash covers all fields except `hash` (superset of the card's required five; stronger guarantee).
+- `verify_chain` can add `PREV_HASH_MISMATCH` noise on top of `HASH_MISMATCH` when a record's hash is tampered; detection remains correct.
+- `append_event` refuses to append to a corrupt chain; documents single-writer, no file-lock assumption.
+- Executor committed on `pilot/PILOT-001` (commit only, no merge); the card forbids merge, not commit.

@@ -1,0 +1,37 @@
+{
+  "schema": "tower/project-profile@1",
+  "project_id": "TOWER-DSH",
+  "project_name": "Tower/DSH Phase 2 Dual Tower",
+  "tower_version": "0.3",
+  "workspace_root": "C:/Users/mac/Documents/deepseek-harness/default-workspace",
+  "tower_root": "C:/Users/mac/Documents/deepseek-harness/default-workspace/tower-dsh",
+  "operating_mode": "goal_mode_control_tower",
+  "control_tower_execution_policy": "dispatch_only_no_direct_domain_execution",
+  "current_gate": "PHASE_3",
+  "phase": "PHASE_3_HANDOFF",
+  "automatic_authority_ceiling": {
+    "engineering_pr_track": "primary_pr_supervisor_merge",
+    "production_track": "no_access"
+  },
+  "owner": {
+    "name": "mac",
+    "reserves": [
+      "merge",
+      "external_call",
+      "deploy_prod",
+      "l0_main",
+      "production_read_write",
+      "data_migration",
+      "legacy_retirement"
+    ]
+  },
+  "pilot": {
+    "task": "PILOT-001",
+    "repo": "pilot/repo",
+    "worktree": "pilot/worktrees/PILOT-001"
+  },
+  "supervision": {
+    "state": "supervision/CURRENT_STATE.json",
+    "queue": "supervision/MERGE_QUEUE.json"
+  }
+}

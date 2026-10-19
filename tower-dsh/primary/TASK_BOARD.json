@@ -1,0 +1,17 @@
+{
+  "schema": "tower/task-board@1",
+  "tower_id": "tower-dsh",
+  "tasks": [
+    {
+      "id": "PILOT-001",
+      "title": "Ledger SHA-256 哈希链模块与篡改检测",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:173919b7-0cb1-4867-9685-e8113368ab97",
+      "reviewer": "subagent:aed01de9-71f1-46cd-ace8-84b720a3e01f",
+      "next": "merged via ENV-PILOT-001; POST_MERGE_VERIFIED",
+      "updated_at": "2026-10-19T12:29:52+08:00"
+    }
+  ],
+  "updated_at": "2026-10-19T12:29:52+08:00"
+}

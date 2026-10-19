@@ -1,0 +1,46 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-001",
+  "task": "PILOT-001",
+  "repository": "pilot/repo",
+  "branch": "pilot/PILOT-001",
+  "base": "main",
+  "implementation_head_sha": "c8af539afbba4666d7cbdc6a5f5eb21538e14709",
+  "envelope_path": "merge-envelopes/ENV-PILOT-001.json",
+  "created_at": "2026-10-19T12:28:42+08:00",
+  "scope": "PILOT-001: ledger hash chain + tamper tests",
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-001/evidence/ledger_chain.py",
+      "sha256": "38ced80e191785ff9c1d3901cf1562c729709522c313436bf63c02029d8a131c"
+    },
+    {
+      "path": "tasks/PILOT-001/evidence/test_ledger_chain.py",
+      "sha256": "57ae95aa6ec05e40468a77a0d589dfb4ffbb0ff5028d8c590293800d6943b70e"
+    },
+    {
+      "path": "tasks/PILOT-001/evidence/README.md",
+      "sha256": "968b351f87e5ee7b6724b2585aa12147bd88b2073789c62de5e79fbb364ef3dd"
+    },
+    {
+      "path": "tasks/PILOT-001/evidence/test-output.txt",
+      "sha256": "80f9e4c35664a1a4dab1cd2114ab875cb3c9ae1ece02ab5e2a7749702f5b9da7"
+    },
+    {
+      "path": "tasks/PILOT-001/evidence/review-output.txt",
+      "sha256": "fc1beed9f68f3308e47476ca8fe81d21822935b75aaa85ab5f115ce47ea44953"
+    }
+  ],
+  "envelope_head_sha": "ed28ac618f524db7d5db426db3839cd185a6da11",
+  "status": "POST_MERGE_VERIFIED",
+  "merge_commit": "9fb5ba243f5cf03f7ccafb0eb381793770835db2",
+  "merged_at": "2026-10-19T12:29:08+08:00",
+  "supervisor": "sup-phase2-pilot",
+  "post_merge_at": "2026-10-19T12:29:11+08:00",
+  "post_merge_note": "independent supervisor post-merge verification"
+}

@@ -1,0 +1,33 @@
+{
+  "schema": "tower/spec@1",
+  "id": "PILOT-001",
+  "title": "Ledger SHA-256 哈希链模块与篡改检测",
+  "authority": "workspace_write",
+  "scope": [
+    "实现 ledger_chain.py：append_event 追加事件并维护 prev_hash/hash 链",
+    "实现 verify_chain：校验 seq、prev_hash、hash、JSON 结构",
+    "为内容篡改、prev_hash 篡改、seq 篡改、hash 篡改编写测试",
+    "提供 README 说明运行命令"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-001/ledger_chain.py",
+    "pilot/worktrees/PILOT-001/tests/test_ledger_chain.py",
+    "pilot/worktrees/PILOT-001/README.md"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access"
+  ],
+  "acceptance": [
+    "append_event 生成 prev_hash/hash 链",
+    "verify_chain 对合法链返回 ok=true",
+    "内容篡改、prev_hash 篡改、seq 篡改、hash 篡改均被检测为失败",
+    "python -m unittest discover -s tests -v 全部通过",
+    "README 给出运行命令"
+  ],
+  "depends_on": [],
+  "worktree": "pilot/worktrees/PILOT-001"
+}

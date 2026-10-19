@@ -1,0 +1,8 @@
+{
+  "schema": "tower/handoff-acceptance@1",
+  "package_id": "HANDOFF-PILOT-001",
+  "source_controller": "ctl-8cd51ef9-2972-415a-b1db-d8d37afdde82",
+  "receiver": "ctl-phase3-receiver-001",
+  "accepted_at": "2026-10-19T12:51:58+08:00",
+  "status": "ACCEPTED"
+}

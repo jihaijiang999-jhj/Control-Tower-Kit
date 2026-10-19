@@ -1,0 +1,30 @@
+{
+  "schema": "tower/current-state@1",
+  "tower_id": "tower-dsh",
+  "role": "primary",
+  "phase": "HANDOFF_ACTIVE",
+  "objective": "用 tower-dsh 的内部任务跑通控制塔首版闭环",
+  "owner": {
+    "name": "mac",
+    "gates": {
+      "merge": "owner",
+      "external_call": "owner",
+      "deploy_prod": "owner",
+      "l0_main": "owner"
+    }
+  },
+  "primary": {
+    "id": "ctl-phase3-receiver-001",
+    "session": "handoff-receiver"
+  },
+  "next_action": "resume from handoffs/HANDOFF-PILOT-001/HANDOFF.md",
+  "blockers": [],
+  "updated_at": "2026-10-19T12:52:42+08:00",
+  "revision": 4,
+  "handoff": {
+    "status": "ACTIVE",
+    "package": "HANDOFF-PILOT-001",
+    "receiver": "ctl-phase3-receiver-001",
+    "activated_at": "2026-10-19T12:52:42+08:00"
+  }
+}

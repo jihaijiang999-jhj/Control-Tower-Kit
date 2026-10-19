@@ -1,0 +1,19 @@
+test_append_to_file_without_trailing_newline (test_ledger_chain.LedgerChainTest.test_append_to_file_without_trailing_newline) ... ok
+test_at_is_added_only_when_absent (test_ledger_chain.LedgerChainTest.test_at_is_added_only_when_absent) ... ok
+test_content_tamper_detected (test_ledger_chain.LedgerChainTest.test_content_tamper_detected) ... ok
+test_duplicate_seq_detected (test_ledger_chain.LedgerChainTest.test_duplicate_seq_detected) ... ok
+test_empty_or_missing_chain_is_valid (test_ledger_chain.LedgerChainTest.test_empty_or_missing_chain_is_valid) ... ok
+test_first_record_must_be_genesis (test_ledger_chain.LedgerChainTest.test_first_record_must_be_genesis) ... ok
+test_hash_tamper_detected (test_ledger_chain.LedgerChainTest.test_hash_tamper_detected) ... ok
+test_invalid_json_line_detected (test_ledger_chain.LedgerChainTest.test_invalid_json_line_detected) ... ok
+test_missing_field_detected (test_ledger_chain.LedgerChainTest.test_missing_field_detected) ... ok
+test_prev_hash_tamper_detected (test_ledger_chain.LedgerChainTest.test_prev_hash_tamper_detected) ... ok
+test_seq_gap_detected (test_ledger_chain.LedgerChainTest.test_seq_gap_detected) ... ok
+test_unicode_payload_is_not_escaped (test_ledger_chain.LedgerChainTest.test_unicode_payload_is_not_escaped) ... ok
+test_valid_chain_appends_and_verifies (test_ledger_chain.LedgerChainTest.test_valid_chain_appends_and_verifies) ... ok
+test_verification_is_read_only (test_ledger_chain.LedgerChainTest.test_verification_is_read_only) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.162s
+
+OK

@@ -1,0 +1,94 @@
+{
+  "schema": "tower/authority-model@1",
+  "authorization_id": "TOWER-DSH-AUTH-PHASE2-001",
+  "authorized_by": "human_owner",
+  "authorized_at": "2026-10-19",
+  "operating_model": "phase2_dual_tower_separation_of_duties",
+  "roles": {
+    "owner": {
+      "name": "mac",
+      "reserves": [
+        "merge",
+        "external_call",
+        "deploy_prod",
+        "l0_main",
+        "production_read_write",
+        "data_migration",
+        "legacy_retirement"
+      ]
+    },
+    "primary_control_tower": {
+      "owns": [
+        "goal_decomposition",
+        "task_cards",
+        "routing",
+        "branch_and_worktree",
+        "commit_and_push",
+        "pr_create_and_update",
+        "evidence_collection",
+        "closeout",
+        "merge_envelope_submission"
+      ],
+      "forbidden": [
+        "merge_pull_request",
+        "merge_local_branch",
+        "substitute_self_review_for_independent_review",
+        "edit_executor_worktree",
+        "rewrite_supervisor_merge_decision"
+      ]
+    },
+    "supervising_control_tower": {
+      "owns": [
+        "independent_acceptance",
+        "serial_merge_queue",
+        "actual_merge",
+        "post_merge_validation",
+        "correction_return",
+        "mechanism_audit_and_improvement"
+      ],
+      "forbidden": [
+        "edit_candidate_implementation",
+        "approve_own_implementation",
+        "bypass_required_evidence"
+      ]
+    },
+    "executor": {
+      "owns": [
+        "implementation_inside_task_worktree"
+      ],
+      "forbidden": [
+        "edit_primary_state",
+        "edit_supervision_state",
+        "merge",
+        "network",
+        "production"
+      ]
+    },
+    "reviewer": {
+      "owns": [
+        "independent_checkback",
+        "evidence_verification"
+      ],
+      "forbidden": [
+        "edit_worktree",
+        "approve_own_implementation",
+        "merge"
+      ]
+    }
+  },
+  "separation_invariants": [
+    "pr_author_must_not_be_merge_approver",
+    "reviewer_must_not_equal_executor",
+    "merge_must_follow_dependency_order",
+    "merge_requires_machine_valid_merge_envelope",
+    "merge_requires_independent_checkback",
+    "merged_is_not_complete_until_post_merge_verified",
+    "repository_authority_does_not_imply_production_authority"
+  ],
+  "supervision": {
+    "status": "ACTIVE",
+    "state": "supervision/CURRENT_STATE.json",
+    "queue": "supervision/MERGE_QUEUE.json",
+    "ledger": "supervision/registries/merge-ledger.json"
+  }
+}

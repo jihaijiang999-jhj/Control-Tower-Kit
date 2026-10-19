@@ -1,0 +1,8 @@
+# Normalize all text to LF in the working tree.
+# Why: evidence SHA-256 must be reproducible from git blobs (see AUDIT-2026-10-19 P1-3).
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary
+*.zip binary

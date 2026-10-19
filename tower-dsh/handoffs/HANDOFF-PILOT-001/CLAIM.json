@@ -1,0 +1,114 @@
+{
+  "schema": "tower/handoff-claim@1",
+  "package_id": "HANDOFF-PILOT-001",
+  "controller": "ctl-phase3-receiver-001",
+  "claimed_at": "2026-10-19T12:51:46+08:00",
+  "checks": [
+    {
+      "name": "HANDOFF.md exists",
+      "ok": true,
+      "detail": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\handoffs\\HANDOFF-PILOT-001\\HANDOFF.md"
+    },
+    {
+      "name": "SELF-CHECK.md exists",
+      "ok": true,
+      "detail": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\handoffs\\HANDOFF-PILOT-001\\SELF-CHECK.md"
+    },
+    {
+      "name": "section ## §0",
+      "ok": true,
+      "detail": "## §0"
+    },
+    {
+      "name": "section ## §0a",
+      "ok": true,
+      "detail": "## §0a"
+    },
+    {
+      "name": "section ## §1",
+      "ok": true,
+      "detail": "## §1"
+    },
+    {
+      "name": "section ## §2",
+      "ok": true,
+      "detail": "## §2"
+    },
+    {
+      "name": "section ## §3",
+      "ok": true,
+      "detail": "## §3"
+    },
+    {
+      "name": "section ## §4",
+      "ok": true,
+      "detail": "## §4"
+    },
+    {
+      "name": "section ## §4a",
+      "ok": true,
+      "detail": "## §4a"
+    },
+    {
+      "name": "section ## §5",
+      "ok": true,
+      "detail": "## §5"
+    },
+    {
+      "name": "section ## §6",
+      "ok": true,
+      "detail": "## §6"
+    },
+    {
+      "name": "section ## §7",
+      "ok": true,
+      "detail": "## §7"
+    },
+    {
+      "name": "self-check no unchecked items",
+      "ok": true,
+      "detail": "all checked"
+    },
+    {
+      "name": "HANDOFF.md hash",
+      "ok": true,
+      "detail": "6ce3e9ceebbea5ea47a236ba287e1090a6d8f4e39eaf08976100a80e10f5fd05"
+    },
+    {
+      "name": "SELF-CHECK.md hash",
+      "ok": true,
+      "detail": "701ac70d1f1d8ea0b3f3435b61f31b5a63a425d5c5133725c47e8aa381745363"
+    },
+    {
+      "name": "main SHA unchanged",
+      "ok": true,
+      "detail": "9fb5ba243f5cf03f7ccafb0eb381793770835db2 vs 9fb5ba243f5cf03f7ccafb0eb381793770835db2"
+    },
+    {
+      "name": "worktree head unchanged",
+      "ok": true,
+      "detail": "ed28ac618f524db7d5db426db3839cd185a6da11 vs ed28ac618f524db7d5db426db3839cd185a6da11"
+    },
+    {
+      "name": "queue still POST_MERGE_VERIFIED",
+      "ok": true,
+      "detail": "POST_MERGE_VERIFIED"
+    },
+    {
+      "name": "task still closed",
+      "ok": true,
+      "detail": "closed"
+    },
+    {
+      "name": "repo working tree clean",
+      "ok": true,
+      "detail": "clean"
+    },
+    {
+      "name": "worktree clean",
+      "ok": true,
+      "detail": "clean"
+    }
+  ],
+  "status": "READY_FOR_RECEIVER"
+}

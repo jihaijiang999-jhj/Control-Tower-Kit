@@ -1,0 +1,299 @@
+{
+  "schema": "tower/handoff-package@1",
+  "package_id": "HANDOFF-PILOT-001",
+  "project": "tower-dsh",
+  "mechanism": "project-handoff-v2.1",
+  "assembly_path": "tower_direct",
+  "created_at": "2026-10-19T12:50:58+08:00",
+  "source_controller": "ctl-8cd51ef9-2972-415a-b1db-d8d37afdde82",
+  "status": "ACTIVE",
+  "files": {
+    "HANDOFF.md": "6ce3e9ceebbea5ea47a236ba287e1090a6d8f4e39eaf08976100a80e10f5fd05",
+    "SELF-CHECK.md": "701ac70d1f1d8ea0b3f3435b61f31b5a63a425d5c5133725c47e8aa381745363"
+  },
+  "state": {
+    "tower_id": "tower-dsh",
+    "phase": "PHASE_2_VERIFIED",
+    "primary_id": "ctl-8cd51ef9-2972-415a-b1db-d8d37afdde82",
+    "supervisor_id": "sup-phase2-pilot",
+    "supervision_phase": "PHASE_2_PILOT_VERIFIED",
+    "main_sha": "9fb5ba243f5cf03f7ccafb0eb381793770835db2",
+    "worktree_head": "ed28ac618f524db7d5db426db3839cd185a6da11",
+    "repo_status": "clean",
+    "worktree_status": "clean",
+    "task_status": "closed",
+    "task_next": "merged via ENV-PILOT-001; POST_MERGE_VERIFIED",
+    "queue_status": "POST_MERGE_VERIFIED",
+    "merge_commit": "9fb5ba243f5cf03f7ccafb0eb381793770835db2",
+    "evidence": [
+      {
+        "path": "tasks/PILOT-001/evidence/ledger_chain.py",
+        "sha256": "38ced80e191785ff9c1d3901cf1562c729709522c313436bf63c02029d8a131c"
+      },
+      {
+        "path": "tasks/PILOT-001/evidence/test_ledger_chain.py",
+        "sha256": "57ae95aa6ec05e40468a77a0d589dfb4ffbb0ff5028d8c590293800d6943b70e"
+      },
+      {
+        "path": "tasks/PILOT-001/evidence/README.md",
+        "sha256": "968b351f87e5ee7b6724b2585aa12147bd88b2073789c62de5e79fbb364ef3dd"
+      },
+      {
+        "path": "tasks/PILOT-001/evidence/test-output.txt",
+        "sha256": "80f9e4c35664a1a4dab1cd2114ab875cb3c9ae1ece02ab5e2a7749702f5b9da7"
+      },
+      {
+        "path": "tasks/PILOT-001/evidence/commit.txt",
+        "sha256": "a8618ec6bfae296e7583d2fec22262fa9e201a2d3840abbb0b61af85bfa96882"
+      },
+      {
+        "path": "tasks/PILOT-001/evidence/review-output.txt",
+        "sha256": "fc1beed9f68f3308e47476ca8fe81d21822935b75aaa85ab5f115ce47ea44953"
+      }
+    ],
+    "ledger_seq": 12,
+    "captured_at": "2026-10-19T12:50:58+08:00"
+  },
+  "claim": {
+    "schema": "tower/handoff-claim@1",
+    "package_id": "HANDOFF-PILOT-001",
+    "controller": "ctl-phase3-receiver-001",
+    "claimed_at": "2026-10-19T12:51:46+08:00",
+    "checks": [
+      {
+        "name": "HANDOFF.md exists",
+        "ok": true,
+        "detail": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\handoffs\\HANDOFF-PILOT-001\\HANDOFF.md"
+      },
+      {
+        "name": "SELF-CHECK.md exists",
+        "ok": true,
+        "detail": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\handoffs\\HANDOFF-PILOT-001\\SELF-CHECK.md"
+      },
+      {
+        "name": "section ## §0",
+        "ok": true,
+        "detail": "## §0"
+      },
+      {
+        "name": "section ## §0a",
+        "ok": true,
+        "detail": "## §0a"
+      },
+      {
+        "name": "section ## §1",
+        "ok": true,
+        "detail": "## §1"
+      },
+      {
+        "name": "section ## §2",
+        "ok": true,
+        "detail": "## §2"
+      },
+      {
+        "name": "section ## §3",
+        "ok": true,
+        "detail": "## §3"
+      },
+      {
+        "name": "section ## §4",
+        "ok": true,
+        "detail": "## §4"
+      },
+      {
+        "name": "section ## §4a",
+        "ok": true,
+        "detail": "## §4a"
+      },
+      {
+        "name": "section ## §5",
+        "ok": true,
+        "detail": "## §5"
+      },
+      {
+        "name": "section ## §6",
+        "ok": true,
+        "detail": "## §6"
+      },
+      {
+        "name": "section ## §7",
+        "ok": true,
+        "detail": "## §7"
+      },
+      {
+        "name": "self-check no unchecked items",
+        "ok": true,
+        "detail": "all checked"
+      },
+      {
+        "name": "HANDOFF.md hash",
+        "ok": true,
+        "detail": "6ce3e9ceebbea5ea47a236ba287e1090a6d8f4e39eaf08976100a80e10f5fd05"
+      },
+      {
+        "name": "SELF-CHECK.md hash",
+        "ok": true,
+        "detail": "701ac70d1f1d8ea0b3f3435b61f31b5a63a425d5c5133725c47e8aa381745363"
+      },
+      {
+        "name": "main SHA unchanged",
+        "ok": true,
+        "detail": "9fb5ba243f5cf03f7ccafb0eb381793770835db2 vs 9fb5ba243f5cf03f7ccafb0eb381793770835db2"
+      },
+      {
+        "name": "worktree head unchanged",
+        "ok": true,
+        "detail": "ed28ac618f524db7d5db426db3839cd185a6da11 vs ed28ac618f524db7d5db426db3839cd185a6da11"
+      },
+      {
+        "name": "queue still POST_MERGE_VERIFIED",
+        "ok": true,
+        "detail": "POST_MERGE_VERIFIED"
+      },
+      {
+        "name": "task still closed",
+        "ok": true,
+        "detail": "closed"
+      },
+      {
+        "name": "repo working tree clean",
+        "ok": true,
+        "detail": "clean"
+      },
+      {
+        "name": "worktree clean",
+        "ok": true,
+        "detail": "clean"
+      }
+    ],
+    "status": "READY_FOR_RECEIVER"
+  },
+  "acceptance": {
+    "schema": "tower/handoff-acceptance@1",
+    "package_id": "HANDOFF-PILOT-001",
+    "source_controller": "ctl-8cd51ef9-2972-415a-b1db-d8d37afdde82",
+    "receiver": "ctl-phase3-receiver-001",
+    "accepted_at": "2026-10-19T12:51:58+08:00",
+    "status": "ACCEPTED"
+  },
+  "receipt": {
+    "controller": "ctl-phase3-receiver-001",
+    "received_at": "2026-10-19T12:51:48+08:00",
+    "checks": [
+      {
+        "name": "HANDOFF.md exists",
+        "ok": true,
+        "detail": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\handoffs\\HANDOFF-PILOT-001\\HANDOFF.md"
+      },
+      {
+        "name": "SELF-CHECK.md exists",
+        "ok": true,
+        "detail": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\handoffs\\HANDOFF-PILOT-001\\SELF-CHECK.md"
+      },
+      {
+        "name": "section ## §0",
+        "ok": true,
+        "detail": "## §0"
+      },
+      {
+        "name": "section ## §0a",
+        "ok": true,
+        "detail": "## §0a"
+      },
+      {
+        "name": "section ## §1",
+        "ok": true,
+        "detail": "## §1"
+      },
+      {
+        "name": "section ## §2",
+        "ok": true,
+        "detail": "## §2"
+      },
+      {
+        "name": "section ## §3",
+        "ok": true,
+        "detail": "## §3"
+      },
+      {
+        "name": "section ## §4",
+        "ok": true,
+        "detail": "## §4"
+      },
+      {
+        "name": "section ## §4a",
+        "ok": true,
+        "detail": "## §4a"
+      },
+      {
+        "name": "section ## §5",
+        "ok": true,
+        "detail": "## §5"
+      },
+      {
+        "name": "section ## §6",
+        "ok": true,
+        "detail": "## §6"
+      },
+      {
+        "name": "section ## §7",
+        "ok": true,
+        "detail": "## §7"
+      },
+      {
+        "name": "self-check no unchecked items",
+        "ok": true,
+        "detail": "all checked"
+      },
+      {
+        "name": "HANDOFF.md hash",
+        "ok": true,
+        "detail": "6ce3e9ceebbea5ea47a236ba287e1090a6d8f4e39eaf08976100a80e10f5fd05"
+      },
+      {
+        "name": "SELF-CHECK.md hash",
+        "ok": true,
+        "detail": "701ac70d1f1d8ea0b3f3435b61f31b5a63a425d5c5133725c47e8aa381745363"
+      },
+      {
+        "name": "main SHA unchanged",
+        "ok": true,
+        "detail": "9fb5ba243f5cf03f7ccafb0eb381793770835db2 vs 9fb5ba243f5cf03f7ccafb0eb381793770835db2"
+      },
+      {
+        "name": "worktree head unchanged",
+        "ok": true,
+        "detail": "ed28ac618f524db7d5db426db3839cd185a6da11 vs ed28ac618f524db7d5db426db3839cd185a6da11"
+      },
+      {
+        "name": "queue still POST_MERGE_VERIFIED",
+        "ok": true,
+        "detail": "POST_MERGE_VERIFIED"
+      },
+      {
+        "name": "task still closed",
+        "ok": true,
+        "detail": "closed"
+      },
+      {
+        "name": "repo working tree clean",
+        "ok": true,
+        "detail": "clean"
+      },
+      {
+        "name": "worktree clean",
+        "ok": true,
+        "detail": "clean"
+      }
+    ],
+    "note": "read v2.1 package; read-only self-check passed",
+    "path": "handoffs/HANDOFF-PILOT-001/RECEIPT.md"
+  },
+  "activation": {
+    "schema": "tower/handoff-activation@1",
+    "package_id": "HANDOFF-PILOT-001",
+    "controller": "ctl-phase3-receiver-001",
+    "activated_at": "2026-10-19T12:52:42+08:00",
+    "status": "ACTIVE"
+  }
+}

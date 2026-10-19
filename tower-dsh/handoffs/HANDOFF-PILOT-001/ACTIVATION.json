@@ -1,0 +1,7 @@
+{
+  "schema": "tower/handoff-activation@1",
+  "package_id": "HANDOFF-PILOT-001",
+  "controller": "ctl-phase3-receiver-001",
+  "activated_at": "2026-10-19T12:52:42+08:00",
+  "status": "ACTIVE"
+}
