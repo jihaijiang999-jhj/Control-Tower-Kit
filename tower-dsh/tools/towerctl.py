@@ -152,6 +152,9 @@ def _clear_stale_lock(path: Path, stale_after: float) -> bool:
         stat = path.stat()
     except FileNotFoundError:
         return True
+    except OSError:
+        # A pending-delete / sharing violation is contention, not staleness.
+        return False
     if time.time() - stat.st_mtime <= stale_after:
         return False
     # Displace atomically so two waiters cannot both break the same lock.
@@ -160,6 +163,10 @@ def _clear_stale_lock(path: Path, stale_after: float) -> bool:
         os.replace(path, displaced)
     except FileNotFoundError:
         return True
+    except PermissionError:
+        # Windows can deny the displacement while the lock is pending delete;
+        # report "not cleared" so the caller keeps waiting/retrying.
+        return False
     except OSError:
         return False
     try:
@@ -176,6 +183,13 @@ def _acquire_lock_file(path: Path, timeout: float, stale_after: float) -> None:
         try:
             fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
+            fd = None
+        except PermissionError:
+            # Windows reports a lock file that another thread is deleting
+            # (pending delete) as EACCES instead of EEXIST.  Treat it as
+            # contention there; on POSIX a PermissionError is a real error.
+            if os.name != "nt":
+                raise
             fd = None
         if fd is not None:
             try:
@@ -196,13 +210,18 @@ def _release_lock_file(path: Path, identity) -> None:
         current = path.stat()
     except FileNotFoundError:
         return
+    except OSError:
+        # Windows pending-delete / sharing violation: the lock is going away
+        # and release must never raise out of the lock's finally block.
+        return
     if identity is not None and (current.st_dev, current.st_ino) != (
             identity.st_dev, identity.st_ino):
         # The lock was broken and re-taken by somebody else; leave it alone.
         return
     try:
         path.unlink()
-    except FileNotFoundError:
+    except OSError:
+        # Never propagate: at worst the stale-lock cleaner removes it later.
         pass
 
 
@@ -217,7 +236,8 @@ def ledger_lock(root: Path, timeout: float | None = None,
     _acquire_lock_file(path, limit, stale)
     try:
         identity = path.stat()
-    except FileNotFoundError:
+    except OSError:
+        # A transient stat failure only disables the identity check.
         identity = None
     try:
         yield path
