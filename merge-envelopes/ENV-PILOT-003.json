@@ -1,0 +1,39 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-003",
+  "task": "PILOT-003",
+  "repository": "..",
+  "branch": "pilot/PILOT-003",
+  "base": "main",
+  "implementation_head_sha": "d2a68b2e3449c7da8269d460b30dba0f2a5fd993",
+  "envelope_path": "merge-envelopes/ENV-PILOT-003.json",
+  "created_at": "2026-10-19T16:57:30+08:00",
+  "scope": "PILOT-003: post-merge clean-check ordering + retry",
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-003/evidence/towerctl.py",
+      "sha256": "a611401a5427d46103fbd14928abad4ff49961228f17b18d51a60002819047d3"
+    },
+    {
+      "path": "tasks/PILOT-003/evidence/test_post_merge.py",
+      "sha256": "2a070431c27826c2dd613dfa6a203da6684f546d7e64071de6f874e5e5188a7f"
+    },
+    {
+      "path": "tasks/PILOT-003/evidence/test-output.txt",
+      "sha256": "4781a2e81bdd8c2300b9e94a59affce2d95b4b8b1e0a829f98b07fed3d5e1538"
+    },
+    {
+      "path": "tasks/PILOT-003/evidence/commit.txt",
+      "sha256": "bb8fed128338d2bb869c3a92b9192c3ea573ab13a2dbd0436f26eb5ee69aa673"
+    },
+    {
+      "path": "tasks/PILOT-003/evidence/diff.txt",
+      "sha256": "1b54da63ff4baed40feae5dff28e33aeb4629d382cab0bbc8b8d28596530baef"
+    }
+  ]
+}
