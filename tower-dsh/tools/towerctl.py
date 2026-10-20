@@ -54,6 +54,15 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _force_utf8_stdio() -> None:
+    """Make JSON output valid UTF-8 even on a non-UTF-8 console (cp1252/cp936)."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except (AttributeError, ValueError):
+            pass
+
+
 def emit(data: dict, code: int = 0) -> None:
     print(json.dumps(data, ensure_ascii=False, indent=2))
     raise SystemExit(code)
@@ -2480,6 +2489,7 @@ def cli_commands() -> list[str]:
 
 def main() -> None:
     args = build_parser().parse_args()
+    _force_utf8_stdio()
     root = Path(args.root).resolve()
     if not root.exists():
         fail([f"root not found: {root}"])

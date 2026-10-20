@@ -1,10 +1,16 @@
-"""Server-side gate regression tests (PILOT-012).
+"""Server-side gate regression tests (PILOT-012, hardened by PILOT-014).
 
 The tower's verification used to live only in local habits.  ``PILOT-012``
 moves it into GitHub Actions and pins the contract down with these tests:
 ``.github/workflows/tower-gate.yml`` must keep running the four hard gates on
-``windows-latest`` / Python 3.12 under ``tower-dsh``, must keep ``status``
-informational, and ``.github/CODEOWNERS`` must keep a default owner.
+``windows-latest`` / Python 3.12 under ``tower-dsh``, must keep ``status`` as
+the last step, and ``.github/CODEOWNERS`` must keep a default owner.
+
+``PILOT-014`` closed the hole that ``continue-on-error`` opened: the status
+step used to be swallowed on a non-UTF-8 runner code page, so the gate stayed
+green while the command crashed.  ``towerctl`` now pins stdio to UTF-8 and the
+workflow must not carry ``continue-on-error`` at all - a real failure turns the
+build red.
 
 These tests only read files inside the repository.  They never touch the
 network, never call ``gh`` and never depend on the live working-tree state, so
@@ -29,7 +35,7 @@ CHECKOUT = "actions/checkout@v4"
 SETUP_PYTHON = "actions/setup-python@v5"
 PYTHON_VERSION = 'python-version: "3.12"'
 WORKING_DIRECTORY = "working-directory: tower-dsh"
-CONTINUE_ON_ERROR = "continue-on-error: true"
+CONTINUE_ON_ERROR = "continue-on-error"
 
 COMMANDS = {
     "unit tests": "python -B -m unittest discover -s tools/tests -v",
@@ -112,11 +118,12 @@ class CiGateWorkflowTestCase(unittest.TestCase):
                       msg=f"working-directory: tower-dsh missing, found {matches!r}:\n"
                           f"{self.workflow}")
 
-    # -- 6. status records, everything else fails the build ---------------
-    def test_continue_on_error_only_covers_the_status_step(self) -> None:
+    # -- 6. a failing status fails the build; status stays the last step --
+    def test_continue_on_error_is_gone_and_status_is_last(self) -> None:
         self.assertEqual(
-            self.workflow.count("continue-on-error"), 1,
-            msg="continue-on-error must appear exactly once:\n" + self.workflow)
+            self.workflow.count(CONTINUE_ON_ERROR), 0,
+            msg="continue-on-error must not appear anywhere; a crashing gate "
+                "step has to turn the build red:\n" + self.workflow)
 
         status_command = COMMANDS["status"]
         status_blocks = [block for block in self.steps if status_command in block]
@@ -125,24 +132,19 @@ class CiGateWorkflowTestCase(unittest.TestCase):
                              f"{self.workflow}")
 
         status_block = status_blocks[0]
-        self.assertIn(CONTINUE_ON_ERROR, status_block,
-                      msg=f"status step is missing continue-on-error:\n{status_block}")
         self.assertIn(status_command, status_block,
                       msg=f"status step lost its command:\n{status_block}")
-
-        for block in self.steps:
-            if block is status_block:
-                continue
-            self.assertNotIn(
-                "continue-on-error", block,
-                msg=f"only the status step may continue on error:\n{block}")
+        # ``status`` may stay informational in content, but it is still the
+        # last thing the gate runs, so its exit code decides the build.
+        self.assertEqual(self.steps[-1], status_block,
+                         msg=f"status must remain the last step:\n{self.workflow}")
 
         for command in HARD_GATE_COMMANDS:
             matching = [block for block in self.steps if command in block]
             self.assertEqual(len(matching), 1,
                              msg=f"expected exactly one step running {command!r}, "
                                  f"found {len(matching)}:\n{self.workflow}")
-            self.assertNotIn("continue-on-error", matching[0],
+            self.assertNotIn(CONTINUE_ON_ERROR, matching[0],
                              msg=f"hard gate step must fail the build:\n{matching[0]}")
 
     # -- 7. actions -------------------------------------------------------
