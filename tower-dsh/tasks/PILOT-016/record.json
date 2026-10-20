@@ -1,0 +1,114 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-016",
+  "title": "PR 合并上真机：gh 认证预检 + checks 注册竞态重试，并用 --mode pr 合并本卡",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "merge --mode pr 在置 MERGING 之前执行 gh auth status 预检；未认证或 token 无效时 exit 2、phase=gh-auth，并提示 gh auth login",
+    "gh pr checks 返回『no checks reported』（PR 刚建、CI 尚未注册）时不判失败，按间隔重试直到超时；只有真实失败才置 CORRECTION_REQUIRED",
+    "重试间隔可通过 --check-interval 配置，默认 10 秒；重试总时长仍受 --check-timeout 约束",
+    "local 模式与既有 PR 模式语义保持不变；既有 174 个测试断言零修改",
+    "新增测试覆盖：未认证预检、checks 从无到有的竞态、真实失败仍 block",
+    "本卡自身合并使用 --mode pr（首次真实端到端），closeout 记录实际 PR 号与 merge commit"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-016/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-016/tower-dsh/tools/tests/test_merge_pr_mode.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "changing existing test assertions"
+  ],
+  "acceptance": [
+    "python -B -m unittest discover -s tools/tests -v 全部通过，既有 174 个测试断言零修改，总数 >= 178",
+    "gh auth status 返回非零时：exit 2、信封与队列均为 CORRECTION_REQUIRED、phase=gh-auth、且未置 MERGING",
+    "checks 首次返回 no checks reported、随后出现并全部通过时：流程继续到 merge 并成功，不产生 MERGE_BLOCKED",
+    "checks 真实失败（非 no-checks）仍置 CORRECTION_REQUIRED，且不会因重试而无限等待",
+    "空全局 git 配置下全量仍全部通过",
+    "spec-coverage 仍 27/27、tool_gaps 为空；spec-lint --strict 仍 6/6",
+    "git diff --name-only main..HEAD 恰好是两个 allowed 文件"
+  ],
+  "depends_on": [
+    "PILOT-015"
+  ],
+  "worktree": "pilot/worktrees/PILOT-016",
+  "spec_path": "pilot/PILOT-016.spec.json",
+  "spec_sha256": "ddd2ea201e34231b38ce34d4cc4dbec31f237e2eebbb90bf18991ba96e3c48d7",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-pilot-016",
+  "dispatch": {
+    "executor": "subagent:exec-pilot-016",
+    "worktree": "pilot/worktrees/PILOT-016",
+    "at": "2026-10-20T19:25:18+08:00"
+  },
+  "evidence": [
+    {
+      "id": "E-001",
+      "path": "tasks/PILOT-016/evidence/towerctl.py",
+      "sha256": "72b99f8460a7a937a2ad80f170384c46348891683e742ff30bae2e49a16e2e4f",
+      "bytes": 120845,
+      "at": "2026-10-20T19:35:03+08:00"
+    },
+    {
+      "id": "E-002",
+      "path": "tasks/PILOT-016/evidence/test_merge_pr_mode.py",
+      "sha256": "2163437157912095f332997ed87a553b572b8c0800565eb3ab1547791420a193",
+      "bytes": 33780,
+      "at": "2026-10-20T19:35:03+08:00"
+    },
+    {
+      "id": "E-003",
+      "path": "tasks/PILOT-016/evidence/test-output.txt",
+      "sha256": "c0c1ef5243c407ca24eb1c4a86399a67441e03add44044bd478a059bcc5585ac",
+      "bytes": 23939,
+      "at": "2026-10-20T19:35:03+08:00"
+    },
+    {
+      "id": "E-004",
+      "path": "tasks/PILOT-016/evidence/test-output-no-gitconfig.txt",
+      "sha256": "283205dc75b913fcd615840cee1d9aa85ffe4c6f06af6bcdfb3f8928473f5ae5",
+      "bytes": 24056,
+      "at": "2026-10-20T19:35:03+08:00"
+    },
+    {
+      "id": "E-005",
+      "path": "tasks/PILOT-016/evidence/commit.txt",
+      "sha256": "7c1d03abb26c173c8ec83c51775c4eba0b3ba79c159ec425b83b7b3ad57bd25a",
+      "bytes": 631,
+      "at": "2026-10-20T19:35:03+08:00"
+    },
+    {
+      "id": "E-006",
+      "path": "tasks/PILOT-016/evidence/diff.txt",
+      "sha256": "603560d63c9c903bf9af0124fd6ed4416d2bcc9d4ac7093458eb5f4dca99d999",
+      "bytes": 16683,
+      "at": "2026-10-20T19:35:03+08:00"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-pilot-016",
+    "verdict": "PASS",
+    "note": "AC-1..AC-7 全 PASS。178 tests OK（main 基线 174）；auth 预检在 MERGING 前拦截（无残留、无 create）；no-reported 竞态重试 3 次后成功；真实失败立即 block；空 git 配置仍绿；6 份证据哈希一致。已知边界（记录在案，不阻塞）：CHECKS_PENDING_RE 用子串匹配，若真实失败输出里含 'no checks' 会被当作 pending 重试到 timeout 才 block——不会误放行，但'立即 block'并非无条件；反向不对称：pending 输出不含该短语会被立即 block。首次真实 PR 合并的主要风险点是 CI 在全新 windows-latest 上失败，其次为分支保护/合并设置。",
+    "at": "2026-10-20T19:43:34+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-016",
+    "actor": "owner",
+    "text": "owner approved auth preflight + checks race retry; first real PR merge to follow",
+    "at": "2026-10-20T19:43:34+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-016/CLOSEOUT.md",
+    "at": "2026-10-20T19:43:34+08:00"
+  },
+  "created_at": "2026-10-20T19:25:17+08:00",
+  "updated_at": "2026-10-20T19:43:34+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-016/MERGE.md",
+  "delivered_at": "2026-10-20T19:35:03+08:00",
+  "accepted_at": "2026-10-20T19:43:34+08:00"
+}

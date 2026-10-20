@@ -1,0 +1,54 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-016",
+  "task": "PILOT-016",
+  "repository": "..",
+  "branch": "pilot/PILOT-016",
+  "base": "main",
+  "implementation_head_sha": "60b8ceb821c0d960aaf793dea43e0bf648147c89",
+  "envelope_path": "merge-envelopes/ENV-PILOT-016.json",
+  "created_at": "2026-10-20T19:43:40+08:00",
+  "scope": "PILOT-016: gh auth preflight + checks race retry (first real PR merge)",
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-016/evidence/towerctl.py",
+      "sha256": "72b99f8460a7a937a2ad80f170384c46348891683e742ff30bae2e49a16e2e4f"
+    },
+    {
+      "path": "tasks/PILOT-016/evidence/test_merge_pr_mode.py",
+      "sha256": "2163437157912095f332997ed87a553b572b8c0800565eb3ab1547791420a193"
+    },
+    {
+      "path": "tasks/PILOT-016/evidence/test-output.txt",
+      "sha256": "c0c1ef5243c407ca24eb1c4a86399a67441e03add44044bd478a059bcc5585ac"
+    },
+    {
+      "path": "tasks/PILOT-016/evidence/test-output-no-gitconfig.txt",
+      "sha256": "283205dc75b913fcd615840cee1d9aa85ffe4c6f06af6bcdfb3f8928473f5ae5"
+    },
+    {
+      "path": "tasks/PILOT-016/evidence/commit.txt",
+      "sha256": "7c1d03abb26c173c8ec83c51775c4eba0b3ba79c159ec425b83b7b3ad57bd25a"
+    },
+    {
+      "path": "tasks/PILOT-016/evidence/diff.txt",
+      "sha256": "603560d63c9c903bf9af0124fd6ed4416d2bcc9d4ac7093458eb5f4dca99d999"
+    }
+  ],
+  "envelope_head_sha": "9743807babc8682c229e79029ce517a7effc64d7",
+  "status": "MERGED",
+  "pr_number": 1,
+  "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/1",
+  "remote_merged": true,
+  "remote_merged_at": "2026-10-20T19:46:08+08:00",
+  "merge_commit": "29d8ec6dcf1b890df64c86b7bcaa095dbd4b7609",
+  "merged_at": "2026-10-20T19:46:10+08:00",
+  "supervisor": "sup-pilot-016-verify",
+  "merge_mode": "pr",
+  "check_conclusion": "success"
+}

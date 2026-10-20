@@ -1,0 +1,11 @@
+commit 60b8ceb821c0d960aaf793dea43e0bf648147c89
+Author:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+AuthorDate: Tue Oct 20 19:32:10 2026 +0800
+Commit:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+CommitDate: Tue Oct 20 19:32:10 2026 +0800
+
+    PILOT-016: gh auth preflight + checks race retry
+60b8ceb PILOT-016: gh auth preflight + checks race retry
+ tower-dsh/tools/tests/test_merge_pr_mode.py | 133 ++++++++++++++++++++++++++--
+ tower-dsh/tools/towerctl.py                 |  92 +++++++++++++++++--
+ 2 files changed, 214 insertions(+), 11 deletions(-)
