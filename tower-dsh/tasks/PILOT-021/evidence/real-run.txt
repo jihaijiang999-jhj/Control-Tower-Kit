@@ -1,0 +1,19 @@
+# A. LIVE tower root: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh (git main @ 47bf18d)
+# command: python -B "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-021\tower-dsh\tools\towerctl.py" --root "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh" state-verify
+{
+  "ok": true,
+  "tasks": 21,
+  "envelopes": 20,
+  "drift": []
+}
+# exit code: 0
+
+# B. task worktree tower root: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-021\tower-dsh (git pilot/PILOT-021 @ c6459f1)
+# command: python -B tools/towerctl.py state-verify   (default --root)
+{
+  "ok": true,
+  "tasks": 20,
+  "envelopes": 20,
+  "drift": []
+}
+# exit code: 0

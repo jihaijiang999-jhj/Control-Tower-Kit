@@ -1,0 +1,58 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-021",
+  "task": "PILOT-021",
+  "repository": "..",
+  "branch": "pilot/PILOT-021",
+  "base": "main",
+  "implementation_head_sha": "c6459f15710be627b49316476ba077e3961c4720",
+  "envelope_path": "merge-envelopes/ENV-PILOT-021.json",
+  "created_at": "2026-10-20T23:20:43+08:00",
+  "scope": "PILOT-021: state-verify replays ledger",
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-021/evidence/towerctl.py",
+      "sha256": "ab5942ae6d827768523739969a1dc4bfaa71df646878d135ea4237c016fe3456"
+    },
+    {
+      "path": "tasks/PILOT-021/evidence/test_state_verify.py",
+      "sha256": "b9ecb3f83475f4e2af64c9f507c7c8b655f579adf1026ea02bc4ca0f1be02120"
+    },
+    {
+      "path": "tasks/PILOT-021/evidence/test-output.txt",
+      "sha256": "94fc2e56bad0bec972febb3ae80ba9ca48706ec7f6361ab6eab587ea338127ae"
+    },
+    {
+      "path": "tasks/PILOT-021/evidence/test-output-no-gitconfig.txt",
+      "sha256": "5b58d85ae8d4a08d0c426f861c3fdb2b732be53b6042119fceccda38a2f6814d"
+    },
+    {
+      "path": "tasks/PILOT-021/evidence/real-run.txt",
+      "sha256": "e60ee295952f347127896983144e86f4c8417c1afad05ed1f56d325577e03618"
+    },
+    {
+      "path": "tasks/PILOT-021/evidence/commit.txt",
+      "sha256": "0489a785343370eeae90bd1430859fd747db29a6a5ef0005378ecc5ed44b99d2"
+    },
+    {
+      "path": "tasks/PILOT-021/evidence/diff.txt",
+      "sha256": "99948abdaf00d9ad0f9342d65f6f1cc6975dad8725c1af8b0ceeebc47263a4b2"
+    }
+  ],
+  "envelope_head_sha": "d087f8198b6392b9e2a4e9a824e0256ef0d987e7",
+  "status": "MERGED",
+  "pr_number": 6,
+  "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/6",
+  "remote_merged": true,
+  "remote_merged_at": "2026-10-20T23:22:47+08:00",
+  "merge_commit": "10fae796735905b2871e7f6baa29e6a94bd4f46a",
+  "merged_at": "2026-10-20T23:22:51+08:00",
+  "supervisor": "sup-pilot-021-verify",
+  "merge_mode": "pr",
+  "check_conclusion": "success"
+}

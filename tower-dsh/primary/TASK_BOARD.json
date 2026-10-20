@@ -201,7 +201,17 @@
       "reviewer": "subagent:rev-pilot-020",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-020/MERGE.md",
       "updated_at": "2026-10-20T21:57:13+08:00"
+    },
+    {
+      "id": "PILOT-021",
+      "title": "state-verify：从 ledger 重放权威状态并与磁盘比对，不一致即 drift",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-021",
+      "reviewer": "subagent:rev-pilot-021",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-021/MERGE.md",
+      "updated_at": "2026-10-20T23:20:38+08:00"
     }
   ],
-  "updated_at": "2026-10-20T21:57:13+08:00"
+  "updated_at": "2026-10-20T23:20:38+08:00"
 }

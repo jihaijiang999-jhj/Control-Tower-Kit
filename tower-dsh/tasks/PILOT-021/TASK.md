@@ -1,0 +1,44 @@
+# PILOT-021 — state-verify：从 ledger 重放权威状态并与磁盘比对，不一致即 drift
+
+- Status: `ready`
+- Authority: `workspace_write`
+- Worktree: `pilot/worktrees/PILOT-021`
+
+## Scope
+
+- 新增 towerctl state-verify 子命令：只读，消费 ledger/primary.jsonl 与 ledger/supervision.jsonl，重放出期望状态后与磁盘比对
+- 任务状态重放规则（按 seq 顺序折叠）：TASK_NEW→ready；DISPATCH→dispatched；DELIVER→delivered；CHECKBACK(verdict=PASS)→reviewed、FAIL→rework；ACCEPT→accepted；CLOSEOUT→closed；其它事件不改变状态
+- 队列/信封状态重放规则：ENVELOPE_NEW→DRAFT；QUEUE_ADD→WAITING；MERGE→MERGED；POST_MERGE_VERIFIED→POST_MERGE_VERIFIED；MERGE_BLOCKED→CORRECTION_REQUIRED；MERGE_START 不改变状态
+- 比对对象：tasks/<id>/record.json 的 status、primary/TASK_BOARD.json 中同任务的 status、supervision/MERGE_QUEUE.json 中该信封的 status 与 supervision/envelopes/<id>.json 的 status
+- 无对应事件的任务或信封跳过（无法重放，不得假报 drift）；事件类型未知时忽略
+- 发现不一致时输出 JSON（ok=false + drift 列表，每条含 kind/target/expected/actual），exit 2；一致时 ok=true exit 0
+- 复用既有 ledger 校验（哈希链/seq 连续性），不重复实现；不修改任何文件
+- 新增 tools/tests/test_state_verify.py 覆盖干净/篡改/跳过/只读四类场景
+
+## Allowed paths
+
+- `pilot/worktrees/PILOT-021/tower-dsh/tools/towerctl.py`
+- `pilot/worktrees/PILOT-021/tower-dsh/tools/tests/test_state_verify.py`
+
+## Forbidden
+
+- network
+- external dependencies
+- changes outside the task worktree
+- merge
+- production access
+- changing existing test assertions
+- state-verify writing any file
+
+## Acceptance
+
+- python -B -m unittest discover -s tools/tests -v 全部通过，总数 >= 199
+- 干净的临时塔（ledger 事件与 record/board/queue/envelope 一致）上 state-verify exit 0 且 ok=true
+- 篡改 record.json 的 status（例如把 closed 改成 dispatched）→ exit 2，drift 含 kind=task_status 与 expected/actual
+- 篡改 TASK_BOARD.json 中某任务 status → exit 2，drift 指向 board
+- 篡改 MERGE_QUEUE.json 中某信封 status → exit 2，drift 指向 queue
+- 无任何事件的任务/信封被跳过且不产生 drift
+- state-verify 运行前后被检查文件逐字节不变（只读证明）
+- 在真实塔上运行一次并把实际结果如实记录；若报 drift，必须逐条列出且不得通过放宽规则消除
+- spec-coverage 27/27、tool_gaps 空；spec-lint --strict 6/6
+- git diff --name-only main..HEAD 恰好两个 allowed 文件
