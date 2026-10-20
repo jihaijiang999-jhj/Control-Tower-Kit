@@ -37,7 +37,5 @@ jobs:
       - name: Verify ledger chain
         run: python tools/towerctl.py verify-ledger
 
-      # Informational only: record authority drift, never fail the gate.
-      - name: Status (record only)
-        continue-on-error: true
+      - name: Status
         run: python tools/towerctl.py status
