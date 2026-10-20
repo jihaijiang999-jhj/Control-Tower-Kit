@@ -1,0 +1,20 @@
+# ENV-PILOT-021 post-merge verification
+
+- base: main
+- implementation: c6459f15710be627b49316476ba077e3961c4720
+- merge_commit: 10fae796735905b2871e7f6baa29e6a94bd4f46a
+- result: PASS
+- working_tree_clean: True
+- tool_owned_paths_ignored: []
+- test_exit: 0
+
+## Test output
+
+
+test_tower_gate_suite (test_tower_gates.TowerGateSuite.test_tower_gate_suite) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 68.140s
+
+OK
+
