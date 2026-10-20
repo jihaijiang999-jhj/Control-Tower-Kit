@@ -2082,6 +2082,9 @@ def parse_created_pr(stdout: str):
     return url, int(match.group(1))
 
 
+GH_AUTH_HINT = "run 'gh auth login' to authenticate"
+
+
 def run_gh(repo: Path, argv: list[str], *, phase: str,
            timeout: float) -> subprocess.CompletedProcess:
     """Run one ``gh`` invocation with ``repo`` as the working directory.
@@ -2103,12 +2106,78 @@ def run_gh(repo: Path, argv: list[str], *, phase: str,
         raise MergeBlocked("gh", "gh-exec", str(exc)) from None
 
 
+def require_gh_auth(repo: Path, timeout: float) -> None:
+    """Fail closed unless ``gh auth status`` reports an authenticated host.
+
+    A merge must never be pinned at ``MERGING`` on a host whose token is
+    missing or expired: real ``gh pr create`` would then fail halfway through.
+    Every failure mode (non-zero exit, spawn error, timeout) becomes a
+    :class:`MergeBlocked` carrying the ``gh auth login`` hint, so no traceback
+    escapes and the queue lands in ``CORRECTION_REQUIRED``.
+    """
+    try:
+        cp = run_gh(repo, ["auth", "status"], phase="gh-auth", timeout=timeout)
+    except MergeBlocked as exc:
+        reason = "timeout" if exc.reason == "timeout" else "gh-exec"
+        raise MergeBlocked(
+            "gh-auth", reason, f"{exc.detail}; {GH_AUTH_HINT}") from None
+    if cp.returncode != 0:
+        output = "\n".join(part.strip() for part in
+                           (cp.stderr or "", cp.stdout or "") if part.strip())
+        detail = f"{output}\n{GH_AUTH_HINT}" if output else GH_AUTH_HINT
+        raise MergeBlocked("gh-auth", "not-authenticated", detail)
+
+
 def require_git(repo: Path, phase: str, *git_args: str) -> subprocess.CompletedProcess:
     """Run one git step of the PR flow, blocking the merge when it fails."""
     cp = git(repo, *git_args)
     if cp.returncode != 0:
         raise MergeBlocked(phase, phase, command_failure(cp))
     return cp
+
+
+# A brand-new PR often has no check runs yet.  Depending on the gh build the
+# gate then exits non-zero (8 on gh 2.96) and prints "no checks reported".
+CHECKS_PENDING_RE = re.compile(r"no checks reported|no checks", re.IGNORECASE)
+
+
+def checks_timeout_detail(number: int, timeout: float, last: str) -> str:
+    detail = (f"gh pr checks {number} did not report a usable result within "
+              f"{timeout:g}s")
+    return f"{detail}; last output: {last}" if last else detail
+
+
+def wait_for_checks(repo: Path, number: int, timeout: float,
+                    interval: float) -> None:
+    """Watch the PR checks until they are green, tolerating registration lag.
+
+    The retry loop is deliberately narrow: only a ``no checks reported`` style
+    answer is transient.  Any other non-zero exit is a real CI failure and
+    blocks the merge immediately.  Each invocation gets the time left on the
+    single ``--check-timeout`` deadline, so the whole gate stays bounded.
+    """
+    argv = ["pr", "checks", str(number), "--watch", "--fail-fast"]
+    deadline = time.monotonic() + timeout
+    last = ""
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise MergeBlocked("checks", "timeout",
+                               checks_timeout_detail(number, timeout, last))
+        cp = run_gh(repo, argv, phase="checks", timeout=remaining)
+        output = "\n".join(part.strip() for part in
+                           (cp.stdout or "", cp.stderr or "") if part.strip())
+        if cp.returncode == 0:
+            return
+        if not CHECKS_PENDING_RE.search(output):
+            raise MergeBlocked("checks", "checks",
+                               output or f"exit code {cp.returncode}")
+        last = output
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise MergeBlocked("checks", "timeout",
+                               checks_timeout_detail(number, timeout, last))
+        time.sleep(min(interval, remaining))
 
 
 def pr_remote_merge(repo: Path, env: dict, args) -> dict:
@@ -2122,6 +2191,9 @@ def pr_remote_merge(repo: Path, env: dict, args) -> dict:
     base = str(env.get("base", "main"))
     remote = getattr(args, "remote", None) or "origin"
     timeout = int(getattr(args, "check_timeout", 900) or 900)
+    interval = float(getattr(args, "check_interval", 10) or 10)
+    if interval <= 0:
+        interval = 1.0
 
     # 1. the remote must actually see the envelope branch before a PR exists.
     require_git(repo, "push", "push", remote, branch)
@@ -2167,11 +2239,9 @@ def pr_remote_merge(repo: Path, env: dict, args) -> dict:
                 f"{(cp.stdout or '')}{(cp.stderr or '')}".strip())
         url, number = parsed
 
-    # 3. CI gate; a hung gate is bounded by --check-timeout.
-    cp = run_gh(repo, ["pr", "checks", str(number), "--watch", "--fail-fast"],
-                phase="checks", timeout=timeout)
-    if cp.returncode != 0:
-        raise MergeBlocked("checks", "checks", command_failure(cp))
+    # 3. CI gate; a hung gate is bounded by --check-timeout and a PR whose
+    #    checks have not registered yet is retried until that deadline.
+    wait_for_checks(repo, number, timeout, interval)
 
     # 4. merge the PR once the checks are green.
     cp = run_gh(repo, ["pr", "merge", str(number), "--merge"],
@@ -2278,12 +2348,17 @@ def cmd_merge(root: Path, args) -> None:
         # the abort is recorded and the SystemExit(2) is re-raised untouched.
         try:
             gh_command()
+            require_gh_auth(repo, int(getattr(args, "check_timeout", 900) or 900))
         except SystemExit:
             block_pr_merge(root, args, env, env_path, queue, entry,
                            "gh", "gh-not-found",
                            "gh executable not found; install GitHub CLI or "
                            "set TOWERCTL_GH")
             raise
+        except MergeBlocked as exc:
+            block_pr_merge(root, args, env, env_path, queue, entry,
+                           exc.phase, exc.reason, exc.detail)
+            fail([f"pr merge blocked at {exc.phase} ({exc.reason}): {exc.detail}"])
     entry["status"] = "MERGING"
     save_queue(root, queue)
     append_supervision_ledger(root, "MERGE_START", "supervision",
@@ -2717,7 +2792,12 @@ def build_parser() -> argparse.ArgumentParser:
     mg.add_argument("--remote", default="origin",
                     help="git remote used by --mode pr (default: origin)")
     mg.add_argument("--check-timeout", dest="check_timeout", type=int, default=900,
-                    help="seconds to wait for gh pr checks --watch (default: 900)")
+                    help="seconds bounding every gh step of a PR merge: "
+                         "auth status, pr create, pr view, pr checks and "
+                         "pr merge (default: 900)")
+    mg.add_argument("--check-interval", dest="check_interval", type=int, default=10,
+                    help="seconds between retries while a new PR reports no "
+                         "checks yet, within --check-timeout (default: 10)")
 
     pm = sub.add_parser("post-merge")
     pm.add_argument("--envelope", required=True)

@@ -11,11 +11,13 @@ base branch.  These tests keep that flow fully offline:
   is involved.
 
 The stub's behaviour is driven by environment variables: ``GH_LOG`` records
-every argv, ``GH_CREATE_EXIT`` / ``GH_CHECKS_EXIT`` / ``GH_MERGE_EXIT`` force a
-failure and ``GH_SLEEP`` lets the checks step hang so ``--check-timeout`` can
-be exercised.  On a successful ``pr merge`` the stub also advances the bare
-origin's ``main`` to the envelope head, which gives the follow-up
-``fetch`` + ``merge --ff-only`` a real fast-forward to perform.
+the ``pr`` argv, ``GH_AUTH_EXIT`` forces ``gh auth status`` to fail,
+``GH_CREATE_EXIT`` / ``GH_CHECKS_EXIT`` / ``GH_MERGE_EXIT`` force a failure,
+``GH_CHECKS_NO_REPORTED`` makes the first N checks calls look unregistered and
+``GH_SLEEP`` lets the checks step hang so ``--check-timeout`` can be exercised.
+On a successful ``pr merge`` the stub also advances the bare origin's ``main``
+to the envelope head, which gives the follow-up ``fetch`` + ``merge --ff-only``
+a real fast-forward to perform.
 
 Each test drives the real CLI through ``subprocess``, exactly as a supervisor
 session would, and asserts the observable exit code plus the resulting
@@ -65,12 +67,17 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 
 PR_URL = "https://example.invalid/pull/42"
 
 
 def log_argv(argv):
+    # Only the ``pr`` flow is recorded: the auth preflight is a separate gate
+    # and the exact-sequence assertions describe the PR steps alone.
+    if argv[:1] != ["pr"]:
+        return
     path = os.environ.get("GH_LOG")
     if path:
         with open(path, "a", encoding="utf-8") as fh:
@@ -88,8 +95,34 @@ def exit_code(name):
         return 0
 
 
+def checks_attempt():
+    """1-based ``pr checks`` call index, persisted across stub processes."""
+    state = os.environ.get("GH_CHECKS_STATE")
+    if not state:
+        log = os.environ.get("GH_LOG")
+        state = ((log + ".checks") if log else
+                 os.path.join(tempfile.gettempdir(), "gh-stub-checks"))
+    try:
+        with open(state, encoding="utf-8") as fh:
+            seen = int(fh.read().strip() or 0)
+    except (OSError, ValueError):
+        seen = 0
+    seen += 1
+    with open(state, "w", encoding="utf-8") as fh:
+        fh.write(str(seen))
+    return seen
+
+
 def main(argv):
     log_argv(argv)
+    if argv[:2] == ["auth", "status"]:
+        # Mirror a logged-out gh: non-zero exit and an explanatory stderr.
+        code = exit_code("GH_AUTH_EXIT")
+        if code:
+            sys.stderr.write("authentication failed\\n")
+            return code
+        print("Logged in to github.com account test")
+        return 0
     if argv[:2] == ["pr", "create"]:
         # Real gh has no --json on create; fail exactly like it does.
         if "--json" in argv:
@@ -110,6 +143,15 @@ def main(argv):
     if argv[:2] == ["pr", "checks"]:
         # Sleeping lets the timeout case prove --check-timeout is applied.
         time.sleep(float(os.environ.get("GH_SLEEP", "0") or 0))
+        # A brand-new PR reports no check runs for the first N calls; the
+        # merge must retry that transient state instead of blocking.
+        try:
+            not_reported = int(os.environ.get("GH_CHECKS_NO_REPORTED", "0") or 0)
+        except ValueError:
+            not_reported = 0
+        if checks_attempt() <= not_reported:
+            sys.stderr.write("no checks reported on the 'feature' branch\\n")
+            return 1
         code = exit_code("GH_CHECKS_EXIT")
         if code:
             sys.stderr.write("conclusion: failure\\n")
@@ -336,6 +378,9 @@ class PrMergeTestCase(unittest.TestCase):
             return []
         return [json.loads(line) for line in
                 self.log.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+    def checks_calls(self) -> list[list[str]]:
+        return [call for call in self.gh_calls() if call[:2] == ["pr", "checks"]]
 
     def head(self) -> str:
         return self.run_git("rev-parse", "HEAD").stdout.strip()
@@ -601,6 +646,84 @@ class PrMergeTestCase(unittest.TestCase):
         self.assertEqual(envelope["merge_mode"], "pr")
         self.assertEqual(envelope["pr_number"], PR_NUMBER)
         self.assertEqual(envelope["pr_url"], PR_URL)
+
+    # -- 12. gh auth status gates the merge before MERGING ----------------
+    def test_unauthenticated_gh_blocks_before_merging(self) -> None:
+        cp = self.run_merge("--mode", "pr",
+                            env_extra={"GH_AUTH_EXIT": "1"}, timeout=120)
+        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        payload = json.loads(cp.stdout)
+        self.assertFalse(payload["ok"])
+        # The operator must be told how to fix it.
+        self.assertIn("gh auth login", (cp.stdout + cp.stderr).lower())
+
+        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
+        self.assertEqual(self.queue_entry()["status"], "CORRECTION_REQUIRED")
+        blocked = self.ledger_events("MERGE_BLOCKED")
+        self.assertEqual(len(blocked), 1, blocked)
+        self.assertEqual(blocked[0]["payload"]["phase"], "gh-auth")
+        self.assertEqual(blocked[0]["payload"]["reason"], "not-authenticated")
+        self.assertIn("authentication failed",
+                      blocked[0]["payload"]["detail"].lower())
+        # The queue was never pinned at MERGING and no PR was opened.
+        self.assertFalse(self.ledger_events("MERGE_START"))
+        self.assertEqual([call for call in self.gh_calls()
+                          if call[:2] == ["pr", "create"]], [])
+
+    # -- 13. unregistered checks are retried, then the merge proceeds ------
+    def test_no_checks_registration_is_retried_until_green(self) -> None:
+        cp = self.run_merge("--mode", "pr", "--check-interval", "1",
+                            "--check-timeout", "20",
+                            env_extra={"GH_CHECKS_NO_REPORTED": "2"}, timeout=120)
+        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        payload = json.loads(cp.stdout)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "MERGED")
+
+        envelope = self.envelope()
+        self.assertEqual(envelope["status"], "MERGED")
+        self.assertEqual(envelope["pr_number"], PR_NUMBER)
+        self.assertEqual(envelope["merge_commit"], self.envelope_head)
+        self.assertEqual(self.queue_entry()["status"], "MERGED")
+        # The transient answer was never recorded as a blocker.
+        self.assertFalse(self.ledger_events("MERGE_BLOCKED"))
+        self.assertEqual(len(self.ledger_events("MERGE_START")), 1)
+        self.assertGreaterEqual(len(self.checks_calls()), 3, self.gh_calls())
+        self.assertTrue(any(call[:2] == ["pr", "merge"] for call in self.gh_calls()))
+
+    # -- 14. a real check failure is never retried away -------------------
+    def test_real_check_failure_is_not_retried_away(self) -> None:
+        cp = self.run_merge("--mode", "pr", "--check-interval", "1",
+                            env_extra={"GH_CHECKS_EXIT": "1"}, timeout=120)
+        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
+        self.assertEqual(self.queue_entry()["status"], "CORRECTION_REQUIRED")
+        blocked = self.ledger_events("MERGE_BLOCKED")
+        self.assertEqual(len(blocked), 1, blocked)
+        self.assertEqual(blocked[0]["payload"]["phase"], "checks")
+        self.assertEqual(blocked[0]["payload"]["reason"], "checks")
+        self.assertIn("failure", blocked[0]["payload"]["detail"].lower())
+        # One failing call is enough: a genuine failure must not be retried.
+        self.assertEqual(len(self.checks_calls()), 1, self.gh_calls())
+
+    # -- 15. the registration retry stays inside --check-timeout ----------
+    def test_no_checks_registration_deadline_is_bounded(self) -> None:
+        started = time.monotonic()
+        cp = self.run_merge("--mode", "pr", "--check-timeout", "2",
+                            "--check-interval", "1",
+                            env_extra={"GH_CHECKS_NO_REPORTED": "99"}, timeout=120)
+        elapsed = time.monotonic() - started
+        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        self.assertLess(elapsed, 15, "the checks deadline was not enforced")
+
+        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
+        blocked = self.ledger_events("MERGE_BLOCKED")
+        self.assertEqual(len(blocked), 1, blocked)
+        self.assertEqual(blocked[0]["payload"]["phase"], "checks")
+        self.assertEqual(blocked[0]["payload"]["reason"], "timeout")
+        self.assertIn("checks", blocked[0]["payload"]["detail"].lower())
+        self.assertFalse(self.ledger_events("MERGE"))
+        self.assertGreaterEqual(len(self.checks_calls()), 2, self.gh_calls())
 
 
 if __name__ == "__main__":
