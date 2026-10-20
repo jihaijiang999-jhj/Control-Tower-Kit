@@ -1,0 +1,114 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-019",
+  "title": "checks pending 判定改用 gh 退出码 8，不再用宽泛子串匹配",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "wait_for_checks 判定 pending 的主依据改为 gh 退出码 8（gh 文档：Checks pending）",
+    "保留整短语『no checks reported』（大小写不敏感）作为兼容触发；删除会误伤真实失败的裸『no checks』分支",
+    "真实失败（非 8 且不含整短语）必须立即 block，不得因重试而延迟",
+    "既有 188 个测试断言零修改；新增测试覆盖四种场景",
+    "不改 local 模式与其它子命令语义"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-019/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-019/tower-dsh/tools/tests/test_merge_pr_mode.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "changing existing test assertions"
+  ],
+  "acceptance": [
+    "python -B -m unittest discover -s tools/tests -v 全部通过，总数 >= 192",
+    "退出码 8 时按 pending 重试，直到 checks 通过或 --check-timeout 到期",
+    "退出码 1 且输出含 'no checks' 但不含 'no checks reported' 时立即 block（不重试）",
+    "退出码 1 且输出含 'no checks reported' 时仍按 pending 重试（兼容旧 gh）",
+    "真实失败场景的 checks 调用次数为 1（证明未重试）",
+    "空全局 git 配置下全量仍通过",
+    "spec-coverage 27/27、tool_gaps 空；spec-lint --strict 6/6",
+    "git diff --name-only main..HEAD 恰好两个 allowed 文件"
+  ],
+  "depends_on": [
+    "PILOT-018"
+  ],
+  "worktree": "pilot/worktrees/PILOT-019",
+  "spec_path": "pilot/PILOT-019.spec.json",
+  "spec_sha256": "c920155aeafd5758411d52cdbe0200d476b5827fc1e441955c6478a324fe4518",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-pilot-019",
+  "dispatch": {
+    "executor": "subagent:exec-pilot-019",
+    "worktree": "pilot/worktrees/PILOT-019",
+    "at": "2026-10-20T21:08:29+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-019/evidence/towerctl.py",
+      "sha256": "eae10f2939c3bfc83c7c59a90a9792e5857c69b5f054a17e1e1ddbc4da342f9f",
+      "bytes": 122084,
+      "at": "2026-10-20T21:22:19+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-019/evidence/test_merge_pr_mode.py",
+      "sha256": "d38ebed4a65281e198a815cabf40c4c14b4796023e3e208c4a6a650c3e9a2c58",
+      "bytes": 39078,
+      "at": "2026-10-20T21:22:19+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-019/evidence/test-output.txt",
+      "sha256": "653831d131771cb8d7e04cbc40be03d221f8527650322a1cd6abcf3c0b8af113",
+      "bytes": 26061,
+      "at": "2026-10-20T21:22:19+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-019/evidence/test-output-no-gitconfig.txt",
+      "sha256": "a0aa61ce20724e6534ec2858cb0b620ac99ef43ddb940f682929c1a94272418a",
+      "bytes": 26189,
+      "at": "2026-10-20T21:22:19+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-019/evidence/commit.txt",
+      "sha256": "20e04a5dd65cddd7f56258b15d5bf92355b3c8e3e451d765f191e58623fa7e1a",
+      "bytes": 519,
+      "at": "2026-10-20T21:22:19+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-019/evidence/diff.txt",
+      "sha256": "89b3e1985e22b0a0830939eed711edbd020d26f7555aab5e7c2b9d764deda423",
+      "bytes": 10152,
+      "at": "2026-10-20T21:22:19+08:00",
+      "id": "E-006"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-pilot-019",
+    "verdict": "PASS",
+    "note": "AC-1..AC-8 全 PASS。192 tests OK（含独立空 GIT_CONFIG 复跑）；exit 8 + 任意文本重试成功；exit 1 + 'no checks'/非整短语立即 block 且 calls=1；整短语仍兼容重试；纯失败回归 calls=1。鉴别力已验证：同一探针在 main 版上 exit 8 立即 block、'no checks passed' 被当 pending 重试 36 次到 timeout。CHECKS_PENDING_EXIT=8 与 gh 2.96 文档一致。残余：若 gh 真在失败时返回 8，会被当 pending 重试到 timeout（仍 fail-closed，只延迟与归因变差）；line 2234 的 'already exists' 仍是文本启发式，列为后续改进。",
+    "at": "2026-10-20T21:31:25+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-019",
+    "actor": "owner",
+    "text": "owner approved exit-code based pending detection",
+    "at": "2026-10-20T21:31:26+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-019/CLOSEOUT.md",
+    "at": "2026-10-20T21:31:26+08:00"
+  },
+  "created_at": "2026-10-20T21:08:29+08:00",
+  "updated_at": "2026-10-20T21:31:26+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-019/MERGE.md",
+  "delivered_at": "2026-10-20T21:22:19+08:00",
+  "accepted_at": "2026-10-20T21:31:26+08:00"
+}

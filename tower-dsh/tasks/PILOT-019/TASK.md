@@ -1,0 +1,38 @@
+# PILOT-019 — checks pending 判定改用 gh 退出码 8，不再用宽泛子串匹配
+
+- Status: `ready`
+- Authority: `workspace_write`
+- Worktree: `pilot/worktrees/PILOT-019`
+
+## Scope
+
+- wait_for_checks 判定 pending 的主依据改为 gh 退出码 8（gh 文档：Checks pending）
+- 保留整短语『no checks reported』（大小写不敏感）作为兼容触发；删除会误伤真实失败的裸『no checks』分支
+- 真实失败（非 8 且不含整短语）必须立即 block，不得因重试而延迟
+- 既有 188 个测试断言零修改；新增测试覆盖四种场景
+- 不改 local 模式与其它子命令语义
+
+## Allowed paths
+
+- `pilot/worktrees/PILOT-019/tower-dsh/tools/towerctl.py`
+- `pilot/worktrees/PILOT-019/tower-dsh/tools/tests/test_merge_pr_mode.py`
+
+## Forbidden
+
+- network
+- external dependencies
+- changes outside the task worktree
+- merge
+- production access
+- changing existing test assertions
+
+## Acceptance
+
+- python -B -m unittest discover -s tools/tests -v 全部通过，总数 >= 192
+- 退出码 8 时按 pending 重试，直到 checks 通过或 --check-timeout 到期
+- 退出码 1 且输出含 'no checks' 但不含 'no checks reported' 时立即 block（不重试）
+- 退出码 1 且输出含 'no checks reported' 时仍按 pending 重试（兼容旧 gh）
+- 真实失败场景的 checks 调用次数为 1（证明未重试）
+- 空全局 git 配置下全量仍通过
+- spec-coverage 27/27、tool_gaps 空；spec-lint --strict 6/6
+- git diff --name-only main..HEAD 恰好两个 allowed 文件

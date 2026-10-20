@@ -181,7 +181,17 @@
       "reviewer": "subagent:rev-pilot-018",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-018/MERGE.md",
       "updated_at": "2026-10-20T21:04:39+08:00"
+    },
+    {
+      "id": "PILOT-019",
+      "title": "checks pending 判定改用 gh 退出码 8，不再用宽泛子串匹配",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-019",
+      "reviewer": "subagent:rev-pilot-019",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-019/MERGE.md",
+      "updated_at": "2026-10-20T21:31:26+08:00"
     }
   ],
-  "updated_at": "2026-10-20T21:04:39+08:00"
+  "updated_at": "2026-10-20T21:31:26+08:00"
 }

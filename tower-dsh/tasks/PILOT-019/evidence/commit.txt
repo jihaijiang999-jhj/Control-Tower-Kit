@@ -1,0 +1,13 @@
+﻿commit 3250378bdcf1a7b0818e456ce3665519220cab4b
+Author:     exec-pilot-019 <exec-pilot-019@tower.invalid>
+AuthorDate: Tue Oct 20 21:13:54 2026 +0800
+Commit:     exec-pilot-019 <exec-pilot-019@tower.invalid>
+CommitDate: Tue Oct 20 21:13:54 2026 +0800
+
+    PILOT-019: pending checks from exit code 8
+
+files changed:
+
+ tower-dsh/tools/tests/test_merge_pr_mode.py | 100 +++++++++++++++++++++++++++-
+ tower-dsh/tools/towerctl.py                 |  20 ++++--
+ 2 files changed, 111 insertions(+), 9 deletions(-)
