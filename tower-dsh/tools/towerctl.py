@@ -2147,9 +2147,14 @@ def require_git(repo: Path, phase: str, *git_args: str) -> subprocess.CompletedP
     return cp
 
 
-# A brand-new PR often has no check runs yet.  Depending on the gh build the
-# gate then exits non-zero (8 on gh 2.96) and prints "no checks reported".
-CHECKS_PENDING_RE = re.compile(r"no checks reported|no checks", re.IGNORECASE)
+# A brand-new PR often has no check runs yet.  ``gh pr checks --help`` documents
+# the exit codes: 8 means "Checks pending", so the exit code alone is the
+# authoritative signal.  Older gh builds instead print "no checks reported" on
+# stderr, which is kept as a narrow compatibility fallback: the bare substring
+# "no checks" is NOT pending, because real failures mention e.g. "no checks
+# passed" and must block immediately.
+CHECKS_PENDING_EXIT = 8
+CHECKS_PENDING_RE = re.compile(r"no checks reported", re.IGNORECASE)
 
 
 def checks_timeout_detail(number: int, timeout: float, last: str) -> str:
@@ -2162,8 +2167,10 @@ def wait_for_checks(repo: Path, number: int, timeout: float,
                     interval: float) -> None:
     """Watch the PR checks until they are green, tolerating registration lag.
 
-    The retry loop is deliberately narrow: only a ``no checks reported`` style
-    answer is transient.  Any other non-zero exit is a real CI failure and
+    The retry loop is deliberately narrow: only "checks pending" is transient.
+    That state is recognised from the ``gh`` exit code (8, documented by
+    ``gh pr checks --help``) or, for older builds, from the exact phrase
+    "no checks reported".  Any other non-zero exit is a real CI failure and
     blocks the merge immediately.  Each invocation gets the time left on the
     single ``--check-timeout`` deadline, so the whole gate stays bounded.
     """
@@ -2180,7 +2187,8 @@ def wait_for_checks(repo: Path, number: int, timeout: float,
                            (cp.stdout or "", cp.stderr or "") if part.strip())
         if cp.returncode == 0:
             return
-        if not CHECKS_PENDING_RE.search(output):
+        if not (cp.returncode == CHECKS_PENDING_EXIT
+                or CHECKS_PENDING_RE.search(output)):
             raise MergeBlocked("checks", "checks",
                                output or f"exit code {cp.returncode}")
         last = output

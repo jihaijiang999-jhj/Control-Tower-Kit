@@ -13,7 +13,10 @@ base branch.  These tests keep that flow fully offline:
 The stub's behaviour is driven by environment variables: ``GH_LOG`` records
 the ``pr`` argv, ``GH_AUTH_EXIT`` forces ``gh auth status`` to fail,
 ``GH_CREATE_EXIT`` / ``GH_CHECKS_EXIT`` / ``GH_MERGE_EXIT`` force a failure,
-``GH_CHECKS_NO_REPORTED`` makes the first N checks calls look unregistered and
+``GH_CHECKS_NO_REPORTED`` makes the first N checks calls look unregistered,
+``GH_CHECKS_PENDING_EXIT`` makes the first N checks calls exit 8 ("Checks
+pending") without printing the legacy phrase, ``GH_CHECKS_TEXT`` overrides the
+checks output text and
 ``GH_SLEEP`` lets the checks step hang so ``--check-timeout`` can be exercised.
 On a successful ``pr merge`` the stub also advances the bare origin's ``main``
 to the envelope head, which gives the follow-up ``fetch`` + ``merge --ff-only``
@@ -143,17 +146,32 @@ def main(argv):
     if argv[:2] == ["pr", "checks"]:
         # Sleeping lets the timeout case prove --check-timeout is applied.
         time.sleep(float(os.environ.get("GH_SLEEP", "0") or 0))
+        attempt = checks_attempt()
+        # gh documents exit code 8 as "Checks pending" (``gh pr checks --help``).
+        # The first N calls exit that way without printing the legacy phrase, so
+        # the exit-code path is exercised on its own.
+        try:
+            pending = int(os.environ.get("GH_CHECKS_PENDING_EXIT", "0") or 0)
+        except ValueError:
+            pending = 0
+        if attempt <= pending:
+            sys.stderr.write(os.environ.get("GH_CHECKS_TEXT")
+                             or "checks pending\\n")
+            return 8
         # A brand-new PR reports no check runs for the first N calls; the
         # merge must retry that transient state instead of blocking.
         try:
             not_reported = int(os.environ.get("GH_CHECKS_NO_REPORTED", "0") or 0)
         except ValueError:
             not_reported = 0
-        if checks_attempt() <= not_reported:
+        if attempt <= not_reported:
             sys.stderr.write("no checks reported on the 'feature' branch\\n")
             return 1
         code = exit_code("GH_CHECKS_EXIT")
-        if code:
+        text = os.environ.get("GH_CHECKS_TEXT")
+        if text:
+            sys.stderr.write(text + "\\n")
+        elif code:
             sys.stderr.write("conclusion: failure\\n")
         return code
     if argv[:2] == ["pr", "merge"]:
@@ -724,6 +742,82 @@ class PrMergeTestCase(unittest.TestCase):
         self.assertIn("checks", blocked[0]["payload"]["detail"].lower())
         self.assertFalse(self.ledger_events("MERGE"))
         self.assertGreaterEqual(len(self.checks_calls()), 2, self.gh_calls())
+
+    # -- 16. exit code 8 ("Checks pending") is retried even without text ---
+    def test_pending_exit_code_is_retried_until_green(self) -> None:
+        cp = self.run_merge(
+            "--mode", "pr", "--check-interval", "1", "--check-timeout", "20",
+            env_extra={"GH_CHECKS_PENDING_EXIT": "2",
+                       "GH_CHECKS_TEXT": "checks are still starting"},
+            timeout=120)
+        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        payload = json.loads(cp.stdout)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "MERGED")
+
+        envelope = self.envelope()
+        self.assertEqual(envelope["status"], "MERGED")
+        self.assertEqual(envelope["pr_number"], PR_NUMBER)
+        self.assertEqual(envelope["merge_commit"], self.envelope_head)
+        self.assertEqual(self.queue_entry()["status"], "MERGED")
+        # Exit code 8 is "checks pending", never a blocker.
+        self.assertFalse(self.ledger_events("MERGE_BLOCKED"))
+        self.assertGreaterEqual(len(self.checks_calls()), 3, self.gh_calls())
+        self.assertTrue(any(call[:2] == ["pr", "merge"] for call in self.gh_calls()))
+
+    # -- 17. a bare "no checks" substring is not pending: it blocks now ----
+    def test_bare_no_checks_substring_blocks_immediately(self) -> None:
+        cp = self.run_merge(
+            "--mode", "pr", "--check-interval", "1",
+            env_extra={"GH_CHECKS_EXIT": "1",
+                       "GH_CHECKS_TEXT":
+                           "conclusion: failure: no checks passed"},
+            timeout=120)
+        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
+        self.assertEqual(self.queue_entry()["status"], "CORRECTION_REQUIRED")
+        blocked = self.ledger_events("MERGE_BLOCKED")
+        self.assertEqual(len(blocked), 1, blocked)
+        self.assertEqual(blocked[0]["payload"]["phase"], "checks")
+        self.assertEqual(blocked[0]["payload"]["reason"], "checks")
+        self.assertIn("no checks", blocked[0]["payload"]["detail"].lower())
+        # Only the phrase "no checks reported" may be retried, nothing else.
+        self.assertEqual(len(self.checks_calls()), 1, self.gh_calls())
+        self.assertFalse(any(call[:2] == ["pr", "merge"] for call in self.gh_calls()))
+
+    # -- 18. the legacy "no checks reported" phrase is still retried ------
+    def test_missing_checks_phrase_is_still_retried(self) -> None:
+        cp = self.run_merge("--mode", "pr", "--check-interval", "1",
+                            "--check-timeout", "20",
+                            env_extra={"GH_CHECKS_NO_REPORTED": "1"}, timeout=120)
+        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        payload = json.loads(cp.stdout)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "MERGED")
+        self.assertEqual(self.envelope()["status"], "MERGED")
+        self.assertEqual(self.envelope()["merge_commit"], self.envelope_head)
+        # Old gh builds keep working: the exact phrase stays transient.
+        self.assertFalse(self.ledger_events("MERGE_BLOCKED"))
+        self.assertGreaterEqual(len(self.checks_calls()), 2, self.gh_calls())
+        self.assertTrue(any(call[:2] == ["pr", "merge"] for call in self.gh_calls()))
+
+    # -- 19. a keyword-free failure still blocks on the first call --------
+    def test_keyword_free_check_failure_blocks_immediately(self) -> None:
+        cp = self.run_merge(
+            "--mode", "pr", "--check-interval", "1",
+            env_extra={"GH_CHECKS_EXIT": "1",
+                       "GH_CHECKS_TEXT": "conclusion: failure"},
+            timeout=120)
+        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
+        self.assertEqual(self.queue_entry()["status"], "CORRECTION_REQUIRED")
+        blocked = self.ledger_events("MERGE_BLOCKED")
+        self.assertEqual(len(blocked), 1, blocked)
+        self.assertEqual(blocked[0]["payload"]["phase"], "checks")
+        self.assertEqual(blocked[0]["payload"]["reason"], "checks")
+        # The narrower regex must not turn this into a pending retry.
+        self.assertEqual(len(self.checks_calls()), 1, self.gh_calls())
+        self.assertFalse(self.ledger_events("MERGE"))
 
 
 if __name__ == "__main__":
