@@ -1,0 +1,8 @@
+﻿PILOT-022 real-tower read-only check
+command: python -B tower-dsh/tools/towerctl.py --root C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh state-verify
+exit code: 0
+stdout captured verbatim in real-run.txt
+observed: tasks=22, envelopes=21, drift=[], skipped=[]
+note: the task card expected 21 tasks; the live main tower now contains PILOT-022 itself
+      (task-new + dispatch appended after the card was written), hence 22 replayed tasks.
+      Counts are replayed entity counts; no drift and no skipped entries were reported.

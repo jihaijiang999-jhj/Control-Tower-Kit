@@ -1,0 +1,195 @@
+test_board_status_drift_is_reported (test_state_verify.StateVerifyTestCase.test_board_status_drift_is_reported) ... ok
+test_broken_board_is_one_board_unreadable (test_state_verify.StateVerifyTestCase.test_broken_board_is_one_board_unreadable) ... FAIL
+test_broken_envelope_is_envelope_unreadable (test_state_verify.StateVerifyTestCase.test_broken_envelope_is_envelope_unreadable) ... FAIL
+test_broken_ledger_reports_errors_without_replay (test_state_verify.StateVerifyTestCase.test_broken_ledger_reports_errors_without_replay) ... ERROR
+test_broken_queue_is_one_queue_unreadable (test_state_verify.StateVerifyTestCase.test_broken_queue_is_one_queue_unreadable) ... FAIL
+test_broken_record_is_record_unreadable (test_state_verify.StateVerifyTestCase.test_broken_record_is_record_unreadable) ... FAIL
+test_checkback_fail_replays_rework_not_accepted (test_state_verify.StateVerifyTestCase.test_checkback_fail_replays_rework_not_accepted) ... FAIL
+test_consistent_tower_exits_zero (test_state_verify.StateVerifyTestCase.test_consistent_tower_exits_zero) ... ok
+test_correction_events_fold_and_merge_start_is_ignored (test_state_verify.StateVerifyTestCase.test_correction_events_fold_and_merge_start_is_ignored) ... ok
+test_deleted_board_is_one_board_unreadable (test_state_verify.StateVerifyTestCase.test_deleted_board_is_one_board_unreadable) ... FAIL
+test_deleted_envelope_is_envelope_missing (test_state_verify.StateVerifyTestCase.test_deleted_envelope_is_envelope_missing) ... FAIL
+test_deleted_queue_is_one_queue_unreadable (test_state_verify.StateVerifyTestCase.test_deleted_queue_is_one_queue_unreadable) ... FAIL
+test_deleted_record_is_record_missing (test_state_verify.StateVerifyTestCase.test_deleted_record_is_record_missing) ... FAIL
+test_entities_without_events_or_files_are_skipped (test_state_verify.StateVerifyTestCase.test_entities_without_events_or_files_are_skipped) ... ERROR
+test_envelope_status_drift_is_reported (test_state_verify.StateVerifyTestCase.test_envelope_status_drift_is_reported) ... ok
+test_queue_status_drift_is_reported (test_state_verify.StateVerifyTestCase.test_queue_status_drift_is_reported) ... ok
+test_record_and_board_same_wrong_value_report_both (test_state_verify.StateVerifyTestCase.test_record_and_board_same_wrong_value_report_both) ... FAIL
+test_record_status_drift_is_reported (test_state_verify.StateVerifyTestCase.test_record_status_drift_is_reported) ... FAIL
+test_skipped_reports_no_events_and_missing_rows (test_state_verify.StateVerifyTestCase.test_skipped_reports_no_events_and_missing_rows) ... ERROR
+test_state_verify_never_writes (test_state_verify.StateVerifyTestCase.test_state_verify_never_writes) ... ok
+test_state_verify_never_writes_with_bad_files (test_state_verify.StateVerifyTestCase.test_state_verify_never_writes_with_bad_files) ... FAIL
+
+======================================================================
+ERROR: test_broken_ledger_reports_errors_without_replay (test_state_verify.StateVerifyTestCase.test_broken_ledger_reports_errors_without_replay)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot022-probe-old-code\tools\tests\test_state_verify.py", line 554, in test_broken_ledger_reports_errors_without_replay
+    self.assertEqual(out["skipped"], [])
+                     ~~~^^^^^^^^^^^
+KeyError: 'skipped'
+
+======================================================================
+ERROR: test_entities_without_events_or_files_are_skipped (test_state_verify.StateVerifyTestCase.test_entities_without_events_or_files_are_skipped)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot022-probe-old-code\tools\tests\test_state_verify.py", line 273, in test_entities_without_events_or_files_are_skipped
+    self.assertEqual(out["skipped"], [
+                     ~~~^^^^^^^^^^^
+KeyError: 'skipped'
+
+======================================================================
+ERROR: test_skipped_reports_no_events_and_missing_rows (test_state_verify.StateVerifyTestCase.test_skipped_reports_no_events_and_missing_rows)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot022-probe-old-code\tools\tests\test_state_verify.py", line 506, in test_skipped_reports_no_events_and_missing_rows
+    self.assertEqual(out["skipped"], [
+                     ~~~^^^^^^^^^^^
+KeyError: 'skipped'
+
+======================================================================
+FAIL: test_broken_board_is_one_board_unreadable (test_state_verify.StateVerifyTestCase.test_broken_board_is_one_board_unreadable)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot022-probe-old-code\tools\tests\test_state_verify.py", line 417, in test_broken_board_is_one_board_unreadable
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': []}
+
+======================================================================
+FAIL: test_broken_envelope_is_envelope_unreadable (test_state_verify.StateVerifyTestCase.test_broken_envelope_is_envelope_unreadable)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot022-probe-old-code\tools\tests\test_state_verify.py", line 475, in test_broken_envelope_is_envelope_unreadable
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': []}
+
+======================================================================
+FAIL: test_broken_queue_is_one_queue_unreadable (test_state_verify.StateVerifyTestCase.test_broken_queue_is_one_queue_unreadable)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot022-probe-old-code\tools\tests\test_state_verify.py", line 450, in test_broken_queue_is_one_queue_unreadable
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': []}
+
+======================================================================
+FAIL: test_broken_record_is_record_unreadable (test_state_verify.StateVerifyTestCase.test_broken_record_is_record_unreadable)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot022-probe-old-code\tools\tests\test_state_verify.py", line 383, in test_broken_record_is_record_unreadable
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': []}
+
+======================================================================
+FAIL: test_checkback_fail_replays_rework_not_accepted (test_state_verify.StateVerifyTestCase.test_checkback_fail_replays_rework_not_accepted)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot022-probe-old-code\tools\tests\test_state_verify.py", line 326, in test_checkback_fail_replays_rework_not_accepted
+    self.assertEqual(self.drift_kinds(out), ["task_status"])
+AssertionError: Lists differ: ['board_status', 'task_status'] != ['task_status']
+
+First differing element 0:
+'board_status'
+'task_status'
+
+First list contains 1 additional elements.
+First extra element 1:
+'task_status'
+
+- ['board_status', 'task_status']
++ ['task_status']
+
+======================================================================
+FAIL: test_deleted_board_is_one_board_unreadable (test_state_verify.StateVerifyTestCase.test_deleted_board_is_one_board_unreadable)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot022-probe-old-code\tools\tests\test_state_verify.py", line 402, in test_deleted_board_is_one_board_unreadable
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': []}
+
+======================================================================
+FAIL: test_deleted_envelope_is_envelope_missing (test_state_verify.StateVerifyTestCase.test_deleted_envelope_is_envelope_missing)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot022-probe-old-code\tools\tests\test_state_verify.py", line 463, in test_deleted_envelope_is_envelope_missing
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': []}
+
+======================================================================
+FAIL: test_deleted_queue_is_one_queue_unreadable (test_state_verify.StateVerifyTestCase.test_deleted_queue_is_one_queue_unreadable)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot022-probe-old-code\tools\tests\test_state_verify.py", line 437, in test_deleted_queue_is_one_queue_unreadable
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': []}
+
+======================================================================
+FAIL: test_deleted_record_is_record_missing (test_state_verify.StateVerifyTestCase.test_deleted_record_is_record_missing)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot022-probe-old-code\tools\tests\test_state_verify.py", line 368, in test_deleted_record_is_record_missing
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': []}
+
+======================================================================
+FAIL: test_record_and_board_same_wrong_value_report_both (test_state_verify.StateVerifyTestCase.test_record_and_board_same_wrong_value_report_both)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot022-probe-old-code\tools\tests\test_state_verify.py", line 191, in test_record_and_board_same_wrong_value_report_both
+    self.assertEqual(self.drift_kinds(out), ["board_status", "task_status"])
+AssertionError: Lists differ: ['task_status'] != ['board_status', 'task_status']
+
+First differing element 0:
+'task_status'
+'board_status'
+
+Second list contains 1 additional elements.
+First extra element 1:
+'task_status'
+
+- ['task_status']
++ ['board_status', 'task_status']
+
+======================================================================
+FAIL: test_record_status_drift_is_reported (test_state_verify.StateVerifyTestCase.test_record_status_drift_is_reported)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot022-probe-old-code\tools\tests\test_state_verify.py", line 174, in test_record_status_drift_is_reported
+    self.assertEqual(self.drift_kinds(out), ["task_status"])
+AssertionError: Lists differ: ['board_status', 'task_status'] != ['task_status']
+
+First differing element 0:
+'board_status'
+'task_status'
+
+First list contains 1 additional elements.
+First extra element 1:
+'task_status'
+
+- ['board_status', 'task_status']
++ ['task_status']
+
+======================================================================
+FAIL: test_state_verify_never_writes_with_bad_files (test_state_verify.StateVerifyTestCase.test_state_verify_never_writes_with_bad_files)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot022-probe-old-code\tools\tests\test_state_verify.py", line 529, in test_state_verify_never_writes_with_bad_files
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': []}
+
+----------------------------------------------------------------------
+Ran 21 tests in 2.603s
+
+FAILED (failures=12, errors=3)
+
+===== PILOT-022 probe summary =====
+Setup: scratch copy of this worktree's tools/ at %TEMP%\pilot022-probe-old-code;
+       tools/towerctl.py replaced with `git show main:tower-dsh/tools/towerctl.py`
+       (the pre-PILOT-022 implementation: no _read_json_object, no skipped output,
+       board compared against record.status). The new test file was run unchanged:
+       python -B -m unittest discover -s tools/tests -p test_state_verify.py -v
+Result: 21 tests, 12 failures + 3 errors (15 discriminating tests).
+Failing new-contract cases: deleted/broken record, board, queue and envelope files;
+record+board same wrong value; skipped output; read-only proof under bad files.
+Also failing: adapted skip test (old output has no "skipped" key), the ledger
+short-circuit's skipped assertions, and the CHECKBACK test because old code
+compared board against record.status instead of the replay.

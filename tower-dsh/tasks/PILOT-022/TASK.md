@@ -1,0 +1,47 @@
+# PILOT-022 — state-verify 收紧：坏文件算 drift、输出 skipped、board 期望值改用重放值
+
+- Status: `ready`
+- Authority: `workspace_write`
+- Worktree: `pilot/worktrees/PILOT-022`
+
+## Scope
+
+- 对有重放生命周期事件的任务，tasks/<id>/record.json 缺失记为 drift（kind=record_missing），存在但无法解析为 JSON 对象记为 record_unreadable；不得再静默跳过
+- 对有重放生命周期事件的信封，supervision/envelopes/<id>.json 缺失记为 envelope_missing，存在但无法解析为 JSON 对象记为 envelope_unreadable；不得再静默跳过
+- primary/TASK_BOARD.json 与 supervision/MERGE_QUEUE.json 缺失、不是 JSON 对象或解析失败时，各报一条文件级 drift（board_unreadable / queue_unreadable，target 为文件名），不再逐实体静默跳过；文件可解析时逐条比对保持不变
+- board 比对一律以重放出的期望状态作为 expected（不再用 record.json 的 status 作为 board 的期望值），因此 record 与 board 被改成同一个错误值时同时产生 task_status 与 board_status，不能互相掩护
+- 合法跳过必须显式输出：结果新增 skipped 数组（每条含 kind=task|envelope、target、reason=no_lifecycle_events|board_entry_missing|queue_entry_missing）与 skipped_count；skipped 不产生 drift、不改变 exit code；ledger 错误短路分支同样输出 skipped=[] 与 skipped_count=0
+- 记录与状态折叠规则、只读约束（state-verify 不写任何文件）与退出码语义保持不变：干净 0、任一 drift 2、ledger 错误 2
+- 更新 tools/tests/test_state_verify.py：既有跳过测试按新契约调整，新增缺文件/坏 JSON/board 期望值/skipped 输出/坏文件下的只读证明等用例；不得删除既有覆盖或用更宽断言替换
+
+## Allowed paths
+
+- `pilot/worktrees/PILOT-022/tower-dsh/tools/towerctl.py`
+- `pilot/worktrees/PILOT-022/tower-dsh/tools/tests/test_state_verify.py`
+
+## Forbidden
+
+- network
+- external dependencies
+- changes outside the task worktree
+- merge
+- production access
+- weakening or deleting existing test coverage
+- state-verify writing any file
+
+## Acceptance
+
+- cd pilot/worktrees/PILOT-022/tower-dsh && python -B -m unittest discover -s tools/tests -v 全部通过，总数 >= 209（main 基线 203）
+- 干净临时塔上 state-verify exit 0、ok=true、drift 为空，且 skipped_count == len(skipped)
+- 删除有事件任务的 record.json → exit 2，drift 含 kind=record_missing 且 target 为该任务，该任务不出现在 skipped
+- 把 record.json 写成坏 JSON（或非对象）→ exit 2，drift 含 kind=record_unreadable
+- 删除 TASK_BOARD.json → exit 2，恰有一条 kind=board_unreadable；把 board 写成坏 JSON → 同样 board_unreadable，且不再逐任务重复报 board_status
+- 删除 MERGE_QUEUE.json → exit 2，恰有一条 kind=queue_unreadable；把 queue 写成坏 JSON → 同样 queue_unreadable
+- 删除有事件信封的 supervision/envelopes/<id>.json → exit 2，drift 含 kind=envelope_missing；写坏该文件 → envelope_unreadable
+- 把 record 与 board 同时改成同一个错误状态 → exit 2，drift 同时含 task_status 与 board_status，且 board_status.expected 等于重放值而不是 record 的错误值
+- 无任何事件的任务/信封、以及有事件但 board/queue 中无对应条目的实体进入 skipped（reason 分别为 no_lifecycle_events / board_entry_missing / queue_entry_missing），exit 仍为 0
+- 一致塔与坏文件塔两种场景下，state-verify 运行前后塔根所有文件 SHA-256 完全一致（只读证明）
+- 在真实塔（tower-dsh 根）运行 python tools/towerctl.py state-verify：exit 0、drift 为空、tasks=21/envelopes=21，输出含 skipped/skipped_count；实际输出逐字作为证据，不得通过放宽规则消除 drift
+- python tools/towerctl.py spec-coverage 为 27/27 且 tool_gaps 为空；python tools/towerctl.py spec-lint --strict 为 6/6
+- git -C pilot/worktrees/PILOT-022 diff --name-only main..HEAD 恰好两个 allowed_paths 文件
+- replay 折叠规则未被改动：CHECKBACK FAIL→rework、MERGE_START 不改变状态、POST_MERGE_FAILED→CORRECTION_REQUIRED 的既有测试仍通过

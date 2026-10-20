@@ -1,0 +1,11 @@
+﻿commit d72df3e20ada3515911de768b986f980e0383498
+Author: mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+Date:   Tue Oct 20 23:42:06 2026 +0800
+
+    PILOT-022: tighten state-verify (bad files, skipped, replay-based board)
+
+ tower-dsh/tools/tests/test_state_verify.py | 236 ++++++++++++++++++++++++++++-
+ tower-dsh/tools/towerctl.py                | 175 +++++++++++++++------
+ 2 files changed, 360 insertions(+), 51 deletions(-)
+
+HEAD d72df3e20ada3515911de768b986f980e0383498

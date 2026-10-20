@@ -211,7 +211,17 @@
       "reviewer": "subagent:rev-pilot-021",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-021/MERGE.md",
       "updated_at": "2026-10-20T23:20:38+08:00"
+    },
+    {
+      "id": "PILOT-022",
+      "title": "state-verify 收紧：坏文件算 drift、输出 skipped、board 期望值改用重放值",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-022",
+      "reviewer": "subagent:rev-pilot-022",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-022/MERGE.md",
+      "updated_at": "2026-10-20T23:49:12+08:00"
     }
   ],
-  "updated_at": "2026-10-20T23:20:38+08:00"
+  "updated_at": "2026-10-20T23:49:12+08:00"
 }
