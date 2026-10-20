@@ -141,10 +141,10 @@
 | 路径越界防护 | `[证]` | `ensure_within` 覆盖 evidence / worktree / package / envelope / repository |
 | ledger 哈希链 | `[证]` | `verify-ledger` → primary 103 事件、supervision 54，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
 | 条款→测试绑定 | `[证]` | `spec-coverage`：6 份规范 / 56 条款 / tool-check 27 / covered **27** / gaps 0 |
-| 测试全绿 | `[证]`（有条件） | `Ran 178 tests / OK`（本地 2026-10-20，PILOT-016 后）；GitHub Actions 在 PR #1 与 main 上均绿。**本地前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
+| 测试全绿 | `[证]`（有条件） | `Ran 193 tests / OK`（本地 2026-10-20，PILOT-020 后）；GitHub Actions 在 PR #5 与 main 上均绿，且 v7 升级后**零注解**。**本地前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
 | 29 条条款靠人 | `[声]` | 12 `review-check` + 17 `owner-gate`（`spec-coverage.manual` / `.owner`） |
 | "每次迭代全局正确" | `[无]` | 无对象层不变量、无趋势锚点、无状态重放 |
-| 16 个任务 / 16 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；**016 经 GitHub PR #1 合并 `29d8ec6`**，post-merge 均 4/4） |
+| 20 个任务 / 20 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`，post-merge 均 4/4） |
 
 ---
 
@@ -255,6 +255,21 @@ push pilot/PILOT-016 → gh pr create → PR #1 出现
 信封实值：`merge_mode=pr`、`pr_number=1`、`pr_url=.../pull/1`、`check_conclusion=success`、`remote_merged=true`、`merge_commit=29d8ec6`。
 
 这一步的意义不是"多了一条合并路径"，而是：**代码进 main 的门第一次由 GitHub 服务端裁决，而不是由本地说"我跑过了"。** 剩下的软处只有 owner 直推（§6.5 已说明为何不锁死）。
+
+---
+
+### 6.8 小卡四连（2026-10-20 晚）：修 backlog，而不只是记 backlog
+
+| 卡 | 修了什么 | 判据 |
+|---|---|---|
+| 017 | `authority_dirty` 覆盖 `tasks/` 与 `pilot/`（原来漏了任务卡与 spec） | 删/改任务卡与 spec 会被计入；被 gitignore 的 worktree 不计入 |
+| 018 | `deliver` 重投递导致证据 ID 全同 | 真实 record 从 5×`E-006` 变成 `E-001..E-006`；旧代码上同一探针失败 |
+| 019 | checks pending 判定从"猜文本"改为 **gh 退出码 8** | 真实失败输出含 `no checks` 时立即 block（calls=1），旧代码要重试到 timeout |
+| 020 | Actions `v4/v5` → `v7` | PR #5 用 v7 跑自己，全绿且**注解区为空**（Node 20 告警消失） |
+
+两张卡的方法值得记：018 和 019 都做了**旧代码上的对照实验**（同一探针跑 main 版工具），证明"测试有鉴别力"，而不是"测试和实现一起写的"。019 还顺带暴露一个通用原则：**CLI 集成优先读退出码，不要读文案**——文案会误伤，退出码是契约。
+
+排序上仍然串行：四张卡依次 PR #2→#5。并行会撞 `base` 祖先断言（§6.2）。
 
 ---
 
