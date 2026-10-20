@@ -41,7 +41,7 @@
     }
   ],
   "envelope_head_sha": "9743807babc8682c229e79029ce517a7effc64d7",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "pr_number": 1,
   "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/1",
   "remote_merged": true,
@@ -50,5 +50,7 @@
   "merged_at": "2026-10-20T19:46:10+08:00",
   "supervisor": "sup-pilot-016-verify",
   "merge_mode": "pr",
-  "check_conclusion": "success"
+  "check_conclusion": "success",
+  "post_merge_at": "2026-10-20T19:47:24+08:00",
+  "post_merge_note": "first real PR merge; 178 tests; merge_mode=pr"
 }
