@@ -1,0 +1,38 @@
+PILOT-023 real-tower state-verify (read-only, rework)
+cwd: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-023
+command: python -B tower-dsh/tools/towerctl.py --root C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh state-verify
+exit code: 0
+parsed: ok=true tasks=23 envelopes=22 drift=[] skipped=[] skipped_count=0 evidence_checked=147
+
+Expected evidence_checked computation (PILOT-023 evidence is now delivered):
+- Scanned every tasks/<id>/record.json under the real tower root.
+- Counted len(record["evidence"]) for each record where evidence is a list.
+- Tasks with record.json: 23; sum of evidence entries = 147.
+- Every recorded path is inside the tower root, exists and is a regular file,
+  so every entry is hashed and counted.
+- Observed evidence_checked (147) equals the independently computed 147.
+
+Per-task counts:
+PILOT-001: evidence=6
+PILOT-002: evidence=6
+PILOT-003: evidence=5
+PILOT-004: evidence=5
+PILOT-005: evidence=5
+PILOT-006: evidence=5
+PILOT-007: evidence=6
+PILOT-008: evidence=6
+PILOT-009: evidence=7
+PILOT-010: evidence=7
+PILOT-011: evidence=5
+PILOT-012: evidence=7
+PILOT-013: evidence=8
+PILOT-014: evidence=10
+PILOT-015: evidence=6
+PILOT-016: evidence=6
+PILOT-017: evidence=6
+PILOT-018: evidence=6
+PILOT-019: evidence=6
+PILOT-020: evidence=6
+PILOT-021: evidence=7
+PILOT-022: evidence=8
+PILOT-023: evidence=8

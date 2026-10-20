@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "tasks": 23,
+  "envelopes": 22,
+  "drift": [],
+  "skipped": [],
+  "skipped_count": 0,
+  "evidence_checked": 147
+}
+
+EXIT_CODE: 0

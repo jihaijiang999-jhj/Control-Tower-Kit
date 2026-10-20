@@ -221,7 +221,17 @@
       "reviewer": "subagent:rev-pilot-022",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-022/MERGE.md",
       "updated_at": "2026-10-20T23:49:12+08:00"
+    },
+    {
+      "id": "PILOT-023",
+      "title": "state-verify 校验证据完整性：证据缺失/哈希/字节数不符与 spec 哈希漂移都算 drift",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-023",
+      "reviewer": "subagent:rev-pilot-023",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-023/MERGE.md",
+      "updated_at": "2026-10-21T04:37:16+08:00"
     }
   ],
-  "updated_at": "2026-10-20T23:49:12+08:00"
+  "updated_at": "2026-10-21T04:37:16+08:00"
 }

@@ -1,0 +1,138 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-023",
+  "title": "state-verify 校验证据完整性：证据缺失/哈希/字节数不符与 spec 哈希漂移都算 drift",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "对有重放生命周期事件且 record.json 可读的任务，逐条校验 record.evidence：证据文件缺失记 evidence_missing；sha256 与记录不符记 evidence_hash_mismatch；记录里的 bytes 与磁盘大小不符记 evidence_bytes_mismatch；条目本身不可用（非对象、path 非字符串或空、sha256 不是 64 位十六进制）记 evidence_unreadable",
+    "证据 path 必须在塔根内：解析后越界（含 ../）记 evidence_path_escape，且绝不打开越界路径；path 存在但不是普通文件按 evidence_missing 处理",
+    "记录的 spec 完整性：当 spec_path 与 spec_sha256 同时存在时，路径越界记 spec_path_escape、文件缺失记 spec_missing、哈希不符记 spec_hash_mismatch；两者缺一不做该检查（不在本卡范围）",
+    "证据/规范类 drift 的条目形状为 {kind, target=<task id>, path=<塔根相对路径|null>, expected, actual}；status 类既有 drift 形状保持不变；drift 排序键在 (kind, target) 基础上加入 path 以保持确定性",
+    "结果新增 evidence_checked 计数（实际计算过哈希的条目数）；ledger 错误短路分支输出 evidence_checked=0；其余字段 tasks/envelopes/drift/skipped/skipped_count 与语义保持不变",
+    "只读：校验只做读取与哈希，不写、不修复、不删除任何文件；退出码语义不变（干净 0、任一 drift 2、ledger 错误 2）",
+    "record.evidence 缺失、为空或不是列表时不做逐条检查（不改变既有测试中无证据 fixture 的干净塔语义）；交付证据的存在性由 accept/close 的证据门负责，不在本卡范围",
+    "更新 tools/tests/test_state_verify.py：新增证据缺失/哈希篡改/字节数篡改/条目不可用/路径越界/规范哈希漂移/规范缺失/只读证明等用例，并保持既有 022 契约测试全绿；不得删除覆盖或用更宽断言替换"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-023/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-023/tower-dsh/tools/tests/test_state_verify.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "state-verify writing any file"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-023/tower-dsh && python -B -m unittest discover -s tools/tests -v 全部通过，总数 >= 222（main 基线 214），且新增至少 8 个证据/规范完整性用例",
+    "带 evidence 与 spec 的干净临时塔上 state-verify exit 0、drift=[]、evidence_checked 等于 record.evidence 条目总数",
+    "改写证据文件内容（长度不变）→ exit 2，drift 含 kind=evidence_hash_mismatch，expected=记录的 sha256、actual=磁盘 sha256",
+    "只改 record.evidence[0].sha256（文件不动）→ exit 2，drift 含 kind=evidence_hash_mismatch（MAP §6.9 记录的盲区）",
+    "删除证据文件 → exit 2，drift 含 kind=evidence_missing，target 为该任务、path 为该证据路径",
+    "只改 record.evidence[0].bytes → exit 2，drift 含 kind=evidence_bytes_mismatch",
+    "证据条目 path 写成 ../outside.txt 且塔外放置诱饵文件 → 记 evidence_path_escape，诱饵文件未被打开/修改，exit 2",
+    "证据条目 sha256 缺失或非 64 位十六进制 → exit 2，drift 含 kind=evidence_unreadable",
+    "修改 spec 文件一个字节 → exit 2，drift 含 kind=spec_hash_mismatch；删除 spec 文件 → spec_missing",
+    "干净塔与篡改塔两种场景下 state-verify 运行前后塔根所有文件 SHA-256 完全一致（只读证明）",
+    "在真实塔（tower-dsh 根）运行 python tools/towerctl.py state-verify：exit 0、drift=[]、tasks=23/envelopes=22，evidence_checked 等于独立复算的全部 record.evidence 条目数（冻结基线 139；本卡交付后按实际复算），不得通过放宽规则消除 drift",
+    "python tools/towerctl.py spec-coverage 为 27/27 且 tool_gaps 为空；python tools/towerctl.py spec-lint --strict 为 6/6",
+    "git -C pilot/worktrees/PILOT-023 diff --name-only main..HEAD 恰好两个 allowed_paths 文件",
+    "PILOT-022 的既有契约测试仍全绿：坏文件算 drift、skipped 输出、board 期望值取重放值、只读证明"
+  ],
+  "depends_on": [
+    "PILOT-022"
+  ],
+  "worktree": "pilot/worktrees/PILOT-023",
+  "spec_path": "pilot/PILOT-023.spec.json",
+  "spec_sha256": "8c28fb9f3eadcd4fdbd7399dacabe0d5412984fd2a2919bcf61372e8b0b2723b",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-pilot-023",
+  "dispatch": {
+    "executor": "subagent:exec-pilot-023",
+    "worktree": "pilot/worktrees/PILOT-023",
+    "at": "2026-10-21T04:18:33+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-023/evidence/towerctl.py",
+      "sha256": "977b7c26bbd9b8d8d4304b40011e37fef857696a441a64421709dc92d798788b",
+      "bytes": 145216,
+      "at": "2026-10-21T04:28:57+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-023/evidence/test_state_verify.py",
+      "sha256": "143460bb3dbc4d54e6b87108f4c7a078cdac1b39fb068330d42d9f132bbb3397",
+      "bytes": 49173,
+      "at": "2026-10-21T04:28:57+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-023/evidence/test-output.txt",
+      "sha256": "e0468cb8b1b6f508fc969c41403888c7562f6fa66ed8f71596889028b43af0b5",
+      "bytes": 32395,
+      "at": "2026-10-21T04:28:57+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-023/evidence/real-run.txt",
+      "sha256": "580757d7291d807dc1fc363502129094d2286c72875d736e06a98dbb6c4b3dbf",
+      "bytes": 155,
+      "at": "2026-10-21T04:28:57+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-023/evidence/real-run-meta.txt",
+      "sha256": "54d6052ce5c91d7e339d831f7e26c7cf05f57813b0e8cec4ff32e4255bd97de9",
+      "bytes": 1431,
+      "at": "2026-10-21T04:28:57+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-023/evidence/probe-old-code.txt",
+      "sha256": "a3cc96241b061af8f69b58e6428b09bede205b7b652450320001b07233c4d9f3",
+      "bytes": 23396,
+      "at": "2026-10-21T04:28:57+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-023/evidence/commit.txt",
+      "sha256": "f5e3863c16a8d45c284f9a02d769a2a00534cdc380084801ec730eaf657bfec6",
+      "bytes": 485,
+      "at": "2026-10-21T04:28:57+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-023/evidence/diff.txt",
+      "sha256": "38b01061037c6cd778d4e25b59d9768d41b728de917efaef63de915c7f94dd8f",
+      "bytes": 40140,
+      "at": "2026-10-21T04:28:57+08:00",
+      "id": "E-008"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-pilot-023",
+    "verdict": "PASS",
+    "note": "复评 PASS（返工后 4b21038）。B1/B2 已闭合：独立 spy 覆盖 os.stat/lstat/open/scandir/realpath/islink/isjunction/exists/io.open/builtins.open，越界证据与越界 spec 同时存在时 touched=[]，drift 仅 evidence_path_escape/spec_path_escape，evidence_checked=1；junction 指向根外同样未触盘。NUL evidence/spec 路径均为 exit 2、单一 JSON、无 traceback（evidence_unreadable/spec_unreadable）。236 tests OK（skipped=1，仅 symlink 权限跳过）；旧码探针 21 failures+4 errors，证明新用例有鉴别力。真实塔 exit 0、tasks=23/envelopes=22、drift=[]、evidence_checked=147（独立复算 147）；8 份证据 SHA-256 与 bytes 全匹配，spec_sha256=8c28fb...匹配；scope 恰两文件；420 文件只读快照一致。残余（不阻塞）：词法前缀大小写敏感（绝对路径仅大小写不同会误报 escape，真实记录均为相对路径）、根内符号链接一律按 escape 保守处理、spec_unreadable 为新 kind 但不削弱既有三类、TOCTOU/hardlink 不在范围。",
+    "at": "2026-10-21T04:37:15+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-023",
+    "actor": "owner",
+    "text": "owner directed PILOT-023; independent reviewer PASS after rework",
+    "at": "2026-10-21T04:37:15+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-023/CLOSEOUT.md",
+    "at": "2026-10-21T04:37:16+08:00"
+  },
+  "created_at": "2026-10-21T03:58:08+08:00",
+  "updated_at": "2026-10-21T04:37:16+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-023/MERGE.md",
+  "delivered_at": "2026-10-21T04:28:57+08:00",
+  "accepted_at": "2026-10-21T04:37:15+08:00"
+}
