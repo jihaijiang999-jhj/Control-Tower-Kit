@@ -88,6 +88,61 @@ class StateVerifyTestCase(unittest.TestCase):
     def remove_file(self, relative: str) -> None:
         (self.root / relative).unlink()
 
+    # -- evidence/spec builders ------------------------------------------
+    def write_evidence_file(self, relative: str, content: bytes) -> dict:
+        path = self.root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+        return {"path": relative,
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "bytes": len(content)}
+
+    def put_record_with_evidence(self, task_id: str, status: str,
+                                 evidence, **extra) -> None:
+        record = {"schema": "tower/task@1", "id": task_id,
+                  "title": task_id, "status": status, "evidence": evidence}
+        record.update(extra)
+        write_json(self.root / "tasks" / task_id / "record.json", record)
+
+    def put_spec(self, task_id: str,
+                 content: bytes = b'{"spec": "frozen"}\n') -> dict:
+        relative = f"pilot/{task_id}.spec.json"
+        path = self.root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+        return {"spec_path": relative,
+                "spec_sha256": hashlib.sha256(content).hexdigest()}
+
+    def build_evidence_tower(self) -> list[dict]:
+        """Base tower plus three evidence files and a frozen spec.
+
+        T-001 owns two evidence files and a spec; T-002 owns one evidence
+        file.  The records keep the replayed statuses so evidence is the only
+        variable under test.
+        """
+        self.build_base_tower()
+        t1 = [
+            self.write_evidence_file("tasks/T-001/evidence/one.txt",
+                                     b"alpha\n"),
+            self.write_evidence_file("tasks/T-001/evidence/two.bin",
+                                     b"\x00\x01\x02"),
+        ]
+        t2 = [
+            self.write_evidence_file("tasks/T-002/evidence/three.txt",
+                                     b"gamma\n"),
+        ]
+        self.put_record_with_evidence("T-001", "closed", t1,
+                                      **self.put_spec("T-001"))
+        self.put_record_with_evidence("T-002", "reviewed", t2)
+        return t1 + t2
+
+    def read_record(self, task_id: str) -> dict:
+        return json.loads((self.root / "tasks" / task_id / "record.json")
+                          .read_text(encoding="utf-8"))
+
+    def write_record(self, task_id: str, record: dict) -> None:
+        write_json(self.root / "tasks" / task_id / "record.json", record)
+
     def build_base_tower(self) -> None:
         """Two consistent tasks and two consistent envelopes.
 
@@ -555,9 +610,377 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(out["skipped_count"], 0)
         self.assertEqual(out["tasks"], 0)
         self.assertEqual(out["envelopes"], 0)
+        self.assertEqual(out["evidence_checked"], 0)
         self.assertTrue(out["ledger_errors"], out)
         self.assertTrue(any("hash mismatch" in error
                             for error in out["ledger_errors"]), out)
+
+    # -- 17. clean evidence + spec --------------------------------------
+    def test_clean_evidence_and_spec_exit_zero(self) -> None:
+        entries = self.build_evidence_tower()
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 0, out)
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(out["drift"], [])
+        self.assertEqual(out["evidence_checked"], 3)
+        self.assertEqual(out["evidence_checked"], len(entries))
+
+    # -- 18. rewritten evidence, same length ----------------------------
+    def test_evidence_content_rewritten_same_length_is_hash_mismatch(self) -> None:
+        self.build_evidence_tower()
+        recorded = self.read_record("T-001")["evidence"][0]
+        path = self.root / recorded["path"]
+        path.write_bytes(b"ALPHA\n")
+        self.assertEqual(path.stat().st_size, recorded["bytes"],
+                         "fixture must keep the length so only the hash drifts")
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["evidence_hash_mismatch"])
+        drift = out["drift"][0]
+        self.assertEqual(drift["target"], "T-001")
+        self.assertEqual(drift["path"], recorded["path"])
+        self.assertEqual(drift["expected"], recorded["sha256"])
+        self.assertEqual(drift["actual"], hashlib.sha256(b"ALPHA\n").hexdigest())
+        self.assertEqual(out["evidence_checked"], 3)
+
+    # -- 19. the documented MAP blind spot: only record.sha256 changes --
+    def test_record_sha256_only_changed_is_hash_mismatch(self) -> None:
+        # The file is untouched, so only re-hashing the claimed path can
+        # expose this: comparing record.sha256 with the package hash cannot.
+        self.build_evidence_tower()
+        record = self.read_record("T-001")
+        entry = record["evidence"][0]
+        actual = hashlib.sha256((self.root / entry["path"]).read_bytes()).hexdigest()
+        wrong = "0" * 64
+        self.assertNotEqual(wrong, actual)
+        entry["sha256"] = wrong
+        self.write_record("T-001", record)
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["evidence_hash_mismatch"])
+        drift = out["drift"][0]
+        self.assertEqual(drift["target"], "T-001")
+        self.assertEqual(drift["path"], entry["path"])
+        self.assertEqual(drift["expected"], wrong)
+        self.assertEqual(drift["actual"], actual)
+        self.assertEqual(out["evidence_checked"], 3)
+
+    # -- 20. deleted evidence -------------------------------------------
+    def test_evidence_file_deleted_is_missing(self) -> None:
+        self.build_evidence_tower()
+        recorded = self.read_record("T-001")["evidence"][0]
+        (self.root / recorded["path"]).unlink()
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["evidence_missing"])
+        drift = out["drift"][0]
+        self.assertEqual(drift["kind"], "evidence_missing")
+        self.assertEqual(drift["target"], "T-001")
+        self.assertEqual(drift["path"], recorded["path"])
+        self.assertEqual(drift["actual"], "missing")
+        self.assertEqual(out["evidence_checked"], 2,
+                         "missing entries must not count as checked")
+
+    # -- 21. bytes mismatch only ----------------------------------------
+    def test_record_bytes_only_changed_is_bytes_mismatch(self) -> None:
+        self.build_evidence_tower()
+        record = self.read_record("T-002")
+        entry = record["evidence"][0]
+        size = (self.root / entry["path"]).stat().st_size
+        entry["bytes"] = size + 5
+        self.write_record("T-002", record)
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["evidence_bytes_mismatch"])
+        drift = out["drift"][0]
+        self.assertEqual(drift["target"], "T-002")
+        self.assertEqual(drift["path"], entry["path"])
+        self.assertEqual(drift["expected"], size + 5)
+        self.assertEqual(drift["actual"], size)
+        self.assertEqual(out["evidence_checked"], 3)
+
+    # -- 22. one file can yield both hash and bytes drift ---------------
+    def test_hash_and_bytes_drift_can_both_be_reported(self) -> None:
+        self.build_evidence_tower()
+        record = self.read_record("T-001")
+        entry = record["evidence"][1]
+        actual = hashlib.sha256((self.root / entry["path"]).read_bytes()).hexdigest()
+        entry["sha256"] = "a" * 64
+        self.assertNotEqual(entry["sha256"], actual)
+        entry["bytes"] = entry["bytes"] + 7
+        self.write_record("T-001", record)
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out),
+                         ["evidence_bytes_mismatch", "evidence_hash_mismatch"])
+        self.assertEqual({item["path"] for item in out["drift"]},
+                         {entry["path"]})
+        by_kind = {item["kind"]: item for item in out["drift"]}
+        self.assertEqual(by_kind["evidence_hash_mismatch"]["actual"], actual)
+        self.assertEqual(by_kind["evidence_bytes_mismatch"]["expected"],
+                         entry["bytes"])
+        self.assertEqual(out["evidence_checked"], 3)
+
+    # -- 23. escaping evidence path is never opened ---------------------
+    def test_evidence_path_escape_is_not_opened(self) -> None:
+        self.build_evidence_tower()
+        bait = self.root.parent / f"{self.root.name}-bait.txt"
+        bait.write_bytes(b"bait-original\n")
+        self.addCleanup(bait.unlink, missing_ok=True)
+        before = bait.read_bytes()
+        recorded_sha = self.read_record("T-001")["evidence"][0]["sha256"]
+
+        record = self.read_record("T-001")
+        record["evidence"][0]["path"] = f"../{bait.name}"
+        record["evidence"][0]["sha256"] = recorded_sha
+        self.write_record("T-001", record)
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["evidence_path_escape"])
+        drift = out["drift"][0]
+        self.assertEqual(drift["target"], "T-001")
+        self.assertEqual(drift["path"], f"../{bait.name}")
+        self.assertEqual(bait.read_bytes(), before,
+                         "state-verify hashed or wrote the escaped bait file")
+        self.assertEqual(out["evidence_checked"], 2,
+                         "escaped entries must not count as checked")
+        self.assertTrue(bait.exists())
+
+    # -- 24. absolute outside path is an escape too ---------------------
+    def test_evidence_absolute_path_outside_is_escape(self) -> None:
+        self.build_evidence_tower()
+        bait = self.root.parent / f"{self.root.name}-abs-bait.txt"
+        bait.write_bytes(b"absolute-bait\n")
+        self.addCleanup(bait.unlink, missing_ok=True)
+        before = bait.read_bytes()
+
+        record = self.read_record("T-001")
+        record["evidence"][0]["path"] = str(bait)
+        self.write_record("T-001", record)
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["evidence_path_escape"])
+        self.assertEqual(out["drift"][0]["path"], str(bait))
+        self.assertEqual(bait.read_bytes(), before,
+                         "state-verify hashed or wrote the escaped bait file")
+        self.assertEqual(out["evidence_checked"], 2)
+
+    # -- 25. malformed entries ------------------------------------------
+    def test_non_dict_evidence_entry_is_unreadable(self) -> None:
+        self.build_evidence_tower()
+        record = self.read_record("T-001")
+        record["evidence"][0] = "not-an-entry"
+        self.write_record("T-001", record)
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["evidence_unreadable"])
+        self.assertEqual(out["drift"][0], {
+            "kind": "evidence_unreadable", "target": "T-001", "path": None,
+            "expected": "well-formed evidence entry", "actual": "invalid entry"})
+        self.assertEqual(out["evidence_checked"], 2)
+
+    def test_evidence_entry_without_path_is_unreadable(self) -> None:
+        self.build_evidence_tower()
+        record = self.read_record("T-001")
+        record["evidence"][0] = {"sha256": "a" * 64, "bytes": 1}
+        self.write_record("T-001", record)
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["evidence_unreadable"])
+        self.assertEqual(out["drift"][0]["path"], None)
+        self.assertEqual(out["drift"][0]["actual"], "invalid path")
+        self.assertEqual(out["evidence_checked"], 2)
+
+        # An empty path is just as unusable.
+        record = self.read_record("T-001")
+        record["evidence"][0] = {"path": "", "sha256": "a" * 64}
+        self.write_record("T-001", record)
+        out, code = self.state_verify()
+        self.assertEqual(code, 2, out)
+        self.assertEqual(out["drift"][0]["actual"], "invalid path")
+        self.assertEqual(out["evidence_checked"], 2)
+
+    def test_invalid_sha256_evidence_entry_is_unreadable(self) -> None:
+        self.build_evidence_tower()
+        recorded_path = self.read_record("T-001")["evidence"][0]["path"]
+        for bad in (None, "abc", "z" * 64, "a" * 64 + "\n"):
+            with self.subTest(sha256=bad):
+                record = self.read_record("T-001")
+                entry = record["evidence"][0]
+                if bad is None:
+                    entry.pop("sha256")
+                else:
+                    entry["sha256"] = bad
+                self.write_record("T-001", record)
+
+                out, code = self.state_verify()
+
+                self.assertEqual(code, 2, out)
+                self.assertEqual(self.drift_kinds(out), ["evidence_unreadable"])
+                self.assertEqual(out["drift"][0]["path"], recorded_path)
+                self.assertEqual(out["drift"][0]["actual"], "invalid sha256")
+                self.assertEqual(out["evidence_checked"], 2)
+
+    # -- 26. frozen spec integrity --------------------------------------
+    def test_spec_modified_is_hash_mismatch(self) -> None:
+        self.build_evidence_tower()
+        recorded = self.read_record("T-001")["spec_sha256"]
+        spec = self.root / "pilot" / "T-001.spec.json"
+        spec.write_bytes(b'{"spec": "thawed"}\n')  # same length as the fixture
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["spec_hash_mismatch"])
+        drift = out["drift"][0]
+        self.assertEqual(drift["target"], "T-001")
+        self.assertEqual(drift["path"], "pilot/T-001.spec.json")
+        self.assertEqual(drift["expected"], recorded)
+        self.assertEqual(drift["actual"],
+                         hashlib.sha256(b'{"spec": "thawed"}\n').hexdigest())
+        self.assertEqual(out["evidence_checked"], 3)
+
+    def test_spec_deleted_is_spec_missing(self) -> None:
+        self.build_evidence_tower()
+        (self.root / "pilot" / "T-001.spec.json").unlink()
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["spec_missing"])
+        drift = out["drift"][0]
+        self.assertEqual(drift["target"], "T-001")
+        self.assertEqual(drift["path"], "pilot/T-001.spec.json")
+        self.assertEqual(drift["actual"], "missing")
+        self.assertEqual(out["evidence_checked"], 3)
+
+    def test_spec_path_escape_is_not_opened(self) -> None:
+        self.build_evidence_tower()
+        bait = self.root.parent / f"{self.root.name}-spec-bait.json"
+        bait.write_bytes(b'{"spec": "outside"}\n')
+        self.addCleanup(bait.unlink, missing_ok=True)
+        before = bait.read_bytes()
+
+        record = self.read_record("T-001")
+        record["spec_path"] = f"../{bait.name}"
+        self.write_record("T-001", record)
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["spec_path_escape"])
+        self.assertEqual(out["drift"][0]["path"], f"../{bait.name}")
+        self.assertEqual(bait.read_bytes(), before,
+                         "state-verify hashed or wrote the escaped spec bait")
+        self.assertEqual(out["evidence_checked"], 3)
+
+    def test_spec_checked_only_when_both_fields_exist(self) -> None:
+        self.build_evidence_tower()
+        (self.root / "pilot" / "T-001.spec.json").write_bytes(b"tampered spec")
+        record = self.read_record("T-001")
+        record.pop("spec_sha256")
+        self.write_record("T-001", record)
+
+        out, code = self.state_verify()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out["evidence_checked"], 3)
+
+        record = self.read_record("T-001")
+        record.pop("spec_path")
+        record["spec_sha256"] = "0" * 64
+        self.write_record("T-001", record)
+        out, code = self.state_verify()
+        self.assertEqual(code, 0, out)
+
+    # -- 27. absent/empty/non-list evidence is unchanged semantics ------
+    def test_absent_empty_or_non_list_evidence_is_ignored(self) -> None:
+        self.build_base_tower()  # records carry no evidence at all
+
+        out, code = self.state_verify()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out["drift"], [])
+        self.assertEqual(out["evidence_checked"], 0)
+
+        record = self.read_record("T-001")
+        record["evidence"] = []
+        self.write_record("T-001", record)
+        out, code = self.state_verify()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out["evidence_checked"], 0)
+
+        # A non-list evidence value is not a list of entries: no checks, no
+        # drift, even when it looks malicious.
+        record["evidence"] = {"path": "../outside.txt", "sha256": "a" * 64}
+        self.write_record("T-001", record)
+        out, code = self.state_verify()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out["drift"], [])
+        self.assertEqual(out["evidence_checked"], 0)
+
+    # -- 28. deterministic drift order ----------------------------------
+    def test_evidence_drift_sorted_by_kind_target_path(self) -> None:
+        self.build_evidence_tower()
+        record = self.read_record("T-001")
+        for entry in record["evidence"]:
+            (self.root / entry["path"]).unlink()
+        record2 = self.read_record("T-002")
+        record2["evidence"][0]["sha256"] = "0" * 64
+        self.write_record("T-002", record2)
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(
+            [(item["kind"], item["target"], item["path"])
+             for item in out["drift"]],
+            [("evidence_hash_mismatch", "T-002",
+              "tasks/T-002/evidence/three.txt"),
+             ("evidence_missing", "T-001", "tasks/T-001/evidence/one.txt"),
+             ("evidence_missing", "T-001", "tasks/T-001/evidence/two.bin")])
+        self.assertEqual(out["evidence_checked"], 1)
+
+    # -- 29. read-only proof with evidence and spec ---------------------
+    def test_evidence_and_spec_verify_never_writes(self) -> None:
+        self.build_evidence_tower()
+        before = self.snapshot()
+        out, code = self.state_verify()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.snapshot(), before,
+                         "state-verify changed files on a clean evidence tower")
+
+        # Tampered evidence and spec must be reported, not repaired.
+        (self.root / "tasks" / "T-001" / "evidence" / "one.txt").write_bytes(
+            b"ALPHA\n")
+        (self.root / "pilot" / "T-001.spec.json").write_bytes(
+            b'{"spec": "thawed"}\n')
+        before = self.snapshot()
+        out, code = self.state_verify()
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.snapshot(), before,
+                         "state-verify repaired evidence/spec instead of "
+                         "reporting it")
+        self.assertEqual(self.drift_kinds(out),
+                         ["evidence_hash_mismatch", "spec_hash_mismatch"])
 
 
 if __name__ == "__main__":
