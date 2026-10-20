@@ -46,7 +46,7 @@ BASE = "main"
 BRANCH = "feature/pr-merge"
 FIXED_TIME = "2026-10-19T00:00:00+08:00"
 PR_NUMBER = 42
-PR_URL = "https://example.invalid/pr/42"
+PR_URL = "https://example.invalid/pull/42"
 
 GIT_IDENTITY = {
     "GIT_AUTHOR_NAME": "Tower Test",
@@ -67,7 +67,7 @@ import subprocess
 import sys
 import time
 
-PR_URL = "https://example.invalid/pr/42"
+PR_URL = "https://example.invalid/pull/42"
 
 
 def log_argv(argv):

@@ -2063,11 +2063,6 @@ def cmd_merge_check(root: Path, args) -> None:
 
 
 PR_URL_RE = re.compile(r"^https?://\S+/pull/(\d+)$")
-# The pilot's offline fixture prints ``https://example.invalid/pr/42``, which
-# a real GitHub URL (``.../pull/42``) does not look like.  Both spellings are
-# accepted so the documented stub keeps working; real gh only ever emits the
-# ``/pull/`` form.
-PR_URL_FIXTURE_RE = re.compile(r"^https?://\S+/pr/(\d+)$")
 
 
 def parse_created_pr(stdout: str):
@@ -2081,7 +2076,7 @@ def parse_created_pr(stdout: str):
     if not lines:
         return None
     url = lines[-1]
-    match = PR_URL_RE.match(url) or PR_URL_FIXTURE_RE.match(url)
+    match = PR_URL_RE.match(url)
     if not match:
         return None
     return url, int(match.group(1))
