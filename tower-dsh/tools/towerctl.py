@@ -1139,10 +1139,15 @@ def cmd_deliver(root: Path, args) -> None:
         if relpath in existing:
             rec["evidence"] = [e for e in rec["evidence"] if e.get("path") != relpath]
         rec.setdefault("evidence", []).append({
-            "id": f"E-{len(rec.get('evidence', [])) + 1:03d}",
             "path": relpath, "sha256": digest, "bytes": dest.stat().st_size, "at": now(),
         })
         existing.add(relpath)
+    # A re-delivery replaces the entry for the same path before appending, so
+    # the list length does not grow.  Numbering after the loop (rather than
+    # from the current length while appending) keeps ids contiguous, unique
+    # and in list order; it also repairs records written by the old scheme.
+    for index, entry in enumerate(rec.get("evidence", []), start=1):
+        entry["id"] = f"E-{index:03d}"
     rec["status"] = "delivered"
     rec["delivered_at"] = now()
     rec["next"] = "等待独立 reviewer"
