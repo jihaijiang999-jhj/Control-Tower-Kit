@@ -122,7 +122,7 @@
 | ∅7 | **授权态单写者** | `SeeMake-Control-Tower-Authority-State.md`：Active Tower / Single Writer / 保留闸 / repo+queue 锚点 | `--role supervisor` 是参数，不是身份；`CURRENT_STATE.primary` 只有一个字符串 | `state/AUTHORITY.json` + `towerctl authority-check`（写者≠活性塔即拒写） |
 | ∅8 | **判例集** | `rules-ref/治理判例集.md`：一次裁决 → 以后可引用的规则 | 5 条散在 `HANDOFF.md §6` | ledger 增加 `PRECEDENT` 事件 + `towerctl precedent --list` |
 | ∅9 | **包号防呆** | `_k3-ops/CURRENT`：包号比你所持新即停手 | `handoff-check` 只在 claim 时跑一次 §0 漂移 | 根目录 `CURRENT` + `startup` 强制比对 |
-| ∅10 | **状态重放** | （K3 也没有） | **已实现**（PILOT-021 `state-verify`）：从两份 ledger 按 seq 折叠状态，与 record/board/queue/envelope 比对，drift 即 exit 2；真实塔 21 任务/21 信封 drift 0 | 仍窄：只校验 status，不校验 evidence 哈希与状态迁移合法性；JSON 解析失败被当跳过（列为后续收紧） |
+| ∅10 | **状态重放** | （K3 也没有） | **已实现并收紧**（PILOT-021 `state-verify` + PILOT-022）：两份 ledger 按 seq 折叠状态，与 record/board/queue/envelope 比对；坏文件（缺失/坏 JSON）现在算 drift，合法跳过显式输出 `skipped`，board 期望值取重放值。真实塔 22 任务/22 信封 drift 0 | 仍窄：只校验 status，不校验 evidence 哈希与状态迁移合法性；带生命周期的非法信封 id 既不进 drift 也不进 skipped（安全选择：绝不作路径打开） |
 | ∅11 | **测试计数门** | （K3 也没有） | `post-merge` 只认 exit code，空 `tests/` 也 PASS | 解析 `Ran N tests`，要求 `N >= baseline`（baseline 存进 envelope） |
 | ∅12 | **证据可复现** | — | 134 测试依赖 `%TEMP%` ACL 与 Windows | 测试强制 `TMPDIR` 沙箱内建塔 + 干净环境复跑清单 |
 
@@ -139,12 +139,12 @@
 | merge 分支断言 | `[证]` | `cmd_merge:1919-1936`，不符即 `CORRECTION_REQUIRED` |
 | post-merge 四检 | `[证]` | 测试 / 实现是祖先 / 信封在 base / 工作树干净（`2058-2070`） |
 | 路径越界防护 | `[证]` | `ensure_within` 覆盖 evidence / worktree / package / envelope / repository |
-| ledger 哈希链 | `[证]` | `verify-ledger` → primary 103 事件、supervision 54，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
+| ledger 哈希链 | `[证]` | `verify-ledger` → primary 205 事件、supervision 114，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
 | 条款→测试绑定 | `[证]` | `spec-coverage`：6 份规范 / 56 条款 / tool-check 27 / covered **27** / gaps 0 |
-| 测试全绿 | `[证]`（有条件） | `Ran 203 tests / OK`（本地 2026-10-20，PILOT-021 后）；GitHub Actions 在 PR #5/#6 与 main 上均绿，v7 后零注解。**本地前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
+| 测试全绿 | `[证]`（有条件） | `Ran 214 tests / OK`（本地 2026-10-20，PILOT-022 后）；GitHub Actions 在 PR #7 上绿，v7 后零注解。**本地前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
 | 29 条条款靠人 | `[声]` | 12 `review-check` + 17 `owner-gate`（`spec-coverage.manual` / `.owner`） |
 | "每次迭代全局正确" | `[无]` | 无对象层不变量、无趋势锚点、无状态重放 |
-| 21 个任务 / 21 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`；021 PR #6 `10fae79`，post-merge 均 4/4） |
+| 22 个任务 / 22 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`；021 PR #6 `10fae79`；022 PR #7 `6a920a5`，post-merge 均 4/4） |
 
 ---
 
@@ -277,10 +277,12 @@ push pilot/PILOT-016 → gh pr create → PR #1 出现
 
 意义：此前"状态是真的"依赖两个假设——工具不半途失败、没人手改。现在多了一条可执行判据：**如果状态是假的，重放会对不上**。它和 `verify-ledger`（历史不可篡改）、`authority_dirty`（状态未提交）合起来，构成了 A 层（全局一致）的三件套。
 
+**PILOT-022 收紧（2026-10-20 23:5x）**：坏文件不再被当跳过——record/envelope 缺失或坏 JSON 各报 `record_missing`/`record_unreadable`/`envelope_missing`/`envelope_unreadable`；board/queue 坏文件各报一条 `board_unreadable`/`queue_unreadable`（不再逐实体静默跳过）；`board_status` 的 expected 改用重放值，record 与 board 同错时两条 drift 都报；合法跳过显式进 `skipped`/`skipped_count`（exit-neutral）。214 tests；独立探针在 main 版工具上让 15 个新用例失败；真实塔 22 任务/22 信封 drift 0。
+
 已知边界（reviewer 实测，不是推测）：
 
 - 只校验 **status**：改 `evidence[0].sha256` 仍 `ok=true`；
-- **JSON 解析失败被当作"跳过"**：删 record、把 board 写成坏 JSON 都不报——比 spec 允许的"无对应事件才跳过"更宽，列为后续收紧项；
+- 坏文件现已算 drift，合法跳过显式输出；带生命周期的**非法信封 id** 既不进 drift 也不进 skipped（安全选择：绝不作路径打开）；
 - 重放是"最后写入者胜"，不校验迁移合法性（`TASK_NEW → CLOSEOUT` 也接受）。
 
 用法：真塔上 `python tools/towerctl.py state-verify`，exit 0 = 状态与历史自洽。
