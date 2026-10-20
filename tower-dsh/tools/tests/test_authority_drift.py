@@ -1,9 +1,15 @@
-"""Dirty-authority-state detection tests (PILOT-011).
+"""Dirty-authority-state detection tests (PILOT-011, PILOT-017).
 
 ``status`` / ``startup`` must report uncommitted authority state
-(``primary/``, ``supervision/``, ``ledger/``, ``handoffs/``, ``shared/``)
-relative to the surrounding git repository, and ``handoff-activate`` must ask
-for a commit without ever performing one.
+(``primary/``, ``supervision/``, ``ledger/``, ``handoffs/``, ``shared/``,
+``tasks/``, ``pilot/``) relative to the surrounding git repository, and
+``handoff-activate`` must ask for a commit without ever performing one.
+
+``tasks/`` (task cards, evidence, records) and ``pilot/`` (specs, worktrees)
+were the gap closed by ``PILOT-017``.  Their gitignored subtrees
+(``pilot/repo``, ``pilot/worktrees``) must never show up as drift: the check
+stays a ``git status`` pathspec query, so git itself hides ignored untracked
+files instead of a hand-rolled directory walk.
 
 Every test builds a throw-away tower root *inside* a throw-away git repository
 under ``tempfile`` and drives the real CLI through ``subprocess``, so no test
@@ -292,6 +298,88 @@ class AuthorityDriftTestCase(unittest.TestCase):
         joined = " ".join(data["authority_dirty"])
         self.assertNotIn("\\344", joined,
                          msg=f"path was octal-escaped: {joined}")
+
+    # -- 10. tasks/ is authority state (PILOT-017) -----------------------
+    def test_modified_task_record_is_authority_drift(self) -> None:
+        record = self.root / "tasks" / "T-1" / "record.json"
+        write_json(record, {"schema": "tower/task@1", "id": "T-1",
+                            "status": "ready"})
+        self.commit_all("track task card T-1")
+        record.write_text(record.read_text(encoding="utf-8") + "\n",
+                          encoding="utf-8")
+        data = self.status_json()
+        self.assertIn("tower-dsh/tasks/T-1/record.json", data["authority_dirty"])
+        self.assertEqual(data["authority_dirty_count"], len(data["authority_dirty"]))
+        self.assertGreaterEqual(data["authority_dirty_count"], 1)
+
+    # -- 11. pilot/ is authority state (PILOT-017) -----------------------
+    def test_new_uncommitted_pilot_spec_is_authority_drift(self) -> None:
+        write_json(self.root / "pilot" / "PILOT-999.spec.json", {
+            "schema": "tower/spec@1",
+            "id": "PILOT-999",
+            "title": "uncommitted pilot spec",
+        })
+        data = self.status_json()
+        self.assertIn("tower-dsh/pilot/PILOT-999.spec.json",
+                      data["authority_dirty"])
+        self.assertEqual(data["authority_dirty_count"], len(data["authority_dirty"]))
+        self.assertGreaterEqual(data["authority_dirty_count"], 1)
+
+    # -- 12. gitignored pilot subtrees are not drift ---------------------
+    def test_gitignored_pilot_worktrees_are_not_authority_drift(self) -> None:
+        # Mirrors the real repository .gitignore: nested repos/worktrees are
+        # backed up separately and are never part of the tower's authority.
+        (self.kit / ".gitignore").write_text(
+            "tower-dsh/pilot/repo/\n"
+            "tower-dsh/pilot/worktrees/\n",
+            encoding="utf-8")
+        self.commit_all("ignore nested pilot repositories")
+
+        ignored = [
+            self.root / "pilot" / "worktrees" / "PILOT-777" /
+            "tower-dsh" / "tools" / "helper.py",
+            self.root / "pilot" / "repo" / "docs" / "README.md",
+        ]
+        for path in ignored:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# ignored scratch copy\n", encoding="utf-8")
+        # The fixture itself must be sound: git has to call these paths ignored,
+        # otherwise the exclusion assertion below could pass for the wrong reason.
+        for path in ignored:
+            relpath = path.relative_to(self.kit).as_posix()
+            cp = self.git(self.kit, "check-ignore", "--quiet", relpath)
+            self.assertEqual(cp.returncode, 0,
+                             msg=f"{relpath} is not gitignored: {cp.stderr}")
+
+        data = self.status_json()
+        joined = " ".join(data["authority_dirty"])
+        self.assertNotIn("pilot/worktrees/", joined)
+        self.assertNotIn("pilot/repo/", joined)
+        self.assertEqual(data["authority_dirty"], [])
+        self.assertEqual(data["authority_dirty_count"], 0)
+
+    # -- 13. tracked tasks/ and pilot/ files are not drift ---------------
+    def test_clean_repository_with_tasks_and_pilot_is_empty(self) -> None:
+        write_json(self.root / "tasks" / "T-1" / "record.json", {
+            "schema": "tower/task@1", "id": "T-1", "status": "ready"})
+        write_json(self.root / "pilot" / "PILOT-001.spec.json", {
+            "schema": "tower/spec@1", "id": "PILOT-001"})
+        self.commit_all("track task card and pilot spec")
+        data = self.status_json()
+        self.assertEqual(data["authority_dirty"], [])
+        self.assertEqual(data["authority_dirty_count"], 0)
+
+    # -- 14. outside git, tasks/ and pilot/ are still unknown ------------
+    def test_tasks_and_pilot_outside_git_repository_report_null(self) -> None:
+        root = self.setUpMissingRepo()
+        write_json(root / "tasks" / "T-1" / "record.json", {
+            "schema": "tower/task@1", "id": "T-1", "status": "ready"})
+        write_json(root / "pilot" / "PILOT-999.spec.json", {
+            "schema": "tower/spec@1", "id": "PILOT-999"})
+        data = self.status_json(root=root,
+                                env_extra={"GIT_CEILING_DIRECTORIES": str(root)})
+        self.assertIsNone(data["authority_dirty"])
+        self.assertIsNone(data["authority_dirty_count"])
 
 
 if __name__ == "__main__":
