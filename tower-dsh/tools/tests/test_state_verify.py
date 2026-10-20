@@ -12,12 +12,15 @@ Run from the tower root (``tower-dsh``)::
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 TOOLS_DIR = Path(__file__).resolve().parents[1]
 TCLI = TOOLS_DIR / "towerctl.py"
@@ -981,6 +984,109 @@ class StateVerifyTestCase(unittest.TestCase):
                          "reporting it")
         self.assertEqual(self.drift_kinds(out),
                          ["evidence_hash_mismatch", "spec_hash_mismatch"])
+
+    # -- 30. containment is lexical: zero filesystem access on escape ----
+    def test_escape_path_never_touches_filesystem(self) -> None:
+        self.build_evidence_tower()
+        bait = self.root.parent / f"{self.root.name}-no-stat-bait.txt"
+        bait.write_bytes(b"do-not-touch\n")
+        self.addCleanup(bait.unlink, missing_ok=True)
+        record = self.read_record("T-001")
+        record["evidence"][0]["path"] = f"../{bait.name}"
+        self.write_record("T-001", record)
+
+        marker = bait.name
+        touched: list[str] = []
+        real_stat, real_lstat = os.stat, os.lstat
+        real_open, real_io_open = os.open, io.open
+        real_realpath, real_islink = os.path.realpath, os.path.islink
+
+        def guard(name, original):
+            def wrapper(path, *args, **kwargs):
+                try:
+                    text = os.fsdecode(path)
+                except TypeError:
+                    text = str(path)
+                if marker in text:
+                    touched.append(f"{name}:{text}")
+                    raise AssertionError(
+                        f"filesystem access ({name}) on escaping path: {text}")
+                return original(path, *args, **kwargs)
+            return wrapper
+
+        with mock.patch("os.stat", guard("stat", real_stat)), \
+                mock.patch("os.lstat", guard("lstat", real_lstat)), \
+                mock.patch("os.open", guard("open", real_open)), \
+                mock.patch("io.open", guard("io.open", real_io_open)), \
+                mock.patch("os.path.realpath", guard("realpath", real_realpath)), \
+                mock.patch("os.path.islink", guard("islink", real_islink)):
+            result = towerctl.state_verify_drift(self.root)
+
+        self.assertEqual(touched, [],
+                         "the escaping path was stat'ed/opened/realpath'ed")
+        self.assertEqual([item["kind"] for item in result["drift"]],
+                         ["evidence_path_escape"])
+        self.assertEqual(result["evidence_checked"], 2)
+
+    # -- 31. NUL path cannot crash state-verify --------------------------
+    def test_nul_byte_evidence_path_is_unreadable_not_crash(self) -> None:
+        self.build_evidence_tower()
+        record = self.read_record("T-001")
+        record["evidence"][0]["path"] = "tasks/T-001/evidence/one\x00.txt"
+        self.write_record("T-001", record)
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertFalse(out["ok"], out)
+        self.assertEqual(self.drift_kinds(out), ["evidence_unreadable"])
+        drift = out["drift"][0]
+        self.assertEqual(drift["target"], "T-001")
+        self.assertIsNone(drift["path"])
+        self.assertEqual(drift["actual"], "invalid path")
+        self.assertEqual(out["evidence_checked"], 2)
+
+    def test_nul_byte_spec_path_is_unreadable_not_crash(self) -> None:
+        self.build_evidence_tower()
+        record = self.read_record("T-001")
+        record["spec_path"] = "pilot/T-001\x00.spec.json"
+        self.write_record("T-001", record)
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["spec_unreadable"])
+        self.assertIsNone(out["drift"][0]["path"])
+        self.assertEqual(out["drift"][0]["actual"], "invalid path")
+        self.assertEqual(out["evidence_checked"], 3)
+
+    # -- 32. a symlinked candidate is rejected, never followed -----------
+    def test_symlink_escape_is_reported_without_hashing(self) -> None:
+        self.build_evidence_tower()
+        bait = self.root.parent / f"{self.root.name}-symlink-bait.txt"
+        bait.write_bytes(b"symlink-bait\n")
+        self.addCleanup(bait.unlink, missing_ok=True)
+        before = bait.read_bytes()
+        link = self.root / "tasks" / "T-001" / "evidence" / "link.txt"
+        try:
+            link.symlink_to(bait)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"platform refuses symlink creation: {exc}")
+        self.addCleanup(link.unlink, missing_ok=True)
+
+        record = self.read_record("T-001")
+        record["evidence"][0]["path"] = "tasks/T-001/evidence/link.txt"
+        self.write_record("T-001", record)
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["evidence_path_escape"])
+        self.assertEqual(out["drift"][0]["path"],
+                         "tasks/T-001/evidence/link.txt")
+        self.assertEqual(bait.read_bytes(), before,
+                         "state-verify followed the symlink and hashed outside")
+        self.assertEqual(out["evidence_checked"], 2)
 
 
 if __name__ == "__main__":

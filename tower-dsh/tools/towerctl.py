@@ -2751,38 +2751,101 @@ def _read_json_object(path: Path) -> tuple[str, dict | None]:
 
 
 SHA256_HEX_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+# Every path probe below is wrapped in this tuple: a record can contain a NUL
+# byte (ValueError), a symlink loop (RuntimeError) or an ordinary I/O problem
+# (OSError).  state-verify turns all of them into drift instead of a traceback.
+PATH_ACCESS_ERRORS = (OSError, ValueError, RuntimeError)
 
 
-def _contained_tower_path(root: Path, raw: str) -> tuple[Path | None, str]:
-    """Resolve a recorded tower-relative path without opening it.
+def _lexical_tower_path(root: Path, raw: str) -> tuple[str | None, str, str | None]:
+    """Pure-string containment check: it performs ZERO filesystem access.
 
-    Returns ``(resolved, display)``.  ``resolved`` is ``None`` when the path
-    resolves outside ``root``; ``display`` is then the raw recorded spelling so
-    drift can show exactly what the record claimed.  For an in-root path
-    ``display`` is the normalized tower-root-relative posix path.
+    Returns ``(lexical, display, error)``.  ``error`` is ``"escape"`` when the
+    normalized path is outside ``root``, ``"invalid"`` when it cannot be
+    normalized at all (for example an embedded NUL), and ``None`` for a
+    lexically contained path.  ``lexical`` is the absolute normalized path and
+    ``display`` its tower-root-relative posix spelling.
 
-    Unlike :func:`ensure_within` this never calls ``fail()``: ``state-verify``
-    must always emit exactly one JSON payload, so an escaping path is reported
-    as drift instead of exiting early.  Resolving is not opening: an escaping
-    path is never stat'ed or read by the callers of this helper.
+    ``os.path.abspath``/``os.path.normpath`` only manipulate strings, so an
+    escaping record path such as ``../outside.txt`` is rejected before any
+    ``stat``, ``open``, ``realpath`` or ``resolve`` can touch the outside file.
     """
-    root_resolved = Path(root).resolve()
-    candidate = Path(raw)
-    if not candidate.is_absolute():
-        candidate = root_resolved / candidate
+    root_abs = os.path.abspath(root)
+    if "\x00" in raw:
+        return None, raw, "invalid"
     try:
-        resolved = candidate.resolve()
-    except OSError:
-        # A path that cannot be resolved safely (for example a symlink loop)
-        # is treated as escaping: it must not be opened.
-        return None, raw
-    if resolved != root_resolved and root_resolved not in resolved.parents:
-        return None, raw
+        candidate = raw if os.path.isabs(raw) else os.path.join(root_abs, raw)
+        lexical = os.path.normpath(candidate)
+    except PATH_ACCESS_ERRORS:
+        return None, raw, "invalid"
+    if lexical != root_abs and not lexical.startswith(root_abs + os.sep):
+        return None, raw, "escape"
     try:
-        display = resolved.relative_to(root_resolved).as_posix()
-    except ValueError:  # pragma: no cover - containment already guarantees it
-        display = raw
-    return resolved, display
+        relative = os.path.relpath(lexical, root_abs)
+    except PATH_ACCESS_ERRORS:
+        return None, raw, "invalid"
+    display = "." if relative == "." else relative.replace(os.sep, "/")
+    return lexical, display, None
+
+
+def _path_has_symlink(root_abs: str, lexical: str) -> bool:
+    """True when any component of a lexically-in-root path is a link.
+
+    Only called after lexical containment has passed.  ``islink``/``isjunction``
+    are read-only metadata probes and never follow the link.
+    """
+    relative = os.path.relpath(lexical, root_abs)
+    if relative == ".":
+        return False
+    current = root_abs
+    isjunction = getattr(os.path, "isjunction", None)
+    for part in relative.split(os.sep):
+        if not part:
+            continue
+        current = os.path.join(current, part)
+        if os.path.islink(current):
+            return True
+        if isjunction is not None and isjunction(current):
+            return True
+    return False
+
+
+def _contained_tower_path(root: Path, raw: str) -> tuple[Path | None, str, str | None]:
+    """Resolve a recorded tower path, deciding containment lexically first.
+
+    Returns ``(resolved, display, error)``:
+
+    * ``error == "escape"``: the normalized path is outside the tower root, or
+      a component/final target is a symlink or junction.  Nothing outside the
+      root is opened, stat'ed or hashed; ``resolved`` is ``None`` and
+      ``display`` keeps the raw recorded spelling.
+    * ``error == "invalid"``: the path cannot be normalized or resolved (for
+      example an embedded NUL byte); ``resolved`` is ``None``.
+    * ``error is None``: ``resolved`` is the lexically contained path ready for
+      the caller's ``is_file``/hash probe; ``display`` is its root-relative
+      posix spelling.
+
+    Containment is decided by pure string normalization *before* any filesystem
+    call, so ``../outside.txt`` cannot even be stat'ed.  Only a lexically
+    contained path is then checked for symlinks and ``realpath`` containment.
+    Unlike :func:`ensure_within` this never calls ``fail()``: ``state-verify``
+    must always emit exactly one JSON payload.
+    """
+    lexical, display, error = _lexical_tower_path(root, raw)
+    if error is not None:
+        return None, display, error
+    root_abs = os.path.abspath(root)
+    try:
+        # Do not follow a symlink/junction: report it as an escape instead.
+        if _path_has_symlink(root_abs, lexical):
+            return None, raw, "escape"
+        real = os.path.realpath(lexical)
+        root_real = os.path.realpath(root_abs)
+    except PATH_ACCESS_ERRORS:
+        return None, raw, "invalid"
+    if real != root_real and not real.startswith(root_real + os.sep):
+        return None, raw, "escape"
+    return Path(lexical), display, None
 
 
 def _evidence_entry_drift(root: Path, task_id: str,
@@ -2810,15 +2873,21 @@ def _evidence_entry_drift(root: Path, task_id: str,
                           "expected": "well-formed evidence entry",
                           "actual": "invalid path"})
             continue
-        resolved, display = _contained_tower_path(root, raw)
+        resolved, display, path_error = _contained_tower_path(root, raw)
         recorded_sha = entry.get("sha256")
+        if path_error == "invalid":
+            drift.append({"kind": "evidence_unreadable", "target": task_id,
+                          "path": None,
+                          "expected": "well-formed evidence entry",
+                          "actual": "invalid path"})
+            continue
         if not isinstance(recorded_sha, str) or not SHA256_HEX_RE.fullmatch(recorded_sha):
             drift.append({"kind": "evidence_unreadable", "target": task_id,
-                          "path": raw if resolved is None else display,
+                          "path": display,
                           "expected": "well-formed evidence entry",
                           "actual": "invalid sha256"})
             continue
-        if resolved is None:
+        if path_error == "escape" or resolved is None:
             # The raw recorded path is kept verbatim; nothing outside the
             # tower root is ever hashed, stat'ed or read.
             drift.append({"kind": "evidence_path_escape", "target": task_id,
@@ -2826,21 +2895,39 @@ def _evidence_entry_drift(root: Path, task_id: str,
                           "expected": "evidence path inside tower root",
                           "actual": raw})
             continue
-        if not resolved.is_file():
+        try:
+            is_file = resolved.is_file()
+        except PATH_ACCESS_ERRORS:
+            drift.append({"kind": "evidence_unreadable", "target": task_id,
+                          "path": None,
+                          "expected": "well-formed evidence entry",
+                          "actual": "invalid path"})
+            continue
+        if not is_file:
+            try:
+                exists = resolved.exists()
+            except PATH_ACCESS_ERRORS:
+                exists = False
             drift.append({"kind": "evidence_missing", "target": task_id,
                           "path": display,
                           "expected": "existing regular file",
-                          "actual": "not a regular file" if resolved.exists()
+                          "actual": "not a regular file" if exists
                                     else "missing"})
             continue
         try:
             actual_sha = sha256_file(resolved)
             size = resolved.stat().st_size
-        except OSError:
+        except FileNotFoundError:
             drift.append({"kind": "evidence_missing", "target": task_id,
                           "path": display,
                           "expected": "existing regular file",
-                          "actual": "unreadable"})
+                          "actual": "missing"})
+            continue
+        except PATH_ACCESS_ERRORS:
+            drift.append({"kind": "evidence_unreadable", "target": task_id,
+                          "path": display,
+                          "expected": "readable regular file",
+                          "actual": "unreadable file"})
             continue
         checked += 1
         if recorded_sha.lower() != actual_sha:
@@ -2865,22 +2952,39 @@ def _spec_drift(root: Path, task_id: str, record: dict) -> list[dict]:
         return []
     if not isinstance(spec_sha, str) or not spec_sha:
         return []
-    resolved, display = _contained_tower_path(root, spec_path)
-    if resolved is None:
+    resolved, display, path_error = _contained_tower_path(root, spec_path)
+    if path_error == "invalid":
+        return [{"kind": "spec_unreadable", "target": task_id, "path": None,
+                 "expected": "well-formed spec path",
+                 "actual": "invalid path"}]
+    if path_error == "escape" or resolved is None:
         return [{"kind": "spec_path_escape", "target": task_id,
                  "path": spec_path,
                  "expected": "spec path inside tower root",
                  "actual": spec_path}]
-    if not resolved.is_file():
+    try:
+        is_file = resolved.is_file()
+    except PATH_ACCESS_ERRORS:
+        return [{"kind": "spec_unreadable", "target": task_id, "path": None,
+                 "expected": "well-formed spec path",
+                 "actual": "invalid path"}]
+    if not is_file:
+        try:
+            exists = resolved.exists()
+        except PATH_ACCESS_ERRORS:
+            exists = False
         return [{"kind": "spec_missing", "target": task_id, "path": display,
                  "expected": "existing regular file",
-                 "actual": "not a regular file" if resolved.exists()
-                           else "missing"}]
+                 "actual": "not a regular file" if exists else "missing"}]
     try:
         actual_sha = sha256_file(resolved)
-    except OSError:
+    except FileNotFoundError:
         return [{"kind": "spec_missing", "target": task_id, "path": display,
-                 "expected": "existing regular file", "actual": "unreadable"}]
+                 "expected": "existing regular file", "actual": "missing"}]
+    except PATH_ACCESS_ERRORS:
+        return [{"kind": "spec_unreadable", "target": task_id, "path": display,
+                 "expected": "readable regular file",
+                 "actual": "unreadable file"}]
     if spec_sha.lower() != actual_sha:
         return [{"kind": "spec_hash_mismatch", "target": task_id,
                  "path": display, "expected": spec_sha, "actual": actual_sha}]
