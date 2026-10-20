@@ -49,7 +49,7 @@
     }
   ],
   "envelope_head_sha": "c110719236b0153e07eb204cbbb20193b3c3307d",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "pr_number": 7,
   "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/7",
   "remote_merged": true,
@@ -58,5 +58,7 @@
   "merged_at": "2026-10-20T23:51:50+08:00",
   "supervisor": "sup-pilot-022-verify",
   "merge_mode": "pr",
-  "check_conclusion": "success"
+  "check_conclusion": "success",
+  "post_merge_at": "2026-10-20T23:53:15+08:00",
+  "post_merge_note": "state-verify tightening; 214 tests; real tower 22 tasks/21 envelopes drift 0"
 }
