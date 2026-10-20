@@ -2705,6 +2705,176 @@ def cmd_verify_ledger(root: Path, args) -> None:
          0 if not errors else 2)
 
 
+# -- state-verify: replay the ledgers into expected state ------------------
+#
+# The replay is deliberately data-only: these helpers read files and return
+# values, so ``state-verify`` can never append an event, rewrite a record or
+# otherwise repair the drift it is asked to report.
+TASK_LIFECYCLE_STATUS = {
+    "TASK_NEW": "ready",
+    "DISPATCH": "dispatched",
+    "DELIVER": "delivered",
+    "ACCEPT": "accepted",
+    "CLOSEOUT": "closed",
+}
+ENVELOPE_LIFECYCLE_STATUS = {
+    "ENVELOPE_NEW": "DRAFT",
+    "QUEUE_ADD": "WAITING",
+    "MERGE": "MERGED",
+    "POST_MERGE_VERIFIED": "POST_MERGE_VERIFIED",
+}
+# A failed post-merge check sends the envelope back for a correction; a
+# later MERGE/POST_MERGE_VERIFIED event overrides it, exactly like the live
+# queue does.
+ENVELOPE_CORRECTION_EVENTS = {"MERGE_BLOCKED", "POST_MERGE_FAILED"}
+
+
+def _optional_json_object(path: Path) -> dict | None:
+    """Best-effort read-only JSON object load.
+
+    Missing, unreadable or non-object files return ``None`` so callers can
+    skip them instead of aborting with a second JSON payload.  This only
+    reads: ``state-verify`` observes state and never writes it.
+    """
+    try:
+        data = jload(path)
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def ledger_events_in_seq_order(root: Path, name: str) -> list[dict]:
+    """Parsed ledger events sorted by ``seq`` (file order breaks ties).
+
+    Rows that are not JSON objects are skipped here; ``verify_ledger_file``
+    reports them, and ``state-verify`` refuses to replay a broken ledger.
+    """
+    rows = []
+    for index, raw in enumerate(ledger_rows(root / "ledger" / LEDGER_FILES[name])):
+        event = parse_ledger_row(raw)
+        if event is None:
+            continue
+        seq = event.get("seq")
+        if isinstance(seq, int) and not isinstance(seq, bool):
+            rows.append(((0, seq, index), event))
+        else:
+            rows.append(((1, 0, index), event))
+    return [event for _, event in sorted(rows, key=lambda pair: pair[0])]
+
+
+def replay_task_statuses(root: Path) -> dict[str, str]:
+    """Fold ``ledger/primary.jsonl`` by task into the expected status."""
+    states: dict[str, str] = {}
+    for event in ledger_events_in_seq_order(root, "primary"):
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        task = payload.get("task")
+        if not isinstance(task, str) or not task:
+            continue
+        event_type = event.get("type")
+        if event_type == "CHECKBACK":
+            states[task] = "reviewed" if payload.get("verdict") == "PASS" else "rework"
+        elif event_type in TASK_LIFECYCLE_STATUS:
+            states[task] = TASK_LIFECYCLE_STATUS[event_type]
+    return states
+
+
+def replay_envelope_statuses(root: Path) -> dict[str, str]:
+    """Fold ``ledger/supervision.jsonl`` by envelope into expected status."""
+    states: dict[str, str] = {}
+    for event in ledger_events_in_seq_order(root, "supervision"):
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        envelope = payload.get("envelope")
+        if not isinstance(envelope, str) or not envelope:
+            continue
+        event_type = event.get("type")
+        if event_type in ENVELOPE_LIFECYCLE_STATUS:
+            states[envelope] = ENVELOPE_LIFECYCLE_STATUS[event_type]
+        elif event_type in ENVELOPE_CORRECTION_EVENTS:
+            states[envelope] = "CORRECTION_REQUIRED"
+        # MERGE_START and any other event leave the folded status unchanged.
+    return states
+
+
+def state_verify_drift(root: Path) -> dict:
+    """Compare replayed state with records, board, queue and envelopes.
+
+    Skip rules (never drift): an entity without lifecycle events, a task
+    without ``tasks/<id>/record.json``, a task absent from the board, a queue
+    entry or envelope file that does not exist, and events whose payload
+    lacks ``task``/``envelope``.
+    """
+    task_states = replay_task_statuses(root)
+    envelope_states = replay_envelope_statuses(root)
+    drift: list[dict] = []
+
+    board = _optional_json_object(root / "primary" / "TASK_BOARD.json") or {}
+    board_tasks: dict[str, dict] = {}
+    for entry in board.get("tasks") or []:
+        if isinstance(entry, dict) and entry.get("id"):
+            board_tasks[str(entry["id"])] = entry
+
+    for task_id, expected in task_states.items():
+        record = _optional_task_record(root, task_id)
+        if record is None:
+            continue
+        record_status = record.get("status")
+        if record_status != expected:
+            drift.append({"kind": "task_status", "target": task_id,
+                          "expected": expected, "actual": record_status})
+        board_entry = board_tasks.get(task_id)
+        if board_entry is not None and board_entry.get("status") != record_status:
+            drift.append({"kind": "board_status", "target": task_id,
+                          "expected": record_status,
+                          "actual": board_entry.get("status")})
+
+    queue = _optional_json_object(root / "supervision" / "MERGE_QUEUE.json") or {}
+    queue_entries: dict[str, dict] = {}
+    for entry in queue.get("entries") or []:
+        if isinstance(entry, dict) and entry.get("envelope_id"):
+            queue_entries[str(entry["envelope_id"])] = entry
+
+    for envelope_id, expected in envelope_states.items():
+        queue_entry = queue_entries.get(envelope_id)
+        if queue_entry is not None and queue_entry.get("status") != expected:
+            drift.append({"kind": "queue_status", "target": envelope_id,
+                          "expected": expected,
+                          "actual": queue_entry.get("status")})
+        envelope = None
+        if is_safe_id(envelope_id, PACKAGE_ID_RE):
+            envelope = _optional_json_object(
+                root / "supervision" / "envelopes" / f"{envelope_id}.json")
+        if envelope is not None and envelope.get("status") != expected:
+            drift.append({"kind": "envelope_status", "target": envelope_id,
+                          "expected": expected, "actual": envelope.get("status")})
+
+    drift.sort(key=lambda item: (item["kind"], str(item["target"])))
+    return {"tasks": len(task_states), "envelopes": len(envelope_states),
+            "drift": drift}
+
+
+def cmd_state_verify(root: Path, args) -> None:
+    """Read-only: replay both ledgers and report observed drift.
+
+    Exit 0 when every compared file agrees with the replay, 2 when any drift
+    is found; a broken ledger short-circuits to 2 with ``ledger_errors``.
+    """
+    ledger_errors: list[str] = []
+    for name in ("primary", "supervision"):
+        report = verify_ledger_file(root, name)
+        ledger_errors.extend(f"{name}: {err}" for err in report["errors"])
+    if ledger_errors:
+        emit({"ok": False, "tasks": 0, "envelopes": 0, "drift": [],
+              "ledger_errors": ledger_errors}, 2)
+    result = state_verify_drift(root)
+    payload = {"ok": not result["drift"], "tasks": result["tasks"],
+               "envelopes": result["envelopes"], "drift": result["drift"]}
+    emit(payload, 0 if payload["ok"] else 2)
+
+
 def cmd_spec_lint(root: Path, args) -> None:
     commands = set(cli_commands())
     strict = bool(getattr(args, "strict", False))
@@ -2750,6 +2920,8 @@ def build_parser() -> argparse.ArgumentParser:
     vl = sub.add_parser("verify-ledger")
     vl.add_argument("--ledger", default="all",
                     choices=["primary", "supervision", "all"])
+
+    sub.add_parser("state-verify")
 
     sl = sub.add_parser("spec-lint")
     sl.add_argument("--dir", default=None,
@@ -2903,6 +3075,7 @@ def main() -> None:
         "envelope-new": cmd_envelope_new, "queue-add": cmd_queue_add,
         "merge-check": cmd_merge_check, "merge": cmd_merge, "post-merge": cmd_post_merge,
         "verify-ledger": cmd_verify_ledger,
+        "state-verify": cmd_state_verify,
         "spec-lint": cmd_spec_lint,
         "spec-coverage": cmd_spec_coverage,
     }
