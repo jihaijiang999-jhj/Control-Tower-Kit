@@ -1,0 +1,1001 @@
+﻿diff --git a/tower-dsh/tools/tests/test_merge_pr_mode.py b/tower-dsh/tools/tests/test_merge_pr_mode.py
+new file mode 100644
+index 0000000..381b72c
+--- /dev/null
++++ b/tower-dsh/tools/tests/test_merge_pr_mode.py
+@@ -0,0 +1,607 @@
++"""PR-mode merge regression tests (PILOT-015).
++
++``towerctl merge --mode pr`` pushes the envelope branch, opens a GitHub pull
++request, watches its checks, merges the PR and then fast-forwards the local
++base branch.  These tests keep that flow fully offline:
++
++* the "remote" is a throw-away ``git init --bare`` repository under ``%TEMP%``,
++  so ``git push`` / ``git fetch`` never touch the network;
++* ``gh`` is a small Python stub written into the temporary directory and
++  injected through ``TOWERCTL_GH``, so no real GitHub CLI, token or repository
++  is involved.
++
++The stub's behaviour is driven by environment variables: ``GH_LOG`` records
++every argv, ``GH_CREATE_EXIT`` / ``GH_CHECKS_EXIT`` / ``GH_MERGE_EXIT`` force a
++failure and ``GH_SLEEP`` lets the checks step hang so ``--check-timeout`` can
++be exercised.  On a successful ``pr merge`` the stub also advances the bare
++origin's ``main`` to the envelope head, which gives the follow-up
++``fetch`` + ``merge --ff-only`` a real fast-forward to perform.
++
++Each test drives the real CLI through ``subprocess``, exactly as a supervisor
++session would, and asserts the observable exit code plus the resulting
++envelope, queue and ledger state.
++
++Run from the tower root (``tower-dsh``)::
++
++    python -B -m unittest discover -s tools/tests -v
++"""
++from __future__ import annotations
++
++import json
++import hashlib
++import os
++import subprocess
++import sys
++import tempfile
++import time
++import unittest
++from pathlib import Path
++
++TOOLS_DIR = Path(__file__).resolve().parents[1]
++TCLI = TOOLS_DIR / "towerctl.py"
++TASK_ID = "TEST-PR-001"
++ENVELOPE_ID = "ENV-TEST-PR-001"
++ENVELOPE_PATH = f"merge-envelopes/{ENVELOPE_ID}.json"
++BASE = "main"
++BRANCH = "feature/pr-merge"
++FIXED_TIME = "2026-10-19T00:00:00+08:00"
++PR_NUMBER = 42
++PR_URL = "https://example.invalid/pull/42"
++
++GIT_IDENTITY = {
++    "GIT_AUTHOR_NAME": "Tower Test",
++    "GIT_AUTHOR_EMAIL": "tower@example.invalid",
++    "GIT_COMMITTER_NAME": "Tower Test",
++    "GIT_COMMITTER_EMAIL": "tower@example.invalid",
++}
++
++# The offline ``gh`` stub.  It mirrors the parts of the real CLI the merge
++# relies on: ``pr create`` takes no ``--json`` and prints the PR URL,
++# ``pr view --json number,url`` is supported, and ``pr checks`` / ``pr merge``
++# take the numeric PR id.  Side effects are asserted through ``GH_LOG`` and the
++# tower state.
++GH_STUB = '''"""Offline ``gh`` stub for test_merge_pr_mode.py."""
++import json
++import os
++import subprocess
++import sys
++import time
++
++PR_URL = "https://example.invalid/pull/42"
++
++
++def log_argv(argv):
++    path = os.environ.get("GH_LOG")
++    if path:
++        with open(path, "a", encoding="utf-8") as fh:
++            fh.write(json.dumps(argv) + "\\n")
++
++
++def flag(name):
++    return os.environ.get(name) == "1"
++
++
++def exit_code(name):
++    try:
++        return int(os.environ.get(name, "0") or 0)
++    except ValueError:
++        return 0
++
++
++def main(argv):
++    log_argv(argv)
++    if argv[:2] == ["pr", "create"]:
++        # Real gh has no --json on create; fail exactly like it does.
++        if "--json" in argv:
++            sys.stderr.write("unknown flag: --json\\n")
++            return 2
++        if flag("GH_CREATE_EXISTING"):
++            sys.stderr.write(
++                'a pull request for branch "feature" already exists\\n')
++            return 1
++        print(PR_URL)
++        return exit_code("GH_CREATE_EXIT")
++    if argv[:2] == ["pr", "view"]:
++        if flag("GH_VIEW_MISSING"):
++            sys.stderr.write("no pull requests found\\n")
++            return 1
++        print(json.dumps({"number": 42, "url": PR_URL}))
++        return exit_code("GH_VIEW_EXIT")
++    if argv[:2] == ["pr", "checks"]:
++        # Sleeping lets the timeout case prove --check-timeout is applied.
++        time.sleep(float(os.environ.get("GH_SLEEP", "0") or 0))
++        code = exit_code("GH_CHECKS_EXIT")
++        if code:
++            sys.stderr.write("conclusion: failure\\n")
++        return code
++    if argv[:2] == ["pr", "merge"]:
++        code = exit_code("GH_MERGE_EXIT")
++        if code == 0 and flag("GH_DIVERGE_LOCAL"):
++            # Simulate the base branch moving locally while the PR is merged:
++            # the follow-up ff-only merge can then no longer fast-forward.
++            local = os.environ.get("GH_LOCAL_REPO")
++            if local:
++                subprocess.run(
++                    ["git", "-C", local, "-c", "user.name=gh stub",
++                     "-c", "user.email=stub@example.invalid",
++                     "commit", "--allow-empty", "-m", "local divergence"],
++                    check=True, capture_output=True)
++        origin = os.environ.get("GH_ORIGIN")
++        sha = os.environ.get("GH_BRANCH_SHA") or os.environ.get("GH_BRANCH")
++        if code == 0 and origin and sha:
++            # Advance the bare origin's base branch so the follow-up fetch and
++            # ff-only merge have something real to fast-forward to.
++            subprocess.run(["git", "--git-dir", origin, "update-ref",
++                            "refs/heads/main", sha], check=True,
++                           capture_output=True)
++        return code
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main(sys.argv[1:]))
++'''
++
++
++def write_json(path: Path, data: dict) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
++                    encoding="utf-8")
++
++
++class PrMergeTestCase(unittest.TestCase):
++    """Fixture: bare origin + working repo + tower root, all under one tmp dir."""
++
++    def setUp(self) -> None:
++        self._tmp = tempfile.TemporaryDirectory(
++            prefix="towerctl-merge-pr-", ignore_cleanup_errors=True)
++        self.tmp = Path(self._tmp.name)
++        self.root = self.tmp / "tower"
++        self.repo = self.root / "pilot" / "repo"
++        self.origin = self.tmp / "origin.git"
++        self.stub = self.tmp / "gh_stub.py"
++        self.log = self.tmp / "gh-argv.jsonl"
++        self.stub.write_text(GH_STUB, encoding="utf-8")
++        for directory in ("primary", "supervision/envelopes", "ledger", "tasks"):
++            (self.root / directory).mkdir(parents=True, exist_ok=True)
++        self.write_tower_state()
++        self.init_repo()
++        self.write_envelope()
++        self.write_queue()
++
++    def tearDown(self) -> None:
++        self._tmp.cleanup()
++
++    # -- fixture helpers -------------------------------------------------
++    def run_git(self, *args: str) -> subprocess.CompletedProcess:
++        env = dict(os.environ)
++        env.update(GIT_IDENTITY)
++        return subprocess.run(
++            ["git", "-C", str(self.repo), *args],
++            capture_output=True, text=True, encoding="utf-8", env=env,
++        )
++
++    def commit_all(self, message: str) -> str:
++        add = self.run_git("add", "-A")
++        self.assertEqual(add.returncode, 0, msg=add.stderr)
++        cp = self.run_git("-c", "commit.gpgsign=false", "commit", "-m", message)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        return self.run_git("rev-parse", "HEAD").stdout.strip()
++
++    def write_tower_state(self) -> None:
++        write_json(self.root / "primary" / "CURRENT_STATE.json", {
++            "schema": "tower/current-state@1",
++            "role": "primary",
++            "primary": {"id": "ctl-test"},
++            "owner": {"name": "mac"},
++        })
++        write_json(self.root / "supervision" / "CURRENT_STATE.json", {
++            "schema": "tower/supervision-state@1",
++            "role": "supervision",
++            "phase": "TEST",
++            "supervisor": {"id": "sup-test"},
++        })
++        (self.root / "ledger" / "supervision.jsonl").write_text("",
++                                                                encoding="utf-8")
++        # ``envelope_checks`` also gates on the task record, its PASS review
++        # and the evidence hash, so the fixture has to be a real verified task.
++        evidence_dir = self.root / "tasks" / TASK_ID / "evidence"
++        evidence_dir.mkdir(parents=True, exist_ok=True)
++        proof = evidence_dir / "proof.txt"
++        proof.write_text("proof of PR-mode merge\n", encoding="utf-8")
++        write_json(self.root / "tasks" / TASK_ID / "record.json", {
++            "schema": "tower/task@1",
++            "id": TASK_ID,
++            "title": "pr-mode merge",
++            "status": "closed",
++            "executor": "exec-test",
++            "review": {"reviewer": "rev-test", "verdict": "PASS"},
++            "evidence": [{
++                "id": "E-001",
++                "path": f"tasks/{TASK_ID}/evidence/proof.txt",
++                "sha256": hashlib.sha256(proof.read_bytes()).hexdigest(),
++                "bytes": proof.stat().st_size,
++                "at": FIXED_TIME,
++            }],
++        })
++
++    def init_repo(self) -> None:
++        bare = subprocess.run(["git", "init", "--bare", str(self.origin)],
++                              capture_output=True, text=True, encoding="utf-8")
++        self.assertEqual(bare.returncode, 0, msg=bare.stderr)
++        self.repo.mkdir(parents=True, exist_ok=True)
++        self.assertEqual(self.run_git("init").returncode, 0)
++        self.assertEqual(
++            self.run_git("symbolic-ref", "HEAD", "refs/heads/main").returncode, 0)
++        (self.repo / "README.md").write_text("base\n", encoding="utf-8")
++        tests_dir = self.repo / "tests"
++        tests_dir.mkdir()
++        (tests_dir / "test_smoke.py").write_text(
++            "import unittest\n\n\n"
++            "class SmokeTest(unittest.TestCase):\n"
++            "    def test_smoke(self):\n"
++            "        self.assertTrue(True)\n",
++            encoding="utf-8",
++        )
++        self.base_head = self.commit_all("base")
++        self.assertEqual(self.run_git("checkout", "-b", BRANCH).returncode, 0)
++        (self.repo / "feature.txt").write_text("implementation\n", encoding="utf-8")
++        self.implementation_head = self.commit_all("implementation")
++        write_json(self.repo / ENVELOPE_PATH, {"envelope_id": ENVELOPE_ID})
++        self.envelope_head = self.commit_all("envelope")
++        self.assertEqual(self.run_git("checkout", BASE).returncode, 0)
++        # Forward slashes keep the local-path remote portable on Windows.
++        remote = str(self.origin).replace("\\", "/")
++        self.assertEqual(
++            self.run_git("remote", "add", "origin", remote).returncode, 0)
++
++    def write_envelope(self, status: str = "DRAFT") -> None:
++        write_json(self.root / "supervision" / "envelopes" / f"{ENVELOPE_ID}.json", {
++            "schema": "tower/merge-envelope@1",
++            "envelope_id": ENVELOPE_ID,
++            "task": TASK_ID,
++            "repository": "pilot/repo",
++            "branch": BRANCH,
++            "base": BASE,
++            "envelope_path": ENVELOPE_PATH,
++            "implementation_head_sha": self.implementation_head,
++            "envelope_head_sha": self.envelope_head,
++            "status": status,
++        })
++
++    def write_queue(self, status: str = "WAITING") -> None:
++        write_json(self.root / "supervision" / "MERGE_QUEUE.json", {
++            "schema": "tower/merge-queue@1",
++            "entries": [{
++                "envelope_id": ENVELOPE_ID,
++                "task": TASK_ID,
++                "branch": BRANCH,
++                "base": BASE,
++                "status": status,
++                "added_at": FIXED_TIME,
++            }],
++            "updated_at": FIXED_TIME,
++        })
++
++    # -- CLI / state accessors -------------------------------------------
++    def run_merge(self, *args: str, env_extra: dict | None = None,
++                  timeout: float | None = None) -> subprocess.CompletedProcess:
++        env = dict(os.environ)
++        for name in [name for name in env if name.startswith("GH_")]:
++            env.pop(name)
++        env.update(GIT_IDENTITY)
++        env.update({
++            "TOWERCTL_GH": f"{sys.executable} {self.stub}",
++            "GH_LOG": str(self.log),
++            "GH_ORIGIN": str(self.origin).replace("\\", "/"),
++            "GH_BRANCH_SHA": self.envelope_head,
++        })
++        if env_extra:
++            env.update(env_extra)
++        return subprocess.run(
++            [sys.executable, "-B", str(TCLI), "--root", str(self.root),
++             "merge", "--envelope", ENVELOPE_ID, "--role", "supervisor",
++             "--supervisor", "sup-x", *args],
++            capture_output=True, text=True, encoding="utf-8", env=env,
++            timeout=timeout,
++        )
++
++    def envelope(self) -> dict:
++        path = self.root / "supervision" / "envelopes" / f"{ENVELOPE_ID}.json"
++        return json.loads(path.read_text(encoding="utf-8"))
++
++    def queue_entry(self) -> dict:
++        path = self.root / "supervision" / "MERGE_QUEUE.json"
++        queue = json.loads(path.read_text(encoding="utf-8"))
++        return next(e for e in queue["entries"] if e["envelope_id"] == ENVELOPE_ID)
++
++    def ledger_events(self, event_type: str | None = None) -> list[dict]:
++        path = self.root / "ledger" / "supervision.jsonl"
++        if not path.exists():
++            return []
++        events = [json.loads(line) for line in
++                  path.read_text(encoding="utf-8").splitlines() if line.strip()]
++        if event_type is not None:
++            events = [e for e in events if e.get("type") == event_type]
++        return events
++
++    def merge_ledger(self) -> list[dict]:
++        path = self.root / "supervision" / "registries" / "merge-ledger.json"
++        if not path.exists():
++            return []
++        return json.loads(path.read_text(encoding="utf-8")).get("entries", [])
++
++    def gh_calls(self) -> list[list[str]]:
++        if not self.log.exists():
++            return []
++        return [json.loads(line) for line in
++                self.log.read_text(encoding="utf-8").splitlines() if line.strip()]
++
++    def head(self) -> str:
++        return self.run_git("rev-parse", "HEAD").stdout.strip()
++
++    # -- 1. happy path -----------------------------------------------------
++    def test_pr_mode_merges_and_records_pr_metadata(self) -> None:
++        cp = self.run_merge("--mode", "pr", timeout=120)
++        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        payload = json.loads(cp.stdout)
++        self.assertTrue(payload["ok"])
++        self.assertEqual(payload["status"], "MERGED")
++
++        envelope = self.envelope()
++        self.assertEqual(envelope["status"], "MERGED")
++        self.assertEqual(envelope["merge_mode"], "pr")
++        self.assertEqual(envelope["pr_number"], PR_NUMBER)
++        self.assertEqual(envelope["pr_url"], PR_URL)
++        self.assertEqual(envelope["check_conclusion"], "success")
++        self.assertEqual(envelope["supervisor"], "sup-x")
++        self.assertIn("merged_at", envelope)
++        # The merge commit is the fast-forwarded envelope head.
++        self.assertEqual(envelope["merge_commit"], self.envelope_head)
++        self.assertEqual(self.head(), self.envelope_head)
++
++        entry = self.queue_entry()
++        self.assertEqual(entry["status"], "MERGED")
++        self.assertEqual(entry["merge_commit"], self.envelope_head)
++
++        calls = self.gh_calls()
++        self.assertEqual([call[:2] for call in calls],
++                         [["pr", "create"], ["pr", "checks"], ["pr", "merge"]])
++        create = calls[0]
++        self.assertIn("--base", create)
++        self.assertEqual(create[create.index("--base") + 1], BASE)
++        self.assertIn("--head", create)
++        self.assertEqual(create[create.index("--head") + 1], BRANCH)
++        self.assertIn(f"merge: {TASK_ID} ({ENVELOPE_ID})", create)
++        # Real gh rejects ``pr create --json``; the URL is the only output.
++        self.assertNotIn("--json", create)
++        checks = calls[1]
++        self.assertIn(str(PR_NUMBER), checks)
++        self.assertIn("--watch", checks)
++        self.assertIn("--fail-fast", checks)
++        self.assertIn("--merge", calls[2])
++
++        records = self.merge_ledger()
++        self.assertEqual(len(records), 1)
++        record = records[0]
++        self.assertEqual(record["merge_mode"], "pr")
++        self.assertEqual(record["pr_number"], PR_NUMBER)
++        self.assertEqual(record["pr_url"], PR_URL)
++        self.assertEqual(record["merge_commit"], self.envelope_head)
++
++        merges = self.ledger_events("MERGE")
++        self.assertEqual(len(merges), 1)
++        self.assertEqual(merges[0]["payload"]["merge_mode"], "pr")
++        self.assertEqual(merges[0]["payload"]["pr_number"], PR_NUMBER)
++        self.assertEqual(merges[0]["payload"]["pr_url"], PR_URL)
++        # A fast-forward leaves exactly one parent; a local --no-ff merge would
++        # leave two, so this pins the PR path to step 5.
++        parents = self.run_git("rev-list", "--parents", "-n", "1", "HEAD").stdout.split()
++        self.assertEqual(len(parents), 2, parents)
++
++    # -- 2. failing checks block the merge without merging -----------------
++    def test_failing_checks_block_with_correction_required(self) -> None:
++        cp = self.run_merge("--mode", "pr", env_extra={"GH_CHECKS_EXIT": "1"},
++                            timeout=120)
++        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        payload = json.loads(cp.stdout)
++        self.assertFalse(payload["ok"])
++        self.assertIn("checks", payload["errors"][0])
++
++        envelope = self.envelope()
++        self.assertEqual(envelope["status"], "CORRECTION_REQUIRED")
++        self.assertNotIn("merge_commit", envelope)
++        self.assertNotEqual(envelope["status"], "MERGED")
++        self.assertEqual(self.queue_entry()["status"], "CORRECTION_REQUIRED")
++
++        blocked = self.ledger_events("MERGE_BLOCKED")
++        self.assertEqual(len(blocked), 1, blocked)
++        self.assertEqual(blocked[0]["payload"]["phase"], "checks")
++        self.assertEqual(blocked[0]["payload"]["reason"], "checks")
++        self.assertIn("failure", blocked[0]["payload"]["detail"].lower())
++        self.assertFalse(self.ledger_events("MERGE"))
++        self.assertFalse(self.merge_ledger())
++        self.assertEqual([call[:2] for call in self.gh_calls()],
++                         [["pr", "create"], ["pr", "checks"]])
++
++    # -- 3. a hung checks gate hits --check-timeout ------------------------
++    def test_check_timeout_blocks_with_timeout_reason(self) -> None:
++        started = time.monotonic()
++        cp = self.run_merge("--mode", "pr", "--check-timeout", "1",
++                            env_extra={"GH_SLEEP": "5"}, timeout=120)
++        elapsed = time.monotonic() - started
++        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        self.assertLess(elapsed, 30, "the 1s check timeout was not enforced")
++
++        envelope = self.envelope()
++        self.assertEqual(envelope["status"], "CORRECTION_REQUIRED")
++        self.assertEqual(self.queue_entry()["status"], "CORRECTION_REQUIRED")
++
++        blocked = self.ledger_events("MERGE_BLOCKED")
++        self.assertEqual(len(blocked), 1, blocked)
++        self.assertEqual(blocked[0]["payload"]["phase"], "checks")
++        self.assertEqual(blocked[0]["payload"]["reason"], "timeout")
++        self.assertIn("checks", blocked[0]["payload"]["detail"].lower())
++        # The gate must not have merged anything after the timeout.
++        self.assertEqual([call[:2] for call in self.gh_calls()],
++                         [["pr", "create"], ["pr", "checks"]])
++
++    # -- 4. a failed push aborts before any PR exists ----------------------
++    def test_push_failure_blocks_without_touching_gh(self) -> None:
++        self.assertEqual(self.run_git("remote", "remove", "origin").returncode, 0)
++        cp = self.run_merge("--mode", "pr", timeout=120)
++        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++
++        envelope = self.envelope()
++        self.assertEqual(envelope["status"], "CORRECTION_REQUIRED")
++        self.assertEqual(self.queue_entry()["status"], "CORRECTION_REQUIRED")
++        blocked = self.ledger_events("MERGE_BLOCKED")
++        self.assertEqual(len(blocked), 1, blocked)
++        self.assertEqual(blocked[0]["payload"]["phase"], "push")
++        self.assertEqual(self.gh_calls(), [])
++
++    # -- 5. a missing gh executable is a clean gate failure ----------------
++    def test_missing_gh_executable_fails_with_hint(self) -> None:
++        missing = self.tmp / "no-such-gh-binary"
++        cp = self.run_merge("--mode", "pr",
++                            env_extra={"TOWERCTL_GH": str(missing)}, timeout=120)
++        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        blob = (cp.stdout + cp.stderr).lower()
++        self.assertIn("gh", blob)
++        self.assertIn("gh not found", blob)
++        self.assertIn("towerctl_gh", blob)
++
++        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
++        self.assertEqual(self.queue_entry()["status"], "CORRECTION_REQUIRED")
++        self.assertEqual(self.gh_calls(), [])
++        self.assertFalse(self.ledger_events("MERGE"))
++
++    # -- 6. local mode still takes the original code path ------------------
++    def test_local_mode_keeps_local_merge(self) -> None:
++        cp = self.run_merge("--mode", "local", timeout=120)
++        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++
++        envelope = self.envelope()
++        self.assertEqual(envelope["status"], "MERGED")
++        self.assertEqual(envelope["merge_mode"], "local")
++        self.assertNotIn("pr_number", envelope)
++        self.assertNotIn("pr_url", envelope)
++        self.assertEqual(self.queue_entry()["status"], "MERGED")
++        # No gh invocation, and a real merge commit with two parents.
++        self.assertEqual(self.gh_calls(), [])
++        parents = self.run_git("rev-list", "--parents", "-n", "1", "HEAD").stdout.split()
++        self.assertEqual(len(parents), 3, parents)
++
++    # -- 7. --mode defaults to local ---------------------------------------
++    def test_mode_defaults_to_local(self) -> None:
++        cp = self.run_merge(timeout=120)
++        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        envelope = self.envelope()
++        self.assertEqual(envelope["status"], "MERGED")
++        self.assertEqual(envelope["merge_mode"], "local")
++        self.assertEqual(self.queue_entry()["status"], "MERGED")
++        self.assertEqual(self.gh_calls(), [])
++
++    # -- 8. create must look like the real CLI: URL only, no --json --------
++    def test_create_has_no_json_flag_and_number_comes_from_url(self) -> None:
++        cp = self.run_merge("--mode", "pr", timeout=120)
++        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++
++        create = self.gh_calls()[0]
++        self.assertEqual(create[:2], ["pr", "create"])
++        self.assertNotIn("--json", create)
++        # The stub only prints the URL; the number can therefore only come
++        # from parsing it.
++        envelope = self.envelope()
++        self.assertEqual(envelope["pr_number"], PR_NUMBER)
++        self.assertEqual(envelope["pr_url"], PR_URL)
++
++    # -- 9. an existing but non-executable TOWERCTL_GH is a clean failure --
++    def test_non_executable_gh_target_fails_without_merging(self) -> None:
++        fake = self.tmp / "gh-not-a-program.txt"
++        fake.write_text("this is not an executable\n", encoding="utf-8")
++        cp = self.run_merge("--mode", "pr",
++                            env_extra={"TOWERCTL_GH": str(fake)}, timeout=120)
++        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        blob = (cp.stdout + cp.stderr).lower()
++        self.assertIn("gh not found", blob)
++        self.assertIn("towerctl_gh", blob)
++
++        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
++        entry = self.queue_entry()
++        self.assertEqual(entry["status"], "CORRECTION_REQUIRED")
++        # The preflight runs before the queue is pinned at MERGING.
++        self.assertNotEqual(entry["status"], "MERGING")
++        self.assertEqual(self.gh_calls(), [])
++        self.assertFalse(self.ledger_events("MERGE"))
++
++    # -- 10. ff failure keeps the remote-merge record; retry reuses the PR --
++    def test_ff_failure_preserves_pr_state_and_retry_is_idempotent(self) -> None:
++        # The stub advances the local base branch while the PR is merged, so
++        # the follow-up ff-only merge cannot fast-forward.
++        first = self.run_merge(
++            "--mode", "pr", timeout=120,
++            env_extra={"GH_DIVERGE_LOCAL": "1",
++                       "GH_LOCAL_REPO": str(self.repo).replace("\\", "/")},
++        )
++        self.assertEqual(first.returncode, 2,
++                         msg=f"stdout={first.stdout}\nstderr={first.stderr}")
++
++        envelope = self.envelope()
++        self.assertEqual(envelope["status"], "CORRECTION_REQUIRED")
++        self.assertEqual(envelope["pr_number"], PR_NUMBER)
++        self.assertEqual(envelope["pr_url"], PR_URL)
++        self.assertIs(envelope["remote_merged"], True)
++        self.assertIn("remote_merged_at", envelope)
++        self.assertNotIn("merge_commit", envelope)
++        self.assertEqual(self.queue_entry()["status"], "CORRECTION_REQUIRED")
++
++        blocked = self.ledger_events("MERGE_BLOCKED")
++        self.assertEqual(len(blocked), 1, blocked)
++        self.assertEqual(blocked[0]["payload"]["phase"], "ff-only")
++        self.assertEqual(blocked[0]["payload"]["reason"], "ff-only")
++
++        # Correct the divergence: put the local base back where it was.
++        reset = self.run_git("reset", "--hard", self.base_head)
++        self.assertEqual(reset.returncode, 0, msg=reset.stderr)
++
++        calls_before = len(self.gh_calls())
++        retry = self.run_merge("--mode", "pr", timeout=120)
++        self.assertEqual(retry.returncode, 0,
++                         msg=f"stdout={retry.stdout}\nstderr={retry.stderr}")
++
++        merged = self.envelope()
++        self.assertEqual(merged["status"], "MERGED")
++        self.assertEqual(merged["merge_commit"], self.envelope_head)
++        self.assertEqual(merged["pr_number"], PR_NUMBER)
++        self.assertEqual(self.queue_entry()["status"], "MERGED")
++        self.assertEqual(self.head(), self.envelope_head)
++        # The retry resumed at fetch/ff: the remote half ran exactly once.
++        creates = [call for call in self.gh_calls() if call[:2] == ["pr", "create"]]
++        self.assertEqual(len(creates), 1, self.gh_calls())
++        self.assertEqual(len(self.gh_calls()), calls_before)
++
++    # -- 11. an already-open PR is reused through gh pr view ----------------
++    def test_existing_pr_falls_back_to_pr_view(self) -> None:
++        cp = self.run_merge("--mode", "pr",
++                            env_extra={"GH_CREATE_EXISTING": "1"}, timeout=120)
++        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++
++        calls = self.gh_calls()
++        self.assertEqual([call[:2] for call in calls],
++                         [["pr", "create"], ["pr", "view"],
++                          ["pr", "checks"], ["pr", "merge"]])
++        view = calls[1]
++        self.assertIn(BRANCH, view)
++        self.assertIn("--json", view)
++        self.assertEqual(view[view.index("--json") + 1], "number,url")
++
++        envelope = self.envelope()
++        self.assertEqual(envelope["status"], "MERGED")
++        self.assertEqual(envelope["merge_mode"], "pr")
++        self.assertEqual(envelope["pr_number"], PR_NUMBER)
++        self.assertEqual(envelope["pr_url"], PR_URL)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tower-dsh/tools/towerctl.py b/tower-dsh/tools/towerctl.py
+index 119994c..118309b 100644
+--- a/tower-dsh/tools/towerctl.py
++++ b/tower-dsh/tools/towerctl.py
+@@ -1,8 +1,9 @@
+ #!/usr/bin/env python3
+ """Tower/DSH v0.3 pilot control-plane CLI.
+ 
+-File-backed, local-only, no network. It records state, evidence and gates;
+-it never executes the task itself.
++File-backed and local-first: it records state, evidence and gates; it never
++executes the task itself.  ``merge --mode pr`` is the only path that shells out
++to the GitHub CLI (``gh``); every other command stays offline.
+ """
+ from __future__ import annotations
+ 
+@@ -11,6 +12,7 @@ import hashlib
+ import json
+ import os
+ import re
++import shlex
+ import shutil
+ import subprocess
+ import sys
+@@ -493,6 +495,84 @@ def git_ok(repo: Path, *args: str) -> str:
+     return cp.stdout.strip()
+ 
+ 
++def _split_argv(raw: str) -> list[str]:
++    """Split a command line into argv, keeping Windows backslashes intact.
++
++    POSIX ``shlex`` treats a backslash as an escape character, so
++    ``C:\\Python\\python.exe`` would come back as ``C:Pythonpython.exe``.  On
++    Windows the tokens are therefore split in non-POSIX mode and the quotes it
++    preserves are stripped by hand; elsewhere plain POSIX splitting applies.
++    """
++    if os.name == "nt":
++        tokens = shlex.split(raw, posix=False)
++        stripped = []
++        for token in tokens:
++            if len(token) >= 2 and token[0] == token[-1] and token[0] in "\"'":
++                token = token[1:-1]
++            stripped.append(token)
++        return stripped
++    return shlex.split(raw)
++
++
++def _looks_like_path(value: str) -> bool:
++    """True when ``value`` is a path rather than a bare command name."""
++    separators = [os.sep] + ([os.altsep] if os.altsep else [])
++    return os.path.isabs(value) or any(sep and sep in value for sep in separators)
++
++
++def _is_executable_path(value: str) -> bool:
++    """True when ``value`` names a runnable file on this platform.
++
++    A bare command name is resolved through ``PATHEXT`` by ``shutil.which``,
++    but an explicit path is not: Windows only executes ``.exe``/``.cmd``/
++    ``.bat``/``.com`` images, and POSIX additionally needs the execute bit.
++    Without this an existing but non-executable file (a stray ``.txt``) would
++    pass a plain ``Path.exists()`` check and then die in ``subprocess.run``.
++    """
++    path = Path(value)
++    if os.name == "nt":
++        return path.is_file() and path.suffix.lower() in (".exe", ".cmd", ".bat", ".com")
++    return path.is_file() and os.access(path, os.X_OK)
++
++
++def gh_command() -> list[str]:
++    """Return the argv prefix used to invoke the GitHub CLI.
++
++    ``TOWERCTL_GH`` overrides the executable and is the test injection point:
++    the PR-mode tests point it at ``"<python> <gh_stub.py>"`` so the whole
++    flow runs offline against a local bare origin.  A missing or
++    non-executable executable is a hard gate (exit 2) rather than a traceback.
++    """
++    raw = os.environ.get("TOWERCTL_GH", "").strip()
++    argv = _split_argv(raw) if raw else []
++    if not argv:
++        argv = ["gh"]
++    exe = argv[0]
++    if _looks_like_path(exe):
++        runnable = _is_executable_path(exe)
++    else:
++        runnable = shutil.which(exe) is not None
++    if not runnable:
++        fail([f"gh not found: {exe}; install GitHub CLI or set TOWERCTL_GH"])
++    return argv
++
++
++class MergeBlocked(RuntimeError):
++    """A PR-mode merge step failed; carries the phase, reason and detail."""
++
++    def __init__(self, phase: str, reason: str, detail: str):
++        super().__init__(f"{phase} ({reason}): {detail}")
++        self.phase = phase
++        self.reason = reason
++        self.detail = detail
++
++
++def command_failure(cp: subprocess.CompletedProcess) -> str:
++    """Best-effort error text for a failed subprocess."""
++    return ((cp.stderr or "").strip() or (cp.stdout or "").strip()
++            or f"exit code {cp.returncode}")
++
++
+ # State directories towerctl itself writes during post-merge.  The tower root
+ # can live inside the verified repository (the kit repo is often the parent of
+ # ``tower-dsh``), so these artefacts must not count as implementation dirt.
+@@ -1982,6 +2062,153 @@ def cmd_merge_check(root: Path, args) -> None:
+     emit({"ok": True, "envelope": args.envelope, "checks": checks})
+ 
+ 
++PR_URL_RE = re.compile(r"^https?://\S+/pull/(\d+)$")
++
++
++def parse_created_pr(stdout: str):
++    """Parse the PR identity ``gh pr create`` prints as its last line.
++
++    Real ``gh`` has no ``--json`` flag on ``pr create``; it prints the PR URL
++    on stdout.  Returns ``(url, number)`` or ``None`` when the output does not
++    look like a pull-request URL.
++    """
++    lines = [line.strip() for line in (stdout or "").splitlines() if line.strip()]
++    if not lines:
++        return None
++    url = lines[-1]
++    match = PR_URL_RE.match(url)
++    if not match:
++        return None
++    return url, int(match.group(1))
++
++
++def run_gh(repo: Path, argv: list[str], *, phase: str,
++           timeout: float) -> subprocess.CompletedProcess:
++    """Run one ``gh`` invocation with ``repo`` as the working directory.
++
++    Every call is bounded by ``--check-timeout`` and every spawn failure is
++    turned into a :class:`MergeBlocked`; no traceback may escape a merge.
++    """
++    try:
++        return subprocess.run(
++            [*gh_command(), *argv], cwd=str(repo), capture_output=True,
++            text=True, encoding="utf-8", timeout=timeout,
++        )
++    except subprocess.TimeoutExpired:
++        raise MergeBlocked(
++            phase, "timeout",
++            f"gh {argv[0]} {argv[1] if len(argv) > 1 else ''} did not finish "
++            f"within {timeout:g}s") from None
++    except OSError as exc:
++        raise MergeBlocked("gh", "gh-exec", str(exc)) from None
++
++
++def require_git(repo: Path, phase: str, *git_args: str) -> subprocess.CompletedProcess:
++    """Run one git step of the PR flow, blocking the merge when it fails."""
++    cp = git(repo, *git_args)
++    if cp.returncode != 0:
++        raise MergeBlocked(phase, phase, command_failure(cp))
++    return cp
++
++
++def pr_remote_merge(repo: Path, env: dict, args) -> dict:
++    """Steps 1-4 of a ``--mode pr`` merge: push, create, checks, merge the PR.
++
++    The remote half is split from the fast-forward half so the caller can
++    persist ``remote_merged`` before touching the local branch.  Raises
++    :class:`MergeBlocked` on the first failure.
++    """
++    branch = str(env.get("branch") or "")
++    base = str(env.get("base", "main"))
++    remote = getattr(args, "remote", None) or "origin"
++    timeout = int(getattr(args, "check_timeout", 900) or 900)
++
++    # 1. the remote must actually see the envelope branch before a PR exists.
++    require_git(repo, "push", "push", remote, branch)
++
++    # 2. open the PR.  ``gh pr create`` deliberately gets no ``--json``: real
++    #    gh rejects it and only prints the PR URL (parsed below).
++    body = (
++        f"Tower merge envelope {args.envelope} for task {env.get('task')}.\n\n"
++        f"- implementation: {env.get('implementation_head_sha')}\n"
++        f"- envelope head: {env.get('envelope_head_sha')}\n"
++        f"- supervisor: {args.supervisor}\n"
++    )
++    cp = run_gh(repo, ["pr", "create", "--base", base, "--head", branch,
++                       "--title", f"merge: {env.get('task')} ({args.envelope})",
++                       "--body", body],
++                phase="pr-create", timeout=timeout)
++    if cp.returncode != 0:
++        combined = f"{cp.stdout or ''}\n{cp.stderr or ''}"
++        if "already exists" in combined.lower():
++            # Re-running a merge must reuse the open PR instead of failing.
++            # ``gh pr view --json`` is a flag the real CLI does support.
++            cp = run_gh(repo, ["pr", "view", branch, "--json", "number,url"],
++                        phase="pr-view", timeout=timeout)
++            if cp.returncode != 0:
++                raise MergeBlocked("pr-view", "view", command_failure(cp))
++            try:
++                viewed = json.loads(cp.stdout)
++                number = viewed["number"]
++                url = viewed["url"]
++            except (TypeError, ValueError, KeyError):
++                raise MergeBlocked(
++                    "pr-view", "parse",
++                    f"cannot parse gh pr view output: {(cp.stdout or '').strip()}"
++                ) from None
++        else:
++            raise MergeBlocked("pr-create", "create", command_failure(cp))
++    else:
++        parsed = parse_created_pr(cp.stdout)
++        if parsed is None:
++            raise MergeBlocked(
++                "pr-create", "no-url",
++                f"cannot parse PR URL from gh pr create output: "
++                f"{(cp.stdout or '')}{(cp.stderr or '')}".strip())
++        url, number = parsed
++
++    # 3. CI gate; a hung gate is bounded by --check-timeout.
++    cp = run_gh(repo, ["pr", "checks", str(number), "--watch", "--fail-fast"],
++                phase="checks", timeout=timeout)
++    if cp.returncode != 0:
++        raise MergeBlocked("checks", "checks", command_failure(cp))
++
++    # 4. merge the PR once the checks are green.
++    cp = run_gh(repo, ["pr", "merge", str(number), "--merge"],
++                phase="pr-merge", timeout=timeout)
++    if cp.returncode != 0:
++        raise MergeBlocked("pr-merge", "merge", command_failure(cp))
++    return {"pr_number": number, "pr_url": url}
++
++
++def pr_fast_forward(repo: Path, env: dict, args) -> str:
++    """Steps 5-6: fetch the merged base, require a fast-forward, return HEAD."""
++    base = str(env.get("base", "main"))
++    remote = getattr(args, "remote", None) or "origin"
++    require_git(repo, "fetch", "fetch", remote, base)
++    require_git(repo, "ff-only", "merge", "--ff-only", f"{remote}/{base}")
++    return git_ok(repo, "rev-parse", "HEAD")
++
++
++def block_pr_merge(root: Path, args, env: dict, env_path: Path, queue: dict,
++                   entry: dict, phase: str, reason: str, detail: str) -> None:
++    """Record a blocked PR merge: both the entry and the envelope need correction.
++
++    ``MERGED`` is never written on this path; only ``CORRECTION_REQUIRED`` plus
++    a ``MERGE_BLOCKED`` ledger event naming the failing ``phase``.
++    """
++    entry["status"] = "CORRECTION_REQUIRED"
++    save_queue(root, queue)
++    env.update({"status": "CORRECTION_REQUIRED"})
++    jdump(env_path, env)
++    append_supervision_ledger(root, "MERGE_BLOCKED", "supervision", {
++        "envelope": args.envelope,
++        "phase": phase,
++        "reason": reason,
++        "detail": detail,
++    })
++
++
+ def cmd_merge(root: Path, args) -> None:
+     if args.role != "supervisor":
+         fail(["merge requires --role supervisor"])
+@@ -2038,35 +2265,97 @@ def cmd_merge(root: Path, args) -> None:
+                                    "errors": [c for c in checks if not c["ok"]]})
+         emit({"ok": False, "envelope": args.envelope,
+               "errors": [c for c in checks if not c["ok"]]}, 2)
++    mode = getattr(args, "mode", "local") or "local"
++    # A previous attempt may already have merged the PR remotely and then
++    # failed only at fetch/fast-forward.  Such a retry must not push, create,
++    # check or merge again -- it resumes straight at step 5.
++    resume_remote = (mode == "pr" and env.get("remote_merged") is True
++                     and bool(env.get("pr_number")) and bool(env.get("pr_url")))
++    if mode == "pr" and not resume_remote:
++        # Preflight before the queue is pinned at MERGING: a host without a
++        # runnable gh must fail the gate cleanly instead of leaving a
++        # half-started merge.  gh_command() emits the JSON error itself, so
++        # the abort is recorded and the SystemExit(2) is re-raised untouched.
++        try:
++            gh_command()
++        except SystemExit:
++            block_pr_merge(root, args, env, env_path, queue, entry,
++                           "gh", "gh-not-found",
++                           "gh executable not found; install GitHub CLI or "
++                           "set TOWERCTL_GH")
++            raise
+     entry["status"] = "MERGING"
+     save_queue(root, queue)
+     append_supervision_ledger(root, "MERGE_START", "supervision",
+                               {"envelope": args.envelope, "supervisor": args.supervisor})
+-    cp = git(repo, "merge", "--no-ff", "-m",
+-             f"merge: {env.get('task')} ({args.envelope})", env.get("branch", ""))
+-    if cp.returncode != 0:
+-        git(repo, "merge", "--abort")
+-        entry["status"] = "CORRECTION_REQUIRED"
+-        save_queue(root, queue)
+-        append_supervision_ledger(root, "MERGE_FAILED", "supervision",
+-                                  {"envelope": args.envelope, "stderr": cp.stderr.strip()})
+-        fail([f"git merge failed: {cp.stderr.strip() or cp.stdout.strip()}"])
+-    merge_commit = git_ok(repo, "rev-parse", "HEAD")
++    merge_extra: dict = {}
++    if mode == "pr":
++        try:
++            if not resume_remote:
++                identity = pr_remote_merge(repo, env, args)
++                env.update({
++                    "pr_number": identity["pr_number"],
++                    "pr_url": identity["pr_url"],
++                    "remote_merged": True,
++                    "remote_merged_at": now(),
++                })
++                # Persist the remote half before touching the local branch: if
++                # the fast-forward fails, the retry knows the PR is merged and
++                # block_pr_merge() must never discard these fields.
++                jdump(env_path, env)
++            merge_commit = pr_fast_forward(repo, env, args)
++        except MergeBlocked as exc:
++            block_pr_merge(root, args, env, env_path, queue, entry,
++                           exc.phase, exc.reason, exc.detail)
++            fail([f"pr merge blocked at {exc.phase} ({exc.reason}): {exc.detail}"])
++        except SystemExit:
++            # gh vanished between the preflight and an actual call; the queue
++            # must not be left at MERGING after the gate already emitted.
++            block_pr_merge(root, args, env, env_path, queue, entry,
++                           "gh", "gh-not-found",
++                           "gh executable not found; install GitHub CLI or "
++                           "set TOWERCTL_GH")
++            raise
++        merge_extra = {
++            "merge_mode": "pr",
++            "pr_number": env["pr_number"],
++            "pr_url": env["pr_url"],
++            "check_conclusion": "success",
++        }
++    else:
++        cp = git(repo, "merge", "--no-ff", "-m",
++                 f"merge: {env.get('task')} ({args.envelope})", env.get("branch", ""))
++        if cp.returncode != 0:
++            git(repo, "merge", "--abort")
++            entry["status"] = "CORRECTION_REQUIRED"
++            save_queue(root, queue)
++            append_supervision_ledger(root, "MERGE_FAILED", "supervision",
++                                      {"envelope": args.envelope, "stderr": cp.stderr.strip()})
++            fail([f"git merge failed: {cp.stderr.strip() or cp.stdout.strip()}"])
++        merge_commit = git_ok(repo, "rev-parse", "HEAD")
++        # Local merges keep their existing records; only the mode is added.
++        merge_extra = {"merge_mode": "local"}
+     env.update({"status": "MERGED", "merge_commit": merge_commit,
+                 "merged_at": now(), "supervisor": args.supervisor})
++    env.update(merge_extra)
+     jdump(env_path, env)
+     entry["status"] = "MERGED"
+     entry["merge_commit"] = merge_commit
+     save_queue(root, queue)
+-    add_merge_ledger(root, {
++    ledger_entry = {
+         "envelope_id": args.envelope, "task": env.get("task"),
+         "implementation_head_sha": env.get("implementation_head_sha"),
+         "envelope_head_sha": env.get("envelope_head_sha"),
+         "merge_commit": merge_commit, "supervisor": args.supervisor,
+         "at": now(),
+-    })
+-    append_supervision_ledger(root, "MERGE", "supervision",
+-                              {"envelope": args.envelope, "merge_commit": merge_commit})
++    }
++    merge_payload = {"envelope": args.envelope, "merge_commit": merge_commit}
++    if mode == "pr":
++        for key in ("merge_mode", "pr_number", "pr_url"):
++            ledger_entry[key] = env[key]
++            merge_payload[key] = env[key]
++    add_merge_ledger(root, ledger_entry)
++    append_supervision_ledger(root, "MERGE", "supervision", merge_payload)
+     emit({"ok": True, "envelope": args.envelope, "status": "MERGED",
+           "merge_commit": merge_commit})
+ 
+@@ -2423,6 +2712,12 @@ def build_parser() -> argparse.ArgumentParser:
+     mg.add_argument("--envelope", required=True)
+     mg.add_argument("--role", required=True, choices=["supervisor"])
+     mg.add_argument("--supervisor", required=True)
++    mg.add_argument("--mode", default="local", choices=["local", "pr"],
++                    help="local merge (default) or PR-mode merge through gh")
++    mg.add_argument("--remote", default="origin",
++                    help="git remote used by --mode pr (default: origin)")
++    mg.add_argument("--check-timeout", dest="check_timeout", type=int, default=900,
++                    help="seconds to wait for gh pr checks --watch (default: 900)")
+ 
+     pm = sub.add_parser("post-merge")
+     pm.add_argument("--envelope", required=True)

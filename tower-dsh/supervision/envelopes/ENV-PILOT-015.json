@@ -1,0 +1,48 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-015",
+  "task": "PILOT-015",
+  "repository": "..",
+  "branch": "pilot/PILOT-015",
+  "base": "main",
+  "implementation_head_sha": "64f22bb6cddfb009dbcebfa7d4c7526be2488b91",
+  "envelope_path": "merge-envelopes/ENV-PILOT-015.json",
+  "created_at": "2026-10-20T12:01:45+08:00",
+  "scope": "PILOT-015: PR-mode merge with CI gate",
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-015/evidence/towerctl.py",
+      "sha256": "beaa855b3780f71330522c8d5f7f63c5ea717797c36b0caf8817aa80ae1e0809"
+    },
+    {
+      "path": "tasks/PILOT-015/evidence/test_merge_pr_mode.py",
+      "sha256": "62b94c6f310b37788abdd858f180f9798663cae80058bd9e88416e012a0b9881"
+    },
+    {
+      "path": "tasks/PILOT-015/evidence/test-output.txt",
+      "sha256": "bebdc08423dd69f81500a98cfa3a22a7007ceb1aeba1b4dfa9065a3d4a422f72"
+    },
+    {
+      "path": "tasks/PILOT-015/evidence/test-output-no-gitconfig.txt",
+      "sha256": "de58b8b55f1b84db34785aa204596b7aa167574e62ae6b11be53dca70aa2c43a"
+    },
+    {
+      "path": "tasks/PILOT-015/evidence/commit.txt",
+      "sha256": "b2b4f547c7be89c0cf0535d7540fa261e36e0e58ac7cd959b3bfe76c2b073f4c"
+    },
+    {
+      "path": "tasks/PILOT-015/evidence/diff.txt",
+      "sha256": "fd6f3192f4157497ec7b7d0faf82ec09c0fc77d984dae906890624b62b35009e"
+    }
+  ],
+  "envelope_head_sha": "10b3fbe168ba312fdc234a7eee0c066206415e55",
+  "status": "MERGED",
+  "merge_commit": "ae4eb4fc62d0d33bb747e9835dd4d7b6c0d3f037",
+  "merged_at": "2026-10-20T12:01:49+08:00",
+  "supervisor": "sup-pilot-015-verify"
+}

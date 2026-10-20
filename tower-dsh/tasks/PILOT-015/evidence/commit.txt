@@ -1,0 +1,6 @@
+﻿HEAD 64f22bb6cddfb009dbcebfa7d4c7526be2488b91
+branch pilot/PILOT-015
+subject PILOT-015: single canonical PR URL regex
+changed-files:
+tower-dsh/tools/tests/test_merge_pr_mode.py
+tower-dsh/tools/towerctl.py
