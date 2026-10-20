@@ -122,7 +122,7 @@
 | ∅7 | **授权态单写者** | `SeeMake-Control-Tower-Authority-State.md`：Active Tower / Single Writer / 保留闸 / repo+queue 锚点 | `--role supervisor` 是参数，不是身份；`CURRENT_STATE.primary` 只有一个字符串 | `state/AUTHORITY.json` + `towerctl authority-check`（写者≠活性塔即拒写） |
 | ∅8 | **判例集** | `rules-ref/治理判例集.md`：一次裁决 → 以后可引用的规则 | 5 条散在 `HANDOFF.md §6` | ledger 增加 `PRECEDENT` 事件 + `towerctl precedent --list` |
 | ∅9 | **包号防呆** | `_k3-ops/CURRENT`：包号比你所持新即停手 | `handoff-check` 只在 claim 时跑一次 §0 漂移 | 根目录 `CURRENT` + `startup` 强制比对 |
-| ∅10 | **状态重放** | （K3 也没有；木塔本可领先） | 状态是并行写，不是 `f(ledger)` | `towerctl state-verify`：从 ledger 重放 → 与 board/record/state 逐字段比对 |
+| ∅10 | **状态重放** | （K3 也没有） | **已实现**（PILOT-021 `state-verify`）：从两份 ledger 按 seq 折叠状态，与 record/board/queue/envelope 比对，drift 即 exit 2；真实塔 21 任务/21 信封 drift 0 | 仍窄：只校验 status，不校验 evidence 哈希与状态迁移合法性；JSON 解析失败被当跳过（列为后续收紧） |
 | ∅11 | **测试计数门** | （K3 也没有） | `post-merge` 只认 exit code，空 `tests/` 也 PASS | 解析 `Ran N tests`，要求 `N >= baseline`（baseline 存进 envelope） |
 | ∅12 | **证据可复现** | — | 134 测试依赖 `%TEMP%` ACL 与 Windows | 测试强制 `TMPDIR` 沙箱内建塔 + 干净环境复跑清单 |
 
@@ -141,10 +141,10 @@
 | 路径越界防护 | `[证]` | `ensure_within` 覆盖 evidence / worktree / package / envelope / repository |
 | ledger 哈希链 | `[证]` | `verify-ledger` → primary 103 事件、supervision 54，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
 | 条款→测试绑定 | `[证]` | `spec-coverage`：6 份规范 / 56 条款 / tool-check 27 / covered **27** / gaps 0 |
-| 测试全绿 | `[证]`（有条件） | `Ran 193 tests / OK`（本地 2026-10-20，PILOT-020 后）；GitHub Actions 在 PR #5 与 main 上均绿，且 v7 升级后**零注解**。**本地前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
+| 测试全绿 | `[证]`（有条件） | `Ran 203 tests / OK`（本地 2026-10-20，PILOT-021 后）；GitHub Actions 在 PR #5/#6 与 main 上均绿，v7 后零注解。**本地前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
 | 29 条条款靠人 | `[声]` | 12 `review-check` + 17 `owner-gate`（`spec-coverage.manual` / `.owner`） |
 | "每次迭代全局正确" | `[无]` | 无对象层不变量、无趋势锚点、无状态重放 |
-| 20 个任务 / 20 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`，post-merge 均 4/4） |
+| 21 个任务 / 21 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`；021 PR #6 `10fae79`，post-merge 均 4/4） |
 
 ---
 
@@ -270,6 +270,20 @@ push pilot/PILOT-016 → gh pr create → PR #1 出现
 两张卡的方法值得记：018 和 019 都做了**旧代码上的对照实验**（同一探针跑 main 版工具），证明"测试有鉴别力"，而不是"测试和实现一起写的"。019 还顺带暴露一个通用原则：**CLI 集成优先读退出码，不要读文案**——文案会误伤，退出码是契约。
 
 排序上仍然串行：四张卡依次 PR #2→#5。并行会撞 `base` 祖先断言（§6.2）。
+
+### 6.9 状态第一次可以"重算"（PILOT-021）
+
+`towerctl state-verify` 把两份 ledger 按 `seq` 折叠成期望状态，再与 `record` / `board` / `queue` / `envelope` 比对。真实塔首跑：**21 任务 / 21 信封 / drift 0**。
+
+意义：此前"状态是真的"依赖两个假设——工具不半途失败、没人手改。现在多了一条可执行判据：**如果状态是假的，重放会对不上**。它和 `verify-ledger`（历史不可篡改）、`authority_dirty`（状态未提交）合起来，构成了 A 层（全局一致）的三件套。
+
+已知边界（reviewer 实测，不是推测）：
+
+- 只校验 **status**：改 `evidence[0].sha256` 仍 `ok=true`；
+- **JSON 解析失败被当作"跳过"**：删 record、把 board 写成坏 JSON 都不报——比 spec 允许的"无对应事件才跳过"更宽，列为后续收紧项；
+- 重放是"最后写入者胜"，不校验迁移合法性（`TASK_NEW → CLOSEOUT` 也接受）。
+
+用法：真塔上 `python tools/towerctl.py state-verify`，exit 0 = 状态与历史自洽。
 
 ---
 
