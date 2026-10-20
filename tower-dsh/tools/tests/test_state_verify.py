@@ -79,6 +79,15 @@ class StateVerifyTestCase(unittest.TestCase):
                    {"schema": "tower/merge-envelope@1",
                     "envelope_id": envelope_id, "status": status})
 
+    def write_raw(self, relative: str, text: str) -> None:
+        """Write arbitrary bytes to a tower file (used for broken JSON)."""
+        path = self.root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+    def remove_file(self, relative: str) -> None:
+        (self.root / relative).unlink()
+
     def build_base_tower(self) -> None:
         """Two consistent tasks and two consistent envelopes.
 
@@ -153,10 +162,10 @@ class StateVerifyTestCase(unittest.TestCase):
     # -- 2. record status drift -----------------------------------------
     def test_record_status_drift_is_reported(self) -> None:
         self.build_base_tower()
-        # Keep the board in sync with the (wrong) record so the only drift is
-        # the record-vs-replay one under test.
+        # Keep the board on the replayed value so the only drift is the
+        # record-vs-replay one under test.
         self.put_record("T-001", "rework")
-        self.write_board({"T-001": "rework", "T-002": "reviewed"})
+        self.write_board({"T-001": "closed", "T-002": "reviewed"})
 
         out, code = self.state_verify()
 
@@ -166,6 +175,29 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(out["drift"][0]["target"], "T-001")
         self.assertEqual(out["drift"][0]["expected"], "closed")
         self.assertEqual(out["drift"][0]["actual"], "rework")
+
+    # -- 2b. board expected value comes from the replay ------------------
+    def test_record_and_board_same_wrong_value_report_both(self) -> None:
+        self.build_base_tower()
+        # Record and board agree with each other but both disagree with the
+        # replay: board_status must compare against the replayed status, not
+        # against record.status (otherwise it would be silently suppressed).
+        self.put_record("T-001", "rework")
+        self.write_board({"T-001": "rework", "T-002": "reviewed"})
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["board_status", "task_status"])
+        by_kind = {item["kind"]: item for item in out["drift"]}
+        self.assertEqual(by_kind["task_status"]["target"], "T-001")
+        self.assertEqual(by_kind["task_status"]["expected"], "closed")
+        self.assertEqual(by_kind["task_status"]["actual"], "rework")
+        self.assertEqual(by_kind["board_status"]["target"], "T-001")
+        self.assertEqual(by_kind["board_status"]["expected"], "closed",
+                         "board_status.expected must be the replayed status")
+        self.assertNotEqual(by_kind["board_status"]["expected"], "rework")
+        self.assertEqual(by_kind["board_status"]["actual"], "rework")
 
     # -- 3. board status drift ------------------------------------------
     def test_board_status_drift_is_reported(self) -> None:
@@ -218,8 +250,10 @@ class StateVerifyTestCase(unittest.TestCase):
         # comparison is skipped, the record still matches the replay.
         self.primary("TASK_NEW", task="T-004")
         self.put_record("T-004", "ready")
-        # T-005 has events but no record: skipped entirely.
+        # T-005 has events and a record but no board row: board comparison is
+        # skipped (and reported), the record matches the replay.
         self.primary("TASK_NEW", task="T-005")
+        self.put_record("T-005", "ready")
         self.write_board({"T-001": "closed", "T-002": "reviewed",
                           "T-003": "ready"})
         # ENV-T-009 has a queue entry and an envelope file but no events:
@@ -236,6 +270,17 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(out["drift"], [])
         self.assertEqual(out["tasks"], 4)
         self.assertEqual(out["envelopes"], 2)
+        self.assertEqual(out["skipped"], [
+            {"kind": "envelope", "target": "ENV-T-009",
+             "reason": "no_lifecycle_events"},
+            {"kind": "task", "target": "T-003",
+             "reason": "no_lifecycle_events"},
+            {"kind": "task", "target": "T-004",
+             "reason": "board_entry_missing"},
+            {"kind": "task", "target": "T-005",
+             "reason": "board_entry_missing"},
+        ])
+        self.assertEqual(out["skipped_count"], 4)
 
     # -- 7. strict read-only proof --------------------------------------
     def test_state_verify_never_writes(self) -> None:
@@ -271,9 +316,10 @@ class StateVerifyTestCase(unittest.TestCase):
 
         # No ACCEPT event was appended: the replay must stay at rework and a
         # record claiming "accepted" must be reported as drift against it.
+        # The board stays on the replayed value so only the record drifts.
         self.put_record("T-003", "accepted")
         self.write_board({"T-001": "closed", "T-002": "reviewed",
-                          "T-003": "accepted"})
+                          "T-003": "rework"})
         out, code = self.state_verify()
 
         self.assertEqual(code, 2, out)
@@ -312,7 +358,183 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertEqual(out["drift"], [])
 
-    # -- 10. broken ledger short-circuits -------------------------------
+    # -- 10. missing / unreadable record files --------------------------
+    def test_deleted_record_is_record_missing(self) -> None:
+        self.build_base_tower()
+        self.remove_file("tasks/T-001/record.json")
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertFalse(out["ok"], out)
+        self.assertEqual(self.drift_kinds(out), ["record_missing"])
+        self.assertEqual(out["drift"][0], {
+            "kind": "record_missing", "target": "T-001",
+            "expected": "closed", "actual": None})
+        self.assertEqual(out["skipped"], [])
+        self.assertEqual(out["skipped_count"], 0)
+
+    def test_broken_record_is_record_unreadable(self) -> None:
+        self.build_base_tower()
+        self.write_raw("tasks/T-001/record.json", "{not valid json")
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["record_unreadable"])
+        self.assertEqual(out["drift"][0], {
+            "kind": "record_unreadable", "target": "T-001",
+            "expected": "closed", "actual": None})
+
+        # A parseable but non-object record is just as unusable.
+        write_json(self.root / "tasks" / "T-001" / "record.json", ["closed"])
+        out, code = self.state_verify()
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["record_unreadable"])
+
+    # -- 11. missing / unreadable board ---------------------------------
+    def test_deleted_board_is_one_board_unreadable(self) -> None:
+        self.build_base_tower()
+        self.remove_file("primary/TASK_BOARD.json")
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertFalse(out["ok"], out)
+        self.assertEqual(out["drift"], [{
+            "kind": "board_unreadable", "target": "TASK_BOARD.json",
+            "expected": "parseable JSON object", "actual": "missing"}])
+        # No per-entity board noise and no board_entry_missing skip.
+        self.assertEqual(out["skipped"], [])
+        self.assertEqual(out["skipped_count"], 0)
+
+    def test_broken_board_is_one_board_unreadable(self) -> None:
+        self.build_base_tower()
+        self.write_raw("primary/TASK_BOARD.json", "{not json")
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(out["drift"], [{
+            "kind": "board_unreadable", "target": "TASK_BOARD.json",
+            "expected": "parseable JSON object", "actual": "unparseable"}])
+
+        # A parseable non-object board is unusable too: still exactly one.
+        write_json(self.root / "primary" / "TASK_BOARD.json", [])
+        out, code = self.state_verify()
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["board_unreadable"])
+        self.assertEqual(out["drift"][0]["actual"], "unparseable")
+        self.assertNotIn("board_status", self.drift_kinds(out))
+
+    # -- 12. missing / unreadable queue ---------------------------------
+    def test_deleted_queue_is_one_queue_unreadable(self) -> None:
+        self.build_base_tower()
+        self.remove_file("supervision/MERGE_QUEUE.json")
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(out["drift"], [{
+            "kind": "queue_unreadable", "target": "MERGE_QUEUE.json",
+            "expected": "parseable JSON object", "actual": "missing"}])
+        self.assertEqual(out["skipped"], [])
+        self.assertEqual(out["skipped_count"], 0)
+
+    def test_broken_queue_is_one_queue_unreadable(self) -> None:
+        self.build_base_tower()
+        self.write_raw("supervision/MERGE_QUEUE.json", "{not json")
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(out["drift"], [{
+            "kind": "queue_unreadable", "target": "MERGE_QUEUE.json",
+            "expected": "parseable JSON object", "actual": "unparseable"}])
+        self.assertNotIn("queue_status", self.drift_kinds(out))
+
+    # -- 13. missing / unreadable envelope files ------------------------
+    def test_deleted_envelope_is_envelope_missing(self) -> None:
+        self.build_base_tower()
+        self.remove_file("supervision/envelopes/ENV-T-001.json")
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["envelope_missing"])
+        self.assertEqual(out["drift"][0], {
+            "kind": "envelope_missing", "target": "ENV-T-001",
+            "expected": "POST_MERGE_VERIFIED", "actual": None})
+
+    def test_broken_envelope_is_envelope_unreadable(self) -> None:
+        self.build_base_tower()
+        self.write_raw("supervision/envelopes/ENV-T-001.json", "not json")
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["envelope_unreadable"])
+        self.assertEqual(out["drift"][0], {
+            "kind": "envelope_unreadable", "target": "ENV-T-001",
+            "expected": "POST_MERGE_VERIFIED", "actual": None})
+
+    # -- 14. skipped output is informational only -----------------------
+    def test_skipped_reports_no_events_and_missing_rows(self) -> None:
+        self.build_base_tower()
+        # T-003 replays but is absent from the board: board_entry_missing.
+        for event_type in ("TASK_NEW", "DISPATCH"):
+            self.primary(event_type, task="T-003")
+        self.put_record("T-003", "dispatched")
+        # T-004 only has a record: no_lifecycle_events.
+        self.put_record("T-004", "ready")
+        # ENV-T-003 replays but has no queue row: queue_entry_missing.
+        self.supervision("ENVELOPE_NEW", envelope="ENV-T-003")
+        self.put_envelope("ENV-T-003", "DRAFT")
+        # ENV-T-009 only has a queue row and a file: no_lifecycle_events.
+        self.write_queue({"ENV-T-001": "POST_MERGE_VERIFIED",
+                          "ENV-T-002": "CORRECTION_REQUIRED",
+                          "ENV-T-009": "WAITING"})
+        self.put_envelope("ENV-T-009", "DRAFT")
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 0, out)
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(out["drift"], [])
+        self.assertEqual(out["tasks"], 3)
+        self.assertEqual(out["envelopes"], 3)
+        self.assertEqual(out["skipped"], [
+            {"kind": "envelope", "target": "ENV-T-003",
+             "reason": "queue_entry_missing"},
+            {"kind": "envelope", "target": "ENV-T-009",
+             "reason": "no_lifecycle_events"},
+            {"kind": "task", "target": "T-003",
+             "reason": "board_entry_missing"},
+            {"kind": "task", "target": "T-004",
+             "reason": "no_lifecycle_events"},
+        ])
+        self.assertEqual(out["skipped_count"], 4)
+
+    # -- 15. read-only proof under bad files ----------------------------
+    def test_state_verify_never_writes_with_bad_files(self) -> None:
+        self.build_base_tower()
+        self.remove_file("tasks/T-001/record.json")
+        self.write_raw("primary/TASK_BOARD.json", "{broken board")
+        self.write_raw("supervision/MERGE_QUEUE.json", "{broken queue")
+        self.write_raw("supervision/envelopes/ENV-T-001.json", "not json")
+        before = self.snapshot()
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.snapshot(), before,
+                         "state-verify repaired bad files instead of "
+                         "reporting them")
+        for kind in ("board_unreadable", "envelope_unreadable",
+                     "queue_unreadable", "record_missing"):
+            self.assertIn(kind, self.drift_kinds(out))
+
+    # -- 16. broken ledger short-circuits -------------------------------
     def test_broken_ledger_reports_errors_without_replay(self) -> None:
         self.build_base_tower()
         ledger = self.root / "ledger" / "primary.jsonl"
@@ -329,6 +551,8 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(code, 2, out)
         self.assertFalse(out["ok"], out)
         self.assertEqual(out["drift"], [])
+        self.assertEqual(out["skipped"], [])
+        self.assertEqual(out["skipped_count"], 0)
         self.assertEqual(out["tasks"], 0)
         self.assertEqual(out["envelopes"], 0)
         self.assertTrue(out["ledger_errors"], out)

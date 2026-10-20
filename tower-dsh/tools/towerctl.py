@@ -2729,18 +2729,25 @@ ENVELOPE_LIFECYCLE_STATUS = {
 ENVELOPE_CORRECTION_EVENTS = {"MERGE_BLOCKED", "POST_MERGE_FAILED"}
 
 
-def _optional_json_object(path: Path) -> dict | None:
-    """Best-effort read-only JSON object load.
+def _read_json_object(path: Path) -> tuple[str, dict | None]:
+    """Read-only probe for a JSON object file.
 
-    Missing, unreadable or non-object files return ``None`` so callers can
-    skip them instead of aborting with a second JSON payload.  This only
-    reads: ``state-verify`` observes state and never writes it.
+    Returns ``("ok", data)`` when the file exists and holds a JSON object,
+    ``("missing", None)`` when it does not exist, and
+    ``("unreadable", None)`` when it exists but cannot be parsed or is not a
+    JSON object.  Callers turn that distinction into drift instead of
+    silently skipping the file.  This only reads: ``state-verify`` observes
+    state and never writes it.
     """
     try:
+        if not path.exists():
+            return "missing", None
         data = jload(path)
     except (OSError, ValueError):
-        return None
-    return data if isinstance(data, dict) else None
+        return "unreadable", None
+    if not isinstance(data, dict):
+        return "unreadable", None
+    return "ok", data
 
 
 def ledger_events_in_seq_order(root: Path, name: str) -> list[dict]:
@@ -2802,58 +2809,132 @@ def replay_envelope_statuses(root: Path) -> dict[str, str]:
 def state_verify_drift(root: Path) -> dict:
     """Compare replayed state with records, board, queue and envelopes.
 
-    Skip rules (never drift): an entity without lifecycle events, a task
-    without ``tasks/<id>/record.json``, a task absent from the board, a queue
-    entry or envelope file that does not exist, and events whose payload
-    lacks ``task``/``envelope``.
+    Every entity with replayed lifecycle events is checked: a missing or
+    unreadable record/envelope file is drift (``record_missing`` /
+    ``record_unreadable`` / ``envelope_missing`` / ``envelope_unreadable``),
+    never silently skipped.  ``TASK_BOARD.json`` and ``MERGE_QUEUE.json``
+    that are missing or unusable yield exactly one file-level
+    ``board_unreadable`` / ``queue_unreadable`` entry and suppress the
+    per-entity comparison for that file.  Board status is compared against
+    the replayed status, not against ``record.status``.
+
+    Entities without lifecycle events, a replayed task absent from a readable
+    board, and a replayed envelope absent from a readable queue are reported
+    in ``skipped``; they are observations, never drift.
     """
     task_states = replay_task_statuses(root)
     envelope_states = replay_envelope_statuses(root)
     drift: list[dict] = []
+    skipped: list[dict] = []
 
-    board = _optional_json_object(root / "primary" / "TASK_BOARD.json") or {}
+    def skip(kind: str, target: str, reason: str) -> None:
+        skipped.append({"kind": kind, "target": target, "reason": reason})
+
+    board_state, board = _read_json_object(root / "primary" / "TASK_BOARD.json")
+    if board is None:
+        drift.append({"kind": "board_unreadable", "target": "TASK_BOARD.json",
+                      "expected": "parseable JSON object",
+                      "actual": "missing" if board_state == "missing"
+                                else "unparseable"})
     board_tasks: dict[str, dict] = {}
-    for entry in board.get("tasks") or []:
-        if isinstance(entry, dict) and entry.get("id"):
-            board_tasks[str(entry["id"])] = entry
+    if board is not None:
+        entries = board.get("tasks")
+        for entry in entries if isinstance(entries, list) else []:
+            if isinstance(entry, dict) and entry.get("id"):
+                board_tasks[str(entry["id"])] = entry
 
-    for task_id, expected in task_states.items():
-        record = _optional_task_record(root, task_id)
-        if record is None:
+    queue_state, queue = _read_json_object(
+        root / "supervision" / "MERGE_QUEUE.json")
+    if queue is None:
+        drift.append({"kind": "queue_unreadable", "target": "MERGE_QUEUE.json",
+                      "expected": "parseable JSON object",
+                      "actual": "missing" if queue_state == "missing"
+                                else "unparseable"})
+    queue_entries: dict[str, dict] = {}
+    if queue is not None:
+        entries = queue.get("entries")
+        for entry in entries if isinstance(entries, list) else []:
+            if isinstance(entry, dict) and entry.get("envelope_id"):
+                queue_entries[str(entry["envelope_id"])] = entry
+
+    # Entities with replayed events plus record/envelope files on disk, so an
+    # entity that only has a file (no ledger event) is reported as skipped
+    # instead of disappearing.
+    task_ids = set(task_states)
+    tasks_dir = root / "tasks"
+    if tasks_dir.is_dir():
+        for child in tasks_dir.iterdir():
+            if child.is_dir() and (child / "record.json").is_file():
+                task_ids.add(child.name)
+    envelope_ids = set(envelope_states)
+    envelopes_dir = root / "supervision" / "envelopes"
+    if envelopes_dir.is_dir():
+        for child in envelopes_dir.iterdir():
+            if child.is_file() and child.suffix == ".json":
+                envelope_ids.add(child.stem)
+
+    for task_id in sorted(task_ids):
+        expected = task_states.get(task_id)
+        if expected is None:
+            skip("task", task_id, "no_lifecycle_events")
             continue
-        record_status = record.get("status")
-        if record_status != expected:
-            drift.append({"kind": "task_status", "target": task_id,
-                          "expected": expected, "actual": record_status})
+        state, record = ("missing", None)
+        if is_safe_id(task_id, TASK_ID_RE):
+            state, record = _read_json_object(
+                root / "tasks" / task_id / "record.json")
+        if record is None:
+            drift.append({
+                "kind": "record_missing" if state == "missing"
+                        else "record_unreadable",
+                "target": task_id, "expected": expected, "actual": None})
+        else:
+            record_status = record.get("status")
+            if record_status != expected:
+                drift.append({"kind": "task_status", "target": task_id,
+                              "expected": expected, "actual": record_status})
+        if board is None:
+            continue
         board_entry = board_tasks.get(task_id)
-        if board_entry is not None and board_entry.get("status") != record_status:
+        if board_entry is None:
+            skip("task", task_id, "board_entry_missing")
+        elif board_entry.get("status") != expected:
             drift.append({"kind": "board_status", "target": task_id,
-                          "expected": record_status,
+                          "expected": expected,
                           "actual": board_entry.get("status")})
 
-    queue = _optional_json_object(root / "supervision" / "MERGE_QUEUE.json") or {}
-    queue_entries: dict[str, dict] = {}
-    for entry in queue.get("entries") or []:
-        if isinstance(entry, dict) and entry.get("envelope_id"):
-            queue_entries[str(entry["envelope_id"])] = entry
-
-    for envelope_id, expected in envelope_states.items():
-        queue_entry = queue_entries.get(envelope_id)
-        if queue_entry is not None and queue_entry.get("status") != expected:
-            drift.append({"kind": "queue_status", "target": envelope_id,
-                          "expected": expected,
-                          "actual": queue_entry.get("status")})
-        envelope = None
-        if is_safe_id(envelope_id, PACKAGE_ID_RE):
-            envelope = _optional_json_object(
-                root / "supervision" / "envelopes" / f"{envelope_id}.json")
-        if envelope is not None and envelope.get("status") != expected:
+    for envelope_id in sorted(envelope_ids):
+        expected = envelope_states.get(envelope_id)
+        if expected is None:
+            skip("envelope", envelope_id, "no_lifecycle_events")
+            continue
+        if queue is not None:
+            queue_entry = queue_entries.get(envelope_id)
+            if queue_entry is None:
+                skip("envelope", envelope_id, "queue_entry_missing")
+            elif queue_entry.get("status") != expected:
+                drift.append({"kind": "queue_status", "target": envelope_id,
+                              "expected": expected,
+                              "actual": queue_entry.get("status")})
+        # Unsafe ids are never used as a filename: they are not opened.
+        if not is_safe_id(envelope_id, PACKAGE_ID_RE):
+            continue
+        state, envelope = _read_json_object(
+            root / "supervision" / "envelopes" / f"{envelope_id}.json")
+        if envelope is None:
+            drift.append({
+                "kind": "envelope_missing" if state == "missing"
+                        else "envelope_unreadable",
+                "target": envelope_id, "expected": expected, "actual": None})
+        elif envelope.get("status") != expected:
             drift.append({"kind": "envelope_status", "target": envelope_id,
-                          "expected": expected, "actual": envelope.get("status")})
+                          "expected": expected,
+                          "actual": envelope.get("status")})
 
     drift.sort(key=lambda item: (item["kind"], str(item["target"])))
+    skipped.sort(key=lambda item: (item["kind"], str(item["target"])))
     return {"tasks": len(task_states), "envelopes": len(envelope_states),
-            "drift": drift}
+            "drift": drift, "skipped": skipped,
+            "skipped_count": len(skipped)}
 
 
 def cmd_state_verify(root: Path, args) -> None:
@@ -2861,6 +2942,7 @@ def cmd_state_verify(root: Path, args) -> None:
 
     Exit 0 when every compared file agrees with the replay, 2 when any drift
     is found; a broken ledger short-circuits to 2 with ``ledger_errors``.
+    ``skipped`` is informational and never affects ``ok`` or the exit code.
     """
     ledger_errors: list[str] = []
     for name in ("primary", "supervision"):
@@ -2868,10 +2950,13 @@ def cmd_state_verify(root: Path, args) -> None:
         ledger_errors.extend(f"{name}: {err}" for err in report["errors"])
     if ledger_errors:
         emit({"ok": False, "tasks": 0, "envelopes": 0, "drift": [],
+              "skipped": [], "skipped_count": 0,
               "ledger_errors": ledger_errors}, 2)
     result = state_verify_drift(root)
     payload = {"ok": not result["drift"], "tasks": result["tasks"],
-               "envelopes": result["envelopes"], "drift": result["drift"]}
+               "envelopes": result["envelopes"], "drift": result["drift"],
+               "skipped": result["skipped"],
+               "skipped_count": result["skipped_count"]}
     emit(payload, 0 if payload["ok"] else 2)
 
 
