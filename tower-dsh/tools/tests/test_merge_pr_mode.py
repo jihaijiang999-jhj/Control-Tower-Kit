@@ -55,9 +55,11 @@ GIT_IDENTITY = {
     "GIT_COMMITTER_EMAIL": "tower@example.invalid",
 }
 
-# The offline ``gh`` stub.  It only implements the three subcommands PR-mode
-# merge uses, and every side effect is either the stdout contract of ``gh`` or
-# something the test asserts through ``GH_LOG`` / the tower state.
+# The offline ``gh`` stub.  It mirrors the parts of the real CLI the merge
+# relies on: ``pr create`` takes no ``--json`` and prints the PR URL,
+# ``pr view --json number,url`` is supported, and ``pr checks`` / ``pr merge``
+# take the numeric PR id.  Side effects are asserted through ``GH_LOG`` and the
+# tower state.
 GH_STUB = '''"""Offline ``gh`` stub for test_merge_pr_mode.py."""
 import json
 import os
@@ -65,12 +67,18 @@ import subprocess
 import sys
 import time
 
+PR_URL = "https://example.invalid/pr/42"
+
 
 def log_argv(argv):
     path = os.environ.get("GH_LOG")
     if path:
         with open(path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(argv) + "\\n")
+
+
+def flag(name):
+    return os.environ.get(name) == "1"
 
 
 def exit_code(name):
@@ -83,9 +91,22 @@ def exit_code(name):
 def main(argv):
     log_argv(argv)
     if argv[:2] == ["pr", "create"]:
-        print(json.dumps({"number": 42,
-                          "url": "https://example.invalid/pr/42"}))
+        # Real gh has no --json on create; fail exactly like it does.
+        if "--json" in argv:
+            sys.stderr.write("unknown flag: --json\\n")
+            return 2
+        if flag("GH_CREATE_EXISTING"):
+            sys.stderr.write(
+                'a pull request for branch "feature" already exists\\n')
+            return 1
+        print(PR_URL)
         return exit_code("GH_CREATE_EXIT")
+    if argv[:2] == ["pr", "view"]:
+        if flag("GH_VIEW_MISSING"):
+            sys.stderr.write("no pull requests found\\n")
+            return 1
+        print(json.dumps({"number": 42, "url": PR_URL}))
+        return exit_code("GH_VIEW_EXIT")
     if argv[:2] == ["pr", "checks"]:
         # Sleeping lets the timeout case prove --check-timeout is applied.
         time.sleep(float(os.environ.get("GH_SLEEP", "0") or 0))
@@ -95,8 +116,18 @@ def main(argv):
         return code
     if argv[:2] == ["pr", "merge"]:
         code = exit_code("GH_MERGE_EXIT")
+        if code == 0 and flag("GH_DIVERGE_LOCAL"):
+            # Simulate the base branch moving locally while the PR is merged:
+            # the follow-up ff-only merge can then no longer fast-forward.
+            local = os.environ.get("GH_LOCAL_REPO")
+            if local:
+                subprocess.run(
+                    ["git", "-C", local, "-c", "user.name=gh stub",
+                     "-c", "user.email=stub@example.invalid",
+                     "commit", "--allow-empty", "-m", "local divergence"],
+                    check=True, capture_output=True)
         origin = os.environ.get("GH_ORIGIN")
-        sha = os.environ.get("GH_BRANCH_SHA")
+        sha = os.environ.get("GH_BRANCH_SHA") or os.environ.get("GH_BRANCH")
         if code == 0 and origin and sha:
             # Advance the bare origin's base branch so the follow-up fetch and
             # ff-only merge have something real to fast-forward to.
@@ -342,7 +373,8 @@ class PrMergeTestCase(unittest.TestCase):
         self.assertIn("--head", create)
         self.assertEqual(create[create.index("--head") + 1], BRANCH)
         self.assertIn(f"merge: {TASK_ID} ({ENVELOPE_ID})", create)
-        self.assertEqual(create[create.index("--json") + 1], "number,url")
+        # Real gh rejects ``pr create --json``; the URL is the only output.
+        self.assertNotIn("--json", create)
         checks = calls[1]
         self.assertIn(str(PR_NUMBER), checks)
         self.assertIn("--watch", checks)
@@ -469,6 +501,106 @@ class PrMergeTestCase(unittest.TestCase):
         self.assertEqual(envelope["merge_mode"], "local")
         self.assertEqual(self.queue_entry()["status"], "MERGED")
         self.assertEqual(self.gh_calls(), [])
+
+    # -- 8. create must look like the real CLI: URL only, no --json --------
+    def test_create_has_no_json_flag_and_number_comes_from_url(self) -> None:
+        cp = self.run_merge("--mode", "pr", timeout=120)
+        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+
+        create = self.gh_calls()[0]
+        self.assertEqual(create[:2], ["pr", "create"])
+        self.assertNotIn("--json", create)
+        # The stub only prints the URL; the number can therefore only come
+        # from parsing it.
+        envelope = self.envelope()
+        self.assertEqual(envelope["pr_number"], PR_NUMBER)
+        self.assertEqual(envelope["pr_url"], PR_URL)
+
+    # -- 9. an existing but non-executable TOWERCTL_GH is a clean failure --
+    def test_non_executable_gh_target_fails_without_merging(self) -> None:
+        fake = self.tmp / "gh-not-a-program.txt"
+        fake.write_text("this is not an executable\n", encoding="utf-8")
+        cp = self.run_merge("--mode", "pr",
+                            env_extra={"TOWERCTL_GH": str(fake)}, timeout=120)
+        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        blob = (cp.stdout + cp.stderr).lower()
+        self.assertIn("gh not found", blob)
+        self.assertIn("towerctl_gh", blob)
+
+        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
+        entry = self.queue_entry()
+        self.assertEqual(entry["status"], "CORRECTION_REQUIRED")
+        # The preflight runs before the queue is pinned at MERGING.
+        self.assertNotEqual(entry["status"], "MERGING")
+        self.assertEqual(self.gh_calls(), [])
+        self.assertFalse(self.ledger_events("MERGE"))
+
+    # -- 10. ff failure keeps the remote-merge record; retry reuses the PR --
+    def test_ff_failure_preserves_pr_state_and_retry_is_idempotent(self) -> None:
+        # The stub advances the local base branch while the PR is merged, so
+        # the follow-up ff-only merge cannot fast-forward.
+        first = self.run_merge(
+            "--mode", "pr", timeout=120,
+            env_extra={"GH_DIVERGE_LOCAL": "1",
+                       "GH_LOCAL_REPO": str(self.repo).replace("\\", "/")},
+        )
+        self.assertEqual(first.returncode, 2,
+                         msg=f"stdout={first.stdout}\nstderr={first.stderr}")
+
+        envelope = self.envelope()
+        self.assertEqual(envelope["status"], "CORRECTION_REQUIRED")
+        self.assertEqual(envelope["pr_number"], PR_NUMBER)
+        self.assertEqual(envelope["pr_url"], PR_URL)
+        self.assertIs(envelope["remote_merged"], True)
+        self.assertIn("remote_merged_at", envelope)
+        self.assertNotIn("merge_commit", envelope)
+        self.assertEqual(self.queue_entry()["status"], "CORRECTION_REQUIRED")
+
+        blocked = self.ledger_events("MERGE_BLOCKED")
+        self.assertEqual(len(blocked), 1, blocked)
+        self.assertEqual(blocked[0]["payload"]["phase"], "ff-only")
+        self.assertEqual(blocked[0]["payload"]["reason"], "ff-only")
+
+        # Correct the divergence: put the local base back where it was.
+        reset = self.run_git("reset", "--hard", self.base_head)
+        self.assertEqual(reset.returncode, 0, msg=reset.stderr)
+
+        calls_before = len(self.gh_calls())
+        retry = self.run_merge("--mode", "pr", timeout=120)
+        self.assertEqual(retry.returncode, 0,
+                         msg=f"stdout={retry.stdout}\nstderr={retry.stderr}")
+
+        merged = self.envelope()
+        self.assertEqual(merged["status"], "MERGED")
+        self.assertEqual(merged["merge_commit"], self.envelope_head)
+        self.assertEqual(merged["pr_number"], PR_NUMBER)
+        self.assertEqual(self.queue_entry()["status"], "MERGED")
+        self.assertEqual(self.head(), self.envelope_head)
+        # The retry resumed at fetch/ff: the remote half ran exactly once.
+        creates = [call for call in self.gh_calls() if call[:2] == ["pr", "create"]]
+        self.assertEqual(len(creates), 1, self.gh_calls())
+        self.assertEqual(len(self.gh_calls()), calls_before)
+
+    # -- 11. an already-open PR is reused through gh pr view ----------------
+    def test_existing_pr_falls_back_to_pr_view(self) -> None:
+        cp = self.run_merge("--mode", "pr",
+                            env_extra={"GH_CREATE_EXISTING": "1"}, timeout=120)
+        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+
+        calls = self.gh_calls()
+        self.assertEqual([call[:2] for call in calls],
+                         [["pr", "create"], ["pr", "view"],
+                          ["pr", "checks"], ["pr", "merge"]])
+        view = calls[1]
+        self.assertIn(BRANCH, view)
+        self.assertIn("--json", view)
+        self.assertEqual(view[view.index("--json") + 1], "number,url")
+
+        envelope = self.envelope()
+        self.assertEqual(envelope["status"], "MERGED")
+        self.assertEqual(envelope["merge_mode"], "pr")
+        self.assertEqual(envelope["pr_number"], PR_NUMBER)
+        self.assertEqual(envelope["pr_url"], PR_URL)
 
 
 if __name__ == "__main__":
