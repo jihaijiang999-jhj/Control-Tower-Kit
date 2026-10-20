@@ -1,0 +1,144 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-014",
+  "title": "输出编码：towerctl 在非 UTF-8 控制台不再崩溃，并让 status 的失败可见",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "towerctl 启动时把 stdout/stderr 重配为 UTF-8（失败则静默降级），保证 JSON 输出始终是合法 UTF-8",
+    "复现条件固定为 PYTHONIOENCODING=cp1252：status 必须 exit 0、输出可 json.loads、中文任务标题完好",
+    "新增 tools/tests/test_output_encoding.py：用临时塔（含中文标题）在 cp1252 环境下跑 status 与 startup",
+    "从 tower-gate.yml 的 status 步骤移除 continue-on-error：崩溃必须让门变红，脏状态本来就不会让 status 失败",
+    "同步更新 test_ci_gate.py 里关于 continue-on-error 的断言（从恰好一处改为零处，并断言 status 步骤为最后一步）",
+    "不改任何既有命令的 JSON 字段语义"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-014/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-014/tower-dsh/tools/tests/test_output_encoding.py",
+    "pilot/worktrees/PILOT-014/tower-dsh/tools/tests/test_ci_gate.py",
+    "pilot/worktrees/PILOT-014/.github/workflows/tower-gate.yml"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "changing other tests"
+  ],
+  "acceptance": [
+    "PYTHONIOENCODING=cp1252 python tools/towerctl.py status 在含中文任务标题的塔上 exit 0，stdout 为合法 UTF-8 且可 json.loads，中文完好",
+    "同一环境下 startup 也不崩溃且输出可解析",
+    "常规全量 python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 160",
+    "空全局 git 配置（GIT_CONFIG_GLOBAL/GIT_CONFIG_SYSTEM 指向空文件）下全量仍全部通过",
+    ".github/workflows/tower-gate.yml 中 continue-on-error 出现次数为 0，且 status 步骤仍是最后一步",
+    "spec-coverage 仍 27/27、tool_gaps 为空；spec-lint --strict 仍 6/6",
+    "git diff --name-only main..HEAD 恰好是四个 allowed 文件"
+  ],
+  "depends_on": [
+    "PILOT-013"
+  ],
+  "worktree": "pilot/worktrees/PILOT-014",
+  "spec_path": "pilot/PILOT-014.spec.json",
+  "spec_sha256": "18db8ee89a2a0a700f3a46049851f436c9fbba125c75e6b83927c17829e6fa5d",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-pilot-014",
+  "dispatch": {
+    "executor": "subagent:exec-pilot-014",
+    "worktree": "pilot/worktrees/PILOT-014",
+    "at": "2026-10-20T08:04:32+08:00"
+  },
+  "evidence": [
+    {
+      "id": "E-001",
+      "path": "tasks/PILOT-014/evidence/towerctl.py",
+      "sha256": "bb2d4ad2d07265d0f5669787fa9fad7c6007232fad1a2078fe1a5f28c5862963",
+      "bytes": 104115,
+      "at": "2026-10-20T08:11:39+08:00"
+    },
+    {
+      "id": "E-002",
+      "path": "tasks/PILOT-014/evidence/test_output_encoding.py",
+      "sha256": "d05c23dbf67c85bc879c1c1732f08b6db4a31bb0390b94d310d3bf70665f719b",
+      "bytes": 8436,
+      "at": "2026-10-20T08:11:39+08:00"
+    },
+    {
+      "id": "E-003",
+      "path": "tasks/PILOT-014/evidence/test_ci_gate.py",
+      "sha256": "02098149de4bf8541936146981ec0e30c0b0c3121ff5d41e8c38cbe226e3e59b",
+      "bytes": 8538,
+      "at": "2026-10-20T08:11:39+08:00"
+    },
+    {
+      "id": "E-004",
+      "path": "tasks/PILOT-014/evidence/tower-gate.yml",
+      "sha256": "59de52cf90073301773dedd4f3931adbad243f97fb00ea3d96eccefb17b0a1a5",
+      "bytes": 857,
+      "at": "2026-10-20T08:11:39+08:00"
+    },
+    {
+      "id": "E-005",
+      "path": "tasks/PILOT-014/evidence/test-output.txt",
+      "sha256": "40c802f5a1af2793255734070c23f5e61f08a62ebbe71502a0c464b6240611c9",
+      "bytes": 45068,
+      "at": "2026-10-20T08:11:39+08:00"
+    },
+    {
+      "id": "E-006",
+      "path": "tasks/PILOT-014/evidence/test-output-cp1252.txt",
+      "sha256": "6b8f445eaa929c17fe8bce5a2bb2235545a70444cf16edd9aed3b57930ac9f95",
+      "bytes": 8049,
+      "at": "2026-10-20T08:11:39+08:00"
+    },
+    {
+      "id": "E-007",
+      "path": "tasks/PILOT-014/evidence/test-output-no-gitconfig.txt",
+      "sha256": "443f951bd5d872a83877c2186139fc2e85e9525ceedf828d051d8cbae593323e",
+      "bytes": 45148,
+      "at": "2026-10-20T08:11:39+08:00"
+    },
+    {
+      "id": "E-008",
+      "path": "tasks/PILOT-014/evidence/mutation-check.txt",
+      "sha256": "65b8a4e966fa23b182dad5df4ed51dde86efae68a6170c6223dcfb3642f8d436",
+      "bytes": 17478,
+      "at": "2026-10-20T08:11:39+08:00"
+    },
+    {
+      "id": "E-009",
+      "path": "tasks/PILOT-014/evidence/commit.txt",
+      "sha256": "fe57dd965628bee3eeeb77c7d44e27368034f8330f9033be4ede6b75912e7e8a",
+      "bytes": 1128,
+      "at": "2026-10-20T08:11:39+08:00"
+    },
+    {
+      "id": "E-010",
+      "path": "tasks/PILOT-014/evidence/diff.txt",
+      "sha256": "538b2251c1792b8588737069b7b0a1beb2c3eef0b3885feed469632c47d487b9",
+      "bytes": 14999,
+      "at": "2026-10-20T08:11:39+08:00"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-pilot-014",
+    "verdict": "PASS",
+    "note": "AC-1..AC-7 全 PASS。非空转实测：删掉 _force_utf8_stdio 调用后 status/startup 均 rc=1 并抛 UnicodeEncodeError；cp1252 下修复后 rc=0、UTF-8 合法、中文完好。workflow 中 continue-on-error 计数 0、status 为最后一步。163 tests OK（常规与空 git 配置两种）。10 份证据哈希一致。已知边界：reconfigure 仅 3.7+；legacy 控制台可能显示乱码但字节是 UTF-8；脏状态不会误红。",
+    "at": "2026-10-20T08:17:06+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-014",
+    "actor": "owner",
+    "text": "owner approved fixing cp1252 output crash found by CI",
+    "at": "2026-10-20T08:17:06+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-014/CLOSEOUT.md",
+    "at": "2026-10-20T08:17:06+08:00"
+  },
+  "created_at": "2026-10-20T08:04:32+08:00",
+  "updated_at": "2026-10-20T08:17:06+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-014/MERGE.md",
+  "delivered_at": "2026-10-20T08:11:39+08:00",
+  "accepted_at": "2026-10-20T08:17:06+08:00"
+}

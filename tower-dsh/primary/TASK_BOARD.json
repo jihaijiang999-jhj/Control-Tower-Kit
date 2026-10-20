@@ -131,7 +131,17 @@
       "reviewer": "subagent:rev-pilot-013",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-013/MERGE.md",
       "updated_at": "2026-10-20T07:49:13+08:00"
+    },
+    {
+      "id": "PILOT-014",
+      "title": "输出编码：towerctl 在非 UTF-8 控制台不再崩溃，并让 status 的失败可见",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-014",
+      "reviewer": "subagent:rev-pilot-014",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-014/MERGE.md",
+      "updated_at": "2026-10-20T08:17:06+08:00"
     }
   ],
-  "updated_at": "2026-10-20T07:49:13+08:00"
+  "updated_at": "2026-10-20T08:17:06+08:00"
 }

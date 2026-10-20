@@ -1,0 +1,178 @@
+﻿PILOT-014 evidence: non-UTF-8 console reproduction (before -> after)
+tower root: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-014\tower-dsh
+python: Python 3.12.10
+
+=== BEFORE (main:tower-dsh/tools/towerctl.py copied to temp) ===
+command: $env:PYTHONIOENCODING="cp1252"; python <tmp>\towerctl.py --root <tower root> status
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot014-before\towerctl.py", line 2512, in <module>
+    main()
+  File "C:\Users\mac\AppData\Local\Temp\pilot014-before\towerctl.py", line 2506, in main
+    handlers[args.cmd](root, args)
+  File "C:\Users\mac\AppData\Local\Temp\pilot014-before\towerctl.py", line 2248, in cmd_status
+    emit({"ok": True, "tower": state.get("tower_id"), "role": state.get("role"),
+  File "C:\Users\mac\AppData\Local\Temp\pilot014-before\towerctl.py", line 58, in emit
+    print(json.dumps(data, ensure_ascii=False, indent=2))
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 244-253: character maps to <undefined>
+
+exit code: 1
+
+=== AFTER (worktree towerctl.py) ===
+command: $env:PYTHONIOENCODING="cp1252"; python tools/towerctl.py status
+{
+  "ok": true,
+  "tower": "tower-dsh",
+  "role": "primary",
+  "phase": "HANDOFF_ACTIVE",
+  "next_action": "resume from handoffs/HANDOFF-PILOT-002/HANDOFF.md",
+  "tasks": [
+    {
+      "id": "PILOT-001",
+      "title": "Ledger SHA-256 哈希链模块与篡改检测",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:173919b7-0cb1-4867-9685-e8113368ab97",
+      "reviewer": "subagent:aed01de9-71f1-46cd-ace8-84b720a3e01f",
+      "next": "merged via ENV-PILOT-001; POST_MERGE_VERIFIED",
+      "updated_at": "2026-10-19T12:29:52+08:00"
+    },
+    {
+      "id": "PILOT-002",
+      "title": "towerctl 门禁硬化：spec 前置、证据前置、reviewer 非空、merge 分支断言 + 回归测试",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:4e3a1640-cff9-4135-8f67-caa396bed7ba",
+      "reviewer": "subagent:11381940-604b-4d97-90cb-b6a85349a162",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T16:45:02+08:00"
+    },
+    {
+      "id": "PILOT-003",
+      "title": "post-merge 修复：清洁检查先于写 review，且允许从 CORRECTION_REQUIRED 重试",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:a7474492-5d9f-4ccb-ba30-51826c4f6e24",
+      "reviewer": "subagent:70e01687-6426-4ff7-ac79-1d6d24c0d10e",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T16:57:25+08:00"
+    },
+    {
+      "id": "PILOT-004",
+      "title": "handoff 参数化：去写死 PILOT-001，改为按 task/envelope 生成与校验",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:a9bf21b3-8952-4466-a4d1-3c0ab3444354",
+      "reviewer": "subagent:3866b916-9dd7-41f6-adce-e6ea1fdf6a40",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T17:21:39+08:00"
+    },
+    {
+      "id": "PILOT-005",
+      "title": "ledger 哈希链 + 单写者锁 + verify-ledger 命令",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:3acc8111-e88b-46bd-b4a7-de18648f161f",
+      "reviewer": "subagent:c7546d3e-2dfa-4815-9eca-607a14e9e34b",
+      "next": "merged; audit recommendations complete",
+      "updated_at": "2026-10-19T17:31:44+08:00"
+    },
+    {
+      "id": "PILOT-006",
+      "title": "ledger 锁 Windows 竞态修复：PermissionError 视作锁竞争 + 并发压测",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:a7172926-6f3e-4ca4-a6ff-add402ef215b",
+      "reviewer": "subagent:5882dd69-c4a0-492d-b483-f76207104f76",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T17:50:43+08:00"
+    },
+    {
+      "id": "PILOT-007",
+      "title": "spec-lint：让工作流规范可被机器校验",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:b98bd372-3dcc-4cb6-add8-06c16b7b364d",
+      "reviewer": "subagent:dcfb55f3-6d2d-44cc-bc2a-cf61e8e54a30",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T18:35:37+08:00"
+    },
+    {
+      "id": "PILOT-008",
+      "title": "spec-lint 扩展：policy 文档校验 + 严格模式",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:12af8987-2ef2-4913-adfa-2ea01a64e937",
+      "reviewer": "subagent:6dfa3e2b-0e5f-4a5d-9432-7350d5bbdedf",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T18:54:47+08:00"
+    },
+    {
+      "id": "PILOT-009",
+      "title": "条款覆盖：把 spec 条款绑定到真实测试并设门",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:4ed8e3bc-a5f4-47e6-97d3-c05242723887",
+      "reviewer": "subagent:f443bad6-ba3a-4f69-b7a2-25f95ae18b85",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",
+      "updated_at": "2026-10-19T19:57:16+08:00"
+    },
+    {
+      "id": "PILOT-010",
+      "title": "硬化 2：路径越界防护、单 JSON 输出、closeout 文案、ACL 忙等、覆盖补强",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:b570c09a-fccf-4e18-a4f1-4d134b06f186",
+      "reviewer": "subagent:92bab935-b241-4a3e-aa17-58d68106244e",
+      "next": "merged via ENV-PILOT-010; POST_MERGE_VERIFIED; hardening 2 complete",
+      "updated_at": "2026-10-19T22:43:52+08:00"
+    },
+    {
+      "id": "PILOT-011",
+      "title": "权威状态脏检测：status/startup 报告未提交的权威状态，handoff-activate 提示提交",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-011",
+      "reviewer": "subagent:rev-pilot-011",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-011/MERGE.md",
+      "updated_at": "2026-10-20T01:50:28+08:00"
+    },
+    {
+      "id": "PILOT-012",
+      "title": "把验证搬到服务端：GitHub Actions 门禁 workflow + CODEOWNERS + 自测",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-012",
+      "reviewer": "subagent:rev-pilot-012",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-012/MERGE.md",
+      "updated_at": "2026-10-20T07:29:29+08:00"
+    },
+    {
+      "id": "PILOT-013",
+      "title": "让门禁测试 hermetic：CLI 子进程注入 git 身份，空全局配置下全套件仍绿",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-013",
+      "reviewer": "subagent:rev-pilot-013",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-013/MERGE.md",
+      "updated_at": "2026-10-20T07:49:13+08:00"
+    }
+  ],
+  "authority_dirty": [],
+  "authority_dirty_count": 0
+}
+
+exit code: 0
+
+=== CHECKS ===
+before_failed_as_expected: True
+after_exit_zero: True
+after_is_valid_json: True
+after_contains_non_ascii_lines: True
+
+non-ascii sample lines (read back as UTF-8):
+      "title": "Ledger SHA-256 哈希链模块与篡改检测",
+      "title": "towerctl 门禁硬化：spec 前置、证据前置、reviewer 非空、merge 分支断言 + 回归测试",
+      "next": "merge/handoff decision (owner gate) — not performed in Phase 1",

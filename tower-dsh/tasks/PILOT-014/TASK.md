@@ -1,0 +1,40 @@
+# PILOT-014 — 输出编码：towerctl 在非 UTF-8 控制台不再崩溃，并让 status 的失败可见
+
+- Status: `ready`
+- Authority: `workspace_write`
+- Worktree: `pilot/worktrees/PILOT-014`
+
+## Scope
+
+- towerctl 启动时把 stdout/stderr 重配为 UTF-8（失败则静默降级），保证 JSON 输出始终是合法 UTF-8
+- 复现条件固定为 PYTHONIOENCODING=cp1252：status 必须 exit 0、输出可 json.loads、中文任务标题完好
+- 新增 tools/tests/test_output_encoding.py：用临时塔（含中文标题）在 cp1252 环境下跑 status 与 startup
+- 从 tower-gate.yml 的 status 步骤移除 continue-on-error：崩溃必须让门变红，脏状态本来就不会让 status 失败
+- 同步更新 test_ci_gate.py 里关于 continue-on-error 的断言（从恰好一处改为零处，并断言 status 步骤为最后一步）
+- 不改任何既有命令的 JSON 字段语义
+
+## Allowed paths
+
+- `pilot/worktrees/PILOT-014/tower-dsh/tools/towerctl.py`
+- `pilot/worktrees/PILOT-014/tower-dsh/tools/tests/test_output_encoding.py`
+- `pilot/worktrees/PILOT-014/tower-dsh/tools/tests/test_ci_gate.py`
+- `pilot/worktrees/PILOT-014/.github/workflows/tower-gate.yml`
+
+## Forbidden
+
+- network
+- external dependencies
+- changes outside the task worktree
+- merge
+- production access
+- changing other tests
+
+## Acceptance
+
+- PYTHONIOENCODING=cp1252 python tools/towerctl.py status 在含中文任务标题的塔上 exit 0，stdout 为合法 UTF-8 且可 json.loads，中文完好
+- 同一环境下 startup 也不崩溃且输出可解析
+- 常规全量 python -B -m unittest discover -s tools/tests -v 全部通过，总用例数 >= 160
+- 空全局 git 配置（GIT_CONFIG_GLOBAL/GIT_CONFIG_SYSTEM 指向空文件）下全量仍全部通过
+- .github/workflows/tower-gate.yml 中 continue-on-error 出现次数为 0，且 status 步骤仍是最后一步
+- spec-coverage 仍 27/27、tool_gaps 为空；spec-lint --strict 仍 6/6
+- git diff --name-only main..HEAD 恰好是四个 allowed 文件

@@ -1,0 +1,64 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-014",
+  "task": "PILOT-014",
+  "repository": "..",
+  "branch": "pilot/PILOT-014",
+  "base": "main",
+  "implementation_head_sha": "ee70004b82ceb782ce476029a5d4ea91466c8f69",
+  "envelope_path": "merge-envelopes/ENV-PILOT-014.json",
+  "created_at": "2026-10-20T08:17:11+08:00",
+  "scope": "PILOT-014: utf-8 stdio + visible status failures",
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-014/evidence/towerctl.py",
+      "sha256": "bb2d4ad2d07265d0f5669787fa9fad7c6007232fad1a2078fe1a5f28c5862963"
+    },
+    {
+      "path": "tasks/PILOT-014/evidence/test_output_encoding.py",
+      "sha256": "d05c23dbf67c85bc879c1c1732f08b6db4a31bb0390b94d310d3bf70665f719b"
+    },
+    {
+      "path": "tasks/PILOT-014/evidence/test_ci_gate.py",
+      "sha256": "02098149de4bf8541936146981ec0e30c0b0c3121ff5d41e8c38cbe226e3e59b"
+    },
+    {
+      "path": "tasks/PILOT-014/evidence/tower-gate.yml",
+      "sha256": "59de52cf90073301773dedd4f3931adbad243f97fb00ea3d96eccefb17b0a1a5"
+    },
+    {
+      "path": "tasks/PILOT-014/evidence/test-output.txt",
+      "sha256": "40c802f5a1af2793255734070c23f5e61f08a62ebbe71502a0c464b6240611c9"
+    },
+    {
+      "path": "tasks/PILOT-014/evidence/test-output-cp1252.txt",
+      "sha256": "6b8f445eaa929c17fe8bce5a2bb2235545a70444cf16edd9aed3b57930ac9f95"
+    },
+    {
+      "path": "tasks/PILOT-014/evidence/test-output-no-gitconfig.txt",
+      "sha256": "443f951bd5d872a83877c2186139fc2e85e9525ceedf828d051d8cbae593323e"
+    },
+    {
+      "path": "tasks/PILOT-014/evidence/mutation-check.txt",
+      "sha256": "65b8a4e966fa23b182dad5df4ed51dde86efae68a6170c6223dcfb3642f8d436"
+    },
+    {
+      "path": "tasks/PILOT-014/evidence/commit.txt",
+      "sha256": "fe57dd965628bee3eeeb77c7d44e27368034f8330f9033be4ede6b75912e7e8a"
+    },
+    {
+      "path": "tasks/PILOT-014/evidence/diff.txt",
+      "sha256": "538b2251c1792b8588737069b7b0a1beb2c3eef0b3885feed469632c47d487b9"
+    }
+  ],
+  "envelope_head_sha": "7ba0489d1e9acd18d96e89d6f860006ddd6a91ff",
+  "status": "MERGED",
+  "merge_commit": "4ef069505b56a4e686b1687e1df6ba754702f481",
+  "merged_at": "2026-10-20T08:17:14+08:00",
+  "supervisor": "sup-pilot-014-verify"
+}
