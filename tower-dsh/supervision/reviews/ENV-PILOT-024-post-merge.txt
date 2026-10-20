@@ -1,0 +1,21 @@
+# ENV-PILOT-024 post-merge verification
+
+- base: main
+- implementation: 80bfe3dcfa3b0e020e7d47a243f4be363f5922e3
+- merge_commit: c4fb58f09f6d906acadc7d51ce4ffe3c606f82c8
+- result: PASS
+- working_tree_clean: True
+- tool_owned_paths_ignored: []
+- test_exit: 0
+
+## Test output
+
+
+test_non_utf8_child_output_is_replaced_not_raised (test_tower_gates.NonUtf8ChildOutput.test_non_utf8_child_output_is_replaced_not_raised) ... ok
+test_tower_gate_suite (test_tower_gates.TowerGateSuite.test_tower_gate_suite) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 76.235s
+
+OK
+

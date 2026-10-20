@@ -45,7 +45,7 @@
     }
   ],
   "envelope_head_sha": "198c7e705b527f356227bf93b1356551eeea55cc",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "pr_number": 9,
   "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/9",
   "remote_merged": true,
@@ -54,5 +54,7 @@
   "merged_at": "2026-10-21T05:04:32+08:00",
   "supervisor": "sup-pilot-024-verify",
   "merge_mode": "pr",
-  "check_conclusion": "success"
+  "check_conclusion": "success",
+  "post_merge_at": "2026-10-21T05:05:55+08:00",
+  "post_merge_note": "gate decode fix; root gate now decodes cp936 child output; 236 inner tests"
 }
