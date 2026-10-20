@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Tower/DSH v0.3 pilot control-plane CLI.
 
-File-backed, local-only, no network. It records state, evidence and gates;
-it never executes the task itself.
+File-backed and local-first: it records state, evidence and gates; it never
+executes the task itself.  ``merge --mode pr`` is the only path that shells out
+to the GitHub CLI (``gh``); every other command stays offline.
 """
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -491,6 +493,84 @@ def git_ok(repo: Path, *args: str) -> str:
     if cp.returncode != 0:
         raise RuntimeError(cp.stderr.strip() or cp.stdout.strip() or f"git {' '.join(args)} failed")
     return cp.stdout.strip()
+
+
+def _split_argv(raw: str) -> list[str]:
+    """Split a command line into argv, keeping Windows backslashes intact.
+
+    POSIX ``shlex`` treats a backslash as an escape character, so
+    ``C:\\Python\\python.exe`` would come back as ``C:Pythonpython.exe``.  On
+    Windows the tokens are therefore split in non-POSIX mode and the quotes it
+    preserves are stripped by hand; elsewhere plain POSIX splitting applies.
+    """
+    if os.name == "nt":
+        tokens = shlex.split(raw, posix=False)
+        stripped = []
+        for token in tokens:
+            if len(token) >= 2 and token[0] == token[-1] and token[0] in "\"'":
+                token = token[1:-1]
+            stripped.append(token)
+        return stripped
+    return shlex.split(raw)
+
+
+def _looks_like_path(value: str) -> bool:
+    """True when ``value`` is a path rather than a bare command name."""
+    separators = [os.sep] + ([os.altsep] if os.altsep else [])
+    return os.path.isabs(value) or any(sep and sep in value for sep in separators)
+
+
+def _is_executable_path(value: str) -> bool:
+    """True when ``value`` names a runnable file on this platform.
+
+    A bare command name is resolved through ``PATHEXT`` by ``shutil.which``,
+    but an explicit path is not: Windows only executes ``.exe``/``.cmd``/
+    ``.bat``/``.com`` images, and POSIX additionally needs the execute bit.
+    Without this an existing but non-executable file (a stray ``.txt``) would
+    pass a plain ``Path.exists()`` check and then die in ``subprocess.run``.
+    """
+    path = Path(value)
+    if os.name == "nt":
+        return path.is_file() and path.suffix.lower() in (".exe", ".cmd", ".bat", ".com")
+    return path.is_file() and os.access(path, os.X_OK)
+
+
+def gh_command() -> list[str]:
+    """Return the argv prefix used to invoke the GitHub CLI.
+
+    ``TOWERCTL_GH`` overrides the executable and is the test injection point:
+    the PR-mode tests point it at ``"<python> <gh_stub.py>"`` so the whole
+    flow runs offline against a local bare origin.  A missing or
+    non-executable executable is a hard gate (exit 2) rather than a traceback.
+    """
+    raw = os.environ.get("TOWERCTL_GH", "").strip()
+    argv = _split_argv(raw) if raw else []
+    if not argv:
+        argv = ["gh"]
+    exe = argv[0]
+    if _looks_like_path(exe):
+        runnable = _is_executable_path(exe)
+    else:
+        runnable = shutil.which(exe) is not None
+    if not runnable:
+        fail([f"gh not found: {exe}; install GitHub CLI or set TOWERCTL_GH"])
+    return argv
+
+
+class MergeBlocked(RuntimeError):
+    """A PR-mode merge step failed; carries the phase, reason and detail."""
+
+    def __init__(self, phase: str, reason: str, detail: str):
+        super().__init__(f"{phase} ({reason}): {detail}")
+        self.phase = phase
+        self.reason = reason
+        self.detail = detail
+
+
+def command_failure(cp: subprocess.CompletedProcess) -> str:
+    """Best-effort error text for a failed subprocess."""
+    return ((cp.stderr or "").strip() or (cp.stdout or "").strip()
+            or f"exit code {cp.returncode}")
 
 
 # State directories towerctl itself writes during post-merge.  The tower root
@@ -1982,6 +2062,153 @@ def cmd_merge_check(root: Path, args) -> None:
     emit({"ok": True, "envelope": args.envelope, "checks": checks})
 
 
+PR_URL_RE = re.compile(r"^https?://\S+/pull/(\d+)$")
+
+
+def parse_created_pr(stdout: str):
+    """Parse the PR identity ``gh pr create`` prints as its last line.
+
+    Real ``gh`` has no ``--json`` flag on ``pr create``; it prints the PR URL
+    on stdout.  Returns ``(url, number)`` or ``None`` when the output does not
+    look like a pull-request URL.
+    """
+    lines = [line.strip() for line in (stdout or "").splitlines() if line.strip()]
+    if not lines:
+        return None
+    url = lines[-1]
+    match = PR_URL_RE.match(url)
+    if not match:
+        return None
+    return url, int(match.group(1))
+
+
+def run_gh(repo: Path, argv: list[str], *, phase: str,
+           timeout: float) -> subprocess.CompletedProcess:
+    """Run one ``gh`` invocation with ``repo`` as the working directory.
+
+    Every call is bounded by ``--check-timeout`` and every spawn failure is
+    turned into a :class:`MergeBlocked`; no traceback may escape a merge.
+    """
+    try:
+        return subprocess.run(
+            [*gh_command(), *argv], cwd=str(repo), capture_output=True,
+            text=True, encoding="utf-8", timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        raise MergeBlocked(
+            phase, "timeout",
+            f"gh {argv[0]} {argv[1] if len(argv) > 1 else ''} did not finish "
+            f"within {timeout:g}s") from None
+    except OSError as exc:
+        raise MergeBlocked("gh", "gh-exec", str(exc)) from None
+
+
+def require_git(repo: Path, phase: str, *git_args: str) -> subprocess.CompletedProcess:
+    """Run one git step of the PR flow, blocking the merge when it fails."""
+    cp = git(repo, *git_args)
+    if cp.returncode != 0:
+        raise MergeBlocked(phase, phase, command_failure(cp))
+    return cp
+
+
+def pr_remote_merge(repo: Path, env: dict, args) -> dict:
+    """Steps 1-4 of a ``--mode pr`` merge: push, create, checks, merge the PR.
+
+    The remote half is split from the fast-forward half so the caller can
+    persist ``remote_merged`` before touching the local branch.  Raises
+    :class:`MergeBlocked` on the first failure.
+    """
+    branch = str(env.get("branch") or "")
+    base = str(env.get("base", "main"))
+    remote = getattr(args, "remote", None) or "origin"
+    timeout = int(getattr(args, "check_timeout", 900) or 900)
+
+    # 1. the remote must actually see the envelope branch before a PR exists.
+    require_git(repo, "push", "push", remote, branch)
+
+    # 2. open the PR.  ``gh pr create`` deliberately gets no ``--json``: real
+    #    gh rejects it and only prints the PR URL (parsed below).
+    body = (
+        f"Tower merge envelope {args.envelope} for task {env.get('task')}.\n\n"
+        f"- implementation: {env.get('implementation_head_sha')}\n"
+        f"- envelope head: {env.get('envelope_head_sha')}\n"
+        f"- supervisor: {args.supervisor}\n"
+    )
+    cp = run_gh(repo, ["pr", "create", "--base", base, "--head", branch,
+                       "--title", f"merge: {env.get('task')} ({args.envelope})",
+                       "--body", body],
+                phase="pr-create", timeout=timeout)
+    if cp.returncode != 0:
+        combined = f"{cp.stdout or ''}\n{cp.stderr or ''}"
+        if "already exists" in combined.lower():
+            # Re-running a merge must reuse the open PR instead of failing.
+            # ``gh pr view --json`` is a flag the real CLI does support.
+            cp = run_gh(repo, ["pr", "view", branch, "--json", "number,url"],
+                        phase="pr-view", timeout=timeout)
+            if cp.returncode != 0:
+                raise MergeBlocked("pr-view", "view", command_failure(cp))
+            try:
+                viewed = json.loads(cp.stdout)
+                number = viewed["number"]
+                url = viewed["url"]
+            except (TypeError, ValueError, KeyError):
+                raise MergeBlocked(
+                    "pr-view", "parse",
+                    f"cannot parse gh pr view output: {(cp.stdout or '').strip()}"
+                ) from None
+        else:
+            raise MergeBlocked("pr-create", "create", command_failure(cp))
+    else:
+        parsed = parse_created_pr(cp.stdout)
+        if parsed is None:
+            raise MergeBlocked(
+                "pr-create", "no-url",
+                f"cannot parse PR URL from gh pr create output: "
+                f"{(cp.stdout or '')}{(cp.stderr or '')}".strip())
+        url, number = parsed
+
+    # 3. CI gate; a hung gate is bounded by --check-timeout.
+    cp = run_gh(repo, ["pr", "checks", str(number), "--watch", "--fail-fast"],
+                phase="checks", timeout=timeout)
+    if cp.returncode != 0:
+        raise MergeBlocked("checks", "checks", command_failure(cp))
+
+    # 4. merge the PR once the checks are green.
+    cp = run_gh(repo, ["pr", "merge", str(number), "--merge"],
+                phase="pr-merge", timeout=timeout)
+    if cp.returncode != 0:
+        raise MergeBlocked("pr-merge", "merge", command_failure(cp))
+    return {"pr_number": number, "pr_url": url}
+
+
+def pr_fast_forward(repo: Path, env: dict, args) -> str:
+    """Steps 5-6: fetch the merged base, require a fast-forward, return HEAD."""
+    base = str(env.get("base", "main"))
+    remote = getattr(args, "remote", None) or "origin"
+    require_git(repo, "fetch", "fetch", remote, base)
+    require_git(repo, "ff-only", "merge", "--ff-only", f"{remote}/{base}")
+    return git_ok(repo, "rev-parse", "HEAD")
+
+
+def block_pr_merge(root: Path, args, env: dict, env_path: Path, queue: dict,
+                   entry: dict, phase: str, reason: str, detail: str) -> None:
+    """Record a blocked PR merge: both the entry and the envelope need correction.
+
+    ``MERGED`` is never written on this path; only ``CORRECTION_REQUIRED`` plus
+    a ``MERGE_BLOCKED`` ledger event naming the failing ``phase``.
+    """
+    entry["status"] = "CORRECTION_REQUIRED"
+    save_queue(root, queue)
+    env.update({"status": "CORRECTION_REQUIRED"})
+    jdump(env_path, env)
+    append_supervision_ledger(root, "MERGE_BLOCKED", "supervision", {
+        "envelope": args.envelope,
+        "phase": phase,
+        "reason": reason,
+        "detail": detail,
+    })
+
+
 def cmd_merge(root: Path, args) -> None:
     if args.role != "supervisor":
         fail(["merge requires --role supervisor"])
@@ -2038,35 +2265,97 @@ def cmd_merge(root: Path, args) -> None:
                                    "errors": [c for c in checks if not c["ok"]]})
         emit({"ok": False, "envelope": args.envelope,
               "errors": [c for c in checks if not c["ok"]]}, 2)
+    mode = getattr(args, "mode", "local") or "local"
+    # A previous attempt may already have merged the PR remotely and then
+    # failed only at fetch/fast-forward.  Such a retry must not push, create,
+    # check or merge again -- it resumes straight at step 5.
+    resume_remote = (mode == "pr" and env.get("remote_merged") is True
+                     and bool(env.get("pr_number")) and bool(env.get("pr_url")))
+    if mode == "pr" and not resume_remote:
+        # Preflight before the queue is pinned at MERGING: a host without a
+        # runnable gh must fail the gate cleanly instead of leaving a
+        # half-started merge.  gh_command() emits the JSON error itself, so
+        # the abort is recorded and the SystemExit(2) is re-raised untouched.
+        try:
+            gh_command()
+        except SystemExit:
+            block_pr_merge(root, args, env, env_path, queue, entry,
+                           "gh", "gh-not-found",
+                           "gh executable not found; install GitHub CLI or "
+                           "set TOWERCTL_GH")
+            raise
     entry["status"] = "MERGING"
     save_queue(root, queue)
     append_supervision_ledger(root, "MERGE_START", "supervision",
                               {"envelope": args.envelope, "supervisor": args.supervisor})
-    cp = git(repo, "merge", "--no-ff", "-m",
-             f"merge: {env.get('task')} ({args.envelope})", env.get("branch", ""))
-    if cp.returncode != 0:
-        git(repo, "merge", "--abort")
-        entry["status"] = "CORRECTION_REQUIRED"
-        save_queue(root, queue)
-        append_supervision_ledger(root, "MERGE_FAILED", "supervision",
-                                  {"envelope": args.envelope, "stderr": cp.stderr.strip()})
-        fail([f"git merge failed: {cp.stderr.strip() or cp.stdout.strip()}"])
-    merge_commit = git_ok(repo, "rev-parse", "HEAD")
+    merge_extra: dict = {}
+    if mode == "pr":
+        try:
+            if not resume_remote:
+                identity = pr_remote_merge(repo, env, args)
+                env.update({
+                    "pr_number": identity["pr_number"],
+                    "pr_url": identity["pr_url"],
+                    "remote_merged": True,
+                    "remote_merged_at": now(),
+                })
+                # Persist the remote half before touching the local branch: if
+                # the fast-forward fails, the retry knows the PR is merged and
+                # block_pr_merge() must never discard these fields.
+                jdump(env_path, env)
+            merge_commit = pr_fast_forward(repo, env, args)
+        except MergeBlocked as exc:
+            block_pr_merge(root, args, env, env_path, queue, entry,
+                           exc.phase, exc.reason, exc.detail)
+            fail([f"pr merge blocked at {exc.phase} ({exc.reason}): {exc.detail}"])
+        except SystemExit:
+            # gh vanished between the preflight and an actual call; the queue
+            # must not be left at MERGING after the gate already emitted.
+            block_pr_merge(root, args, env, env_path, queue, entry,
+                           "gh", "gh-not-found",
+                           "gh executable not found; install GitHub CLI or "
+                           "set TOWERCTL_GH")
+            raise
+        merge_extra = {
+            "merge_mode": "pr",
+            "pr_number": env["pr_number"],
+            "pr_url": env["pr_url"],
+            "check_conclusion": "success",
+        }
+    else:
+        cp = git(repo, "merge", "--no-ff", "-m",
+                 f"merge: {env.get('task')} ({args.envelope})", env.get("branch", ""))
+        if cp.returncode != 0:
+            git(repo, "merge", "--abort")
+            entry["status"] = "CORRECTION_REQUIRED"
+            save_queue(root, queue)
+            append_supervision_ledger(root, "MERGE_FAILED", "supervision",
+                                      {"envelope": args.envelope, "stderr": cp.stderr.strip()})
+            fail([f"git merge failed: {cp.stderr.strip() or cp.stdout.strip()}"])
+        merge_commit = git_ok(repo, "rev-parse", "HEAD")
+        # Local merges keep their existing records; only the mode is added.
+        merge_extra = {"merge_mode": "local"}
     env.update({"status": "MERGED", "merge_commit": merge_commit,
                 "merged_at": now(), "supervisor": args.supervisor})
+    env.update(merge_extra)
     jdump(env_path, env)
     entry["status"] = "MERGED"
     entry["merge_commit"] = merge_commit
     save_queue(root, queue)
-    add_merge_ledger(root, {
+    ledger_entry = {
         "envelope_id": args.envelope, "task": env.get("task"),
         "implementation_head_sha": env.get("implementation_head_sha"),
         "envelope_head_sha": env.get("envelope_head_sha"),
         "merge_commit": merge_commit, "supervisor": args.supervisor,
         "at": now(),
-    })
-    append_supervision_ledger(root, "MERGE", "supervision",
-                              {"envelope": args.envelope, "merge_commit": merge_commit})
+    }
+    merge_payload = {"envelope": args.envelope, "merge_commit": merge_commit}
+    if mode == "pr":
+        for key in ("merge_mode", "pr_number", "pr_url"):
+            ledger_entry[key] = env[key]
+            merge_payload[key] = env[key]
+    add_merge_ledger(root, ledger_entry)
+    append_supervision_ledger(root, "MERGE", "supervision", merge_payload)
     emit({"ok": True, "envelope": args.envelope, "status": "MERGED",
           "merge_commit": merge_commit})
 
@@ -2423,6 +2712,12 @@ def build_parser() -> argparse.ArgumentParser:
     mg.add_argument("--envelope", required=True)
     mg.add_argument("--role", required=True, choices=["supervisor"])
     mg.add_argument("--supervisor", required=True)
+    mg.add_argument("--mode", default="local", choices=["local", "pr"],
+                    help="local merge (default) or PR-mode merge through gh")
+    mg.add_argument("--remote", default="origin",
+                    help="git remote used by --mode pr (default: origin)")
+    mg.add_argument("--check-timeout", dest="check_timeout", type=int, default=900,
+                    help="seconds to wait for gh pr checks --watch (default: 900)")
 
     pm = sub.add_parser("post-merge")
     pm.add_argument("--envelope", required=True)
