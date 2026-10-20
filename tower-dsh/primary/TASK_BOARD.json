@@ -161,7 +161,17 @@
       "reviewer": "subagent:rev-pilot-016",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-016/MERGE.md",
       "updated_at": "2026-10-20T19:43:34+08:00"
+    },
+    {
+      "id": "PILOT-017",
+      "title": "权威状态检测补齐 tasks/ 与 pilot/，并把目录集合变成可测试的常量",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-017",
+      "reviewer": "subagent:rev-pilot-017",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-017/MERGE.md",
+      "updated_at": "2026-10-20T20:41:57+08:00"
     }
   ],
-  "updated_at": "2026-10-20T19:43:34+08:00"
+  "updated_at": "2026-10-20T20:41:57+08:00"
 }

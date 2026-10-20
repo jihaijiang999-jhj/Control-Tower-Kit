@@ -1,0 +1,10 @@
+commit abe4ec36eefe8fd16ea2cec1fbf82b616461c472
+Author:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+AuthorDate: Tue Oct 20 20:08:08 2026 +0800
+Commit:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+CommitDate: Tue Oct 20 20:08:08 2026 +0800
+
+    PILOT-017: cover tasks/ and pilot/ in authority drift
+abe4ec36eefe8fd16ea2cec1fbf82b616461c472
+tower-dsh/tools/tests/test_authority_drift.py
+tower-dsh/tools/towerctl.py
