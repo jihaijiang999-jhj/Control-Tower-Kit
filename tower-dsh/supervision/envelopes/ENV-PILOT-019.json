@@ -41,7 +41,7 @@
     }
   ],
   "envelope_head_sha": "5df359c8f657158a5c20da00b72249f3f611cb3b",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "pr_number": 4,
   "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/4",
   "remote_merged": true,
@@ -50,5 +50,7 @@
   "merged_at": "2026-10-20T21:34:24+08:00",
   "supervisor": "sup-pilot-019-verify",
   "merge_mode": "pr",
-  "check_conclusion": "success"
+  "check_conclusion": "success",
+  "post_merge_at": "2026-10-20T21:35:52+08:00",
+  "post_merge_note": "exit-code based pending detection; 192 tests"
 }
