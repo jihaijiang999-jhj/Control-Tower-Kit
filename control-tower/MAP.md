@@ -108,7 +108,7 @@
 
 | # | 空白 | 现状证据 | 后果 |
 |---|---|---|---|
-| ∅1 | 远端 PR / 分支保护 | CI 已通电并在 main 上跑绿（run 39346811217，九步全绿、零 `##[error]`，PILOT-012/014），但**仍无 branch protection**；merge 仍是本地 `git merge --no-ff` | 门只在"推上去之后"验证；本地 merge 依旧无人拦 |
+| ∅1 | 远端 PR / 分支保护 | CI 已通电并在 main 上跑绿（run 39346811217）；2026-10-20 仓库转 public 后已开 main 保护：**禁强推、禁删分支、要求 `tower gate` 检查**；但 `enforce_admins=false`，owner 仍可直推 | 门对"非管理员"是硬的；对 owner 仍是软的——全锁需要先把 merge 改成 PR 流程（PILOT-015） |
 | ∅2 | Console / presets（Phase 4） | 无代码 | 操作全靠 CLI |
 | ∅3 | 多任务并发 | 队列只校验 `entry.status`，不排斥并发 `MERGING`（P1-14） | 并发合并可能写坏 base |
 | ∅4 | 真实项目 pilot | 只有 `pilot/repo` 玩具项目（10 个 worktree） | 未证过接第二个项目 |
@@ -213,6 +213,18 @@ UnicodeEncodeError: 'charmap' codec can't encode characters in position 244-253
 处置（PILOT-014）：`towerctl` 启动时把 stdout/stderr 重配为 UTF-8；同时**删掉该步骤的 `continue-on-error`**，因为 `status` 对脏状态本来就 `exit 0`，会失败只可能是真异常。
 
 **判例**：容错设置必须区分"预期内的坏结果"（脏状态）与"工具坏了"（异常）。把两者都设成 `continue-on-error`，等于给自己发一张"永远绿"的假证书。
+
+### 6.5 判例：计划限制不是实现缺陷
+
+`gh api PUT .../branches/main/protection` 首次返回：
+
+```
+403 Upgrade to GitHub Pro or make this repository public to enable this feature.
+```
+
+私有仓 + 免费计划下，服务端分支保护**不可用**。处置：owner 决定把仓库转为 public（公开前已扫描工作树与全部 81 个提交，无密钥/令牌/私钥模式命中），随后保护成功开启。
+
+**归因教训**：MAP 早先把 ∅1 写成"没做"，实际有一半是"做不了"。**把限制误记为欠账，会让人以为再努力一点就行**——这类错误比漏记更贵。
 
 **同时更正**：`handoff-activate` 把 phase 从 `READY_FOR_PRACTICE` 改为 `HANDOFF_ACTIVE`、`next_action` 改为 `resume from handoffs/HANDOFF-PILOT-002/HANDOFF.md`；§1 主图已按实值更新。
 
