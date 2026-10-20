@@ -31,8 +31,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "tower-gate.yml"
 CODEOWNERS = REPO_ROOT / ".github" / "CODEOWNERS"
 
-CHECKOUT = "actions/checkout@v4"
-SETUP_PYTHON = "actions/setup-python@v5"
+CHECKOUT = "actions/checkout@v7"
+SETUP_PYTHON = "actions/setup-python@v7"
 PYTHON_VERSION = 'python-version: "3.12"'
 WORKING_DIRECTORY = "working-directory: tower-dsh"
 CONTINUE_ON_ERROR = "continue-on-error"
@@ -155,6 +155,17 @@ class CiGateWorkflowTestCase(unittest.TestCase):
         self.assertLess(self.workflow.index(CHECKOUT),
                         self.workflow.index(SETUP_PYTHON),
                         msg=f"checkout must precede setup-python:\n{self.workflow}")
+
+    def test_workflow_uses_v7_actions(self) -> None:
+        """PILOT-020: the Node.js 20 deprecation notices are gone."""
+        self.assertNotIn("actions/checkout@v4", self.workflow,
+                         msg=f"stale actions/checkout@v4 still present:\n{self.workflow}")
+        self.assertNotIn("actions/setup-python@v5", self.workflow,
+                         msg=f"stale actions/setup-python@v5 still present:\n{self.workflow}")
+        self.assertEqual(self.workflow.count(CHECKOUT), 1,
+                         msg=f"expected exactly one {CHECKOUT}:\n{self.workflow}")
+        self.assertEqual(self.workflow.count(SETUP_PYTHON), 1,
+                         msg=f"expected exactly one {SETUP_PYTHON}:\n{self.workflow}")
 
     def test_workflow_requests_read_only_permissions(self) -> None:
         self.assertRegex(
