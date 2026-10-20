@@ -108,7 +108,7 @@
 
 | # | 空白 | 现状证据 | 后果 |
 |---|---|---|---|
-| ∅1 | 远端 PR / 分支保护 | CI 已通电并在 main 上跑绿（run 39346811217）；2026-10-20 仓库转 public 后已开 main 保护：**禁强推、禁删分支、要求 `tower gate` 检查**；但 `enforce_admins=false`，owner 仍可直推 | 门对"非管理员"是硬的；对 owner 仍是软的——全锁需要先把 merge 改成 PR 流程（PILOT-015） |
+| ∅1 | 远端 PR / 分支保护 | main 已保护（禁强推/禁删分支/要求 `tower gate`）；`towerctl merge --mode pr` 已于 PILOT-015 落地（push → PR → checks → merge → ff），**但尚未端到端实跑**；`enforce_admins=false` | 门对非管理员是硬的；owner 仍可直推。PR 模式首次真实使用是下一个未决项 |
 | ∅2 | Console / presets（Phase 4） | 无代码 | 操作全靠 CLI |
 | ∅3 | 多任务并发 | 队列只校验 `entry.status`，不排斥并发 `MERGING`（P1-14） | 并发合并可能写坏 base |
 | ∅4 | 真实项目 pilot | 只有 `pilot/repo` 玩具项目（10 个 worktree） | 未证过接第二个项目 |
@@ -141,10 +141,10 @@
 | 路径越界防护 | `[证]` | `ensure_within` 覆盖 evidence / worktree / package / envelope / repository |
 | ledger 哈希链 | `[证]` | `verify-ledger` → primary 103 事件、supervision 54，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
 | 条款→测试绑定 | `[证]` | `spec-coverage`：6 份规范 / 56 条款 / tool-check 27 / covered **27** / gaps 0 |
-| 测试全绿 | `[证]`（有条件） | `Ran 163 tests / OK`（本地 2026-10-20，PILOT-014 后）；GitHub Actions `Ran 163 tests in 68.271s`（run 39346811217，全绿）。**本地前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
+| 测试全绿 | `[证]`（有条件） | `Ran 174 tests / OK`（本地 2026-10-20，PILOT-015 后）；GitHub Actions `Ran 163 tests`（run 39346811217）。**本地前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
 | 29 条条款靠人 | `[声]` | 12 `review-check` + 17 `owner-gate`（`spec-coverage.manual` / `.owner`） |
 | "每次迭代全局正确" | `[无]` | 无对象层不变量、无趋势锚点、无状态重放 |
-| 14 个任务 / 14 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（PILOT-011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`，post-merge 均 4/4）；GitHub 门禁 run 39346811217 全绿 |
+| 15 个任务 / 15 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`，post-merge 均 4/4） |
 
 ---
 
@@ -225,6 +225,18 @@ UnicodeEncodeError: 'charmap' codec can't encode characters in position 244-253
 私有仓 + 免费计划下，服务端分支保护**不可用**。处置：owner 决定把仓库转为 public（公开前已扫描工作树与全部 81 个提交，无密钥/令牌/私钥模式命中），随后保护成功开启。
 
 **归因教训**：MAP 早先把 ∅1 写成"没做"，实际有一半是"做不了"。**把限制误记为欠账，会让人以为再努力一点就行**——这类错误比漏记更贵。
+
+### 6.6 判例：桩比真实环境宽容，就是在测想象
+
+PILOT-015 给 `merge` 加了 `--mode pr`。首轮实现 + 11 个测试全绿，独立 reviewer 判 **FAIL**，理由只有一句：
+
+> 真实 `gh` 2.96 **没有** `gh pr create --json`；真实行为是只打印 URL。桩接受了 `--json` 并返回 JSON，所以测试测的是想象。
+
+而这句 `--json` 是**我自己写进 spec 的**——spec 与实现同源错误，两轮自动化检查都没抓到，靠独立复核抓到了。
+
+同轮还暴露两个真实缺口：`TOWERCTL_GH` 指向"存在但不可执行"的文件时 `Popen` 抛 `OSError` 未捕获，队列**永久卡在 `MERGING`**；以及 PR 已在远端合并、本地 ff 失败时，塔里连 PR 号都没落盘，重试会撞"PR already exists"。后者已改为"合并后先落盘 `pr_number`/`remote_merged`，再 ff；重试跳过远端半程"。
+
+**判例**：桩必须模拟真实工具的**缺陷**（拒绝它不支持的 flag、只输出它真的会输出的东西），否则测试只证明"我的假设自洽"。另：**spec 也会写错**，冻结的是契约不是真理——错了要按证据改实现，并在 REVIEW 里记明偏离，而不是让测试去迁就错的 spec。
 
 **同时更正**：`handoff-activate` 把 phase 从 `READY_FOR_PRACTICE` 改为 `HANDOFF_ACTIVE`、`next_action` 改为 `resume from handoffs/HANDOFF-PILOT-002/HANDOFF.md`；§1 主图已按实值更新。
 
