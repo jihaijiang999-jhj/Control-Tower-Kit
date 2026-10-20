@@ -6,35 +6,16 @@
 - result: PASS
 - working_tree_clean: True
 - tool_owned_paths_ignored: []
-- test_exit: 1
+- test_exit: 0
 
 ## Test output
 
 
-test_tower_gate_suite (test_tower_gates.TowerGateSuite.test_tower_gate_suite) ... Exception in thread Thread-2 (_readerthread):
-Traceback (most recent call last):
-  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
-    self.run()
-  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
-    self._target(*self._args, **self._kwargs)
-  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1599, in _readerthread
-    buffer.append(fh.read())
-                  ^^^^^^^^^
-  File "<frozen codecs>", line 322, in decode
-UnicodeDecodeError: 'utf-8' codec can't decode byte 0xbf in position 31994: invalid start byte
-ERROR
-
-======================================================================
-ERROR: test_tower_gate_suite (test_tower_gates.TowerGateSuite.test_tower_gate_suite)
-----------------------------------------------------------------------
-Traceback (most recent call last):
-  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tests\test_tower_gates.py", line 26, in test_tower_gate_suite
-    self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)
-                                       ~~~~~~~~~~^~~~~~~~~~~
-TypeError: can only concatenate str (not "NoneType") to str
+test_non_utf8_child_output_is_replaced_not_raised (test_tower_gates.NonUtf8ChildOutput.test_non_utf8_child_output_is_replaced_not_raised) ... ok
+test_tower_gate_suite (test_tower_gates.TowerGateSuite.test_tower_gate_suite) ... ok
 
 ----------------------------------------------------------------------
-Ran 1 test in 77.034s
+Ran 2 tests in 75.979s
 
-FAILED (errors=1)
+OK
 

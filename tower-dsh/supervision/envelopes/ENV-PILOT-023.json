@@ -49,7 +49,7 @@
     }
   ],
   "envelope_head_sha": "ec99c55c1885ea727bcc192da4eb509f19d0033e",
-  "status": "CORRECTION_REQUIRED",
+  "status": "POST_MERGE_VERIFIED",
   "pr_number": 8,
   "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/8",
   "remote_merged": true,
@@ -58,5 +58,7 @@
   "merged_at": "2026-10-21T04:40:10+08:00",
   "supervisor": "sup-pilot-023-verify",
   "merge_mode": "pr",
-  "check_conclusion": "success"
+  "check_conclusion": "success",
+  "post_merge_at": "2026-10-21T05:07:15+08:00",
+  "post_merge_note": "retry after PILOT-024 gate decode fix; 236 tests; evidence/spec integrity"
 }
