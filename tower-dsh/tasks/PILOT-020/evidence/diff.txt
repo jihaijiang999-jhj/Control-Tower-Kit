@@ -1,0 +1,58 @@
+﻿commit ec31e713320749add9afc4f1619ada5973a2dde6
+Author:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+AuthorDate: Tue Oct 20 21:45:33 2026 +0800
+Commit:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+CommitDate: Tue Oct 20 21:45:33 2026 +0800
+
+    PILOT-020: bump CI actions to v7
+
+diff --git a/.github/workflows/tower-gate.yml b/.github/workflows/tower-gate.yml
+index 81ec39a..fc97bc7 100644
+--- a/.github/workflows/tower-gate.yml
++++ b/.github/workflows/tower-gate.yml
+@@ -18,10 +18,10 @@ jobs:
+         working-directory: tower-dsh
+     steps:
+       - name: Checkout repository
+-        uses: actions/checkout@v4
++        uses: actions/checkout@v7
+ 
+       - name: Set up Python 3.12
+-        uses: actions/setup-python@v5
++        uses: actions/setup-python@v7
+         with:
+           python-version: "3.12"
+ 
+diff --git a/tower-dsh/tools/tests/test_ci_gate.py b/tower-dsh/tools/tests/test_ci_gate.py
+index ed3dc96..0522ff7 100644
+--- a/tower-dsh/tools/tests/test_ci_gate.py
++++ b/tower-dsh/tools/tests/test_ci_gate.py
+@@ -31,8 +31,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
+ WORKFLOW = REPO_ROOT / ".github" / "workflows" / "tower-gate.yml"
+ CODEOWNERS = REPO_ROOT / ".github" / "CODEOWNERS"
+ 
+-CHECKOUT = "actions/checkout@v4"
+-SETUP_PYTHON = "actions/setup-python@v5"
++CHECKOUT = "actions/checkout@v7"
++SETUP_PYTHON = "actions/setup-python@v7"
+ PYTHON_VERSION = 'python-version: "3.12"'
+ WORKING_DIRECTORY = "working-directory: tower-dsh"
+ CONTINUE_ON_ERROR = "continue-on-error"
+@@ -156,6 +156,17 @@ class CiGateWorkflowTestCase(unittest.TestCase):
+                         self.workflow.index(SETUP_PYTHON),
+                         msg=f"checkout must precede setup-python:\n{self.workflow}")
+ 
++    def test_workflow_uses_v7_actions(self) -> None:
++        """PILOT-020: the Node.js 20 deprecation notices are gone."""
++        self.assertNotIn("actions/checkout@v4", self.workflow,
++                         msg=f"stale actions/checkout@v4 still present:\n{self.workflow}")
++        self.assertNotIn("actions/setup-python@v5", self.workflow,
++                         msg=f"stale actions/setup-python@v5 still present:\n{self.workflow}")
++        self.assertEqual(self.workflow.count(CHECKOUT), 1,
++                         msg=f"expected exactly one {CHECKOUT}:\n{self.workflow}")
++        self.assertEqual(self.workflow.count(SETUP_PYTHON), 1,
++                         msg=f"expected exactly one {SETUP_PYTHON}:\n{self.workflow}")
++
+     def test_workflow_requests_read_only_permissions(self) -> None:
+         self.assertRegex(
+             self.workflow, r"(?m)^permissions:\s*$\n(?:\s+.*\n)*?\s+contents:\s*read\s*$",

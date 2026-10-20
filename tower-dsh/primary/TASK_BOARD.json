@@ -191,7 +191,17 @@
       "reviewer": "subagent:rev-pilot-019",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-019/MERGE.md",
       "updated_at": "2026-10-20T21:31:26+08:00"
+    },
+    {
+      "id": "PILOT-020",
+      "title": "CI action 升级到 checkout@v7 / setup-python@v7，消除 Node 20 弃用告警",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-020",
+      "reviewer": "subagent:rev-pilot-020",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-020/MERGE.md",
+      "updated_at": "2026-10-20T21:57:13+08:00"
     }
   ],
-  "updated_at": "2026-10-20T21:31:26+08:00"
+  "updated_at": "2026-10-20T21:57:13+08:00"
 }

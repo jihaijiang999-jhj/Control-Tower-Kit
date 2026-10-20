@@ -1,0 +1,110 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-020",
+  "title": "CI action 升级到 checkout@v7 / setup-python@v7，消除 Node 20 弃用告警",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "tower-gate.yml 的 actions/checkout 从 v4 升到 v7，actions/setup-python 从 v5 升到 v7",
+    "保持 runs-on windows-latest、python-version 3.12、working-directory tower-dsh、五步顺序不变",
+    "同步更新 test_ci_gate.py 中对 action 版本的断言（常量），其余断言不动",
+    "合并后在 GitHub 上确认 CI 仍全绿且不再出现 Node.js 20 弃用注解"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-020/.github/workflows/tower-gate.yml",
+    "pilot/worktrees/PILOT-020/tower-dsh/tools/tests/test_ci_gate.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "changing other tests or towerctl.py"
+  ],
+  "acceptance": [
+    "python -B -m unittest discover -s tools/tests -v 全部通过，总数 >= 193",
+    "workflow 中 checkout 为 @v7、setup-python 为 @v7，且不再出现 @v4/@v5",
+    "window-latest、python-version \"3.12\"、working-directory tower-dsh、五条 run 步骤与顺序均不变",
+    "spec-coverage 27/27、tool_gaps 空；spec-lint --strict 6/6",
+    "git diff --name-only main..HEAD 恰好两个 allowed 文件"
+  ],
+  "depends_on": [
+    "PILOT-019"
+  ],
+  "worktree": "pilot/worktrees/PILOT-020",
+  "spec_path": "pilot/PILOT-020.spec.json",
+  "spec_sha256": "a79b74c0f1bc2f9b76dc34b02f46ac9807c09c5dce99643ac2fce26ed13b2672",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-pilot-020",
+  "dispatch": {
+    "executor": "subagent:exec-pilot-020",
+    "worktree": "pilot/worktrees/PILOT-020",
+    "at": "2026-10-20T21:36:04+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-020/evidence/tower-gate.yml",
+      "sha256": "08eefd46cf1602705ede1296279da9649b42c40364dc9464160bccb5955bf293",
+      "bytes": 857,
+      "at": "2026-10-20T21:49:44+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-020/evidence/test_ci_gate.py",
+      "sha256": "fbaba34bb45f14d65b1ee837e418995007d6dbcf6bee1e15b6c3b7220efaecdc",
+      "bytes": 9270,
+      "at": "2026-10-20T21:49:44+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-020/evidence/test-output.txt",
+      "sha256": "7e979dbb8fa5540b1fa47a0203a32b607dc3a5f5fdcc909efd9b48c8b0c4bdaa",
+      "bytes": 26267,
+      "at": "2026-10-20T21:49:44+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-020/evidence/test-output-no-gitconfig.txt",
+      "sha256": "aaee5320faf81c2c2cdaefc60302e6b095338e877d9daf9dd43b883a131e2921",
+      "bytes": 26394,
+      "at": "2026-10-20T21:49:44+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-020/evidence/commit.txt",
+      "sha256": "82e75b429333fcccf33cf611eb323dfe7d4b77268cc2341c44b5c537cb322ad3",
+      "bytes": 418,
+      "at": "2026-10-20T21:49:44+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-020/evidence/diff.txt",
+      "sha256": "d657af8b008089ae6fdbfef98ba12390a33f08863318d54aa98e57909d1a3bc0",
+      "bytes": 2783,
+      "at": "2026-10-20T21:49:44+08:00",
+      "id": "E-006"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-pilot-020",
+    "verdict": "PASS",
+    "note": "AC-1..AC-5 全 PASS。193 tests OK；workflow diff 仅 2 行版本号（-U0 核对），pyyaml 对比 main 与 HEAD 结构完全相等（1 job / 7 steps）；v7 tag 真实存在且 action.yml 为 node24；测试双向鉴别力已验证（改常量或改 workflow 任一方向都会红）。已知：合并前该分支无 CI 运行，故'Node20 注解消失'目前依据 action.yml=node24 推断，真实观测留待 PR 与合并后 CI。v5→v7 breaking 面（runner≥2.327.1、fork PR 默认拒 checkout、setup-python 移除 pip-install 输入）均不命中本 workflow。",
+    "at": "2026-10-20T21:57:13+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-020",
+    "actor": "owner",
+    "text": "owner approved actions v7 upgrade",
+    "at": "2026-10-20T21:57:13+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-020/CLOSEOUT.md",
+    "at": "2026-10-20T21:57:13+08:00"
+  },
+  "created_at": "2026-10-20T21:36:03+08:00",
+  "updated_at": "2026-10-20T21:57:13+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-020/MERGE.md",
+  "delivered_at": "2026-10-20T21:49:44+08:00",
+  "accepted_at": "2026-10-20T21:57:13+08:00"
+}

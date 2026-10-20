@@ -1,0 +1,9 @@
+﻿commit ec31e713320749add9afc4f1619ada5973a2dde6
+branch HEAD -> pilot/PILOT-020
+subject PILOT-020: bump CI actions to v7
+author mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+date Tue Oct 20 21:45:33 2026 +0800
+---
+ .github/workflows/tower-gate.yml      |  4 ++--
+ tower-dsh/tools/tests/test_ci_gate.py | 15 +++++++++++++--
+ 2 files changed, 15 insertions(+), 4 deletions(-)

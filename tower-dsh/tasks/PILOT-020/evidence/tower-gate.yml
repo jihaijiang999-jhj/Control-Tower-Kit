@@ -1,0 +1,41 @@
+name: tower-gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: tower gate
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: tower-dsh
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Unit tests
+        run: python -B -m unittest discover -s tools/tests -v
+
+      - name: Spec lint (strict)
+        run: python tools/towerctl.py spec-lint --strict
+
+      - name: Spec coverage
+        run: python tools/towerctl.py spec-coverage
+
+      - name: Verify ledger chain
+        run: python tools/towerctl.py verify-ledger
+
+      - name: Status
+        run: python tools/towerctl.py status
