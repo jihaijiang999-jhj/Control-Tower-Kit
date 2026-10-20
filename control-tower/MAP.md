@@ -108,7 +108,7 @@
 
 | # | 空白 | 现状证据 | 后果 |
 |---|---|---|---|
-| ∅1 | 远端 PR / 分支保护 | main 已保护（禁强推/禁删分支/要求 `tower gate`）；`towerctl merge --mode pr` 已于 PILOT-015 落地（push → PR → checks → merge → ff），**但尚未端到端实跑**；`enforce_admins=false` | 门对非管理员是硬的；owner 仍可直推。PR 模式首次真实使用是下一个未决项 |
+| ∅1 | 远端 PR / 分支保护 | main 已保护（禁强推/禁删分支/要求 `tower gate`）；`merge --mode pr` 已**真实跑通**：PILOT-016 经 GitHub PR #1 合并（merge `29d8ec6`），PR 上 `tower gate` 绿后由 `gh pr merge --merge` 合入并本地 ff；`enforce_admins=false` | 门对非管理员是硬的；owner 仍可直推。全锁需要状态提交也走 PR（不做，理由见 §6.5） |
 | ∅2 | Console / presets（Phase 4） | 无代码 | 操作全靠 CLI |
 | ∅3 | 多任务并发 | 队列只校验 `entry.status`，不排斥并发 `MERGING`（P1-14） | 并发合并可能写坏 base |
 | ∅4 | 真实项目 pilot | 只有 `pilot/repo` 玩具项目（10 个 worktree） | 未证过接第二个项目 |
@@ -141,10 +141,10 @@
 | 路径越界防护 | `[证]` | `ensure_within` 覆盖 evidence / worktree / package / envelope / repository |
 | ledger 哈希链 | `[证]` | `verify-ledger` → primary 103 事件、supervision 54，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
 | 条款→测试绑定 | `[证]` | `spec-coverage`：6 份规范 / 56 条款 / tool-check 27 / covered **27** / gaps 0 |
-| 测试全绿 | `[证]`（有条件） | `Ran 174 tests / OK`（本地 2026-10-20，PILOT-015 后）；GitHub Actions `Ran 163 tests`（run 39346811217）。**本地前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
+| 测试全绿 | `[证]`（有条件） | `Ran 178 tests / OK`（本地 2026-10-20，PILOT-016 后）；GitHub Actions 在 PR #1 与 main 上均绿。**本地前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
 | 29 条条款靠人 | `[声]` | 12 `review-check` + 17 `owner-gate`（`spec-coverage.manual` / `.owner`） |
 | "每次迭代全局正确" | `[无]` | 无对象层不变量、无趋势锚点、无状态重放 |
-| 15 个任务 / 15 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`，post-merge 均 4/4） |
+| 16 个任务 / 16 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；**016 经 GitHub PR #1 合并 `29d8ec6`**，post-merge 均 4/4） |
 
 ---
 
@@ -239,6 +239,22 @@ PILOT-015 给 `merge` 加了 `--mode pr`。首轮实现 + 11 个测试全绿，�
 **判例**：桩必须模拟真实工具的**缺陷**（拒绝它不支持的 flag、只输出它真的会输出的东西），否则测试只证明"我的假设自洽"。另：**spec 也会写错**，冻结的是契约不是真理——错了要按证据改实现，并在 REVIEW 里记明偏离，而不是让测试去迁就错的 spec。
 
 **同时更正**：`handoff-activate` 把 phase 从 `READY_FOR_PRACTICE` 改为 `HANDOFF_ACTIVE`、`next_action` 改为 `resume from handoffs/HANDOFF-PILOT-002/HANDOFF.md`；§1 主图已按实值更新。
+
+### 6.7 第一次真实 PR 合并（2026-10-20）
+
+`merge --mode pr` 第一次在真机上跑完整条链，用的是**被合并分支里的新 towerctl**（`--root .`，即用待合并的代码合并它自己）：
+
+```
+push pilot/PILOT-016 → gh pr create → PR #1 出现
+→ gh pr checks --watch（GitHub 上 tower gate 跑绿）
+→ gh pr merge --merge → merge 29d8ec6
+→ git fetch + merge --ff-only → 本地 main 跟上
+→ post-merge 4/4 → POST_MERGE_VERIFIED
+```
+
+信封实值：`merge_mode=pr`、`pr_number=1`、`pr_url=.../pull/1`、`check_conclusion=success`、`remote_merged=true`、`merge_commit=29d8ec6`。
+
+这一步的意义不是"多了一条合并路径"，而是：**代码进 main 的门第一次由 GitHub 服务端裁决，而不是由本地说"我跑过了"。** 剩下的软处只有 owner 直推（§6.5 已说明为何不锁死）。
 
 ---
 
