@@ -1,0 +1,47 @@
+{
+  "schema": "tower/spec@1",
+  "id": "PILOT-023",
+  "title": "state-verify 校验证据完整性：证据缺失/哈希/字节数不符与 spec 哈希漂移都算 drift",
+  "authority": "workspace_write",
+  "scope": [
+    "对有重放生命周期事件且 record.json 可读的任务，逐条校验 record.evidence：证据文件缺失记 evidence_missing；sha256 与记录不符记 evidence_hash_mismatch；记录里的 bytes 与磁盘大小不符记 evidence_bytes_mismatch；条目本身不可用（非对象、path 非字符串或空、sha256 不是 64 位十六进制）记 evidence_unreadable",
+    "证据 path 必须在塔根内：解析后越界（含 ../）记 evidence_path_escape，且绝不打开越界路径；path 存在但不是普通文件按 evidence_missing 处理",
+    "记录的 spec 完整性：当 spec_path 与 spec_sha256 同时存在时，路径越界记 spec_path_escape、文件缺失记 spec_missing、哈希不符记 spec_hash_mismatch；两者缺一不做该检查（不在本卡范围）",
+    "证据/规范类 drift 的条目形状为 {kind, target=<task id>, path=<塔根相对路径|null>, expected, actual}；status 类既有 drift 形状保持不变；drift 排序键在 (kind, target) 基础上加入 path 以保持确定性",
+    "结果新增 evidence_checked 计数（实际计算过哈希的条目数）；ledger 错误短路分支输出 evidence_checked=0；其余字段 tasks/envelopes/drift/skipped/skipped_count 与语义保持不变",
+    "只读：校验只做读取与哈希，不写、不修复、不删除任何文件；退出码语义不变（干净 0、任一 drift 2、ledger 错误 2）",
+    "record.evidence 缺失、为空或不是列表时不做逐条检查（不改变既有测试中无证据 fixture 的干净塔语义）；交付证据的存在性由 accept/close 的证据门负责，不在本卡范围",
+    "更新 tools/tests/test_state_verify.py：新增证据缺失/哈希篡改/字节数篡改/条目不可用/路径越界/规范哈希漂移/规范缺失/只读证明等用例，并保持既有 022 契约测试全绿；不得删除覆盖或用更宽断言替换"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-023/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-023/tower-dsh/tools/tests/test_state_verify.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "state-verify writing any file"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-023/tower-dsh && python -B -m unittest discover -s tools/tests -v 全部通过，总数 >= 222（main 基线 214），且新增至少 8 个证据/规范完整性用例",
+    "带 evidence 与 spec 的干净临时塔上 state-verify exit 0、drift=[]、evidence_checked 等于 record.evidence 条目总数",
+    "改写证据文件内容（长度不变）→ exit 2，drift 含 kind=evidence_hash_mismatch，expected=记录的 sha256、actual=磁盘 sha256",
+    "只改 record.evidence[0].sha256（文件不动）→ exit 2，drift 含 kind=evidence_hash_mismatch（MAP §6.9 记录的盲区）",
+    "删除证据文件 → exit 2，drift 含 kind=evidence_missing，target 为该任务、path 为该证据路径",
+    "只改 record.evidence[0].bytes → exit 2，drift 含 kind=evidence_bytes_mismatch",
+    "证据条目 path 写成 ../outside.txt 且塔外放置诱饵文件 → 记 evidence_path_escape，诱饵文件未被打开/修改，exit 2",
+    "证据条目 sha256 缺失或非 64 位十六进制 → exit 2，drift 含 kind=evidence_unreadable",
+    "修改 spec 文件一个字节 → exit 2，drift 含 kind=spec_hash_mismatch；删除 spec 文件 → spec_missing",
+    "干净塔与篡改塔两种场景下 state-verify 运行前后塔根所有文件 SHA-256 完全一致（只读证明）",
+    "在真实塔（tower-dsh 根）运行 python tools/towerctl.py state-verify：exit 0、drift=[]、tasks=23/envelopes=22，evidence_checked 等于独立复算的全部 record.evidence 条目数（冻结基线 139；本卡交付后按实际复算），不得通过放宽规则消除 drift",
+    "python tools/towerctl.py spec-coverage 为 27/27 且 tool_gaps 为空；python tools/towerctl.py spec-lint --strict 为 6/6",
+    "git -C pilot/worktrees/PILOT-023 diff --name-only main..HEAD 恰好两个 allowed_paths 文件",
+    "PILOT-022 的既有契约测试仍全绿：坏文件算 drift、skipped 输出、board 期望值取重放值、只读证明"
+  ],
+  "depends_on": ["PILOT-022"],
+  "worktree": "pilot/worktrees/PILOT-023"
+}

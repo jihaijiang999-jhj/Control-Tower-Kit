@@ -198,7 +198,16 @@
       "status": "POST_MERGE_VERIFIED",
       "added_at": "2026-10-20T23:49:33+08:00",
       "merge_commit": "6a920a59bfdcbac29155be96d64086cb87a88e79"
+    },
+    {
+      "envelope_id": "ENV-PILOT-023",
+      "task": "PILOT-023",
+      "branch": "pilot/PILOT-023",
+      "base": "main",
+      "status": "CORRECTION_REQUIRED",
+      "added_at": "2026-10-21T04:37:23+08:00",
+      "merge_commit": "a88388b3b0744050de227c1f4b3a620fa303f4a9"
     }
   ],
-  "updated_at": "2026-10-20T23:53:15+08:00"
+  "updated_at": "2026-10-21T04:41:36+08:00"
 }

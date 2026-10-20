@@ -1,0 +1,12 @@
+commit 4b210389da1db4e02f4982941b6f4ba132b1c7b7
+Author: mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+Date:   Wed Oct 21 04:22:21 2026 +0800
+
+    PILOT-023: lexical containment before filesystem access
+
+ tower-dsh/tools/tests/test_state_verify.py | 106 +++++++++++++++++
+ tower-dsh/tools/towerctl.py                | 182 ++++++++++++++++++++++-------
+ 2 files changed, 249 insertions(+), 39 deletions(-)
+
+HEAD 4b210389da1db4e02f4982941b6f4ba132b1c7b7
+

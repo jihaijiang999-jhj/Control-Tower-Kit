@@ -1,0 +1,40 @@
+# ENV-PILOT-023 post-merge verification
+
+- base: main
+- implementation: 4b210389da1db4e02f4982941b6f4ba132b1c7b7
+- merge_commit: a88388b3b0744050de227c1f4b3a620fa303f4a9
+- result: PASS
+- working_tree_clean: True
+- tool_owned_paths_ignored: []
+- test_exit: 1
+
+## Test output
+
+
+test_tower_gate_suite (test_tower_gates.TowerGateSuite.test_tower_gate_suite) ... Exception in thread Thread-2 (_readerthread):
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1599, in _readerthread
+    buffer.append(fh.read())
+                  ^^^^^^^^^
+  File "<frozen codecs>", line 322, in decode
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xbf in position 31994: invalid start byte
+ERROR
+
+======================================================================
+ERROR: test_tower_gate_suite (test_tower_gates.TowerGateSuite.test_tower_gate_suite)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tests\test_tower_gates.py", line 26, in test_tower_gate_suite
+    self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)
+                                       ~~~~~~~~~~^~~~~~~~~~~
+TypeError: can only concatenate str (not "NoneType") to str
+
+----------------------------------------------------------------------
+Ran 1 test in 77.034s
+
+FAILED (errors=1)
+

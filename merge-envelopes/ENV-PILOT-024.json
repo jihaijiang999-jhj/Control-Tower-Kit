@@ -1,0 +1,47 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-024",
+  "task": "PILOT-024",
+  "repository": "..",
+  "branch": "pilot/PILOT-024",
+  "base": "main",
+  "implementation_head_sha": "80bfe3dcfa3b0e020e7d47a243f4be363f5922e3",
+  "envelope_path": "merge-envelopes/ENV-PILOT-024.json",
+  "created_at": "2026-10-21T05:01:46+08:00",
+  "scope": "PILOT-024: decode gate subprocess output robustly",
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-024/evidence/test_tower_gates.py",
+      "sha256": "fe1bf5ce1daa3853f9df1266349ec29cc93883db114104771ab0456eaf33bf07"
+    },
+    {
+      "path": "tasks/PILOT-024/evidence/root-test-output.txt",
+      "sha256": "dc16e1abf2d0bdd1552669ff285ea5efb4977c6aca8377b2db748b5830870262"
+    },
+    {
+      "path": "tasks/PILOT-024/evidence/real-gate-output.txt",
+      "sha256": "004297138da40528a766b427ed3c390f3229403e7bf9dc4ccfe7e69202535f11"
+    },
+    {
+      "path": "tasks/PILOT-024/evidence/probe-old-code.txt",
+      "sha256": "e9c5b6588fcd0982a2a8dd19b3a4a96ee650a2e0f194fda5d8a01830ab4ca0c6"
+    },
+    {
+      "path": "tasks/PILOT-024/evidence/weakness-check.txt",
+      "sha256": "355ec7498a9659351ea544222b13783411db83af27f244c9807dd1dbcd389bba"
+    },
+    {
+      "path": "tasks/PILOT-024/evidence/commit.txt",
+      "sha256": "a1e7669a377306a8a5437012b48fbb5bf5f8589ff51609fbaa99dda7bbb0cd40"
+    },
+    {
+      "path": "tasks/PILOT-024/evidence/diff.txt",
+      "sha256": "4af5501ccc032c71f5940d24aec4336ee01a566caecc769ae915f26bc5435d4e"
+    }
+  ]
+}

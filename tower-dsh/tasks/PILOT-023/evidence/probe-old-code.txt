@@ -1,0 +1,271 @@
+PILOT-023 discriminating probe (rework): NEW test file vs main towerctl.py
+scratch dir: C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5
+main towerctl source: git show main:tower-dsh/tools/towerctl.py
+worktree test file: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-023\tower-dsh\tools\tests\test_state_verify.py
+command: C:\Users\mac\AppData\Local\Programs\Python\Python312\python.exe -B tests/test_state_verify.py -v (cwd C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools)
+exit code: 1
+NOTE: scratch is under %TEMP%; the PILOT-023 worktree was not modified.
+========================================================================
+test_absent_empty_or_non_list_evidence_is_ignored (__main__.StateVerifyTestCase.test_absent_empty_or_non_list_evidence_is_ignored) ... ERROR
+test_board_status_drift_is_reported (__main__.StateVerifyTestCase.test_board_status_drift_is_reported) ... ok
+test_broken_board_is_one_board_unreadable (__main__.StateVerifyTestCase.test_broken_board_is_one_board_unreadable) ... ok
+test_broken_envelope_is_envelope_unreadable (__main__.StateVerifyTestCase.test_broken_envelope_is_envelope_unreadable) ... ok
+test_broken_ledger_reports_errors_without_replay (__main__.StateVerifyTestCase.test_broken_ledger_reports_errors_without_replay) ... ERROR
+test_broken_queue_is_one_queue_unreadable (__main__.StateVerifyTestCase.test_broken_queue_is_one_queue_unreadable) ... ok
+test_broken_record_is_record_unreadable (__main__.StateVerifyTestCase.test_broken_record_is_record_unreadable) ... ok
+test_checkback_fail_replays_rework_not_accepted (__main__.StateVerifyTestCase.test_checkback_fail_replays_rework_not_accepted) ... ok
+test_clean_evidence_and_spec_exit_zero (__main__.StateVerifyTestCase.test_clean_evidence_and_spec_exit_zero) ... ERROR
+test_consistent_tower_exits_zero (__main__.StateVerifyTestCase.test_consistent_tower_exits_zero) ... ok
+test_correction_events_fold_and_merge_start_is_ignored (__main__.StateVerifyTestCase.test_correction_events_fold_and_merge_start_is_ignored) ... ok
+test_deleted_board_is_one_board_unreadable (__main__.StateVerifyTestCase.test_deleted_board_is_one_board_unreadable) ... ok
+test_deleted_envelope_is_envelope_missing (__main__.StateVerifyTestCase.test_deleted_envelope_is_envelope_missing) ... ok
+test_deleted_queue_is_one_queue_unreadable (__main__.StateVerifyTestCase.test_deleted_queue_is_one_queue_unreadable) ... ok
+test_deleted_record_is_record_missing (__main__.StateVerifyTestCase.test_deleted_record_is_record_missing) ... ok
+test_entities_without_events_or_files_are_skipped (__main__.StateVerifyTestCase.test_entities_without_events_or_files_are_skipped) ... ok
+test_envelope_status_drift_is_reported (__main__.StateVerifyTestCase.test_envelope_status_drift_is_reported) ... ok
+test_escape_path_never_touches_filesystem (__main__.StateVerifyTestCase.test_escape_path_never_touches_filesystem) ... FAIL
+test_evidence_absolute_path_outside_is_escape (__main__.StateVerifyTestCase.test_evidence_absolute_path_outside_is_escape) ... FAIL
+test_evidence_and_spec_verify_never_writes (__main__.StateVerifyTestCase.test_evidence_and_spec_verify_never_writes) ... FAIL
+test_evidence_content_rewritten_same_length_is_hash_mismatch (__main__.StateVerifyTestCase.test_evidence_content_rewritten_same_length_is_hash_mismatch) ... FAIL
+test_evidence_drift_sorted_by_kind_target_path (__main__.StateVerifyTestCase.test_evidence_drift_sorted_by_kind_target_path) ... FAIL
+test_evidence_entry_without_path_is_unreadable (__main__.StateVerifyTestCase.test_evidence_entry_without_path_is_unreadable) ... FAIL
+test_evidence_file_deleted_is_missing (__main__.StateVerifyTestCase.test_evidence_file_deleted_is_missing) ... FAIL
+test_evidence_path_escape_is_not_opened (__main__.StateVerifyTestCase.test_evidence_path_escape_is_not_opened) ... FAIL
+test_hash_and_bytes_drift_can_both_be_reported (__main__.StateVerifyTestCase.test_hash_and_bytes_drift_can_both_be_reported) ... FAIL
+test_invalid_sha256_evidence_entry_is_unreadable (__main__.StateVerifyTestCase.test_invalid_sha256_evidence_entry_is_unreadable) ... 
+  test_invalid_sha256_evidence_entry_is_unreadable (__main__.StateVerifyTestCase.test_invalid_sha256_evidence_entry_is_unreadable) (sha256=None) ... FAIL
+  test_invalid_sha256_evidence_entry_is_unreadable (__main__.StateVerifyTestCase.test_invalid_sha256_evidence_entry_is_unreadable) (sha256='abc') ... FAIL
+  test_invalid_sha256_evidence_entry_is_unreadable (__main__.StateVerifyTestCase.test_invalid_sha256_evidence_entry_is_unreadable) (sha256='zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz') ... FAIL
+  test_invalid_sha256_evidence_entry_is_unreadable (__main__.StateVerifyTestCase.test_invalid_sha256_evidence_entry_is_unreadable) (sha256='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n') ... FAIL
+test_non_dict_evidence_entry_is_unreadable (__main__.StateVerifyTestCase.test_non_dict_evidence_entry_is_unreadable) ... FAIL
+test_nul_byte_evidence_path_is_unreadable_not_crash (__main__.StateVerifyTestCase.test_nul_byte_evidence_path_is_unreadable_not_crash) ... FAIL
+test_nul_byte_spec_path_is_unreadable_not_crash (__main__.StateVerifyTestCase.test_nul_byte_spec_path_is_unreadable_not_crash) ... FAIL
+test_queue_status_drift_is_reported (__main__.StateVerifyTestCase.test_queue_status_drift_is_reported) ... ok
+test_record_and_board_same_wrong_value_report_both (__main__.StateVerifyTestCase.test_record_and_board_same_wrong_value_report_both) ... ok
+test_record_bytes_only_changed_is_bytes_mismatch (__main__.StateVerifyTestCase.test_record_bytes_only_changed_is_bytes_mismatch) ... FAIL
+test_record_sha256_only_changed_is_hash_mismatch (__main__.StateVerifyTestCase.test_record_sha256_only_changed_is_hash_mismatch) ... FAIL
+test_record_status_drift_is_reported (__main__.StateVerifyTestCase.test_record_status_drift_is_reported) ... ok
+test_skipped_reports_no_events_and_missing_rows (__main__.StateVerifyTestCase.test_skipped_reports_no_events_and_missing_rows) ... ok
+test_spec_checked_only_when_both_fields_exist (__main__.StateVerifyTestCase.test_spec_checked_only_when_both_fields_exist) ... ERROR
+test_spec_deleted_is_spec_missing (__main__.StateVerifyTestCase.test_spec_deleted_is_spec_missing) ... FAIL
+test_spec_modified_is_hash_mismatch (__main__.StateVerifyTestCase.test_spec_modified_is_hash_mismatch) ... FAIL
+test_spec_path_escape_is_not_opened (__main__.StateVerifyTestCase.test_spec_path_escape_is_not_opened) ... FAIL
+test_state_verify_never_writes (__main__.StateVerifyTestCase.test_state_verify_never_writes) ... ok
+test_state_verify_never_writes_with_bad_files (__main__.StateVerifyTestCase.test_state_verify_never_writes_with_bad_files) ... ok
+test_symlink_escape_is_reported_without_hashing (__main__.StateVerifyTestCase.test_symlink_escape_is_reported_without_hashing) ... skipped "platform refuses symlink creation: [WinError 1314] �ͻ���û���������Ȩ��: 'C:\\\\Users\\\\mac\\\\AppData\\\\Local\\\\Temp\\\\towerctl-state-verify-z6n45o4n-symlink-bait.txt' -> 'C:\\\\Users\\\\mac\\\\AppData\\\\Local\\\\Temp\\\\towerctl-state-verify-z6n45o4n\\\\tasks\\\\T-001\\\\evidence\\\\link.txt'"
+
+======================================================================
+ERROR: test_absent_empty_or_non_list_evidence_is_ignored (__main__.StateVerifyTestCase.test_absent_empty_or_non_list_evidence_is_ignored)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 925, in test_absent_empty_or_non_list_evidence_is_ignored
+    self.assertEqual(out["evidence_checked"], 0)
+                     ~~~^^^^^^^^^^^^^^^^^^^^
+KeyError: 'evidence_checked'
+
+======================================================================
+ERROR: test_broken_ledger_reports_errors_without_replay (__main__.StateVerifyTestCase.test_broken_ledger_reports_errors_without_replay)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 616, in test_broken_ledger_reports_errors_without_replay
+    self.assertEqual(out["evidence_checked"], 0)
+                     ~~~^^^^^^^^^^^^^^^^^^^^
+KeyError: 'evidence_checked'
+
+======================================================================
+ERROR: test_clean_evidence_and_spec_exit_zero (__main__.StateVerifyTestCase.test_clean_evidence_and_spec_exit_zero)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 630, in test_clean_evidence_and_spec_exit_zero
+    self.assertEqual(out["evidence_checked"], 3)
+                     ~~~^^^^^^^^^^^^^^^^^^^^
+KeyError: 'evidence_checked'
+
+======================================================================
+ERROR: test_spec_checked_only_when_both_fields_exist (__main__.StateVerifyTestCase.test_spec_checked_only_when_both_fields_exist)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 909, in test_spec_checked_only_when_both_fields_exist
+    self.assertEqual(out["evidence_checked"], 3)
+                     ~~~^^^^^^^^^^^^^^^^^^^^
+KeyError: 'evidence_checked'
+
+======================================================================
+FAIL: test_escape_path_never_touches_filesystem (__main__.StateVerifyTestCase.test_escape_path_never_touches_filesystem)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 1027, in test_escape_path_never_touches_filesystem
+    self.assertEqual([item["kind"] for item in result["drift"]],
+AssertionError: Lists differ: [] != ['evidence_path_escape']
+
+Second list contains 1 additional elements.
+First extra element 0:
+'evidence_path_escape'
+
+- []
++ ['evidence_path_escape']
+
+======================================================================
+FAIL: test_evidence_absolute_path_outside_is_escape (__main__.StateVerifyTestCase.test_evidence_absolute_path_outside_is_escape)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 780, in test_evidence_absolute_path_outside_is_escape
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_evidence_and_spec_verify_never_writes (__main__.StateVerifyTestCase.test_evidence_and_spec_verify_never_writes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 981, in test_evidence_and_spec_verify_never_writes
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_evidence_content_rewritten_same_length_is_hash_mismatch (__main__.StateVerifyTestCase.test_evidence_content_rewritten_same_length_is_hash_mismatch)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 644, in test_evidence_content_rewritten_same_length_is_hash_mismatch
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_evidence_drift_sorted_by_kind_target_path (__main__.StateVerifyTestCase.test_evidence_drift_sorted_by_kind_target_path)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 955, in test_evidence_drift_sorted_by_kind_target_path
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_evidence_entry_without_path_is_unreadable (__main__.StateVerifyTestCase.test_evidence_entry_without_path_is_unreadable)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 811, in test_evidence_entry_without_path_is_unreadable
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_evidence_file_deleted_is_missing (__main__.StateVerifyTestCase.test_evidence_file_deleted_is_missing)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 685, in test_evidence_file_deleted_is_missing
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_evidence_path_escape_is_not_opened (__main__.StateVerifyTestCase.test_evidence_path_escape_is_not_opened)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 755, in test_evidence_path_escape_is_not_opened
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_hash_and_bytes_drift_can_both_be_reported (__main__.StateVerifyTestCase.test_hash_and_bytes_drift_can_both_be_reported)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 728, in test_hash_and_bytes_drift_can_both_be_reported
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_invalid_sha256_evidence_entry_is_unreadable (__main__.StateVerifyTestCase.test_invalid_sha256_evidence_entry_is_unreadable) (sha256=None)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 841, in test_invalid_sha256_evidence_entry_is_unreadable
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_invalid_sha256_evidence_entry_is_unreadable (__main__.StateVerifyTestCase.test_invalid_sha256_evidence_entry_is_unreadable) (sha256='abc')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 841, in test_invalid_sha256_evidence_entry_is_unreadable
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_invalid_sha256_evidence_entry_is_unreadable (__main__.StateVerifyTestCase.test_invalid_sha256_evidence_entry_is_unreadable) (sha256='zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 841, in test_invalid_sha256_evidence_entry_is_unreadable
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_invalid_sha256_evidence_entry_is_unreadable (__main__.StateVerifyTestCase.test_invalid_sha256_evidence_entry_is_unreadable) (sha256='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 841, in test_invalid_sha256_evidence_entry_is_unreadable
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_non_dict_evidence_entry_is_unreadable (__main__.StateVerifyTestCase.test_non_dict_evidence_entry_is_unreadable)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 796, in test_non_dict_evidence_entry_is_unreadable
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_nul_byte_evidence_path_is_unreadable_not_crash (__main__.StateVerifyTestCase.test_nul_byte_evidence_path_is_unreadable_not_crash)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 1040, in test_nul_byte_evidence_path_is_unreadable_not_crash
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_nul_byte_spec_path_is_unreadable_not_crash (__main__.StateVerifyTestCase.test_nul_byte_spec_path_is_unreadable_not_crash)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 1057, in test_nul_byte_spec_path_is_unreadable_not_crash
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_record_bytes_only_changed_is_bytes_mismatch (__main__.StateVerifyTestCase.test_record_bytes_only_changed_is_bytes_mismatch)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 706, in test_record_bytes_only_changed_is_bytes_mismatch
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_record_sha256_only_changed_is_hash_mismatch (__main__.StateVerifyTestCase.test_record_sha256_only_changed_is_hash_mismatch)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 668, in test_record_sha256_only_changed_is_hash_mismatch
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_spec_deleted_is_spec_missing (__main__.StateVerifyTestCase.test_spec_deleted_is_spec_missing)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 872, in test_spec_deleted_is_spec_missing
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_spec_modified_is_hash_mismatch (__main__.StateVerifyTestCase.test_spec_modified_is_hash_mismatch)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 856, in test_spec_modified_is_hash_mismatch
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+======================================================================
+FAIL: test_spec_path_escape_is_not_opened (__main__.StateVerifyTestCase.test_spec_path_escape_is_not_opened)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot023-probe-6oh0m6g5\tools\tests\test_state_verify.py", line 893, in test_spec_path_escape_is_not_opened
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 2, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0}
+
+----------------------------------------------------------------------
+Ran 43 tests in 6.321s
+
+FAILED (failures=21, errors=4, skipped=1)
