@@ -633,7 +633,13 @@ def working_tree_state(root: Path, repo: Path) -> tuple[list[str], list[str]]:
 # Authority state that a caller is expected to commit in the surrounding git
 # repository.  ``status``/``startup`` report it, ``handoff-activate`` hints at
 # the commit; towerctl itself never commits (the commit boundary stays human).
-AUTHORITY_STATE_DIRS = ("primary", "supervision", "ledger", "handoffs", "shared")
+# ``tasks`` (task cards, evidence, records) and ``pilot`` (specs, worktrees) are
+# authority state too: leaving them out let an uncommitted task card or spec
+# look like a clean tower.  Watching the whole ``pilot`` tree is safe because
+# ``pilot/repo`` and ``pilot/worktrees`` are gitignored and ``git status``
+# never reports ignored untracked files.
+AUTHORITY_STATE_DIRS = ("primary", "supervision", "ledger", "handoffs", "shared",
+                        "tasks", "pilot")
 
 
 def authority_repo(root: Path) -> Path | None:
