@@ -1,0 +1,113 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-018",
+  "title": "修复 deliver 重复投递产生的重复证据 ID：每次投递后按序重排 E-001..E-00N",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "cmd_deliver 在合并完本次证据后，把 record.evidence 的 id 统一重排为 E-001..E-00N（顺序为当前列表顺序）",
+    "重投递同一路径时更新该条目的 sha256/bytes/at，不追加重复条目，重排后 ID 仍连续唯一",
+    "deliver 的 JSON 输出与 DELIVERY.md 内容随之使用重排后的 ID",
+    "不改既有命令的其它字段语义；既有测试断言零修改",
+    "新增 tools/tests/test_deliver_ids.py 固定以上行为"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-018/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-018/tower-dsh/tools/tests/test_deliver_ids.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "changing existing test assertions"
+  ],
+  "acceptance": [
+    "python -B -m unittest discover -s tools/tests -v 全部通过，总数 >= 187",
+    "对同一路径连续 deliver 两次后，record.evidence 的 id 严格等于 [E-001, E-002, ...]，无重复",
+    "一次 deliver 三个不同文件后，id 为 E-001/E-002/E-003，且 path 与 sha256 与源文件一致",
+    "重投递同一路径后条目数量不变、该条目 sha256 更新为新文件哈希",
+    "DELIVERY.md 中的 ID 与 record.evidence 一致",
+    "spec-coverage 27/27、tool_gaps 空；spec-lint --strict 6/6",
+    "git diff --name-only main..HEAD 恰好两个 allowed 文件"
+  ],
+  "depends_on": [
+    "PILOT-017"
+  ],
+  "worktree": "pilot/worktrees/PILOT-018",
+  "spec_path": "pilot/PILOT-018.spec.json",
+  "spec_sha256": "c0123dc3b03ce0a7d36137c5dcdedd939242bfba4fb0311bfd4b4280ad9ac3f6",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-pilot-018",
+  "dispatch": {
+    "executor": "subagent:exec-pilot-018",
+    "worktree": "pilot/worktrees/PILOT-018",
+    "at": "2026-10-20T20:46:10+08:00"
+  },
+  "evidence": [
+    {
+      "id": "E-001",
+      "path": "tasks/PILOT-018/evidence/towerctl.py",
+      "sha256": "2da66174db4b45b1201a511f3e1b7651277f7ba46db1d6d02fada6f9c53f7ca0",
+      "bytes": 121590,
+      "at": "2026-10-20T20:58:45+08:00"
+    },
+    {
+      "id": "E-002",
+      "path": "tasks/PILOT-018/evidence/test_deliver_ids.py",
+      "sha256": "9fa8b7dbbd2e5c8f0a951895a306b03122e87c1e41699ed5af266c35edf3c0aa",
+      "bytes": 9744,
+      "at": "2026-10-20T20:58:45+08:00"
+    },
+    {
+      "id": "E-003",
+      "path": "tasks/PILOT-018/evidence/test-output.txt",
+      "sha256": "d5be425843c68dbdc911a7e7d9977ffac0196a11c1690f4423f444901c6763bd",
+      "bytes": 25491,
+      "at": "2026-10-20T20:58:45+08:00"
+    },
+    {
+      "id": "E-004",
+      "path": "tasks/PILOT-018/evidence/test-output-no-gitconfig.txt",
+      "sha256": "1401ff04040d975a778d47ac740589d769b250375f57094ede3f7c5e68f788b8",
+      "bytes": 25605,
+      "at": "2026-10-20T20:58:45+08:00"
+    },
+    {
+      "id": "E-005",
+      "path": "tasks/PILOT-018/evidence/commit.txt",
+      "sha256": "b20bac9a39bf9a52d5479fd22b47f023a90b1f6ce8f69109b3a91345eee59289",
+      "bytes": 482,
+      "at": "2026-10-20T20:58:45+08:00"
+    },
+    {
+      "id": "E-006",
+      "path": "tasks/PILOT-018/evidence/diff.txt",
+      "sha256": "6853a481e3428fa6957916d318c334c258e5a6c0f7a87840c635378a1c7c67a2",
+      "bytes": 11329,
+      "at": "2026-10-20T20:58:45+08:00"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-pilot-018",
+    "verdict": "PASS",
+    "note": "AC-1..AC-7 全 PASS。188 tests OK；同路径重投条数不变且哈希更新；三文件按参数顺序编号；旧重复 ID record 可被下次 deliver 修复；DELIVERY.md 与 record 一致。鉴别力已验：同一探针在 main 版 towerctl 上产生 ['E-002','E-002'] 且旧 E-006 不修复，新测试 5 个里 2 个失败——证明这是真实行为变更而非测试自洽。引用安全：信封/merge-ledger 用 (path, sha256) 匹配，不存 ID 字面量；全仓无解析 E-0xx 的代码。历史遗留：PILOT-011/015 的旧 record 仍带重复 ID，只在下一次 deliver 时重排。",
+    "at": "2026-10-20T21:04:39+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-018",
+    "actor": "owner",
+    "text": "owner approved fixing duplicate evidence ids",
+    "at": "2026-10-20T21:04:39+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-018/CLOSEOUT.md",
+    "at": "2026-10-20T21:04:39+08:00"
+  },
+  "created_at": "2026-10-20T20:46:10+08:00",
+  "updated_at": "2026-10-20T21:04:39+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-018/MERGE.md",
+  "delivered_at": "2026-10-20T20:58:45+08:00",
+  "accepted_at": "2026-10-20T21:04:39+08:00"
+}

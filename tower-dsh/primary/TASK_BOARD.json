@@ -171,7 +171,17 @@
       "reviewer": "subagent:rev-pilot-017",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-017/MERGE.md",
       "updated_at": "2026-10-20T20:41:57+08:00"
+    },
+    {
+      "id": "PILOT-018",
+      "title": "修复 deliver 重复投递产生的重复证据 ID：每次投递后按序重排 E-001..E-00N",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-018",
+      "reviewer": "subagent:rev-pilot-018",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-018/MERGE.md",
+      "updated_at": "2026-10-20T21:04:39+08:00"
     }
   ],
-  "updated_at": "2026-10-20T20:41:57+08:00"
+  "updated_at": "2026-10-20T21:04:39+08:00"
 }
