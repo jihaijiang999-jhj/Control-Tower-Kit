@@ -108,7 +108,7 @@
 
 | # | 空白 | 现状证据 | 后果 |
 |---|---|---|---|
-| ∅1 | 远端 PR / 分支保护 | CI workflow 已入库（`.github/workflows/tower-gate.yml`，PILOT-012），但**未 push、未开 branch protection**；merge 仍是本地 `git merge --no-ff` | CI 只在推上去之后才跑；本地 merge 仍无人拦 |
+| ∅1 | 远端 PR / 分支保护 | CI 已通电并在 main 上跑绿（run 39346811217，九步全绿、零 `##[error]`，PILOT-012/014），但**仍无 branch protection**；merge 仍是本地 `git merge --no-ff` | 门只在"推上去之后"验证；本地 merge 依旧无人拦 |
 | ∅2 | Console / presets（Phase 4） | 无代码 | 操作全靠 CLI |
 | ∅3 | 多任务并发 | 队列只校验 `entry.status`，不排斥并发 `MERGING`（P1-14） | 并发合并可能写坏 base |
 | ∅4 | 真实项目 pilot | 只有 `pilot/repo` 玩具项目（10 个 worktree） | 未证过接第二个项目 |
@@ -141,10 +141,10 @@
 | 路径越界防护 | `[证]` | `ensure_within` 覆盖 evidence / worktree / package / envelope / repository |
 | ledger 哈希链 | `[证]` | `verify-ledger` → primary 103 事件、supervision 54，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
 | 条款→测试绑定 | `[证]` | `spec-coverage`：6 份规范 / 56 条款 / tool-check 27 / covered **27** / gaps 0 |
-| 测试全绿 | `[证]`（有条件） | `Ran 156 tests / OK`（2026-10-20，PILOT-012 后）。**前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
+| 测试全绿 | `[证]`（有条件） | `Ran 163 tests / OK`（本地 2026-10-20，PILOT-014 后）；GitHub Actions `Ran 163 tests in 68.271s`（run 39346811217，全绿）。**本地前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
 | 29 条条款靠人 | `[声]` | 12 `review-check` + 17 `owner-gate`（`spec-coverage.manual` / `.owner`） |
 | "每次迭代全局正确" | `[无]` | 无对象层不变量、无趋势锚点、无状态重放 |
-| 12 个任务 / 12 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（PILOT-011：`6a849b9`；PILOT-012：`bc4be88`，post-merge 均 4/4）；kit main `e5e2edb` |
+| 14 个任务 / 14 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（PILOT-011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`，post-merge 均 4/4）；GitHub 门禁 run 39346811217 全绿 |
 
 ---
 
@@ -197,6 +197,22 @@ envelope-new → FAIL: "base main is ancestor of implementation"
 闭环：`cde8f1d`（实现，156 tests）→ `7f600bc`（信封）→ `bc4be88`（merge）→ post-merge 4/4。
 
 **但它现在是"未通电"的**：没有 push，GitHub 上不跑；没有 branch protection，本地 merge 也拦不住。已知盲区（reviewer 记录）：测试只断言"命令文本出现"，注释掉 `run:`、加 `if: false`、接 `|| true` 都抓不到；这类语义必须靠"真的跑一次"来兜底——所以 push + 首次 CI 结果才是这张卡的最终证据。
+
+（后续：PILOT-013/014 修完两个由 CI 发现的缺陷后，run 39346811217 九步全绿、零 `##[error]`。"通电"这一半已经成立；缺的只剩 branch protection。）
+
+### 6.4 判例：绿 ≠ 正确——`continue-on-error` 吞掉真崩溃
+
+run 39344018538 整体显示 success，但 `Status` 步骤其实 **exit 1**：
+
+```
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 244-253
+```
+
+原因是 GitHub Windows runner 的控制台不是 UTF-8，而 `status` 要打印中文任务标题。`continue-on-error: true` 本意是"权威状态脏了不要判红"，却把"工具坏了"也一起吞了。
+
+处置（PILOT-014）：`towerctl` 启动时把 stdout/stderr 重配为 UTF-8；同时**删掉该步骤的 `continue-on-error`**，因为 `status` 对脏状态本来就 `exit 0`，会失败只可能是真异常。
+
+**判例**：容错设置必须区分"预期内的坏结果"（脏状态）与"工具坏了"（异常）。把两者都设成 `continue-on-error`，等于给自己发一张"永远绿"的假证书。
 
 **同时更正**：`handoff-activate` 把 phase 从 `READY_FOR_PRACTICE` 改为 `HANDOFF_ACTIVE`、`next_action` 改为 `resume from handoffs/HANDOFF-PILOT-002/HANDOFF.md`；§1 主图已按实值更新。
 
