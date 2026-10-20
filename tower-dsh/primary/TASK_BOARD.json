@@ -231,7 +231,17 @@
       "reviewer": "subagent:rev-pilot-023",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-023/MERGE.md",
       "updated_at": "2026-10-21T04:37:16+08:00"
+    },
+    {
+      "id": "PILOT-024",
+      "title": "post-merge 门禁解码：子进程非 UTF-8 输出不再让门禁误判红",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-024",
+      "reviewer": "subagent:rev-pilot-024",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-024/MERGE.md",
+      "updated_at": "2026-10-21T05:01:37+08:00"
     }
   ],
-  "updated_at": "2026-10-21T04:37:16+08:00"
+  "updated_at": "2026-10-21T05:01:37+08:00"
 }

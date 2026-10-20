@@ -1,0 +1,36 @@
+Exception in thread Thread-4 (_readerthread):
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1599, in _readerthread
+    buffer.append(fh.read())
+                  ^^^^^^^^^
+  File "<frozen codecs>", line 322, in decode
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xb4 in position 106: invalid start byte
+imported fixed helper: fixed_gate -> C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-024\tests\test_tower_gates.py
+helper uses env PYTHONIOENCODING=utf-8 + errors='replace'
+
+cp936 WinError text: [WinError 112] 磁盘空间不足。
+cp936 bytes: 5b57696e4572726f72203131325d20b4c5c5ccbfd5bce4b2bbd7e3a1a3
+contains 0xbf: True at offset 19
+strict utf-8 decode of those bytes -> UnicodeDecodeError: 'utf-8' codec can't decode byte 0xb4 in position 15: invalid start byte
+
+fixed helper on the cp936 child (the gate's real path):
+  returncode: 0
+  type(stdout): str
+  type(stderr): str
+  stdout: ''
+  stderr: "test_ledger_lock (test_ledger_lock_windows.Foo.test_bar) ... skipped 'Windows ledger lock: [WinError 112] ���̿ռ䲻�㡣'\nRan 236 tests in 77.6s\n\nOK (skipped=1)\n"
+  U+FFFD present in stderr: True
+  'Ran (\d+) test' match: Ran 236 test
+  count: 236 >= 8: True
+
+contrast: main/old policy on the SAME child
+  returncode: 0
+  stdout: ''
+  stderr: None
+  gate concat -> TypeError: can only concatenate str (not "NoneType") to str
+
+WEAKNESS CHECK: PASS

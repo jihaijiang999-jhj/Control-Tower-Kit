@@ -1,0 +1,17 @@
+﻿PILOT-024 commit evidence
+captured: 2026-10-21T04:52:00.1373379+08:00
+
+git rev-parse HEAD:
+80bfe3dcfa3b0e020e7d47a243f4be363f5922e3
+
+git log -1 --stat:
+commit 80bfe3dcfa3b0e020e7d47a243f4be363f5922e3
+Author: mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+Date:   Wed Oct 21 04:51:55 2026 +0800
+Subject: PILOT-024: decode gate subprocess output robustly
+
+ tests/test_tower_gates.py | 65 ++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 59 insertions(+), 6 deletions(-)
+
+git diff --name-only main..HEAD:
+tests/test_tower_gates.py

@@ -1,0 +1,120 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-024",
+  "title": "post-merge 门禁解码：子进程非 UTF-8 输出不再让门禁误判红",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "根目录 tests/test_tower_gates.py 中启动塔套件的子进程调用统一走一个捕获辅助函数：显式向子进程注入 PYTHONIOENCODING=utf-8，并以 UTF-8 + errors=replace 解码 stdout/stderr（或等价健壮策略）",
+    "任何子进程输出中的非 UTF-8 字节不得抛出 UnicodeDecodeError，也不得让 captured stdout/stderr 变成 None 而导致二次异常（TypeError）",
+    "保留原有门禁语义与断言：塔套件 returncode 必须为 0、stderr 必须匹配 Ran N test、N >= 8；本卡只修解码健壮性，不改变跑什么套件",
+    "新增回归测试：用同一捕获辅助函数运行一个故意向 sys.stdout.buffer 写 b\\xbf 的子进程，断言不抛异常、stdout/stderr 为 str、returncode 可读",
+    "旧码对照证据：在 main 版 test_tower_gates 的解码策略下，同一非 UTF-8 子进程会抛 UnicodeDecodeError；修复版通过",
+    "不修改 tower-dsh 内任何文件、不修改 .github workflow、不改测试断言阈值"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-024/tests/test_tower_gates.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening existing gate assertions",
+    "changing what the gate suite runs"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-024 && python -B -m unittest discover -s tests -v 全部通过（>= 2 tests），且塔套件子测试仍跑满全量（Ran 236 tests）并 >= 8",
+    "新增的坏字节子进程回归测试通过：不抛 UnicodeDecodeError/TypeError，stdout/stderr 均为 str，returncode 可读",
+    "旧码对照证据：main 版解码策略（text=True, encoding=utf-8, 不设 errors）对同一坏字节子进程抛 UnicodeDecodeError，已捕获记录",
+    "在真实塔根运行修复后的 gate 套件：python -B -m unittest discover -s tests -v 通过，不再因非 UTF-8 输出崩溃",
+    "git -C pilot/worktrees/PILOT-024 diff --name-only main..HEAD 恰好一个 allowed_paths 文件",
+    "在 tower-dsh 下 python tools/towerctl.py spec-lint --strict 为 6/6、spec-coverage 为 27/27（本卡不触碰规范文件）"
+  ],
+  "depends_on": [
+    "PILOT-023"
+  ],
+  "worktree": "pilot/worktrees/PILOT-024",
+  "spec_path": "pilot/PILOT-024.spec.json",
+  "spec_sha256": "6b6b652ce8a806cb157064f1ae51bea6293cfbb3030ad12be75d818b73534d2a",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-pilot-024",
+  "dispatch": {
+    "executor": "subagent:exec-pilot-024",
+    "worktree": "pilot/worktrees/PILOT-024",
+    "at": "2026-10-21T04:43:59+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-024/evidence/test_tower_gates.py",
+      "sha256": "fe1bf5ce1daa3853f9df1266349ec29cc93883db114104771ab0456eaf33bf07",
+      "bytes": 3014,
+      "at": "2026-10-21T04:53:12+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-024/evidence/root-test-output.txt",
+      "sha256": "dc16e1abf2d0bdd1552669ff285ea5efb4977c6aca8377b2db748b5830870262",
+      "bytes": 336,
+      "at": "2026-10-21T04:53:12+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-024/evidence/real-gate-output.txt",
+      "sha256": "004297138da40528a766b427ed3c390f3229403e7bf9dc4ccfe7e69202535f11",
+      "bytes": 33305,
+      "at": "2026-10-21T04:53:12+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-024/evidence/probe-old-code.txt",
+      "sha256": "e9c5b6588fcd0982a2a8dd19b3a4a96ee650a2e0f194fda5d8a01830ab4ca0c6",
+      "bytes": 6879,
+      "at": "2026-10-21T04:53:12+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-024/evidence/weakness-check.txt",
+      "sha256": "355ec7498a9659351ea544222b13783411db83af27f244c9807dd1dbcd389bba",
+      "bytes": 1797,
+      "at": "2026-10-21T04:53:12+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-024/evidence/commit.txt",
+      "sha256": "a1e7669a377306a8a5437012b48fbb5bf5f8589ff51609fbaa99dda7bbb0cd40",
+      "bytes": 596,
+      "at": "2026-10-21T04:53:12+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-024/evidence/diff.txt",
+      "sha256": "4af5501ccc032c71f5940d24aec4336ee01a566caecc769ae915f26bc5435d4e",
+      "bytes": 3534,
+      "at": "2026-10-21T04:53:12+08:00",
+      "id": "E-007"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-pilot-024",
+    "verdict": "PASS",
+    "note": "AC-1..AC-6 全 PASS。根套件 Ran 2 tests OK（内层塔套件 Ran 236 / OK skipped=1，阈值 >=8 未改）；run_captured 同时被真实门禁与新回归测试使用，门禁 argv/cwd/returncode/Ran 计数断言逐字未变。独立复现旧策略：真 236 套件在 main 解码策略下 stderr=None、TypeError，reader 线程 UnicodeDecodeError 位置 31994，与 PILOT-023 post-merge 完全一致；新 helper 对 raw 0xbf 返回 str + U+FFFD、无异常；monkeypatch 旧策略下新回归测试失败（非空转）。7 份证据 SHA-256/bytes 全匹配，spec_sha256 匹配；scope 恰一文件；481 文件只读快照一致。结论：该修复闭合 PILOT-023 post-merge 失败。残余（不阻塞）：errors=replace 会掩盖子进程本地化诊断文本；PYTHONIOENCODING 影响所有门禁子进程。",
+    "at": "2026-10-21T05:01:36+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-024",
+    "actor": "owner",
+    "text": "owner directed PILOT-024; independent reviewer PASS",
+    "at": "2026-10-21T05:01:36+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-024/CLOSEOUT.md",
+    "at": "2026-10-21T05:01:37+08:00"
+  },
+  "created_at": "2026-10-21T04:43:58+08:00",
+  "updated_at": "2026-10-21T05:01:37+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-024/MERGE.md",
+  "delivered_at": "2026-10-21T04:53:12+08:00",
+  "accepted_at": "2026-10-21T05:01:36+08:00"
+}

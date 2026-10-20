@@ -1,0 +1,7 @@
+test_non_utf8_child_output_is_replaced_not_raised (test_tower_gates.NonUtf8ChildOutput.test_non_utf8_child_output_is_replaced_not_raised) ... ok
+test_tower_gate_suite (test_tower_gates.TowerGateSuite.test_tower_gate_suite) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 77.615s
+
+OK

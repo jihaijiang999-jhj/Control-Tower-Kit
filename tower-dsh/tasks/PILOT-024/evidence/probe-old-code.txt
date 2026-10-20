@@ -1,0 +1,126 @@
+Exception in thread Thread-1 (_readerthread):
+Traceback (most recent call last):
+Exception in thread Thread-2 (_readerthread):
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+    self.run()
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1599, in _readerthread
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1599, in _readerthread
+    buffer.append(fh.read())
+                  ^^^^^^^^^
+  File "<frozen codecs>", line 322, in decode
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xbf in position 0: invalid start byte
+    buffer.append(fh.read())
+                  ^^^^^^^^^
+  File "<frozen codecs>", line 322, in decode
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xbf in position 0: invalid start byte
+Exception in thread Thread-4 (_readerthread):
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1599, in _readerthread
+    buffer.append(fh.read())
+                  ^^^^^^^^^
+  File "<frozen codecs>", line 322, in decode
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xbf in position 0: invalid start byte
+
+======================================================================
+0. direct strict decode of the offending byte (main's policy in one line)
+======================================================================
+bytes([0xbf]).decode('utf-8')
+RAISED: UnicodeDecodeError
+MESSAGE: 'utf-8' codec can't decode byte 0xbf in position 0: invalid start byte
+
+======================================================================
+1. MAIN's policy on a child writing 0xbf to BOTH pipes
+======================================================================
+policy: subprocess.run(..., capture_output=True, text=True, encoding='utf-8')
+        (no errors=..., no PYTHONIOENCODING injection)
+NOTE: on Python 3.12 the decode failure happens in subprocess's reader
+threads; run() itself returns and those threads print the traceback above.
+returncode: 0
+stdout: None
+stderr: None
+=> both captures are None: the reader threads died decoding 0xbf.
+
+======================================================================
+2. The reported real-world shape: valid stdout + undecodable stderr
+======================================================================
+child: stdout 'Ran 236 tests' (ASCII), stderr one 0xbf byte
+returncode: 0
+stdout: 'Ran 236 tests\n'
+stderr: None
+main's gate then evaluates: self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)
+RAISED: TypeError
+MESSAGE: can only concatenate str (not "NoneType") to str
+=> exactly the post-merge error: can only concatenate str (not "NoneType") to str
+
+======================================================================
+3. main's gate test copy run under unittest (scratch copy, argv -> bad child)
+======================================================================
+See kit/tests/main_gate_copy.py; its only edit is the child argv.
+Its unittest ERROR output is appended below by the caller.
+test_tower_gate_suite (kit.tests.main_gate_copy.TowerGateSuite.test_tower_gate_suite) ... Exception in thread Thread-2 (_readerthread):
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1599, in _readerthread
+    buffer.append(fh.read())
+                  ^^^^^^^^^
+  File "<frozen codecs>", line 322, in decode
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xbf in position 0: invalid start byte
+ERROR
+
+======================================================================
+ERROR: test_tower_gate_suite (kit.tests.main_gate_copy.TowerGateSuite.test_tower_gate_suite)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot024-oldcode-probe\kit\tests\main_gate_copy.py", line 26, in test_tower_gate_suite
+    self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)
+                                       ~~~~~~~~~~^~~~~~~~~~~
+TypeError: can only concatenate str (not "NoneType") to str
+
+----------------------------------------------------------------------
+Ran 1 test in 0.037s
+
+FAILED (errors=1)
+
+======================================================================
+4. REAL 236-test tower suite under MAIN's policy (no PYTHONIOENCODING)
+======================================================================
+
+Exception in thread Thread-2 (_readerthread):
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1599, in _readerthread
+    buffer.append(fh.read())
+                  ^^^^^^^^^
+  File "<frozen codecs>", line 322, in decode
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xbf in position 31994: invalid start byte
+cwd: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-024\tower-dsh
+env PYTHONIOENCODING present: False
+argv: python -B -m unittest discover -s tools/tests -v
+policy: subprocess.run(capture_output=True, text=True, encoding='utf-8')
+        (main's policy: no errors=..., no PYTHONIOENCODING injection)
+
+returncode: 0 (the suite itself passed)
+stdout: ''
+stderr: None
+
+main's gate then evaluates: self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)
+RAISED: TypeError
+MESSAGE: can only concatenate str (not "NoneType") to str
+=> PILOT-023 false red reproduced on the real suite.
