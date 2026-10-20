@@ -57,8 +57,10 @@
     }
   ],
   "envelope_head_sha": "7ba0489d1e9acd18d96e89d6f860006ddd6a91ff",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "merge_commit": "4ef069505b56a4e686b1687e1df6ba754702f481",
   "merged_at": "2026-10-20T08:17:14+08:00",
-  "supervisor": "sup-pilot-014-verify"
+  "supervisor": "sup-pilot-014-verify",
+  "post_merge_at": "2026-10-20T08:17:56+08:00",
+  "post_merge_note": "utf-8 stdio + visible status failures; 163 tests"
 }
