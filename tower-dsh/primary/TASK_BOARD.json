@@ -241,7 +241,17 @@
       "reviewer": "subagent:rev-pilot-024",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-024/MERGE.md",
       "updated_at": "2026-10-21T05:01:37+08:00"
+    },
+    {
+      "id": "PILOT-025",
+      "title": "测试计数门：post-merge 解析 Ran N tests 并对 envelope 里的 baseline 设门",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-025",
+      "reviewer": "subagent:rev-pilot-025",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-025/MERGE.md",
+      "updated_at": "2026-10-22T00:34:53+08:00"
     }
   ],
-  "updated_at": "2026-10-21T05:01:37+08:00"
+  "updated_at": "2026-10-22T00:34:53+08:00"
 }

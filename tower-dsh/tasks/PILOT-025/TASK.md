@@ -1,0 +1,46 @@
+# PILOT-025 — 测试计数门：post-merge 解析 Ran N tests 并对 envelope 里的 baseline 设门
+
+- Status: `ready`
+- Authority: `workspace_write`
+- Worktree: `pilot/worktrees/PILOT-025`
+
+## Scope
+
+- 新增只读辅助 parse_test_count(stdout, stderr)：用正则 Ran (\d+) tests? 从子进程输出取最后一次匹配的整数，无匹配返回 None；不写任何文件
+- cmd_post_merge 运行 post-merge 套件时给子进程注入 PYTHONIOENCODING=utf-8，并以 UTF-8 + errors=replace 解码（与 PILOT-024 同一解码契约），避免本地化输出把门禁弄崩
+- 解析本次套件的测试数 tests_count，并在 checks 中新增一项：envelope 带合法 tests_baseline（int >= 1）时检查 tests_count >= tests_baseline，名称 tests count >= baseline；未带 baseline 的旧信封按 legacy 规则要求 tests_count >= 1，名称 tests count present
+- tests_count 为 None（输出里根本没有 Ran N tests）时该检查失败——空测试目录不得再 PASS
+- review 文件记录 tests_count 与 tests_baseline 两行；成功与失败路径都把 tests_count 写进 envelope，并把 tests_count 一并写入 POST_MERGE_VERIFIED / POST_MERGE_FAILED 的 ledger payload
+- tests_baseline 由信封携带（envelope-new 已逐字段复制），本卡不强制旧信封补字段；本卡自己的信封必须写 tests_baseline=2（当前根套件 2 个测试）
+- 同步更新 tools/tests/test_hardening2.py 中写死的 Post-merge checks: 4/4 断言为 5/5：新增检查使 checks 从 4 变 5，该断言只跟踪总数，不削弱覆盖
+- 更新 tools/tests/test_post_merge.py：fixture 信封默认 tests_baseline=1，并新增计数达标/低于基线/legacy 无基线/零测试/parse_test_count 单元用例；不删除既有 post-merge 断言
+- 本 v2 替代 v1：v1 卡的 allowed_paths 漏列 test_hardening2.py，v1 卡与 spec 已作废留痕（tasks/PILOT-025-VOID、pilot/PILOT-025.spec.v1.json），实现与工作树不变
+- 不修改 tools/tests/test_tower_gates.py、不改 CI workflow、不改状态文件格式
+
+## Allowed paths
+
+- `pilot/worktrees/PILOT-025/tower-dsh/tools/towerctl.py`
+- `pilot/worktrees/PILOT-025/tower-dsh/tools/tests/test_post_merge.py`
+- `pilot/worktrees/PILOT-025/tower-dsh/tools/tests/test_hardening2.py`
+
+## Forbidden
+
+- network
+- external dependencies
+- changes outside the task worktree
+- merge
+- production access
+- weakening or deleting existing test coverage
+
+## Acceptance
+
+- cd pilot/worktrees/PILOT-025/tower-dsh && python -B -m unittest discover -s tools/tests -v 全部通过，总数 >= 240（main 基线 236），且覆盖计数达标/低于基线/legacy/零测试/parse 五类场景
+- kit fixture：tests_baseline=1 且套件 1 个测试时 post-merge PASS，checks 含 tests count >= baseline 且 detail 为 ran 1, baseline 1，envelope.tests_count=1，review 文件含 tests_count/tests_baseline 两行
+- 同一 fixture 把 tests_baseline 设为 2 时 post-merge 判红（exit 2），envelope 与队列转 CORRECTION_REQUIRED，该检查 ok=false，且不产生 POST_MERGE_VERIFIED
+- 信封不带 tests_baseline 时按 legacy：tests_count >= 1 通过；把 kit 的测试文件删掉（0 tests）后同一信封判红
+- parse_test_count 单元用例：'Ran 236 tests in 76s'→236、'Ran 1 test'→1、多行取最后一次、无匹配→None
+- test_hardening2.py 的 MERGE.md 断言随新增检查更新为 5/5，且该文件其余断言未改动
+- 在真实塔上完成本卡自己的 post-merge：checks 含 tests count >= baseline 且 ran 2, baseline 2（本卡 5/5 通过）
+- python tools/towerctl.py spec-coverage 为 27/27 且 tool_gaps 为空；python tools/towerctl.py spec-lint --strict 为 6/6
+- git -C pilot/worktrees/PILOT-025 diff --name-only main..HEAD 恰好三个 allowed_paths 文件
+- 既有 post-merge 行为不回归：FAIL 可重试、review 先于写文件、tool-owned 忽略、clean 检查、状态守卫等原测试全绿

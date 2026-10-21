@@ -1,0 +1,171 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-025",
+  "title": "测试计数门：post-merge 解析 Ran N tests 并对 envelope 里的 baseline 设门",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "新增只读辅助 parse_test_count(stdout, stderr)：用正则 Ran (\\d+) tests? 从子进程输出取最后一次匹配的整数，无匹配返回 None；不写任何文件",
+    "cmd_post_merge 运行 post-merge 套件时给子进程注入 PYTHONIOENCODING=utf-8，并以 UTF-8 + errors=replace 解码（与 PILOT-024 同一解码契约），避免本地化输出把门禁弄崩",
+    "解析本次套件的测试数 tests_count，并在 checks 中新增一项：envelope 带合法 tests_baseline（int >= 1）时检查 tests_count >= tests_baseline，名称 tests count >= baseline；未带 baseline 的旧信封按 legacy 规则要求 tests_count >= 1，名称 tests count present",
+    "tests_count 为 None（输出里根本没有 Ran N tests）时该检查失败——空测试目录不得再 PASS",
+    "review 文件记录 tests_count 与 tests_baseline 两行；成功与失败路径都把 tests_count 写进 envelope，并把 tests_count 一并写入 POST_MERGE_VERIFIED / POST_MERGE_FAILED 的 ledger payload",
+    "tests_baseline 由信封携带（envelope-new 已逐字段复制），本卡不强制旧信封补字段；本卡自己的信封必须写 tests_baseline=2（当前根套件 2 个测试）",
+    "同步更新 tools/tests/test_hardening2.py 中写死的 Post-merge checks: 4/4 断言为 5/5：新增检查使 checks 从 4 变 5，该断言只跟踪总数，不削弱覆盖",
+    "更新 tools/tests/test_post_merge.py：fixture 信封默认 tests_baseline=1，并新增计数达标/低于基线/legacy 无基线/零测试/parse_test_count 单元用例；不删除既有 post-merge 断言",
+    "本 v2 替代 v1：v1 卡的 allowed_paths 漏列 test_hardening2.py，v1 卡与 spec 已作废留痕（tasks/PILOT-025-VOID、pilot/PILOT-025.spec.v1.json），实现与工作树不变",
+    "不修改 tools/tests/test_tower_gates.py、不改 CI workflow、不改状态文件格式"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-025/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-025/tower-dsh/tools/tests/test_post_merge.py",
+    "pilot/worktrees/PILOT-025/tower-dsh/tools/tests/test_hardening2.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-025/tower-dsh && python -B -m unittest discover -s tools/tests -v 全部通过，总数 >= 240（main 基线 236），且覆盖计数达标/低于基线/legacy/零测试/parse 五类场景",
+    "kit fixture：tests_baseline=1 且套件 1 个测试时 post-merge PASS，checks 含 tests count >= baseline 且 detail 为 ran 1, baseline 1，envelope.tests_count=1，review 文件含 tests_count/tests_baseline 两行",
+    "同一 fixture 把 tests_baseline 设为 2 时 post-merge 判红（exit 2），envelope 与队列转 CORRECTION_REQUIRED，该检查 ok=false，且不产生 POST_MERGE_VERIFIED",
+    "信封不带 tests_baseline 时按 legacy：tests_count >= 1 通过；把 kit 的测试文件删掉（0 tests）后同一信封判红",
+    "parse_test_count 单元用例：'Ran 236 tests in 76s'→236、'Ran 1 test'→1、多行取最后一次、无匹配→None",
+    "test_hardening2.py 的 MERGE.md 断言随新增检查更新为 5/5，且该文件其余断言未改动",
+    "在真实塔上完成本卡自己的 post-merge：checks 含 tests count >= baseline 且 ran 2, baseline 2（本卡 5/5 通过）",
+    "python tools/towerctl.py spec-coverage 为 27/27 且 tool_gaps 为空；python tools/towerctl.py spec-lint --strict 为 6/6",
+    "git -C pilot/worktrees/PILOT-025 diff --name-only main..HEAD 恰好三个 allowed_paths 文件",
+    "既有 post-merge 行为不回归：FAIL 可重试、review 先于写文件、tool-owned 忽略、clean 检查、状态守卫等原测试全绿"
+  ],
+  "depends_on": [
+    "PILOT-024"
+  ],
+  "worktree": "pilot/worktrees/PILOT-025",
+  "spec_path": "pilot/PILOT-025.spec.json",
+  "spec_sha256": "334f128dbfcaa9fd3f2e4d04fbc8488a79bd164cda172eebc2adf556dc2c7bba",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-pilot-025",
+  "dispatch": {
+    "executor": "subagent:exec-pilot-025",
+    "worktree": "pilot/worktrees/PILOT-025",
+    "at": "2026-10-22T00:08:39+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-025/evidence/towerctl.py",
+      "sha256": "c4f892fe1309c6f5cdf0f66425553d582ed5e407b5b1ffc78f871e7c5519ceee",
+      "bytes": 146754,
+      "at": "2026-10-22T00:19:12+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-025/evidence/test_post_merge.py",
+      "sha256": "1b10e4323de145f2f17b804c13fb7cddf26c794778c73f4a754d4e75b8c9c7cd",
+      "bytes": 17947,
+      "at": "2026-10-22T00:19:12+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-025/evidence/test_hardening2.py",
+      "sha256": "cd82604128fbdcc63f7377ca4d963f908b271d434bd7c2395e9c27c6af21bce5",
+      "bytes": 25357,
+      "at": "2026-10-22T00:19:12+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-025/evidence/test-output.txt",
+      "sha256": "cea8fb3851556c12ed098b5e69e26f8ec3c0c3218150659eeb93235374498d3b",
+      "bytes": 67458,
+      "at": "2026-10-22T00:19:12+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-025/evidence/post-merge-checks.txt",
+      "sha256": "1ebb5436cbc143cf17ca255a04e10df5c8bf23f941e563439443e2f2b57a03d2",
+      "bytes": 2548,
+      "at": "2026-10-22T00:19:12+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-025/evidence/parse-probe.txt",
+      "sha256": "c218cddf043272599022c0266ba6641fb2c98d4f342977e321e79f72b2ffc21e",
+      "bytes": 700,
+      "at": "2026-10-22T00:19:12+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-025/evidence/real-run.txt",
+      "sha256": "e786822f93efd4bf0584cf4983c8a3816b78b1036085050db40ff89de51dc615",
+      "bytes": 514,
+      "at": "2026-10-22T00:19:12+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-025/evidence/real-spec-coverage.txt",
+      "sha256": "596fa953b85b1c28fc7d3658113a17c2e31b68512bd85a544b980a6178a9120d",
+      "bytes": 1954,
+      "at": "2026-10-22T00:19:12+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-025/evidence/real-spec-lint.txt",
+      "sha256": "85b54ab102dfc3b86e0eb4bc245e1ff116a83d2d189c9d05bb0ccb2dece2737c",
+      "bytes": 7986,
+      "at": "2026-10-22T00:19:12+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-025/evidence/probe-old-code.txt",
+      "sha256": "29a6ade35e8c4bda314a2075d37ec508de0a112bd7d648320fd2e87cf3fb912a",
+      "bytes": 30132,
+      "at": "2026-10-22T00:19:12+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-025/evidence/CONFLICT.md",
+      "sha256": "c0a9d4423c06b04029fcd85b75d11b299d15d5f06f8fac8e67bd66301692a97b",
+      "bytes": 755,
+      "at": "2026-10-22T00:19:12+08:00",
+      "id": "E-011"
+    },
+    {
+      "path": "tasks/PILOT-025/evidence/commit.txt",
+      "sha256": "48e7ceaa3705d7ac001001e40f38826d55c58c94f83e644f7c9c5f01a4806a77",
+      "bytes": 1256,
+      "at": "2026-10-22T00:19:12+08:00",
+      "id": "E-012"
+    },
+    {
+      "path": "tasks/PILOT-025/evidence/diff.txt",
+      "sha256": "08b49a84b6298fc66d528df7f75baf9db8180119bfd1b1f2b623cf90db521236",
+      "bytes": 24670,
+      "at": "2026-10-22T00:19:12+08:00",
+      "id": "E-013"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-pilot-025",
+    "verdict": "PASS",
+    "note": "v2 独立复核 PASS。241 tests OK(skipped=1)；五个自建 post-merge fixture 全对：baseline1 通过(ran 1, baseline 1, envelope/review/ledger 均记 tests_count)、baseline2 判红并转 CORRECTION_REQUIRED、legacy 无基线走 tests count present、删测试后 0 tests 判红、坏字节子进程 exit0 且 U+FFFD（main 版则 UnicodeDecodeError，证明解码修复真实）；parse 取最后一次匹配。test_hardening2 只改 4/4→5/5 一行（numstat 1/1，line 508）。13/13 证据哈希匹配，spec_sha256=334f128...匹配 v2；v1 spec 哈希与 VOID record 匹配。scope 恰三文件；456 文件只读快照一致；state-verify drift=[]，VOID 仅进 skipped（预期）。v1→v2 重建被判定必要且可追溯。AC7（真实塔 ran 2, baseline 2, 5/5）按流程留给 merge 后 post-merge；信封须带 tests_baseline=2。残余（不阻塞）：towerctl.py:2463 docstring 仍写 4/4；信封缺 baseline 会静默降级 legacy；tests_count 可能为 null；TEST_COUNT_RE 多 \\\\b；E-004..013 为 UTF-16LE。",
+    "at": "2026-10-22T00:34:53+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-025",
+    "actor": "owner",
+    "text": "owner directed PILOT-025; v2 independent reviewer PASS",
+    "at": "2026-10-22T00:34:53+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-025/CLOSEOUT.md",
+    "at": "2026-10-22T00:34:53+08:00"
+  },
+  "created_at": "2026-10-22T00:08:39+08:00",
+  "updated_at": "2026-10-22T00:34:53+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-025/MERGE.md",
+  "delivered_at": "2026-10-22T00:19:12+08:00",
+  "accepted_at": "2026-10-22T00:34:53+08:00"
+}
