@@ -26,6 +26,11 @@ import unittest
 from pathlib import Path
 
 TOOLS_DIR = Path(__file__).resolve().parents[1]
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+import towerctl  # noqa: E402  (needs TOOLS_DIR on sys.path)
+
 TCLI = TOOLS_DIR / "towerctl.py"
 TOWER_NAME = "tower-dsh"
 TASK_ID = "TEST-PM-001"
@@ -136,7 +141,8 @@ class PostMergeTestCase(unittest.TestCase):
         self.assertEqual(merge.returncode, 0, msg=merge.stdout + merge.stderr)
         self.merge_commit = self.git("rev-parse", "HEAD").stdout.strip()
 
-    def write_envelope(self, *, status: str, merge_commit: str | None) -> None:
+    def write_envelope(self, *, status: str, merge_commit: str | None,
+                       tests_baseline: int | None = 1) -> None:
         envelope = {
             "schema": "tower/merge-envelope@1",
             "envelope_id": ENVELOPE_ID,
@@ -150,6 +156,8 @@ class PostMergeTestCase(unittest.TestCase):
             "status": status,
             "merge_commit": merge_commit,
         }
+        if tests_baseline is not None:
+            envelope["tests_baseline"] = tests_baseline
         self.write_json(self.root / "supervision" / "envelopes" / f"{ENVELOPE_ID}.json",
                         envelope)
 
@@ -286,6 +294,84 @@ class PostMergeTestCase(unittest.TestCase):
         self.assertEqual(self.envelope()["status"], "DRAFT")
         self.assertEqual(self.queue_entry()["status"], "MERGED")
         self.assertEqual(self.ledger_events(), [])
+
+    # -- 7. count gate: an explicit baseline is met ----------------------
+    def test_count_gate_passes_when_baseline_met(self) -> None:
+        cp = self.run_post_merge("PASS")
+        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        payload = json.loads(cp.stdout)
+        self.assertEqual(payload["tests_count"], 1)
+        count = self.check(cp, "tests count >= baseline")
+        self.assertTrue(count["ok"], count)
+        self.assertEqual(count["detail"], "ran 1, baseline 1")
+        self.assertEqual(self.envelope()["tests_count"], 1)
+        review = self.review_file().read_text(encoding="utf-8")
+        self.assertIn("- tests_count: 1", review)
+        self.assertIn("- tests_baseline: 1", review)
+
+    # -- 8. count gate: a shrunken suite fails below the baseline --------
+    def test_count_gate_fails_when_suite_is_below_baseline(self) -> None:
+        self.write_envelope(status="MERGED", merge_commit=self.merge_commit,
+                            tests_baseline=2)
+        self.commit_all("envelope with a two-test baseline")
+        cp = self.run_post_merge("PASS")
+        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        payload = json.loads(cp.stdout)
+        self.assertEqual(payload["status"], "CORRECTION_REQUIRED")
+        self.assertEqual(payload["tests_count"], 1)
+        count = self.check(cp, "tests count >= baseline")
+        self.assertFalse(count["ok"], count)
+        self.assertEqual(count["detail"], "ran 1, baseline 2")
+        envelope = self.envelope()
+        self.assertEqual(envelope["status"], "CORRECTION_REQUIRED")
+        self.assertEqual(envelope["tests_count"], 1)
+        self.assertFalse([e for e in self.ledger_events()
+                          if e["type"] == "POST_MERGE_VERIFIED"])
+
+    # -- 9. count gate: legacy envelope without a baseline still passes ---
+    def test_legacy_envelope_without_baseline_passes(self) -> None:
+        self.write_envelope(status="MERGED", merge_commit=self.merge_commit,
+                            tests_baseline=None)
+        self.commit_all("legacy envelope without tests_baseline")
+        cp = self.run_post_merge("PASS")
+        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        count = self.check(cp, "tests count present")
+        self.assertTrue(count["ok"], count)
+        self.assertEqual(count["detail"], "ran 1, baseline not set")
+        self.assertEqual(self.envelope()["tests_count"], 1)
+        self.assertIn("- tests_baseline: not set",
+                      self.review_file().read_text(encoding="utf-8"))
+
+    # -- 10. count gate: an empty tests/ dir must not pass ----------------
+    def test_legacy_envelope_fails_when_no_tests_remain(self) -> None:
+        self.write_envelope(status="MERGED", merge_commit=self.merge_commit,
+                            tests_baseline=None)
+        (self.kit / "tests" / "test_smoke.py").unlink()
+        self.commit_all("delete the smoke test")
+        cp = self.run_post_merge("PASS")
+        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        count = self.check(cp, "tests count present")
+        self.assertFalse(count["ok"], count)
+        self.assertEqual(count["detail"], "ran 0, baseline not set")
+        envelope = self.envelope()
+        self.assertEqual(envelope["status"], "CORRECTION_REQUIRED")
+        self.assertEqual(envelope["tests_count"], 0)
+        self.assertIn("- tests_count: 0",
+                      self.review_file().read_text(encoding="utf-8"))
+
+    # -- 11. parse_test_count unit contract ------------------------------
+    def test_parse_test_count_unit_cases(self) -> None:
+        cases = [
+            ("Ran 236 tests in 76s", None, 236),
+            ("Ran 1 test", None, 1),
+            ("Ran 3 tests\nsome noise\nRan 7 tests\n", None, 7),
+            ("stdout says nothing", "Ran 11 tests in 0.1s", 11),
+            ("no summary line at all", None, None),
+            (None, None, None),
+        ]
+        for stdout, stderr, expected in cases:
+            with self.subTest(stdout=stdout, stderr=stderr):
+                self.assertEqual(towerctl.parse_test_count(stdout, stderr), expected)
 
 
 if __name__ == "__main__":

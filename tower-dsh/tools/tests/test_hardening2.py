@@ -505,7 +505,7 @@ class PostMergeArtifactTestCase(unittest.TestCase):
         self.assertIn(self.implementation_head, text)
         self.assertIn(envelope["merge_commit"], text)
         self.assertIn("POST_MERGE_VERIFIED", text)
-        self.assertIn("Post-merge checks: 4/4", text)
+        self.assertIn("Post-merge checks: 5/5", text)
         self.assertIn("Verified at:", text)
 
 
