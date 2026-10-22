@@ -1,0 +1,61 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-026",
+  "task": "PILOT-026",
+  "repository": "..",
+  "branch": "pilot/PILOT-026",
+  "base": "main",
+  "implementation_head_sha": "31712353911fbc5759d757707fb9e8f72cec4d81",
+  "envelope_path": "merge-envelopes/ENV-PILOT-026.json",
+  "created_at": "2026-10-22T15:31:09+08:00",
+  "scope": "PILOT-026: gate post-merge on the tower suite count",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 241,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-026/evidence/towerctl.py",
+      "sha256": "fcb6e0b691384c1cd67d3794d190cb54ac98926acd6a2d1341dc45b6e03b9bc2"
+    },
+    {
+      "path": "tasks/PILOT-026/evidence/test_post_merge.py",
+      "sha256": "a5f2f5a35b26ebefb4f3054dc83138f54e3379af1f6c0109400050b292dc84ed"
+    },
+    {
+      "path": "tasks/PILOT-026/evidence/test_hardening2.py",
+      "sha256": "d866cfbd08b1e9c2a29e254db77c6cee09987d13edd1c5e0c5cda043e72c907e"
+    },
+    {
+      "path": "tasks/PILOT-026/evidence/test-output.txt",
+      "sha256": "ee8f1ff9d1efdf4bfcbb436de32a70523656f95c8a0a72cc8f8923ddcb04fbd5"
+    },
+    {
+      "path": "tasks/PILOT-026/evidence/post-merge-checks.txt",
+      "sha256": "56c6f0af6d3dc7d230addf2c5af635a1f7c4ec0a3c21304f0fb557f19d199077"
+    },
+    {
+      "path": "tasks/PILOT-026/evidence/probe-old-code.txt",
+      "sha256": "ee60cddfa34cbc46dc039380de6344bb84e80cad5c1ddf9fd8017d444a9b991c"
+    },
+    {
+      "path": "tasks/PILOT-026/evidence/real-run.txt",
+      "sha256": "cd14078bcf08b49cec99ddf10242beee9dd094c7c8fde9773b74b8f32ec56f21"
+    },
+    {
+      "path": "tasks/PILOT-026/evidence/deviation-6of6-premise.txt",
+      "sha256": "1abc62b359687f43ad46180e930b72b4211f1021f44915aedd9d402a6fd33471"
+    },
+    {
+      "path": "tasks/PILOT-026/evidence/commit.txt",
+      "sha256": "5d935b92a3a9c3e1ba87c802ed265974725eedec0335488ec3ff9716ee0028e8"
+    },
+    {
+      "path": "tasks/PILOT-026/evidence/diff.txt",
+      "sha256": "525f4395680d8ab5f5f155c99830616f65e4829f4883958793be92d16c134709"
+    }
+  ]
+}
