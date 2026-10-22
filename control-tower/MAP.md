@@ -7,6 +7,7 @@
 > 修订：2026-10-22T00:4x —— PILOT-022/023/024/025 落地（状态重放收紧、证据完整性、门禁解码、测试计数门）；§4.2 ∅10/∅11、§5、§6.9–6.11 同步。
 > 修订：2026-10-22T15:3x —— PILOT-026 落地（塔套件计数入闸）；∅11、§5、§6.11 同步。
 > 修订：2026-10-22T20:5x —— RUN-2026-10-22-B 批跑（027 runner/TMP、028 迁移合法性、029 baseline 必填）；∅10–∅12、§5、§6.12 同步。
+> 修订：2026-10-23T03:0x —— RUN-2026-10-23-C 批跑（030 queue-add 门、031 单调锚点、032 完成卡禁止重置）；∅10/∅11、§5、§6.13 同步。
 > 依据：`startup` / `wiring` / `status` / `handoff-check` / `spec-coverage` / `verify-ledger` 实跑输出 + 代码通读 + git 实值 + 一次测试复跑。
 > 标注约定：`[证]` 有可执行证据 / `[声]` 仅文档或口头声明 / `[无]` 未做 / `⊙` 单点 / `∅` 空白。
 
@@ -125,9 +126,9 @@
 | ∅7 | **授权态单写者** | `SeeMake-Control-Tower-Authority-State.md`：Active Tower / Single Writer / 保留闸 / repo+queue 锚点 | `--role supervisor` 是参数，不是身份；`CURRENT_STATE.primary` 只有一个字符串 | `state/AUTHORITY.json` + `towerctl authority-check`（写者≠活性塔即拒写） |
 | ∅8 | **判例集** | `rules-ref/治理判例集.md`：一次裁决 → 以后可引用的规则 | 5 条散在 `HANDOFF.md §6` | ledger 增加 `PRECEDENT` 事件 + `towerctl precedent --list` |
 | ∅9 | **包号防呆** | `_k3-ops/CURRENT`：包号比你所持新即停手 | `handoff-check` 只在 claim 时跑一次 §0 漂移 | 根目录 `CURRENT` + `startup` 强制比对 |
-| ∅10 | **状态重放** | （K3 也没有） | **已实现并持续收紧**（PILOT-021/022/023/028）：ledger 折叠状态并与 record/board/queue/envelope 比对；坏文件算 drift，合法跳过显式 `skipped`，board 取重放值；证据逐条校验 SHA-256/字节数，spec 校验冻结哈希；状态迁移按真实历史表校验，跳步/乱序记 `illegal_transition`。真实塔 29 任务/29 信封、211 条证据、drift 0 | 仍窄：`TASK_NEW` 允许任意来源（重建先例，但重复 TASK_NEW 可静默重置已关闭卡）；未来新增生命周期事件若漏表会默认放行；TOCTOU/hardlink 不在范围 |
-| ∅11 | **测试计数门** | （K3 也没有） | **已实现并加深**（PILOT-025/026/029）：`post-merge` 解析 `Ran N tests`；根套件按 `tests_baseline`、塔套件按 `tower_tests_baseline` 设门；`envelope-new` 现在强制两个 baseline（int>=1），漏写直接 exit 2。真实塔首跑：根 `ran 2, baseline 2` + 塔 `ran 266, baseline 261`，6/6 | 仍窄：手写 `supervision/envelopes/*.json` + `queue-add` 可绕过 envelope-new；baseline 只校验存在/类型/>=1，低值或过期值不会被拒 |
-| ∅12 | **证据可复现** | — | **已实现切片**（PILOT-027）：`tools/run_tests.py` 把 `TMP/TEMP/TMPDIR` 指向仓内 `.test-tmp/run-*`，post-merge 与根门禁都走 runner；`REPRODUCE.md` 给出干净环境复跑清单；全套件 266 绿 | 仍窄：`.test-tmp` 不自动清理；运行器依赖 Windows 下的 core.longpaths 注入；直接 discovery 不走沙箱 |
+| ∅10 | **状态重放** | （K3 也没有） | **已实现并持续收紧**（PILOT-021/022/023/028/032）：ledger 折叠状态并与 record/board/queue/envelope 比对；坏文件算 drift，合法跳过显式 `skipped`，board 取重放值；证据逐条校验 SHA-256/字节数，spec 校验冻结哈希；状态迁移按真实历史表校验，跳步/乱序记 `illegal_transition`；`TASK_NEW` 只允许未完成状态重建，accepted/closed 重置判红。真实塔 32 任务/32 信封、237 条证据、drift 0 | 仍窄：`ready→TASK_NEW` 仍合法；未来新增生命周期事件若漏表会默认放行（建议完整性断言）；关闭卡无正式 reopen 流程；TOCTOU/hardlink 不在范围 |
+| ∅11 | **测试计数门** | （K3 也没有） | **已实现并合围**（PILOT-025/026/029/030/031）：`post-merge` 解析 `Ran N tests`；根/塔套件按 baseline 设门；`envelope-new` 与 `queue-add` 都强制两个 baseline；baseline 不得低于 ledger 里已验证 `tower_tests_count` 的最大值。真实塔：根 `2/2`、塔 `281/281`、anchor `281>=277`，7/7 | 仍窄：直接手改 `MERGE_QUEUE.json` 可绕过入队门；伪造/错误 verified 事件可抬高锚（fail-closed DoS）；锚不追溯旧事件；只校数量不校质量 |
+| ∅12 | **证据可复现** | — | **已实现切片**（PILOT-027）：`tools/run_tests.py` 把 `TMP/TEMP/TMPDIR` 指向仓内 `.test-tmp/run-*`，post-merge 与根门禁都走 runner；`REPRODUCE.md` 给出干净环境复跑清单；全套件 281 绿 | 仍窄：`.test-tmp` 不自动清理；运行器依赖 Windows 下的 core.longpaths 注入；直接 discovery 不走沙箱 |
 
 ---
 
@@ -140,14 +141,14 @@
 | accept / close 强证据 | `[证]` | `cmd_accept:1022`、`cmd_close:1046` 内联 `check_evidence` |
 | reviewer 非空且 ≠ executor | `[证]` | `cmd_checkback:992-996` |
 | merge 分支断言 | `[证]` | `cmd_merge:1919-1936`，不符即 `CORRECTION_REQUIRED` |
-| post-merge 六检 | `[证]` | 测试 / 根套件计数 / 塔套件计数（opt-in） / 实现是祖先 / 信封在 base / 工作树干净（PILOT-026 后） |
+| post-merge 七检 | `[证]` | 测试 / 根套件计数 / 塔套件计数 / baseline 不回退 / 实现是祖先 / 信封在 base / 工作树干净（RUN-C 后；count 检查对旧信封 opt-in） |
 | 路径越界防护 | `[证]` | `ensure_within` 覆盖 evidence / worktree / package / envelope / repository |
-| ledger 哈希链 | `[证]` | `verify-ledger` → primary 268 事件、supervision 152，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
+| ledger 哈希链 | `[证]` | `verify-ledger` → primary 292 事件、supervision 168，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
 | 条款→测试绑定 | `[证]` | `spec-coverage`：6 份规范 / 56 条款 / tool-check 27 / covered **27** / gaps 0 |
-| 测试全绿 | `[证]`（有条件） | `Ran 266 tests / OK`（本地 2026-10-22，RUN-B 后）；GitHub Actions 在 PR #12–#14 上绿，v7 后零注解。**建议跑法**：`python -B tools/run_tests.py`（TMP 在仓内，避受限沙箱 ACL）；直接 discovery 仍可用，但受限模式下 `%TEMP%` 仍会让 134/134 在 0.05 s 内全 ERROR |
+| 测试全绿 | `[证]`（有条件） | `Ran 281 tests / OK`（本地 2026-10-23，RUN-C 后）；GitHub Actions 在 PR #15–#17 上绿，v7 后零注解。**建议跑法**：`python -B tools/run_tests.py`（TMP 在仓内，避受限沙箱 ACL）；直接 discovery 仍可用，但受限模式下 `%TEMP%` 仍会让 134/134 在 0.05 s 内全 ERROR |
 | 29 条条款靠人 | `[声]` | 12 `review-check` + 17 `owner-gate`（`spec-coverage.manual` / `.owner`） |
 | "每次迭代全局正确" | `[无]` | 无对象层不变量、无趋势锚点、无状态重放 |
-| 29 个任务 / 29 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`；021 PR #6 `10fae79`；022 PR #7 `6a920a5`；023 PR #8 `a88388b`（假红修复后重试 4/4）；024 PR #9 `c4fb58f`；025 PR #10 `f265847`（5/5）；026 PR #11 `e73f1f5`；027 PR #12 `223b10b`（6/6，塔 `252/246`）；028 PR #13 `188f122`（6/6，塔 `261/252`）；029 PR #14 `ef72400`（6/6，塔 `266/261`），其余 post-merge 均 4/4） |
+| 32 个任务 / 32 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`；021 PR #6 `10fae79`；022 PR #7 `6a920a5`；023 PR #8 `a88388b`；024 PR #9 `c4fb58f`；025 PR #10 `f265847`；026 PR #11 `e73f1f5`；027 PR #12 `223b10b`（塔 `252/246`）；028 PR #13 `188f122`（塔 `261/252`）；029 PR #14 `ef72400`（塔 `266/261`）；030 PR #15 `aa88f76`（塔 `271/266`）；031 PR #16 `c9a7da6`（7/7，塔 `277/277`，anchor `277>=271`）；032 PR #17 `da5a25c`（7/7，塔 `281/281`，anchor `281>=277`），其余 post-merge 均 4/4） |
 
 ---
 
@@ -326,6 +327,18 @@ TypeError: can only concatenate str (not "NoneType") to str
 - **残余是政策，不是 bug**：`028` 的 `TASK_NEW` 任意来源（重建先例的副作用）、`029` 的手写信封旁路与低值 baseline、`012` 的 `.test-tmp` 不清理——都是已知且记录在案的政策缺口，下一批应优先处理"手写信封 + queue-add 旁路"。
 
 **判例**：批授权把注意力成本从"每卡一次"降到"每批一次"，但前提是**卡序锁定、验收可判定、硬停可执行、owner 可抽样**；任何一条缺失，批授权就退化成"无人看管的连跑"。
+
+### 6.13 判例：把旁路一条条钉死（RUN-2026-10-23-C）
+
+第二批三卡专门堵 RUN-B 复核留下的旁路：`030` 让 `queue-add` 也强制 baseline（堵手写信封入队）、`031` 让 baseline 不得低于 ledger 里已验证计数的最大值（单调锚点）、`032` 把 `TASK_NEW` 从"任意来源"收紧为"仅未完成状态"（完成卡不得静默重置）。三卡一次复核通过、零 rework、零硬停，约 1 小时 25 分钟；最终 32 任务/32 信封、281 tests、post-merge 七检全绿。
+
+可复用判据：
+
+- **旁路要逐个封，别指望一个门**：`envelope-new` 之后还有 `queue-add`，`envelope-new` 里能带假 baseline，`state-verify` 能看见重置但不能阻止它。每加一道门，reviewer 都会找下一道没关的门——这是特性，不是刁难。
+- **锚点用已有证据，不造新状态**：`031` 没有引入 `BASELINE.json`，而是从 append-only + 哈希链的 supervision ledger 里取 `POST_MERGE_VERIFIED.tower_tests_count` 的最大值。少一个可被手改的状态文件，多一条可被 `verify-ledger` 保护的事实。
+- **同一个错犯两次是流程问题**：RUN-B 与 RUN-C 的首次 post-merge 都因"提前放进塔根的后续 spec 仍未提交"判脏。第一次记了判例，第二次仍复现——说明"预批准物必须先入库"没有变成硬约束。下一批要么在 `run-charter` 里加一步“预批准 spec 先提交”，要么把未跟踪的 spec 视为 post-merge clean 检查的白名单（需权衡）。
+
+**判例**：门禁的演进不是"加更多检查"，而是**沿着攻击面把每一条能绕过的路径变成一条可判定的规则**；当一条残余被写进判例却仍在下一批复现时，说明它需要工具化，而不是再记一次。
 
 ---
 
