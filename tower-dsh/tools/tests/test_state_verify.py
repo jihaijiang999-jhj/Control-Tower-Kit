@@ -1088,6 +1088,170 @@ class StateVerifyTestCase(unittest.TestCase):
                          "state-verify followed the symlink and hashed outside")
         self.assertEqual(out["evidence_checked"], 2)
 
+    # -- 33. illegal task transitions ------------------------------------
+    def illegal_transitions(self, out: dict) -> list[dict]:
+        return [item for item in out["drift"]
+                if item["kind"] == "illegal_transition"]
+
+    def test_closeout_after_task_new_is_illegal_transition(self) -> None:
+        # ∅10's blind spot: replay is last-writer-wins, so without transition
+        # checks TASK_NEW -> CLOSEOUT would simply fold to "closed".
+        self.build_base_tower()
+        self.primary("TASK_NEW", task="T-003")
+        self.primary("CLOSEOUT", task="T-003")
+        self.put_record("T-003", "closed")
+        self.write_board({"T-001": "closed", "T-002": "reviewed",
+                          "T-003": "closed"})
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.illegal_transitions(out), [{
+            "kind": "illegal_transition", "target": "T-003",
+            "event": "CLOSEOUT", "expected": ["accepted"],
+            "actual": "ready"}])
+        self.assertNotIn("path", self.illegal_transitions(out)[0])
+        # The replay itself is unchanged: it still folds to "closed".
+        self.assertEqual(self.drift_kinds(out), ["illegal_transition"])
+
+    def test_accept_without_reviewed_checkback_is_illegal(self) -> None:
+        self.build_base_tower()
+        for event_type in ("TASK_NEW", "DISPATCH", "DELIVER", "ACCEPT"):
+            self.primary(event_type, task="T-003")
+        self.put_record("T-003", "accepted")
+        self.write_board({"T-001": "closed", "T-002": "reviewed",
+                          "T-003": "accepted"})
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.illegal_transitions(out), [{
+            "kind": "illegal_transition", "target": "T-003",
+            "event": "ACCEPT", "expected": ["reviewed"],
+            "actual": "delivered"}])
+        self.assertEqual(self.drift_kinds(out), ["illegal_transition"])
+
+    # -- 34. illegal envelope transitions --------------------------------
+    def test_merge_without_merge_start_is_illegal(self) -> None:
+        self.write_board({})
+        self.supervision("ENVELOPE_NEW", envelope="ENV-T-003")
+        self.supervision("QUEUE_ADD", envelope="ENV-T-003")
+        self.supervision("MERGE", envelope="ENV-T-003", merge_commit="abc")
+        self.put_envelope("ENV-T-003", "MERGED")
+        self.write_queue({"ENV-T-003": "MERGED"})
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.illegal_transitions(out), [{
+            "kind": "illegal_transition", "target": "ENV-T-003",
+            "event": "MERGE", "expected": ["MERGING"],
+            "actual": "WAITING"}])
+        self.assertEqual(out["envelopes"], 1)
+
+    def test_post_merge_verified_from_waiting_is_illegal(self) -> None:
+        self.write_board({})
+        self.supervision("ENVELOPE_NEW", envelope="ENV-T-003")
+        self.supervision("QUEUE_ADD", envelope="ENV-T-003")
+        self.supervision("POST_MERGE_VERIFIED", envelope="ENV-T-003")
+        self.put_envelope("ENV-T-003", "POST_MERGE_VERIFIED")
+        self.write_queue({"ENV-T-003": "POST_MERGE_VERIFIED"})
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.illegal_transitions(out), [{
+            "kind": "illegal_transition", "target": "ENV-T-003",
+            "event": "POST_MERGE_VERIFIED",
+            "expected": ["CORRECTION_REQUIRED", "MERGED"],
+            "actual": "WAITING"}])
+
+    # -- 35. real-ledger precedents stay legal --------------------------
+    def test_task_new_rebuild_from_dispatched_is_legal(self) -> None:
+        # PILOT-025 precedent: a rebuilt card starts over with TASK_NEW.
+        self.build_base_tower()
+        for event_type in ("TASK_NEW", "DISPATCH", "TASK_NEW"):
+            self.primary(event_type, task="T-003")
+        self.put_record("T-003", "ready")
+        self.write_board({"T-001": "closed", "T-002": "reviewed",
+                          "T-003": "ready"})
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out["drift"], [])
+        self.assertEqual(self.illegal_transitions(out), [])
+
+    def test_redelivery_from_delivered_is_legal(self) -> None:
+        # PILOT-001 precedent: DELIVER landed twice on a delivered card.
+        self.build_base_tower()
+        for event_type in ("TASK_NEW", "DISPATCH", "DELIVER", "DELIVER"):
+            self.primary(event_type, task="T-003")
+        self.put_record("T-003", "delivered")
+        self.write_board({"T-001": "closed", "T-002": "reviewed",
+                          "T-003": "delivered"})
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out["drift"], [])
+
+    def test_correction_retry_transitions_are_legal(self) -> None:
+        # MERGE_START from CORRECTION_REQUIRED and POST_MERGE_VERIFIED from
+        # CORRECTION_REQUIRED are both real retry shapes.
+        self.write_board({})
+        for event_type in ("ENVELOPE_NEW", "QUEUE_ADD", "MERGE_START"):
+            self.supervision(event_type, envelope="ENV-T-003")
+        self.supervision("MERGE", envelope="ENV-T-003", merge_commit="abc")
+        self.supervision("POST_MERGE_FAILED", envelope="ENV-T-003")
+        self.supervision("MERGE_START", envelope="ENV-T-003")
+        self.supervision("MERGE", envelope="ENV-T-003", merge_commit="def")
+        self.supervision("POST_MERGE_VERIFIED", envelope="ENV-T-003")
+
+        for event_type in ("ENVELOPE_NEW", "QUEUE_ADD", "MERGE_START"):
+            self.supervision(event_type, envelope="ENV-T-004")
+        self.supervision("MERGE", envelope="ENV-T-004", merge_commit="ghi")
+        self.supervision("POST_MERGE_FAILED", envelope="ENV-T-004")
+        self.supervision("POST_MERGE_VERIFIED", envelope="ENV-T-004")
+
+        for envelope_id in ("ENV-T-003", "ENV-T-004"):
+            self.put_envelope(envelope_id, "POST_MERGE_VERIFIED")
+        self.write_queue({"ENV-T-003": "POST_MERGE_VERIFIED",
+                          "ENV-T-004": "POST_MERGE_VERIFIED"})
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out["drift"], [])
+        self.assertEqual(out["envelopes"], 2)
+
+    # -- 36. unknown events are ignored ---------------------------------
+    def test_unknown_event_types_are_ignored(self) -> None:
+        self.build_base_tower()
+        self.primary("TASK_NEW", task="T-003")
+        self.primary("MYSTERY_EVENT", task="T-003")
+        self.supervision("MYSTERY_ENVELOPE_EVENT", envelope="ENV-T-003")
+        self.put_record("T-003", "ready")
+        self.write_board({"T-001": "closed", "T-002": "reviewed",
+                          "T-003": "ready"})
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out["drift"], [])
+        self.assertEqual(out["tasks"], 3)
+        self.assertEqual(out["envelopes"], 2)
+
+    # -- 37. clean full tower: every transition is inside the tables -----
+    def test_clean_tower_has_no_illegal_transition(self) -> None:
+        self.build_base_tower()
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out["drift"], [])
+        self.assertEqual(self.illegal_transitions(out), [])
+
 
 if __name__ == "__main__":
     unittest.main()

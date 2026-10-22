@@ -2826,6 +2826,39 @@ ENVELOPE_LIFECYCLE_STATUS = {
 # later MERGE/POST_MERGE_VERIFIED event overrides it, exactly like the live
 # queue does.
 ENVELOPE_CORRECTION_EVENTS = {"MERGE_BLOCKED", "POST_MERGE_FAILED"}
+# Internal envelope state while a merge is running.  MERGE_START is the only
+# event that enters it and, like the live queue, it does not change the folded
+# status: the next MERGE / correction event settles the envelope again.
+ENVELOPE_MERGING_STATUS = "MERGING"
+# Sentinel for "legal from any state": a rebuilt card starts a fresh
+# ``TASK_NEW`` even when the previous card was dispatched or closed.
+ANY_STATE = object()
+# Legal source states per lifecycle event, derived from a read-only probe of
+# the real ledgers (``evidence/real-transitions.txt``) rather than invented
+# rules.  They are deliberately permissive where the tower has precedent:
+# ``TASK_NEW`` rebuilds a card from any state, ``DELIVER`` may re-deliver an
+# already delivered card, ``CHECKBACK`` may re-review a delivered/reviewed/
+# reworked card, and a correction may be retried straight from
+# ``CORRECTION_REQUIRED``.  Any event not listed here is ignored by the replay
+# and therefore cannot drift.
+TASK_TRANSITIONS = {
+    "TASK_NEW": ANY_STATE,
+    "DISPATCH": frozenset({"ready", "rework"}),
+    "DELIVER": frozenset({"dispatched", "delivered", "rework"}),
+    "CHECKBACK": frozenset({"delivered", "reviewed", "rework"}),
+    "ACCEPT": frozenset({"reviewed"}),
+    "CLOSEOUT": frozenset({"accepted"}),
+}
+ENVELOPE_TRANSITIONS = {
+    "ENVELOPE_NEW": frozenset({None, "DRAFT", "CORRECTION_REQUIRED"}),
+    "QUEUE_ADD": frozenset({"DRAFT"}),
+    "MERGE_START": frozenset({"WAITING", "CORRECTION_REQUIRED"}),
+    "MERGE": frozenset({ENVELOPE_MERGING_STATUS}),
+    "POST_MERGE_VERIFIED": frozenset({"MERGED", "CORRECTION_REQUIRED"}),
+    "MERGE_BLOCKED": frozenset({"WAITING", ENVELOPE_MERGING_STATUS,
+                                "CORRECTION_REQUIRED"}),
+    "POST_MERGE_FAILED": frozenset({"MERGED", "CORRECTION_REQUIRED"}),
+}
 
 
 def _read_json_object(path: Path) -> tuple[str, dict | None]:
@@ -3109,8 +3142,30 @@ def ledger_events_in_seq_order(root: Path, name: str) -> list[dict]:
     return [event for _, event in sorted(rows, key=lambda pair: pair[0])]
 
 
-def replay_task_statuses(root: Path) -> dict[str, str]:
-    """Fold ``ledger/primary.jsonl`` by task into the expected status."""
+def _sorted_states(states) -> list:
+    """Sort allowed from-states for a drift row: ``None`` first, then names."""
+    return sorted(states, key=lambda state: (state is not None, state or ""))
+
+
+def _illegal_transition(target: str, event_type: str, allowed,
+                        actual: str | None) -> dict:
+    """One drift row for an event whose source state is outside the table."""
+    return {"kind": "illegal_transition", "target": target,
+            "event": event_type, "expected": _sorted_states(allowed),
+            "actual": actual}
+
+
+def replay_task_statuses(root: Path,
+                         transitions: list[dict] | None = None) -> dict[str, str]:
+    """Fold ``ledger/primary.jsonl`` by task into the expected status.
+
+    When ``transitions`` is a list, append one ``illegal_transition`` row for
+    every lifecycle event whose source state is outside :data:`TASK_TRANSITIONS`
+    (``TASK_NEW`` is legal from any state).  The fold itself is untouched: an
+    illegal event is still replayed last-writer-wins, so the final-state map and
+    every existing drift stay exactly as before; the caller reports the extra
+    rows.  Unknown event types are ignored and never produce a transition.
+    """
     states: dict[str, str] = {}
     for event in ledger_events_in_seq_order(root, "primary"):
         payload = event.get("payload")
@@ -3121,15 +3176,35 @@ def replay_task_statuses(root: Path) -> dict[str, str]:
             continue
         event_type = event.get("type")
         if event_type == "CHECKBACK":
-            states[task] = "reviewed" if payload.get("verdict") == "PASS" else "rework"
+            next_state = "reviewed" if payload.get("verdict") == "PASS" else "rework"
         elif event_type in TASK_LIFECYCLE_STATUS:
-            states[task] = TASK_LIFECYCLE_STATUS[event_type]
+            next_state = TASK_LIFECYCLE_STATUS[event_type]
+        else:
+            # Unknown / non-lifecycle event: ignored, exactly as before.
+            continue
+        if transitions is not None:
+            allowed = TASK_TRANSITIONS.get(event_type, ANY_STATE)
+            previous = states.get(task)
+            if allowed is not ANY_STATE and previous not in allowed:
+                transitions.append(
+                    _illegal_transition(task, event_type, allowed, previous))
+        states[task] = next_state
     return states
 
 
-def replay_envelope_statuses(root: Path) -> dict[str, str]:
-    """Fold ``ledger/supervision.jsonl`` by envelope into expected status."""
+def replay_envelope_statuses(root: Path,
+                             transitions: list[dict] | None = None) -> dict[str, str]:
+    """Fold ``ledger/supervision.jsonl`` by envelope into expected status.
+
+    ``MERGE_START`` moves an internal-only state to ``MERGING`` (it still
+    leaves the folded status unchanged), so a following ``MERGE`` is checked
+    against the merge that actually started.  When ``transitions`` is a list,
+    append one ``illegal_transition`` row for every lifecycle event whose
+    source state is outside :data:`ENVELOPE_TRANSITIONS`; the fold and every
+    existing drift keep their previous values.  Unknown events are ignored.
+    """
     states: dict[str, str] = {}
+    internal: dict[str, str] = {}
     for event in ledger_events_in_seq_order(root, "supervision"):
         payload = event.get("payload")
         if not isinstance(payload, dict):
@@ -3138,11 +3213,24 @@ def replay_envelope_statuses(root: Path) -> dict[str, str]:
         if not isinstance(envelope, str) or not envelope:
             continue
         event_type = event.get("type")
-        if event_type in ENVELOPE_LIFECYCLE_STATUS:
-            states[envelope] = ENVELOPE_LIFECYCLE_STATUS[event_type]
+        if event_type == "MERGE_START":
+            next_state = ENVELOPE_MERGING_STATUS
+        elif event_type in ENVELOPE_LIFECYCLE_STATUS:
+            next_state = ENVELOPE_LIFECYCLE_STATUS[event_type]
         elif event_type in ENVELOPE_CORRECTION_EVENTS:
-            states[envelope] = "CORRECTION_REQUIRED"
-        # MERGE_START and any other event leave the folded status unchanged.
+            next_state = "CORRECTION_REQUIRED"
+        else:
+            # Unknown / non-lifecycle event: ignored, exactly as before.
+            continue
+        if transitions is not None:
+            allowed = ENVELOPE_TRANSITIONS.get(event_type)
+            previous = internal.get(envelope)
+            if allowed is not None and previous not in allowed:
+                transitions.append(
+                    _illegal_transition(envelope, event_type, allowed, previous))
+        internal[envelope] = next_state
+        if event_type != "MERGE_START":
+            states[envelope] = next_state
     return states
 
 
@@ -3158,6 +3246,12 @@ def state_verify_drift(root: Path) -> dict:
     per-entity comparison for that file.  Board status is compared against
     the replayed status, not against ``record.status``.
 
+    While folding, each lifecycle event is also checked against its legal
+    source states and an out-of-table event yields one ``illegal_transition``
+    entry (``event``, ``expected`` allowed from-states, ``actual`` observed
+    from-state).  The final-state maps, counts and every other drift are
+    unchanged by that check.
+
     Entities without lifecycle events, a replayed task absent from a readable
     board, and a replayed envelope absent from a readable queue are reported
     in ``skipped``; they are observations, never drift.
@@ -3167,9 +3261,10 @@ def state_verify_drift(root: Path) -> dict:
     against the bytes on disk.  ``evidence_checked`` counts only the evidence
     entries whose bytes were actually hashed.
     """
-    task_states = replay_task_statuses(root)
-    envelope_states = replay_envelope_statuses(root)
-    drift: list[dict] = []
+    transitions: list[dict] = []
+    task_states = replay_task_statuses(root, transitions)
+    envelope_states = replay_envelope_statuses(root, transitions)
+    drift: list[dict] = list(transitions)
     skipped: list[dict] = []
     evidence_checked = 0
 
