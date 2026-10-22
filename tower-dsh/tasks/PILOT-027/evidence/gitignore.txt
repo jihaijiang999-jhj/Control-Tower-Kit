@@ -1,0 +1,18 @@
+# nested git repositories / worktrees (backed up separately)
+tower-dsh/pilot/repo/
+tower-dsh/pilot/worktrees/
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+
+# tower temp
+*.tmp
+
+# tower test sandbox (tools/run_tests.py TMP/TEMP/TMPDIR)
+tower-dsh/.test-tmp/
+
+# OS
+Thumbs.db
+.DS_Store

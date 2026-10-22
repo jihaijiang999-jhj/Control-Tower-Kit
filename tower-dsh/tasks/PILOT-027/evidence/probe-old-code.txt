@@ -1,0 +1,48 @@
+﻿# PILOT-027 old-code contrast: new tests vs main code (no tools/run_tests.py)
+# probe root: C:\Users\mac\AppData\Local\Temp\pilot027-old-code-ec3c53f5
+---
+## 1) new tools/tests/test_run_tests.py against main code
+## cmd: cd <probe>/tower-dsh; python -B -m unittest discover -s tools/tests -p test_run_tests.py -v
+test_run_tests (unittest.loader._FailedTest.test_run_tests) ... ERROR
+
+======================================================================
+ERROR: test_run_tests (unittest.loader._FailedTest.test_run_tests)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_run_tests
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\unittest\loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mac\AppData\Local\Programs\Python\Python312\Lib\unittest\loader.py", line 339, in _get_module_from_name
+    __import__(name)
+  File "C:\Users\mac\AppData\Local\Temp\pilot027-old-code-ec3c53f5\tower-dsh\tools\tests\test_run_tests.py", line 30, in <module>
+    import run_tests  # noqa: E402  (tools/ is put on sys.path above)
+    ^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'run_tests'
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (errors=1)
+exit code: 1
+---
+## 2) new tests/test_tower_gates.py against main tower (runner file absent)
+## cmd: cd <probe>; python -B -m unittest discover -s tests -v
+test_non_utf8_child_output_is_replaced_not_raised (test_tower_gates.NonUtf8ChildOutput.test_non_utf8_child_output_is_replaced_not_raised) ... ok
+test_tower_gate_suite (test_tower_gates.TowerGateSuite.test_tower_gate_suite) ... FAIL
+
+======================================================================
+FAIL: test_tower_gate_suite (test_tower_gates.TowerGateSuite.test_tower_gate_suite)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot027-old-code-ec3c53f5\tests\test_tower_gates.py", line 59, in test_tower_gate_suite
+    self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)
+AssertionError: 2 != 0 : C:\Users\mac\AppData\Local\Programs\Python\Python312\python.exe: can't open file 'C:\\Users\\mac\\AppData\\Local\\Temp\\pilot027-old-code-ec3c53f5\\tower-dsh\\tools\\run_tests.py': [Errno 2] No such file or directory
+
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.068s
+
+FAILED (failures=1)
+exit code: 1
