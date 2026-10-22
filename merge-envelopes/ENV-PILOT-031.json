@@ -1,0 +1,57 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-031",
+  "task": "PILOT-031",
+  "repository": "..",
+  "branch": "pilot/PILOT-031",
+  "base": "main",
+  "implementation_head_sha": "686084125c7ef42063fb12e875eba4b6ef17aea1",
+  "envelope_path": "merge-envelopes/ENV-PILOT-031.json",
+  "created_at": "2026-10-23T02:24:47+08:00",
+  "scope": "PILOT-031: keep count baselines monotonic against verified ledger counts",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 277,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-031/evidence/towerctl.py",
+      "sha256": "57468519f6a768e0a4c8a4ef6802037c03bd8434e7e28745632dfc80f7be8000"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/test_post_merge.py",
+      "sha256": "a42a9e617a7cd666a58f200b3f9f0eb26993c2c100188525dd5141a294e43d17"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/test-output.txt",
+      "sha256": "99272e4215e8ad7a50d75961fe68a199ed582cddd3cc82c9daf9fc6ae38f5342"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/anchor-probe.txt",
+      "sha256": "0d6ee72745fafc8e8dd6b642d9519f82c4ab24aea329aa483bb9fae229d076ba"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/anchor_probe.py",
+      "sha256": "943b65af187017ad268807617828a53c23efc0a82d27c8bb5ae79e06fbb27940"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/real-run.txt",
+      "sha256": "7e5a3173ea517a21a79e989b6bb8d64d7fad12592f7b38ae864fc58ddb96c3df"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/probe-old-code.txt",
+      "sha256": "1102d47aa815fe5c14f29e56553782797e1e71e2fc9803c1dfa368eed8469173"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/commit.txt",
+      "sha256": "e6a6bbd2329b308af1d87f849316c3c57eb7d9914719d627707cebe74172b862"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/diff.txt",
+      "sha256": "bc5474e0ea1ae7c8e4bc6f555d311e0fee940957bafdd4d2b4102cf8dd5dabc1"
+    }
+  ]
+}
