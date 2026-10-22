@@ -2901,19 +2901,19 @@ ENVELOPE_CORRECTION_EVENTS = {"MERGE_BLOCKED", "POST_MERGE_FAILED"}
 # event that enters it and, like the live queue, it does not change the folded
 # status: the next MERGE / correction event settles the envelope again.
 ENVELOPE_MERGING_STATUS = "MERGING"
-# Sentinel for "legal from any state": a rebuilt card starts a fresh
-# ``TASK_NEW`` even when the previous card was dispatched or closed.
-ANY_STATE = object()
 # Legal source states per lifecycle event, derived from a read-only probe of
 # the real ledgers (``evidence/real-transitions.txt``) rather than invented
 # rules.  They are deliberately permissive where the tower has precedent:
-# ``TASK_NEW`` rebuilds a card from any state, ``DELIVER`` may re-deliver an
-# already delivered card, ``CHECKBACK`` may re-review a delivered/reviewed/
+# ``TASK_NEW`` creates a card once (``None``) and rebuilds an *unfinished*
+# card in place (PILOT-025: dispatched -> ready); it must never reset a card
+# that already reached ``accepted`` or ``closed``.  ``DELIVER`` may re-deliver
+# an already delivered card, ``CHECKBACK`` may re-review a delivered/reviewed/
 # reworked card, and a correction may be retried straight from
 # ``CORRECTION_REQUIRED``.  Any event not listed here is ignored by the replay
 # and therefore cannot drift.
 TASK_TRANSITIONS = {
-    "TASK_NEW": ANY_STATE,
+    "TASK_NEW": frozenset({None, "ready", "dispatched", "delivered",
+                           "reviewed", "rework"}),
     "DISPATCH": frozenset({"ready", "rework"}),
     "DELIVER": frozenset({"dispatched", "delivered", "rework"}),
     "CHECKBACK": frozenset({"delivered", "reviewed", "rework"}),
@@ -3232,10 +3232,12 @@ def replay_task_statuses(root: Path,
 
     When ``transitions`` is a list, append one ``illegal_transition`` row for
     every lifecycle event whose source state is outside :data:`TASK_TRANSITIONS`
-    (``TASK_NEW`` is legal from any state).  The fold itself is untouched: an
-    illegal event is still replayed last-writer-wins, so the final-state map and
-    every existing drift stay exactly as before; the caller reports the extra
-    rows.  Unknown event types are ignored and never produce a transition.
+    (``TASK_NEW`` creates a card from ``None`` and rebuilds only unfinished
+    cards, never one that is already ``accepted``/``closed``).  The fold itself
+    is untouched: an illegal event is still replayed last-writer-wins, so the
+    final-state map and every existing drift stay exactly as before; the caller
+    reports the extra rows.  Unknown event types are ignored and never produce
+    a transition.
     """
     states: dict[str, str] = {}
     for event in ledger_events_in_seq_order(root, "primary"):
@@ -3254,9 +3256,9 @@ def replay_task_statuses(root: Path,
             # Unknown / non-lifecycle event: ignored, exactly as before.
             continue
         if transitions is not None:
-            allowed = TASK_TRANSITIONS.get(event_type, ANY_STATE)
+            allowed = TASK_TRANSITIONS.get(event_type)
             previous = states.get(task)
-            if allowed is not ANY_STATE and previous not in allowed:
+            if allowed is not None and previous not in allowed:
                 transitions.append(
                     _illegal_transition(task, event_type, allowed, previous))
         states[task] = next_state

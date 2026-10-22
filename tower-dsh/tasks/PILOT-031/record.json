@@ -1,0 +1,138 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-031",
+  "title": "baseline 不得回退：以 ledger 已验证计数为锚拒绝更低 baseline",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "新增只读辅助 max_verified_tower_tests(root)：解析 supervision ledger 事件，取 type=POST_MERGE_VERIFIED 且 payload.tower_tests_count 为 int（非 bool、>=0）的最大值；无匹配返回 None；坏行忽略",
+    "cmd_post_merge 在塔套件计数检查之后、祖先检查之前新增检查 tower baseline >= last verified：仅当锚点存在且 envelope.tower_tests_baseline 合法时启用；ok = tower_tests_baseline >= 锚点；detail 为 baseline B, last verified A；锚点不存在时不出该检查（legacy）",
+    "该检查不通过时 post-merge 判红（CORRECTION_REQUIRED），不写 POST_MERGE_VERIFIED；不改变既有检查、计数与证据语义",
+    "扩展 tools/tests/test_post_merge.py：fixture ledger 预置 tower_tests_count=10 的 POST_MERGE_VERIFIED 事件，信封 baseline=5 → 判红；baseline=10 → 通过；baseline=12 → 通过；无历史事件 → 不出现该检查；多条事件取最大值；bool/字符串/nil 计数被忽略",
+    "不新增状态文件、不改 queue/envelope schema"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-031/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-031/tower-dsh/tools/tests/test_post_merge.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "allowing a baseline below the ledger-verified maximum"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-031/tower-dsh && python -B tools/run_tests.py 全部通过，总数 >= 266（main 基线 266）",
+    "fixture：历史 POST_MERGE_VERIFIED tower_tests_count=10，信封 baseline=5 → exit 2，检查 tower baseline >= last verified ok=false，detail 含 baseline 5, last verified 10，无 POST_MERGE_VERIFIED 事件",
+    "同一 fixture baseline=10 或 12 → 通过，检查 ok=true",
+    "无历史计数事件 → 不出现 tower baseline >= last verified 检查（旧塔兼容）",
+    "多条历史事件取最大值；tower_tests_count 为 bool/字符串/null 的事件被忽略",
+    "在真实塔完成本卡 post-merge：6/6 且该检查 ok=true（锚点 = 历史最大值，baseline 取冻结时主分支塔套件数）",
+    "real tower state-verify drift=[]（本卡未交付信封前 tasks=31/envelopes=30）",
+    "python tools/towerctl.py spec-coverage 27/27、spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-031 diff --name-only main..HEAD 恰好两个 allowed_paths 文件",
+    "既有 post-merge 测试（计数/解码/clean/重试）全绿"
+  ],
+  "depends_on": [
+    "PILOT-030"
+  ],
+  "worktree": "pilot/worktrees/PILOT-031",
+  "spec_path": "pilot/PILOT-031.spec.json",
+  "spec_sha256": "302a053962b41ab2de04db0ac4305322dcc12f9ea1ed9482539c818a23aa1e73",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-run-c-031",
+  "dispatch": {
+    "executor": "subagent:exec-run-c-031",
+    "worktree": "pilot/worktrees/PILOT-031",
+    "at": "2026-10-23T02:06:41+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-031/evidence/towerctl.py",
+      "sha256": "57468519f6a768e0a4c8a4ef6802037c03bd8434e7e28745632dfc80f7be8000",
+      "bytes": 158587,
+      "at": "2026-10-23T02:14:18+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/test_post_merge.py",
+      "sha256": "a42a9e617a7cd666a58f200b3f9f0eb26993c2c100188525dd5141a294e43d17",
+      "bytes": 31495,
+      "at": "2026-10-23T02:14:18+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/test-output.txt",
+      "sha256": "99272e4215e8ad7a50d75961fe68a199ed582cddd3cc82c9daf9fc6ae38f5342",
+      "bytes": 79416,
+      "at": "2026-10-23T02:14:18+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/anchor-probe.txt",
+      "sha256": "0d6ee72745fafc8e8dd6b642d9519f82c4ab24aea329aa483bb9fae229d076ba",
+      "bytes": 1382,
+      "at": "2026-10-23T02:14:18+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/anchor_probe.py",
+      "sha256": "943b65af187017ad268807617828a53c23efc0a82d27c8bb5ae79e06fbb27940",
+      "bytes": 3543,
+      "at": "2026-10-23T02:14:18+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/real-run.txt",
+      "sha256": "7e5a3173ea517a21a79e989b6bb8d64d7fad12592f7b38ae864fc58ddb96c3df",
+      "bytes": 514,
+      "at": "2026-10-23T02:14:18+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/probe-old-code.txt",
+      "sha256": "1102d47aa815fe5c14f29e56553782797e1e71e2fc9803c1dfa368eed8469173",
+      "bytes": 9912,
+      "at": "2026-10-23T02:14:18+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/commit.txt",
+      "sha256": "e6a6bbd2329b308af1d87f849316c3c57eb7d9914719d627707cebe74172b862",
+      "bytes": 255,
+      "at": "2026-10-23T02:14:18+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-031/evidence/diff.txt",
+      "sha256": "bc5474e0ea1ae7c8e4bc6f555d311e0fee940957bafdd4d2b4102cf8dd5dabc1",
+      "bytes": 11116,
+      "at": "2026-10-23T02:14:18+08:00",
+      "id": "E-009"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-run-c-031",
+    "verdict": "PASS",
+    "note": "RUN-C 卡 2/3 PASS。277 tests OK(skipped=1)；独立 11 项 anchor 矩阵：anchor10/baseline5 判红且 detail 精确、无新 VERIFIED；10 与 12 通过；无事件时检查缺省；[7,10,3] 取 max=10；true/字符串/null 被忽略；POST_MERGE_FAILED 不抬锚；字符串/缺失 baseline 时两道塔门均缺省；无 ledger 时 anchor None。真实 anchor 独立解析=271（246/252/261/266/271，25 条无计数的 legacy 事件忽略）；真实塔 31/30/drift 0。旧码对照恰 6 个新测试失败、16 个旧测试绿。9/9 证据哈希与 spec_sha256 匹配；scope 恰两文件；594 文件只读快照一致。残余（不阻塞）：opt-in 缺省可绕过塔门；伪造/错误 verified 事件可抬高锚（fail-closed DoS）；非追溯；锚只增不减，旧基线信封需重冻结；无锁读尾可能瞬时少计（fail-open）；只校数量不校质量。证据小瑕疵（不影响验收）：E-008 两个列表段为字面 System.Object[]、E-003 含 PowerShell 噪声，但恰含一条 Ran 277/OK。",
+    "at": "2026-10-23T02:24:41+08:00"
+  },
+  "decision": {
+    "id": "D-RUN-C-031",
+    "actor": "owner",
+    "text": "owner approved RUN-2026-10-23-C; card 2/3 PASS",
+    "at": "2026-10-23T02:24:41+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-031/CLOSEOUT.md",
+    "at": "2026-10-23T02:24:41+08:00"
+  },
+  "created_at": "2026-10-23T02:06:40+08:00",
+  "updated_at": "2026-10-23T02:24:41+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-031/MERGE.md",
+  "delivered_at": "2026-10-23T02:14:18+08:00",
+  "accepted_at": "2026-10-23T02:24:41+08:00"
+}

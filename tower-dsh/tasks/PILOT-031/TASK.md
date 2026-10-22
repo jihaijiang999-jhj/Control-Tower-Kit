@@ -1,0 +1,41 @@
+# PILOT-031 — baseline 不得回退：以 ledger 已验证计数为锚拒绝更低 baseline
+
+- Status: `ready`
+- Authority: `workspace_write`
+- Worktree: `pilot/worktrees/PILOT-031`
+
+## Scope
+
+- 新增只读辅助 max_verified_tower_tests(root)：解析 supervision ledger 事件，取 type=POST_MERGE_VERIFIED 且 payload.tower_tests_count 为 int（非 bool、>=0）的最大值；无匹配返回 None；坏行忽略
+- cmd_post_merge 在塔套件计数检查之后、祖先检查之前新增检查 tower baseline >= last verified：仅当锚点存在且 envelope.tower_tests_baseline 合法时启用；ok = tower_tests_baseline >= 锚点；detail 为 baseline B, last verified A；锚点不存在时不出该检查（legacy）
+- 该检查不通过时 post-merge 判红（CORRECTION_REQUIRED），不写 POST_MERGE_VERIFIED；不改变既有检查、计数与证据语义
+- 扩展 tools/tests/test_post_merge.py：fixture ledger 预置 tower_tests_count=10 的 POST_MERGE_VERIFIED 事件，信封 baseline=5 → 判红；baseline=10 → 通过；baseline=12 → 通过；无历史事件 → 不出现该检查；多条事件取最大值；bool/字符串/nil 计数被忽略
+- 不新增状态文件、不改 queue/envelope schema
+
+## Allowed paths
+
+- `pilot/worktrees/PILOT-031/tower-dsh/tools/towerctl.py`
+- `pilot/worktrees/PILOT-031/tower-dsh/tools/tests/test_post_merge.py`
+
+## Forbidden
+
+- network
+- external dependencies
+- changes outside the task worktree
+- merge
+- production access
+- weakening or deleting existing test coverage
+- allowing a baseline below the ledger-verified maximum
+
+## Acceptance
+
+- cd pilot/worktrees/PILOT-031/tower-dsh && python -B tools/run_tests.py 全部通过，总数 >= 266（main 基线 266）
+- fixture：历史 POST_MERGE_VERIFIED tower_tests_count=10，信封 baseline=5 → exit 2，检查 tower baseline >= last verified ok=false，detail 含 baseline 5, last verified 10，无 POST_MERGE_VERIFIED 事件
+- 同一 fixture baseline=10 或 12 → 通过，检查 ok=true
+- 无历史计数事件 → 不出现 tower baseline >= last verified 检查（旧塔兼容）
+- 多条历史事件取最大值；tower_tests_count 为 bool/字符串/null 的事件被忽略
+- 在真实塔完成本卡 post-merge：6/6 且该检查 ok=true（锚点 = 历史最大值，baseline 取冻结时主分支塔套件数）
+- real tower state-verify drift=[]（本卡未交付信封前 tasks=31/envelopes=30）
+- python tools/towerctl.py spec-coverage 27/27、spec-lint --strict 6/6
+- git -C pilot/worktrees/PILOT-031 diff --name-only main..HEAD 恰好两个 allowed_paths 文件
+- 既有 post-merge 测试（计数/解码/clean/重试）全绿
