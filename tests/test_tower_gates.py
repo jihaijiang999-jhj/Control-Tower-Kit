@@ -53,7 +53,7 @@ def run_captured(argv, cwd):
 class TowerGateSuite(unittest.TestCase):
     def test_tower_gate_suite(self):
         cp = run_captured(
-            [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tools/tests", "-v"],
+            [sys.executable, "-B", "tools/run_tests.py"],
             TOWER,
         )
         self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)

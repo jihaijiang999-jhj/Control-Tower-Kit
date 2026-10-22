@@ -1,0 +1,69 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-027",
+  "task": "PILOT-027",
+  "repository": "..",
+  "branch": "pilot/PILOT-027",
+  "base": "main",
+  "implementation_head_sha": "fb2a3b1cd5258f70dd6df61027138654a469d31b",
+  "envelope_path": "merge-envelopes/ENV-PILOT-027.json",
+  "created_at": "2026-10-22T19:40:11+08:00",
+  "scope": "PILOT-027: run tests under a repo-local TMP sandbox",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 246,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-027/evidence/test-output.txt",
+      "sha256": "09adfbc3037fafe1a20970154ed84a41680a2011bcd32359ce5639aa962a3a7d"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/direct-discovery.txt",
+      "sha256": "94d946f8e045f3cfb7c9816f505bfec370d3087c83fbdda99747b9b7f2a1e254"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/real-run.txt",
+      "sha256": "0b80f9a01aa73f46fe979437144c66c0bfab6060d59ec9a5c34654e9769dd032"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/probe-old-code.txt",
+      "sha256": "30ed6882db9d194530f2634c4f80078555153899e1786c9145623e2a2fdcb298"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/commit.txt",
+      "sha256": "492964c92717cfe0371aa03da5e3da89d362c4ccde6041aca1d34d5f80e10afa"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/diff.txt",
+      "sha256": "598504f5a5b08c172c62466834f5031255529de3ac71f40666f2b2c1a34ae256"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/gitignore.txt",
+      "sha256": "318493ab76cf99415bb2220450c1b247845f7ab27677aaea2b6d54263e970e95"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/run_tests.py",
+      "sha256": "d0bcfe6ad685f19f7c65b0fc0ccbdc8e00575a30bd485916a9d78f1b58a2f091"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/test_run_tests.py",
+      "sha256": "36fc77fff0caf5df7e36e32eb0139acd7342223beedcb3c278928b8d5d677e1b"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/towerctl.py",
+      "sha256": "51b4936b02809c9e56ddb9cd550d45426b6c12b9743e2266deef4791c6831ccb"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/REPRODUCE.md",
+      "sha256": "46f2d04a8341293f48e234f770a6230526af5d5c41312e277b42cad169d583cc"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/test_tower_gates.py",
+      "sha256": "81cdb2f6e6f5e0daa0e3c401eeb0386c37a11c11794af3d6cc00329d6ccfd5f8"
+    }
+  ]
+}
