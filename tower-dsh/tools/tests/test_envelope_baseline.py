@@ -352,6 +352,79 @@ class EnvelopeBaselineTestCase(unittest.TestCase):
         self.assertEqual(len(self.queue_events()), 1,
                          msg=self.supervision_ledger())
 
+    # -- ledger-backed queue requirement (PILOT-033) ---------------------
+    def handwrite_queue_entry(self) -> None:
+        """Queue the envelope by editing ``MERGE_QUEUE.json`` directly."""
+        write_json(self.root / "supervision" / "MERGE_QUEUE.json", {
+            "schema": "tower/merge-queue@1",
+            "entries": [{
+                "envelope_id": ENVELOPE, "task": TASK,
+                "branch": BRANCH, "base": "main",
+                "status": "WAITING", "added_at": FIXED_TIME,
+            }],
+        })
+
+    def test_handwritten_queue_entry_fails_merge_check(self) -> None:
+        # New-style envelope (both baselines) with no ENVELOPE_NEW and a queue
+        # row with no QUEUE_ADD: every file-level check passes, so only the
+        # ledger-backed check can reject the hand-written queue bypass.
+        self.write_handwritten_envelope()
+        self.handwrite_queue_entry()
+        self.assertNotIn("QUEUE_ADD", self.supervision_ledger())
+        self.assertNotIn("ENVELOPE_NEW", self.supervision_ledger())
+
+        cp = run_cli(self.root, "merge-check", "--envelope", ENVELOPE)
+
+        self.assertEqual(cp.returncode, 2,
+                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        payload = json.loads(cp.stdout)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["errors"], [{
+            "name": "queue entry backed by ledger", "ok": False,
+            "detail": "QUEUE_ADD event missing"}])
+
+    def test_handwritten_queue_entry_blocks_merge(self) -> None:
+        self.write_handwritten_envelope()
+        self.handwrite_queue_entry()
+
+        cp = run_cli(self.root, "merge", "--role", "supervisor",
+                     "--supervisor", "sup-1", "--envelope", ENVELOPE)
+
+        self.assertEqual(cp.returncode, 2,
+                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        payload = json.loads(cp.stdout)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["errors"], [{
+            "name": "queue entry backed by ledger", "ok": False,
+            "detail": "QUEUE_ADD event missing"}])
+        # The shared check fails before any git merge: the entry is marked for
+        # correction and never reaches MERGING/MERGED.
+        self.assertEqual(self.queue_entries()[0]["status"], "CORRECTION_REQUIRED")
+        self.assertNotIn(read_json(self.envelope_path())["status"],
+                         ("MERGED", "POST_MERGE_VERIFIED"))
+        self.assertIn("MERGE_BLOCKED", self.supervision_ledger())
+        self.assertNotIn("MERGE_START", self.supervision_ledger())
+
+    def test_queue_add_backs_merge_check(self) -> None:
+        cp = run_cli(self.root, "envelope-new", "--task", TASK,
+                     "--file", str(self.envelope_file))
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        cp = run_cli(self.root, "queue-add", "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        self.assertEqual(len(self.queue_events()), 1,
+                         msg=self.supervision_ledger())
+
+        cp = run_cli(self.root, "merge-check", "--envelope", ENVELOPE)
+
+        self.assertEqual(cp.returncode, 0,
+                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        payload = json.loads(cp.stdout)
+        self.assertTrue(payload["ok"], msg=cp.stdout)
+        check = next(c for c in payload["checks"]
+                     if c["name"] == "queue entry backed by ledger")
+        self.assertTrue(check["ok"])
+        self.assertEqual(check["detail"], "QUEUE_ADD event present")
+
     # -- legacy compatibility -------------------------------------------
     def test_legacy_envelope_without_baselines_still_merge_checks(self) -> None:
         # Written directly on purpose: envelope-new would refuse it, but an
@@ -383,6 +456,10 @@ class EnvelopeBaselineTestCase(unittest.TestCase):
         self.assertTrue(payload["ok"], msg=cp.stdout)
         self.assertNotIn("int >= 1", cp.stdout)
         self.assertNotIn("tests_baseline", cp.stdout)
+        # Legacy envelopes keep the old opt-in semantics: the new ledger-backed
+        # check is not injected when the baselines are absent.
+        self.assertNotIn("queue entry backed by ledger",
+                         [c["name"] for c in payload["checks"]])
 
 
 if __name__ == "__main__":
