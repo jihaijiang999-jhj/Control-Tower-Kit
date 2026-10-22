@@ -1,0 +1,225 @@
+========================================================================
+(a) tower_tests_baseline=1, one passing tower test  ->  post-merge exit 0
+========================================================================
+checks JSON:
+[
+  {
+    "name": "post-merge tests pass",
+    "ok": true,
+    "detail": "exit 0"
+  },
+  {
+    "name": "tests count >= baseline",
+    "ok": true,
+    "detail": "ran 1, baseline 1"
+  },
+  {
+    "name": "tower tests count >= baseline",
+    "ok": true,
+    "detail": "exit 0, ran 1, baseline 1"
+  },
+  {
+    "name": "implementation is ancestor of base",
+    "ok": true,
+    "detail": "687a6b66671adb22b0253829342ffac08be02418..main"
+  },
+  {
+    "name": "envelope file exists on base",
+    "ok": true,
+    "detail": "main:merge-envelopes/ENV-TEST-PM-001.json"
+  },
+  {
+    "name": "working tree clean",
+    "ok": true,
+    "detail": "clean"
+  }
+]
+payload.status: POST_MERGE_VERIFIED
+envelope.status: POST_MERGE_VERIFIED
+envelope.tower_tests_count: 1
+queue.status: POST_MERGE_VERIFIED
+review count lines:
+  - tests_count: 1
+  - tests_baseline: 1
+  - tower_tests_count: 1
+  - tower_tests_baseline: 1
+
+========================================================================
+(b) tower_tests_baseline=2, one passing tower test  ->  post-merge exit 2
+========================================================================
+checks JSON:
+[
+  {
+    "name": "post-merge tests pass",
+    "ok": true,
+    "detail": "exit 0"
+  },
+  {
+    "name": "tests count >= baseline",
+    "ok": true,
+    "detail": "ran 1, baseline 1"
+  },
+  {
+    "name": "tower tests count >= baseline",
+    "ok": false,
+    "detail": "exit 0, ran 1, baseline 2"
+  },
+  {
+    "name": "implementation is ancestor of base",
+    "ok": true,
+    "detail": "ca6e760515d9f7026ae7973ca076f89542345669..main"
+  },
+  {
+    "name": "envelope file exists on base",
+    "ok": true,
+    "detail": "main:merge-envelopes/ENV-TEST-PM-001.json"
+  },
+  {
+    "name": "working tree clean",
+    "ok": true,
+    "detail": "clean"
+  }
+]
+payload.status: CORRECTION_REQUIRED
+envelope.status: CORRECTION_REQUIRED
+envelope.tower_tests_count: 1
+queue.status: CORRECTION_REQUIRED
+review count lines:
+  - tests_count: 1
+  - tests_baseline: 1
+  - tower_tests_count: 1
+  - tower_tests_baseline: 2
+
+========================================================================
+(c) tower_tests_baseline=1, no tools/tests directory  ->  post-merge exit 2
+========================================================================
+checks JSON:
+[
+  {
+    "name": "post-merge tests pass",
+    "ok": true,
+    "detail": "exit 0"
+  },
+  {
+    "name": "tests count >= baseline",
+    "ok": true,
+    "detail": "ran 1, baseline 1"
+  },
+  {
+    "name": "tower tests count >= baseline",
+    "ok": false,
+    "detail": "exit 1, ran unknown, baseline 1"
+  },
+  {
+    "name": "implementation is ancestor of base",
+    "ok": true,
+    "detail": "156e357a30f0856d89fe3ccc356260905e63b540..main"
+  },
+  {
+    "name": "envelope file exists on base",
+    "ok": true,
+    "detail": "main:merge-envelopes/ENV-TEST-PM-001.json"
+  },
+  {
+    "name": "working tree clean",
+    "ok": true,
+    "detail": "clean"
+  }
+]
+payload.status: CORRECTION_REQUIRED
+envelope.status: CORRECTION_REQUIRED
+envelope.tower_tests_count: None
+queue.status: CORRECTION_REQUIRED
+review count lines:
+  - tests_count: 1
+  - tests_baseline: 1
+  - tower_tests_count: unknown
+  - tower_tests_baseline: 1
+
+========================================================================
+(d) legacy envelope, no tower_tests_baseline  ->  post-merge exit 0
+========================================================================
+checks JSON:
+[
+  {
+    "name": "post-merge tests pass",
+    "ok": true,
+    "detail": "exit 0"
+  },
+  {
+    "name": "tests count >= baseline",
+    "ok": true,
+    "detail": "ran 1, baseline 1"
+  },
+  {
+    "name": "implementation is ancestor of base",
+    "ok": true,
+    "detail": "3d3efb57a9bc5b0eb6f118e7a5c3d7ad58f21b2a..main"
+  },
+  {
+    "name": "envelope file exists on base",
+    "ok": true,
+    "detail": "main:merge-envelopes/ENV-TEST-PM-001.json"
+  },
+  {
+    "name": "working tree clean",
+    "ok": true,
+    "detail": "clean"
+  }
+]
+payload.status: POST_MERGE_VERIFIED
+envelope.status: POST_MERGE_VERIFIED
+envelope.tower_tests_count: <absent>
+queue.status: POST_MERGE_VERIFIED
+review count lines:
+  - tests_count: 1
+  - tests_baseline: 1
+  - tower_tests_count: unknown
+  - tower_tests_baseline: not set
+
+========================================================================
+(e) tower_tests_baseline=1, suite with a failing test  ->  post-merge exit 2
+========================================================================
+checks JSON:
+[
+  {
+    "name": "post-merge tests pass",
+    "ok": true,
+    "detail": "exit 0"
+  },
+  {
+    "name": "tests count >= baseline",
+    "ok": true,
+    "detail": "ran 1, baseline 1"
+  },
+  {
+    "name": "tower tests count >= baseline",
+    "ok": false,
+    "detail": "exit 1, ran 3, baseline 1"
+  },
+  {
+    "name": "implementation is ancestor of base",
+    "ok": true,
+    "detail": "86815d4f78082c58ff16466a56a97029dc126e14..main"
+  },
+  {
+    "name": "envelope file exists on base",
+    "ok": true,
+    "detail": "main:merge-envelopes/ENV-TEST-PM-001.json"
+  },
+  {
+    "name": "working tree clean",
+    "ok": true,
+    "detail": "clean"
+  }
+]
+payload.status: CORRECTION_REQUIRED
+envelope.status: CORRECTION_REQUIRED
+envelope.tower_tests_count: 3
+queue.status: CORRECTION_REQUIRED
+review count lines:
+  - tests_count: 1
+  - tests_baseline: 1
+  - tower_tests_count: 3
+  - tower_tests_baseline: 1
+

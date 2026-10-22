@@ -1,0 +1,22 @@
+commit 31712353911fbc5759d757707fb9e8f72cec4d81
+Author:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+AuthorDate: Thu Oct 22 15:13:50 2026 +0800
+Commit:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+CommitDate: Thu Oct 22 15:13:50 2026 +0800
+
+    PILOT-026: gate post-merge on the tower suite count
+  
+--- git show --stat ---  
+3171235 PILOT-026: gate post-merge on the tower suite count
+ tower-dsh/tools/tests/test_hardening2.py |  14 +++-
+ tower-dsh/tools/tests/test_post_merge.py | 122 ++++++++++++++++++++++++++++++-
+ tower-dsh/tools/towerctl.py              |  74 ++++++++++++++++---
+ 3 files changed, 196 insertions(+), 14 deletions(-)
+  
+--- git status --short ---  
+?? evidence/
+  
+--- git diff --name-only main..HEAD ---  
+tower-dsh/tools/tests/test_hardening2.py
+tower-dsh/tools/tests/test_post_merge.py
+tower-dsh/tools/towerctl.py

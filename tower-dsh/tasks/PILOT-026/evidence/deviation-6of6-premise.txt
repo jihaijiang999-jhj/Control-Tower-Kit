@@ -1,0 +1,46 @@
+﻿PILOT-026 deviation probe: the card's "5/5 -> 6/6" premise
+================================================================
+Card instruction 3 said only the assertion changes, because "the new check
+raises the total from 5 to 6".  In this fixture the envelope carries no
+tower_tests_baseline, so the opt-in gate correctly does NOT run and the
+artefact still records 5 checks.  This probe keeps the 6/6 assertion but
+removes the fixture's tower baseline (everything else is the final code):
+
+    python -B -m unittest discover -s tools/tests -p test_hardening2.py -v
+
+--- output ---
+
+test_normal_contention_is_not_an_immediate_timeout (test_hardening2.LedgerLockDeadlineTestCase.test_normal_contention_is_not_an_immediate_timeout) ... ok
+test_persistent_permission_error_without_lock_hits_deadline (test_hardening2.LedgerLockDeadlineTestCase.test_persistent_permission_error_without_lock_hits_deadline) ... ok
+test_close_closeout_has_no_not_performed (test_hardening2.PathSafetyTestCase.test_close_closeout_has_no_not_performed) ... ok
+test_deliver_accepts_evidence_inside_root (test_hardening2.PathSafetyTestCase.test_deliver_accepts_evidence_inside_root) ... ok
+test_deliver_rejects_evidence_outside_root (test_hardening2.PathSafetyTestCase.test_deliver_rejects_evidence_outside_root) ... ok
+test_dispatch_accepts_worktree_inside_root (test_hardening2.PathSafetyTestCase.test_dispatch_accepts_worktree_inside_root) ... ok
+test_dispatch_rejects_worktree_outside_root (test_hardening2.PathSafetyTestCase.test_dispatch_rejects_worktree_outside_root) ... ok
+test_envelope_id_traversal_is_rejected (test_hardening2.PathSafetyTestCase.test_envelope_id_traversal_is_rejected) ... ok
+test_envelope_new_rejects_file_outside_root (test_hardening2.PathSafetyTestCase.test_envelope_new_rejects_file_outside_root) ... ok
+test_envelope_new_rejects_task_traversal (test_hardening2.PathSafetyTestCase.test_envelope_new_rejects_task_traversal) ... ok
+test_envelope_repository_outside_parent_is_rejected (test_hardening2.PathSafetyTestCase.test_envelope_repository_outside_parent_is_rejected) ... ok
+test_envelope_repository_parent_is_allowed (test_hardening2.PathSafetyTestCase.test_envelope_repository_parent_is_allowed) ... ok
+test_evidence_path_under_pilot_worktrees_is_accepted (test_hardening2.PathSafetyTestCase.test_evidence_path_under_pilot_worktrees_is_accepted) ... ok
+test_handoff_package_traversal_is_rejected (test_hardening2.PathSafetyTestCase.test_handoff_package_traversal_is_rejected) ... ok
+test_merge_check_missing_record_emits_single_json_object (test_hardening2.PathSafetyTestCase.test_merge_check_missing_record_emits_single_json_object) ... ok
+test_package_id_with_dotdot_segment_is_rejected (test_hardening2.PathSafetyTestCase.test_package_id_with_dotdot_segment_is_rejected) ... ok
+test_task_id_traversal_is_rejected (test_hardening2.PathSafetyTestCase.test_task_id_traversal_is_rejected) ... ok
+test_task_new_rejects_spec_outside_root (test_hardening2.PathSafetyTestCase.test_task_new_rejects_spec_outside_root) ... ok
+test_task_new_rejects_worktree_outside_root (test_hardening2.PathSafetyTestCase.test_task_new_rejects_worktree_outside_root) ... ok
+test_post_merge_success_writes_merge_md (test_hardening2.PostMergeArtifactTestCase.test_post_merge_success_writes_merge_md) ... FAIL
+
+======================================================================
+FAIL: test_post_merge_success_writes_merge_md (test_hardening2.PostMergeArtifactTestCase.test_post_merge_success_writes_merge_md)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot026-premise\tools\tests\test_hardening2.py", line 509, in test_post_merge_success_writes_merge_md
+    self.assertIn("Post-merge checks: 6/6", text)
+AssertionError: 'Post-merge checks: 6/6' not found in '# T-PM-001 — Merge record\n\n- Envelope: `ENV-PM-001`\n- Implementation head: `3f9bb06bade658b802460d74a69f1e3562672dd9`\n- Envelope head: `c3948a5f496571d5b6af7c07dbf21c6e5665c223`\n- Merge commit: `8d686f92472bc167038dd31c5036eb3f579430aa`\n- Base: `main`\n- Status: `POST_MERGE_VERIFIED`\n- Verified at: 2026-10-22T15:12:23+08:00\n- Post-merge checks: 5/5\n\n## Checks\n\n- [x] post-merge tests pass — exit 0\n- [x] tests count present — ran 1, baseline not set\n- [x] implementation is ancestor of base — 3f9bb06bade658b802460d74a69f1e3562672dd9..main\n- [x] envelope file exists on base — main:merge-envelopes/ENV-PM-001.json\n- [x] working tree clean — clean\n'
+
+----------------------------------------------------------------------
+Ran 20 tests in 3.742s
+
+FAILED (failures=1)
+

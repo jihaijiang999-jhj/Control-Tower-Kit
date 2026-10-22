@@ -251,7 +251,17 @@
       "reviewer": "subagent:rev-pilot-025",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-025/MERGE.md",
       "updated_at": "2026-10-22T00:34:53+08:00"
+    },
+    {
+      "id": "PILOT-026",
+      "title": "塔套件计数入闸：post-merge 直接跑 tools/tests 并按 tower_tests_baseline 设门",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-026",
+      "reviewer": "subagent:rev-pilot-026",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-026/MERGE.md",
+      "updated_at": "2026-10-22T15:31:00+08:00"
     }
   ],
-  "updated_at": "2026-10-22T00:34:53+08:00"
+  "updated_at": "2026-10-22T15:31:00+08:00"
 }

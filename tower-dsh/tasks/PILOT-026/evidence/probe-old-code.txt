@@ -1,0 +1,231 @@
+﻿PILOT-026 probe: new tests vs OLD towerctl (main 81ea484)
+================================================================
+old towerctl source: git show main:tower-dsh/tools/towerctl.py
+new tests: tower-dsh/tools/tests/test_post_merge.py (modified)
+           tower-dsh/tools/tests/test_hardening2.py (modified)
+run from: C:\Users\mac\AppData\Local\Temp\pilot026-old-code  (throw-away copy; never the real tower)
+
+--- python -B -m unittest discover -s tools/tests -p test_post_merge.py -v ---
+
+test_count_gate_fails_when_suite_is_below_baseline (test_post_merge.PostMergeTestCase.test_count_gate_fails_when_suite_is_below_baseline) ... ok
+test_count_gate_passes_when_baseline_met (test_post_merge.PostMergeTestCase.test_count_gate_passes_when_baseline_met) ... ok
+test_fail_is_retryable_after_correction (test_post_merge.PostMergeTestCase.test_fail_is_retryable_after_correction) ... ok
+test_failure_appends_ledger_event (test_post_merge.PostMergeTestCase.test_failure_appends_ledger_event) ... ok
+test_legacy_envelope_fails_when_no_tests_remain (test_post_merge.PostMergeTestCase.test_legacy_envelope_fails_when_no_tests_remain) ... ok
+test_legacy_envelope_without_baseline_passes (test_post_merge.PostMergeTestCase.test_legacy_envelope_without_baseline_passes) ... ok
+test_legacy_envelope_without_tower_baseline_skips_gate (test_post_merge.PostMergeTestCase.test_legacy_envelope_without_tower_baseline_skips_gate) ... FAIL
+test_parse_test_count_unit_cases (test_post_merge.PostMergeTestCase.test_parse_test_count_unit_cases) ... ok
+test_preexisting_review_file_does_not_fail_clean_check (test_post_merge.PostMergeTestCase.test_preexisting_review_file_does_not_fail_clean_check) ... ok
+test_rejects_envelope_that_was_never_merged (test_post_merge.PostMergeTestCase.test_rejects_envelope_that_was_never_merged) ... ok
+test_success_appends_ledger_event (test_post_merge.PostMergeTestCase.test_success_appends_ledger_event) ... ok
+test_tower_count_gate_fails_when_suite_exits_nonzero (test_post_merge.PostMergeTestCase.test_tower_count_gate_fails_when_suite_exits_nonzero) ... FAIL
+test_tower_count_gate_fails_when_suite_is_below_baseline (test_post_merge.PostMergeTestCase.test_tower_count_gate_fails_when_suite_is_below_baseline) ... FAIL
+test_tower_count_gate_fails_when_tools_tests_missing (test_post_merge.PostMergeTestCase.test_tower_count_gate_fails_when_tools_tests_missing) ... FAIL
+test_tower_count_gate_passes_when_baseline_met (test_post_merge.PostMergeTestCase.test_tower_count_gate_passes_when_baseline_met) ... FAIL
+test_unrelated_dirty_file_still_blocks (test_post_merge.PostMergeTestCase.test_unrelated_dirty_file_still_blocks) ... ok
+
+======================================================================
+FAIL: test_legacy_envelope_without_tower_baseline_skips_gate (test_post_merge.PostMergeTestCase.test_legacy_envelope_without_tower_baseline_skips_gate)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot026-old-code\tools\tests\test_post_merge.py", line 482, in test_legacy_envelope_without_tower_baseline_skips_gate
+    self.assertIn("- tower_tests_count: unknown", review)
+AssertionError: '- tower_tests_count: unknown' not found in '# ENV-TEST-PM-001 post-merge verification\n\n- base: main\n- implementation: 0278bd3c834fbf5500ff7b7e332c085d32ba20bc\n- merge_commit: 05799f28e7f3aa3053300ab11aaf04b1a53eb221\n- result: PASS\n- working_tree_clean: True\n- tool_owned_paths_ignored: []\n- test_exit: 0\n- tests_count: 1\n- tests_baseline: 1\n\n## Test output\n\n\ntest_smoke (test_smoke.SmokeTest.test_smoke) ... ok\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK\n\n'
+
+======================================================================
+FAIL: test_tower_count_gate_fails_when_suite_exits_nonzero (test_post_merge.PostMergeTestCase.test_tower_count_gate_fails_when_suite_exits_nonzero)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot026-old-code\tools\tests\test_post_merge.py", line 491, in test_tower_count_gate_fails_when_suite_exits_nonzero
+    self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+AssertionError: 0 != 2 : stdout={
+  "ok": true,
+  "envelope": "ENV-TEST-PM-001",
+  "status": "POST_MERGE_VERIFIED",
+  "checks": [
+    {
+      "name": "post-merge tests pass",
+      "ok": true,
+      "detail": "exit 0"
+    },
+    {
+      "name": "tests count >= baseline",
+      "ok": true,
+      "detail": "ran 1, baseline 1"
+    },
+    {
+      "name": "implementation is ancestor of base",
+      "ok": true,
+      "detail": "b1e2d28519e278a8d5116b9038d0b11a01944b35..main"
+    },
+    {
+      "name": "envelope file exists on base",
+      "ok": true,
+      "detail": "main:merge-envelopes/ENV-TEST-PM-001.json"
+    },
+    {
+      "name": "working tree clean",
+      "ok": true,
+      "detail": "clean"
+    }
+  ],
+  "tests_count": 1,
+  "review": "supervision/reviews/ENV-TEST-PM-001-post-merge.txt",
+  "merge_record": "tasks/TEST-PM-001/MERGE.md"
+}
+
+stderr=
+
+======================================================================
+FAIL: test_tower_count_gate_fails_when_suite_is_below_baseline (test_post_merge.PostMergeTestCase.test_tower_count_gate_fails_when_suite_is_below_baseline)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot026-old-code\tools\tests\test_post_merge.py", line 435, in test_tower_count_gate_fails_when_suite_is_below_baseline
+    self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+AssertionError: 0 != 2 : stdout={
+  "ok": true,
+  "envelope": "ENV-TEST-PM-001",
+  "status": "POST_MERGE_VERIFIED",
+  "checks": [
+    {
+      "name": "post-merge tests pass",
+      "ok": true,
+      "detail": "exit 0"
+    },
+    {
+      "name": "tests count >= baseline",
+      "ok": true,
+      "detail": "ran 1, baseline 1"
+    },
+    {
+      "name": "implementation is ancestor of base",
+      "ok": true,
+      "detail": "02fcde81ed25bc2cb7f564460586098868e819f7..main"
+    },
+    {
+      "name": "envelope file exists on base",
+      "ok": true,
+      "detail": "main:merge-envelopes/ENV-TEST-PM-001.json"
+    },
+    {
+      "name": "working tree clean",
+      "ok": true,
+      "detail": "clean"
+    }
+  ],
+  "tests_count": 1,
+  "review": "supervision/reviews/ENV-TEST-PM-001-post-merge.txt",
+  "merge_record": "tasks/TEST-PM-001/MERGE.md"
+}
+
+stderr=
+
+======================================================================
+FAIL: test_tower_count_gate_fails_when_tools_tests_missing (test_post_merge.PostMergeTestCase.test_tower_count_gate_fails_when_tools_tests_missing)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot026-old-code\tools\tests\test_post_merge.py", line 457, in test_tower_count_gate_fails_when_tools_tests_missing
+    self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+AssertionError: 0 != 2 : stdout={
+  "ok": true,
+  "envelope": "ENV-TEST-PM-001",
+  "status": "POST_MERGE_VERIFIED",
+  "checks": [
+    {
+      "name": "post-merge tests pass",
+      "ok": true,
+      "detail": "exit 0"
+    },
+    {
+      "name": "tests count >= baseline",
+      "ok": true,
+      "detail": "ran 1, baseline 1"
+    },
+    {
+      "name": "implementation is ancestor of base",
+      "ok": true,
+      "detail": "cfbf7700a5287d2a24030990820f0687595bf213..main"
+    },
+    {
+      "name": "envelope file exists on base",
+      "ok": true,
+      "detail": "main:merge-envelopes/ENV-TEST-PM-001.json"
+    },
+    {
+      "name": "working tree clean",
+      "ok": true,
+      "detail": "clean"
+    }
+  ],
+  "tests_count": 1,
+  "review": "supervision/reviews/ENV-TEST-PM-001-post-merge.txt",
+  "merge_record": "tasks/TEST-PM-001/MERGE.md"
+}
+
+stderr=
+
+======================================================================
+FAIL: test_tower_count_gate_passes_when_baseline_met (test_post_merge.PostMergeTestCase.test_tower_count_gate_passes_when_baseline_met)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot026-old-code\tools\tests\test_post_merge.py", line 409, in test_tower_count_gate_passes_when_baseline_met
+    self.assertEqual([c["name"] for c in payload["checks"]], [
+AssertionError: Lists differ: ['pos[44 chars]e', 'implementation is ancestor of base', 'env[44 chars]ean'] != ['pos[44 chars]e', 'tower tests count >= baseline', 'implemen[77 chars]ean']
+
+First differing element 2:
+'implementation is ancestor of base'
+'tower tests count >= baseline'
+
+Second list contains 1 additional elements.
+First extra element 5:
+'working tree clean'
+
+  ['post-merge tests pass',
+   'tests count >= baseline',
++  'tower tests count >= baseline',
+   'implementation is ancestor of base',
+   'envelope file exists on base',
+   'working tree clean']
+
+----------------------------------------------------------------------
+Ran 16 tests in 12.648s
+
+FAILED (failures=5)
+
+
+--- python -B -m unittest discover -s tools/tests -p test_hardening2.py -v ---
+
+test_normal_contention_is_not_an_immediate_timeout (test_hardening2.LedgerLockDeadlineTestCase.test_normal_contention_is_not_an_immediate_timeout) ... ok
+test_persistent_permission_error_without_lock_hits_deadline (test_hardening2.LedgerLockDeadlineTestCase.test_persistent_permission_error_without_lock_hits_deadline) ... ok
+test_close_closeout_has_no_not_performed (test_hardening2.PathSafetyTestCase.test_close_closeout_has_no_not_performed) ... ok
+test_deliver_accepts_evidence_inside_root (test_hardening2.PathSafetyTestCase.test_deliver_accepts_evidence_inside_root) ... ok
+test_deliver_rejects_evidence_outside_root (test_hardening2.PathSafetyTestCase.test_deliver_rejects_evidence_outside_root) ... ok
+test_dispatch_accepts_worktree_inside_root (test_hardening2.PathSafetyTestCase.test_dispatch_accepts_worktree_inside_root) ... ok
+test_dispatch_rejects_worktree_outside_root (test_hardening2.PathSafetyTestCase.test_dispatch_rejects_worktree_outside_root) ... ok
+test_envelope_id_traversal_is_rejected (test_hardening2.PathSafetyTestCase.test_envelope_id_traversal_is_rejected) ... ok
+test_envelope_new_rejects_file_outside_root (test_hardening2.PathSafetyTestCase.test_envelope_new_rejects_file_outside_root) ... ok
+test_envelope_new_rejects_task_traversal (test_hardening2.PathSafetyTestCase.test_envelope_new_rejects_task_traversal) ... ok
+test_envelope_repository_outside_parent_is_rejected (test_hardening2.PathSafetyTestCase.test_envelope_repository_outside_parent_is_rejected) ... ok
+test_envelope_repository_parent_is_allowed (test_hardening2.PathSafetyTestCase.test_envelope_repository_parent_is_allowed) ... ok
+test_evidence_path_under_pilot_worktrees_is_accepted (test_hardening2.PathSafetyTestCase.test_evidence_path_under_pilot_worktrees_is_accepted) ... ok
+test_handoff_package_traversal_is_rejected (test_hardening2.PathSafetyTestCase.test_handoff_package_traversal_is_rejected) ... ok
+test_merge_check_missing_record_emits_single_json_object (test_hardening2.PathSafetyTestCase.test_merge_check_missing_record_emits_single_json_object) ... ok
+test_package_id_with_dotdot_segment_is_rejected (test_hardening2.PathSafetyTestCase.test_package_id_with_dotdot_segment_is_rejected) ... ok
+test_task_id_traversal_is_rejected (test_hardening2.PathSafetyTestCase.test_task_id_traversal_is_rejected) ... ok
+test_task_new_rejects_spec_outside_root (test_hardening2.PathSafetyTestCase.test_task_new_rejects_spec_outside_root) ... ok
+test_task_new_rejects_worktree_outside_root (test_hardening2.PathSafetyTestCase.test_task_new_rejects_worktree_outside_root) ... ok
+test_post_merge_success_writes_merge_md (test_hardening2.PostMergeArtifactTestCase.test_post_merge_success_writes_merge_md) ... FAIL
+
+======================================================================
+FAIL: test_post_merge_success_writes_merge_md (test_hardening2.PostMergeArtifactTestCase.test_post_merge_success_writes_merge_md)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot026-old-code\tools\tests\test_hardening2.py", line 520, in test_post_merge_success_writes_merge_md
+    self.assertIn("Post-merge checks: 6/6", text)
+AssertionError: 'Post-merge checks: 6/6' not found in '# T-PM-001 — Merge record\n\n- Envelope: `ENV-PM-001`\n- Implementation head: `47a08a390eb720deaf7e1a5391790767f1318ade`\n- Envelope head: `e2909e2f852fc3f2e6bae9eaa11275c9208c579c`\n- Merge commit: `6120ee66d58f2fd74fce46d45c23191e9e0564c4`\n- Base: `main`\n- Status: `POST_MERGE_VERIFIED`\n- Verified at: 2026-10-22T15:10:49+08:00\n- Post-merge checks: 5/5\n\n## Checks\n\n- [x] post-merge tests pass — exit 0\n- [x] tests count present — ran 1, baseline not set\n- [x] implementation is ancestor of base — 47a08a390eb720deaf7e1a5391790767f1318ade..main\n- [x] envelope file exists on base — main:merge-envelopes/ENV-PM-001.json\n- [x] working tree clean — clean\n'
+
+----------------------------------------------------------------------
+Ran 20 tests in 3.816s
+
+FAILED (failures=1)
+
