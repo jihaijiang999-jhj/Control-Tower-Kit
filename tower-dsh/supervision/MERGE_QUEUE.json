@@ -240,10 +240,10 @@
       "task": "PILOT-027",
       "branch": "pilot/PILOT-027",
       "base": "main",
-      "status": "MERGED",
+      "status": "CORRECTION_REQUIRED",
       "added_at": "2026-10-22T19:40:12+08:00",
       "merge_commit": "223b10be627dd92096cfb0fe26203da6a5aaaab1"
     }
   ],
-  "updated_at": "2026-10-22T19:42:37+08:00"
+  "updated_at": "2026-10-22T19:48:36+08:00"
 }
