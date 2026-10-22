@@ -59,7 +59,7 @@
     }
   ],
   "envelope_head_sha": "86a1a89a41bfc29b9379050dc557f67890f6f359",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "pr_number": 11,
   "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/11",
   "remote_merged": true,
@@ -68,5 +68,9 @@
   "merged_at": "2026-10-22T15:34:26+08:00",
   "supervisor": "sup-pilot-026-verify",
   "merge_mode": "pr",
-  "check_conclusion": "success"
+  "check_conclusion": "success",
+  "tests_count": 2,
+  "tower_tests_count": 246,
+  "post_merge_at": "2026-10-22T15:37:19+08:00",
+  "post_merge_note": "tower-suite count gate; root baseline 2, tower baseline 241"
 }
