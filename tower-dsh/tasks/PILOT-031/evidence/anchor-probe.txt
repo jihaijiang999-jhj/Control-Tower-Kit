@@ -1,0 +1,29 @@
+﻿# Temp-tower probe: real towerctl.py post-merge on throw-away git fixtures,
+# with POST_MERGE_VERIFIED rows seeded into ledger/supervision.jsonl.
+
+[block: baseline below verified]
+  anchor_events=[10] baseline=5 suite=10
+  exit=2 status=CORRECTION_REQUIRED verified_events_for_envelope=0
+  anchor_check ok=False detail='baseline 5, last verified 10'
+[pass: baseline equal to verified]
+  anchor_events=[10] baseline=10 suite=10
+  exit=0 status=POST_MERGE_VERIFIED verified_events_for_envelope=1
+  anchor_check ok=True detail='baseline 10, last verified 10'
+[pass: baseline above verified]
+  anchor_events=[10] baseline=12 suite=12
+  exit=0 status=POST_MERGE_VERIFIED verified_events_for_envelope=1
+  anchor_check ok=True detail='baseline 12, last verified 10'
+[legacy: no verified event]
+  anchor_events=[] baseline=5 suite=10
+  exit=0 status=POST_MERGE_VERIFIED verified_events_for_envelope=1
+  anchor_check=<ABSENT>
+[block: maximum wins over latest]
+  anchor_events=[7, 10, 3] baseline=5 suite=10
+  exit=2 status=CORRECTION_REQUIRED verified_events_for_envelope=0
+  anchor_check ok=False detail='baseline 5, last verified 10'
+[pass: invalid counts ignored]
+  anchor_events=[True, '10', None, 7] baseline=7 suite=7
+  exit=0 status=POST_MERGE_VERIFIED verified_events_for_envelope=1
+  anchor_check ok=True detail='baseline 7, last verified 7'
+MATRIX OK
+

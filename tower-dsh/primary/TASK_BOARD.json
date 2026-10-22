@@ -301,7 +301,17 @@
       "reviewer": "subagent:rev-run-c-030",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-030/MERGE.md",
       "updated_at": "2026-10-23T01:56:40+08:00"
+    },
+    {
+      "id": "PILOT-031",
+      "title": "baseline 不得回退：以 ledger 已验证计数为锚拒绝更低 baseline",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-run-c-031",
+      "reviewer": "subagent:rev-run-c-031",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-031/MERGE.md",
+      "updated_at": "2026-10-23T02:24:41+08:00"
     }
   ],
-  "updated_at": "2026-10-23T01:56:40+08:00"
+  "updated_at": "2026-10-23T02:24:41+08:00"
 }

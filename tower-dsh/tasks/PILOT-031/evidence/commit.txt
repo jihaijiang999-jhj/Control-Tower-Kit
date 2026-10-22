@@ -1,0 +1,10 @@
+﻿commit 686084125c7ef42063fb12e875eba4b6ef17aea1
+branch pilot/PILOT-031
+base   c485742
+subject PILOT-031: keep count baselines monotonic against verified ledger counts
+
+git diff --name-only main..HEAD:
+System.Object[]
+
+git show --stat:
+System.Object[]
