@@ -142,7 +142,8 @@ class PostMergeTestCase(unittest.TestCase):
         self.merge_commit = self.git("rev-parse", "HEAD").stdout.strip()
 
     def write_envelope(self, *, status: str, merge_commit: str | None,
-                       tests_baseline: int | None = 1) -> None:
+                       tests_baseline: int | None = 1,
+                       tower_tests_baseline: int | None = None) -> None:
         envelope = {
             "schema": "tower/merge-envelope@1",
             "envelope_id": ENVELOPE_ID,
@@ -158,8 +159,31 @@ class PostMergeTestCase(unittest.TestCase):
         }
         if tests_baseline is not None:
             envelope["tests_baseline"] = tests_baseline
+        if tower_tests_baseline is not None:
+            envelope["tower_tests_baseline"] = tower_tests_baseline
         self.write_json(self.root / "supervision" / "envelopes" / f"{ENVELOPE_ID}.json",
                         envelope)
+
+    def write_tower_suite(self, test_count: int, *, failing: bool = False) -> str:
+        """Write and commit a tiny ``tools/tests`` suite under the tower root.
+
+        The tower root is the parent of ``tools``, exactly like the real tower,
+        so ``post-merge`` discovers this suite with ``-s tools/tests``.
+        """
+        tests_dir = self.root / "tools" / "tests"
+        tests_dir.mkdir(parents=True, exist_ok=True)
+        lines = ["import unittest", "", "",
+                 "class TowerSmokeTest(unittest.TestCase):"]
+        for index in range(test_count):
+            lines += [f"    def test_tower_{index}(self):",
+                      "        self.assertTrue(True)", ""]
+        if failing:
+            lines += ["class TowerFailingTest(unittest.TestCase):",
+                      "    def test_tower_failure(self):",
+                      "        self.assertTrue(False)", ""]
+        (tests_dir / "test_tower_smoke.py").write_text("\n".join(lines),
+                                                       encoding="utf-8")
+        return self.commit_all("tower suite fixture")
 
     def write_queue(self, *, status: str) -> None:
         self.write_json(self.root / "supervision" / "MERGE_QUEUE.json", {
@@ -372,6 +396,102 @@ class PostMergeTestCase(unittest.TestCase):
         for stdout, stderr, expected in cases:
             with self.subTest(stdout=stdout, stderr=stderr):
                 self.assertEqual(towerctl.parse_test_count(stdout, stderr), expected)
+
+    # -- 12. tower gate: an explicit baseline is met ---------------------
+    def test_tower_count_gate_passes_when_baseline_met(self) -> None:
+        self.write_envelope(status="MERGED", merge_commit=self.merge_commit,
+                            tests_baseline=1, tower_tests_baseline=1)
+        self.write_tower_suite(1)
+        cp = self.run_post_merge("PASS")
+        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        payload = json.loads(cp.stdout)
+        self.assertEqual([c["name"] for c in payload["checks"]], [
+            "post-merge tests pass",
+            "tests count >= baseline",
+            "tower tests count >= baseline",
+            "implementation is ancestor of base",
+            "envelope file exists on base",
+            "working tree clean",
+        ])
+        tower = self.check(cp, "tower tests count >= baseline")
+        self.assertTrue(tower["ok"], tower)
+        self.assertEqual(tower["detail"], "exit 0, ran 1, baseline 1")
+        self.assertEqual(self.envelope()["tower_tests_count"], 1)
+        review = self.review_file().read_text(encoding="utf-8")
+        self.assertIn("- tower_tests_count: 1", review)
+        self.assertIn("- tower_tests_baseline: 1", review)
+        verified = [e for e in self.ledger_events()
+                    if e["type"] == "POST_MERGE_VERIFIED"]
+        self.assertEqual(len(verified), 1, verified)
+        self.assertEqual(verified[0]["payload"]["tower_tests_count"], 1)
+
+    # -- 13. tower gate: a shrunken tower suite fails ---------------------
+    def test_tower_count_gate_fails_when_suite_is_below_baseline(self) -> None:
+        self.write_envelope(status="MERGED", merge_commit=self.merge_commit,
+                            tests_baseline=1, tower_tests_baseline=2)
+        self.write_tower_suite(1)
+        cp = self.run_post_merge("PASS")
+        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        payload = json.loads(cp.stdout)
+        self.assertEqual(payload["status"], "CORRECTION_REQUIRED")
+        tower = self.check(cp, "tower tests count >= baseline")
+        self.assertFalse(tower["ok"], tower)
+        self.assertEqual(tower["detail"], "exit 0, ran 1, baseline 2")
+        envelope = self.envelope()
+        self.assertEqual(envelope["status"], "CORRECTION_REQUIRED")
+        self.assertEqual(envelope["tower_tests_count"], 1)
+        self.assertEqual(self.queue_entry()["status"], "CORRECTION_REQUIRED")
+        events = self.ledger_events()
+        self.assertFalse([e for e in events if e["type"] == "POST_MERGE_VERIFIED"])
+        failed = [e for e in events if e["type"] == "POST_MERGE_FAILED"]
+        self.assertEqual(len(failed), 1, events)
+        self.assertEqual(failed[0]["payload"]["tower_tests_count"], 1)
+
+    # -- 14. tower gate: a missing tools/tests directory must fail --------
+    def test_tower_count_gate_fails_when_tools_tests_missing(self) -> None:
+        self.write_envelope(status="MERGED", merge_commit=self.merge_commit,
+                            tests_baseline=1, tower_tests_baseline=1)
+        self.commit_all("envelope with a tower baseline but no tower suite")
+        cp = self.run_post_merge("PASS")
+        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        tower = self.check(cp, "tower tests count >= baseline")
+        self.assertFalse(tower["ok"], tower)
+        self.assertIn("ran unknown", tower["detail"])
+        self.assertIsNone(self.envelope()["tower_tests_count"])
+        self.assertIn("- tower_tests_count: unknown",
+                      self.review_file().read_text(encoding="utf-8"))
+
+    # -- 15. legacy envelope: no tower baseline, no tower run -------------
+    def test_legacy_envelope_without_tower_baseline_skips_gate(self) -> None:
+        # setUp already committed a MERGED envelope with no tower baseline.
+        self.assertNotIn("tower_tests_baseline", self.envelope())
+        cp = self.run_post_merge("PASS")
+        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        names = [c["name"] for c in json.loads(cp.stdout)["checks"]]
+        self.assertNotIn("tower tests count >= baseline", names)
+        self.assertEqual(names, [
+            "post-merge tests pass",
+            "tests count >= baseline",
+            "implementation is ancestor of base",
+            "envelope file exists on base",
+            "working tree clean",
+        ])
+        self.assertNotIn("tower_tests_count", self.envelope())
+        review = self.review_file().read_text(encoding="utf-8")
+        self.assertIn("- tower_tests_count: unknown", review)
+        self.assertIn("- tower_tests_baseline: not set", review)
+
+    # -- 16. tower gate: a failing suite fails despite a high count -------
+    def test_tower_count_gate_fails_when_suite_exits_nonzero(self) -> None:
+        self.write_envelope(status="MERGED", merge_commit=self.merge_commit,
+                            tests_baseline=1, tower_tests_baseline=1)
+        self.write_tower_suite(2, failing=True)
+        cp = self.run_post_merge("PASS")
+        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        tower = self.check(cp, "tower tests count >= baseline")
+        self.assertFalse(tower["ok"], tower)
+        self.assertEqual(tower["detail"], "exit 1, ran 3, baseline 1")
+        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
 
 
 if __name__ == "__main__":
