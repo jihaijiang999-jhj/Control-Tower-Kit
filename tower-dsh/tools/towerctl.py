@@ -2547,6 +2547,34 @@ def run_test_suite(argv: list[str], cwd: Path) -> subprocess.CompletedProcess:
     )
 
 
+def max_verified_tower_tests(root: Path) -> int | None:
+    """Highest tower count ever verified in the supervision ledger.
+
+    Only ``POST_MERGE_VERIFIED`` events carry a verified count.  The ledger is
+    append-only and hash-chained, but this reader is deliberately forgiving:
+    broken (non-JSON / non-object) rows are skipped, as are counts that are not
+    plain non-negative integers (``true`` and ``"10"`` are not counts).  The
+    result is the maximum over every valid event, so an older, larger count is
+    never masked by a later, smaller one.  ``None`` means the ledger has no
+    such event yet (a legacy tower), which keeps the monotonic gate off.
+    """
+    highest = None
+    path = root / "ledger" / "supervision.jsonl"
+    for raw_row in ledger_rows(path):
+        event = parse_ledger_row(raw_row)
+        if event is None or event.get("type") != "POST_MERGE_VERIFIED":
+            continue
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        count = payload.get("tower_tests_count")
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            continue
+        if highest is None or count > highest:
+            highest = count
+    return highest
+
+
 def cmd_post_merge(root: Path, args) -> None:
     envelope_id = check_package_id(args.envelope, "envelope")
     env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
@@ -2598,6 +2626,10 @@ def cmd_post_merge(root: Path, args) -> None:
     tower_baseline_ok = (isinstance(tower_baseline, int)
                          and not isinstance(tower_baseline, bool)
                          and tower_baseline >= 1)
+    # Opt-in monotonic-count gate: compare the declared baseline with the
+    # highest count the append-only ledger already verified.  A legacy tower
+    # (no verified event yet) has no anchor and keeps the old behaviour.
+    anchor = max_verified_tower_tests(root) if tower_baseline_ok else None
     tower_count = None
     tower_check = None
     if tower_baseline_ok:
@@ -2651,6 +2683,14 @@ def cmd_post_merge(root: Path, args) -> None:
     ]
     if tower_check is not None:
         checks.append(tower_check)
+    if tower_baseline_ok and anchor is not None:
+        # A verified count is a floor: a later envelope may raise the declared
+        # baseline, or keep it, but never declare it below what already passed.
+        checks.append({
+            "name": "tower baseline >= last verified",
+            "ok": tower_baseline >= anchor,
+            "detail": f"baseline {tower_baseline}, last verified {anchor}",
+        })
     checks += [
         {"name": "implementation is ancestor of base",
          "ok": git(repo, "merge-base", "--is-ancestor", a, base).returncode == 0,

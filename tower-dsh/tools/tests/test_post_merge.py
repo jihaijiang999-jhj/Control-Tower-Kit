@@ -185,6 +185,35 @@ class PostMergeTestCase(unittest.TestCase):
                                                        encoding="utf-8")
         return self.commit_all("tower suite fixture")
 
+    def seed_verified_events(self, *counts) -> None:
+        """Seed the supervision ledger with ``POST_MERGE_VERIFIED`` rows.
+
+        ``post-merge`` only reads this ledger (towerctl is its only writer), so
+        plain JSON rows are enough -- no hash chain has to be faked.  Each
+        value is written verbatim as ``payload.tower_tests_count`` so invalid
+        shapes such as ``True``, ``"10"`` or ``None`` can be exercised too.
+        """
+        path = self.root / "ledger" / "supervision.jsonl"
+        lines = [
+            json.dumps({
+                "seq": index,
+                "at": FIXED_TIME,
+                "actor": "supervision",
+                "type": "POST_MERGE_VERIFIED",
+                "payload": {"envelope": f"ENV-SEED-{index:03d}",
+                            "tower_tests_count": count},
+            }, ensure_ascii=False)
+            for index, count in enumerate(counts, 1)
+        ]
+        path.write_text("\n".join(lines) + ("\n" if lines else ""),
+                        encoding="utf-8")
+
+    def append_raw_ledger_row(self, raw: str) -> None:
+        """Append one raw (possibly broken) row to the supervision ledger."""
+        path = self.root / "ledger" / "supervision.jsonl"
+        path.write_text(path.read_text(encoding="utf-8") + raw + "\n",
+                        encoding="utf-8")
+
     def write_queue(self, *, status: str) -> None:
         self.write_json(self.root / "supervision" / "MERGE_QUEUE.json", {
             "schema": "tower/merge-queue@1",
@@ -492,6 +521,103 @@ class PostMergeTestCase(unittest.TestCase):
         self.assertFalse(tower["ok"], tower)
         self.assertEqual(tower["detail"], "exit 1, ran 3, baseline 1")
         self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
+
+    # -- 17. anchor: a baseline below the verified ledger count fails -----
+    def test_anchor_blocks_baseline_below_last_verified(self) -> None:
+        self.write_envelope(status="MERGED", merge_commit=self.merge_commit,
+                            tests_baseline=1, tower_tests_baseline=5)
+        self.seed_verified_events(10)
+        self.write_tower_suite(10)
+        cp = self.run_post_merge("PASS")
+        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        anchor = self.check(cp, "tower baseline >= last verified")
+        self.assertFalse(anchor["ok"], anchor)
+        self.assertEqual(anchor["detail"], "baseline 5, last verified 10")
+        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
+        events = self.ledger_events()
+        self.assertFalse([
+            e for e in events
+            if e["type"] == "POST_MERGE_VERIFIED"
+            and e["payload"].get("envelope") == ENVELOPE_ID
+        ])
+        failed = [e for e in events if e["type"] == "POST_MERGE_FAILED"]
+        self.assertEqual(len(failed), 1, events)
+
+    # -- 18. anchor: a baseline equal to the verified count passes --------
+    def test_anchor_allows_baseline_equal_to_last_verified(self) -> None:
+        self.write_envelope(status="MERGED", merge_commit=self.merge_commit,
+                            tests_baseline=1, tower_tests_baseline=10)
+        self.seed_verified_events(10)
+        self.write_tower_suite(10)
+        cp = self.run_post_merge("PASS")
+        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        anchor = self.check(cp, "tower baseline >= last verified")
+        self.assertTrue(anchor["ok"], anchor)
+        self.assertEqual(anchor["detail"], "baseline 10, last verified 10")
+        self.assertEqual(self.envelope()["status"], "POST_MERGE_VERIFIED")
+
+    # -- 19. anchor: a baseline above the verified count passes -----------
+    def test_anchor_allows_baseline_above_last_verified(self) -> None:
+        self.write_envelope(status="MERGED", merge_commit=self.merge_commit,
+                            tests_baseline=1, tower_tests_baseline=12)
+        self.seed_verified_events(10)
+        self.write_tower_suite(12)
+        cp = self.run_post_merge("PASS")
+        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        anchor = self.check(cp, "tower baseline >= last verified")
+        self.assertTrue(anchor["ok"], anchor)
+        self.assertEqual(anchor["detail"], "baseline 12, last verified 10")
+        self.assertEqual(self.envelope()["status"], "POST_MERGE_VERIFIED")
+
+    # -- 20. anchor: no verified history keeps the legacy shape -----------
+    def test_anchor_check_absent_without_verified_history(self) -> None:
+        self.write_envelope(status="MERGED", merge_commit=self.merge_commit,
+                            tests_baseline=1, tower_tests_baseline=1)
+        self.write_tower_suite(1)
+        self.assertIsNone(towerctl.max_verified_tower_tests(self.root))
+        cp = self.run_post_merge("PASS")
+        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        names = [c["name"] for c in json.loads(cp.stdout)["checks"]]
+        self.assertNotIn("tower baseline >= last verified", names)
+        self.assertEqual(names, [
+            "post-merge tests pass",
+            "tests count >= baseline",
+            "tower tests count >= baseline",
+            "implementation is ancestor of base",
+            "envelope file exists on base",
+            "working tree clean",
+        ])
+
+    # -- 21. anchor: the maximum verified count wins, not the latest ------
+    def test_anchor_uses_max_of_multiple_verified_events(self) -> None:
+        self.write_envelope(status="MERGED", merge_commit=self.merge_commit,
+                            tests_baseline=1, tower_tests_baseline=5)
+        self.seed_verified_events(7, 10, 3)
+        self.write_tower_suite(10)
+        self.assertEqual(towerctl.max_verified_tower_tests(self.root), 10)
+        cp = self.run_post_merge("PASS")
+        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        anchor = self.check(cp, "tower baseline >= last verified")
+        self.assertFalse(anchor["ok"], anchor)
+        # The latest event says 3; only the maximum (10) can block baseline 5.
+        self.assertEqual(anchor["detail"], "baseline 5, last verified 10")
+
+    # -- 22. anchor: invalid counts and broken rows are ignored -----------
+    def test_anchor_ignores_invalid_counts_and_broken_rows(self) -> None:
+        self.write_envelope(status="MERGED", merge_commit=self.merge_commit,
+                            tests_baseline=1, tower_tests_baseline=7)
+        self.seed_verified_events(True, "10", None)
+        self.assertIsNone(towerctl.max_verified_tower_tests(self.root))
+        self.seed_verified_events(True, "10", None, 7)
+        self.append_raw_ledger_row("{not valid json")
+        self.write_tower_suite(7)
+        self.assertEqual(towerctl.max_verified_tower_tests(self.root), 7)
+        cp = self.run_post_merge("PASS")
+        self.assertEqual(cp.returncode, 0, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        anchor = self.check(cp, "tower baseline >= last verified")
+        self.assertTrue(anchor["ok"], anchor)
+        self.assertEqual(anchor["detail"], "baseline 7, last verified 7")
+        self.assertEqual(self.envelope()["status"], "POST_MERGE_VERIFIED")
 
 
 if __name__ == "__main__":
