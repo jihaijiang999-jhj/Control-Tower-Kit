@@ -51,7 +51,7 @@
     }
   ],
   "envelope_head_sha": "fc494570c187ceb0900195c039c79c63f9851fa2",
-  "status": "CORRECTION_REQUIRED",
+  "status": "POST_MERGE_VERIFIED",
   "pr_number": 15,
   "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/15",
   "remote_merged": true,
@@ -62,5 +62,7 @@
   "merge_mode": "pr",
   "check_conclusion": "success",
   "tests_count": 2,
-  "tower_tests_count": 271
+  "tower_tests_count": 271,
+  "post_merge_at": "2026-10-23T02:06:31+08:00",
+  "post_merge_note": "queue baseline gate; root 2/2, tower 271/266 (retry after committing pre-approved specs)"
 }
