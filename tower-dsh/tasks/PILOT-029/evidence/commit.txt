@@ -1,0 +1,18 @@
+﻿COMMIT 78986115b9208b5f1b6d9519d7e7c91a1328efe4
+
+== git show --stat ==
+7898611 PILOT-029: require count baselines on new envelopes
+ tower-dsh/tools/tests/test_coverage.py          |   5 +-
+ tower-dsh/tools/tests/test_envelope_baseline.py | 285 ++++++++++++++++++++++++
+ tower-dsh/tools/tests/test_hardening2.py        |  10 +-
+ tower-dsh/tools/towerctl.py                     |  15 ++
+ 4 files changed, 312 insertions(+), 3 deletions(-)
+
+== changed files main..HEAD ==
+tower-dsh/tools/tests/test_coverage.py
+tower-dsh/tools/tests/test_envelope_baseline.py
+tower-dsh/tools/tests/test_hardening2.py
+tower-dsh/tools/towerctl.py
+
+== git status --short ==
+?? evidence/

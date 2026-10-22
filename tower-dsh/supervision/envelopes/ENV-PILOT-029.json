@@ -1,0 +1,76 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-029",
+  "task": "PILOT-029",
+  "repository": "..",
+  "branch": "pilot/PILOT-029",
+  "base": "main",
+  "implementation_head_sha": "78986115b9208b5f1b6d9519d7e7c91a1328efe4",
+  "envelope_path": "merge-envelopes/ENV-PILOT-029.json",
+  "created_at": "2026-10-22T20:35:04+08:00",
+  "scope": "PILOT-029: require count baselines on new envelopes",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 261,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-029/evidence/towerctl.py",
+      "sha256": "9f17da6b4f3d505bd83547fbe9b3310018499bf018ab3c61da7779ccf102c22e"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/test_coverage.py",
+      "sha256": "8e105724dd67e804808cb8a357bb96736ed141e63b401d38595f2a13df4ee895"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/test_hardening2.py",
+      "sha256": "0edfb4c708a14bff7a7f90ae40823b2b42cff0fa8a71bdb513ee14fee9f70d87"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/test_envelope_baseline.py",
+      "sha256": "3053ec8f8d939678058e89f1533f362b1903a4b2f8f2ec7875ad7b60efc8658b"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/test-output.txt",
+      "sha256": "41204363f7f51efe738a03d976156eb1cbd262fe3237b3faddbeb52846e520c2"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/real-run.txt",
+      "sha256": "fcfaf3465877d320495da59c3e2564eeb41f9e4bd00ba9389761c764fab79917"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/baseline-probe.txt",
+      "sha256": "3ac15f0e93b0c6388e6fcad7bc8c411f665a09f39753fa7fb0bdb4b9d1446596"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/probe-old-code.txt",
+      "sha256": "81f8d993ebca5f699272b8fc0a5394715dd5c810a4313678f621aa55d2cd6ce4"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/probe_envelope_baseline.py",
+      "sha256": "d9988ec24ea95a7d94c864437f9f8d05951d52cc544eb71d77dbdc2d371e402a"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/commit.txt",
+      "sha256": "e339fec9a2ab8d3c70dc6998597cc39f2512bfb74bbfaf734c3bb6c6193d558a"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/diff.txt",
+      "sha256": "51aa337114e7d76a89d63b97abfc98aa7cd069695cc026535accd0f5dd1cf85d"
+    }
+  ],
+  "envelope_head_sha": "5514914aef93851dabcccd3a166e94cb534000c4",
+  "status": "MERGED",
+  "pr_number": 14,
+  "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/14",
+  "remote_merged": true,
+  "remote_merged_at": "2026-10-22T20:38:27+08:00",
+  "merge_commit": "ef72400ebd9900b1ec01c5dd95eaaca372e9fa32",
+  "merged_at": "2026-10-22T20:38:28+08:00",
+  "supervisor": "sup-run-b-verify",
+  "merge_mode": "pr",
+  "check_conclusion": "success"
+}

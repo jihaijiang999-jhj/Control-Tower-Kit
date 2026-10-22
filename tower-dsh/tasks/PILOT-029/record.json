@@ -1,0 +1,153 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-029",
+  "title": "baseline 必填：新信封必须声明 tests_baseline 与 tower_tests_baseline",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "cmd_envelope_new 在写 DRAFT 前校验 envelope.tests_baseline 与 envelope.tower_tests_baseline：都必须是 int（非 bool）且 >= 1，否则 exit 2，错误信息同时点名两个字段与合法取值",
+    "校验失败不得产生 supervision/envelopes 文件、不得追加 ENVELOPE_NEW 事件、不得改任务状态",
+    "旧信封（已存在、无 baseline）不受影响：post-merge 的 legacy 路径与 merge-check 行为保持不变",
+    "更新现有 envelope-new 调用点的 fixture（tools/tests/test_coverage.py、tools/tests/test_hardening2.py）补上 tests_baseline 与 tower_tests_baseline",
+    "新增 tools/tests/test_envelope_baseline.py：缺 tests_baseline、缺 tower_tests_baseline、0、-1、True、\"2\"、1.0 各自 exit 2 且无副作用；两字段合法时成功建 DRAFT 且事件已追加；旧信封仍可 merge-check",
+    "不修改 post-merge 计数语义、不改 merge-check 对旧信封的兼容、不改状态 schema"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-029/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-029/tower-dsh/tools/tests/test_coverage.py",
+    "pilot/worktrees/PILOT-029/tower-dsh/tools/tests/test_hardening2.py",
+    "pilot/worktrees/PILOT-029/tower-dsh/tools/tests/test_envelope_baseline.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "allowing an envelope without both baselines to be created"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-029/tower-dsh && python -B -m unittest discover -s tools/tests -v 全部通过，总数 >= 250（main 基线 246 + 029 新增 >= 4），新增用例覆盖缺失/类型错误/合法三类",
+    "缺少任一 baseline 或取值非法（0/-1/True/\"2\"/1.0）→ exit 2，错误信息同时包含 tests_baseline 与 tower_tests_baseline，且 supervision/envelopes 下无新文件、ledger 无 ENVELOPE_NEW、record 状态不变",
+    "两字段合法（均为 int>=1）→ 建 DRAFT 成功、ENVELOPE_NEW 已追加、后续 queue-add/merge-check 正常",
+    "旧信封（无 baseline）仍能通过 merge-check，post-merge legacy 行为不变",
+    "在真实塔完成本卡 post-merge：6/6，且本卡信封由新校验放行（tests_baseline=2、tower_tests_baseline=冻结时主分支塔套件实测数）",
+    "python tools/towerctl.py state-verify 真实塔 drift=[]（本卡未交付信封前 tasks=29、envelopes=28，skipped 仅 PILOT-025-VOID）",
+    "python tools/towerctl.py spec-coverage 27/27、spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-029 diff --name-only main..HEAD 恰好四个 allowed_paths 文件"
+  ],
+  "depends_on": [
+    "PILOT-028"
+  ],
+  "worktree": "pilot/worktrees/PILOT-029",
+  "spec_path": "pilot/PILOT-029.spec.json",
+  "spec_sha256": "c18179557b3377072f86b651d8d98d7b0e7a6459d245b4f9bfb54b1a45a9d637",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-run-b-029",
+  "dispatch": {
+    "executor": "subagent:exec-run-b-029",
+    "worktree": "pilot/worktrees/PILOT-029",
+    "at": "2026-10-22T20:17:42+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-029/evidence/towerctl.py",
+      "sha256": "9f17da6b4f3d505bd83547fbe9b3310018499bf018ab3c61da7779ccf102c22e",
+      "bytes": 155571,
+      "at": "2026-10-22T20:24:30+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/test_coverage.py",
+      "sha256": "8e105724dd67e804808cb8a357bb96736ed141e63b401d38595f2a13df4ee895",
+      "bytes": 46026,
+      "at": "2026-10-22T20:24:30+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/test_hardening2.py",
+      "sha256": "0edfb4c708a14bff7a7f90ae40823b2b42cff0fa8a71bdb513ee14fee9f70d87",
+      "bytes": 26274,
+      "at": "2026-10-22T20:24:30+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/test_envelope_baseline.py",
+      "sha256": "3053ec8f8d939678058e89f1533f362b1903a4b2f8f2ec7875ad7b60efc8658b",
+      "bytes": 12046,
+      "at": "2026-10-22T20:24:30+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/test-output.txt",
+      "sha256": "41204363f7f51efe738a03d976156eb1cbd262fe3237b3faddbeb52846e520c2",
+      "bytes": 76042,
+      "at": "2026-10-22T20:24:30+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/real-run.txt",
+      "sha256": "fcfaf3465877d320495da59c3e2564eeb41f9e4bd00ba9389761c764fab79917",
+      "bytes": 514,
+      "at": "2026-10-22T20:24:30+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/baseline-probe.txt",
+      "sha256": "3ac15f0e93b0c6388e6fcad7bc8c411f665a09f39753fa7fb0bdb4b9d1446596",
+      "bytes": 12956,
+      "at": "2026-10-22T20:24:30+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/probe-old-code.txt",
+      "sha256": "81f8d993ebca5f699272b8fc0a5394715dd5c810a4313678f621aa55d2cd6ce4",
+      "bytes": 42464,
+      "at": "2026-10-22T20:24:30+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/probe_envelope_baseline.py",
+      "sha256": "d9988ec24ea95a7d94c864437f9f8d05951d52cc544eb71d77dbdc2d371e402a",
+      "bytes": 7798,
+      "at": "2026-10-22T20:24:30+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/commit.txt",
+      "sha256": "e339fec9a2ab8d3c70dc6998597cc39f2512bfb74bbfaf734c3bb6c6193d558a",
+      "bytes": 685,
+      "at": "2026-10-22T20:24:30+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-029/evidence/diff.txt",
+      "sha256": "51aa337114e7d76a89d63b97abfc98aa7cd069695cc026535accd0f5dd1cf85d",
+      "bytes": 16846,
+      "at": "2026-10-22T20:24:30+08:00",
+      "id": "E-011"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-run-b-029",
+    "verdict": "PASS",
+    "note": "RUN-B 卡 3/3 PASS。266 tests OK(skipped=1)；15/15 独立探针：两字段缺失、各自 0/-1/true/字符串2/1.0 共 12 种拒绝全部 exit2、错误同时点名两字段、无 envelope 文件/无 ENVELOPE_NEW/record+queue+ledger 快照不变；合法 1/1 与 3/5 均建 DRAFT 且保留值、ENVELOPE_NEW 恰 1 条；手写 legacy 信封仍可 queue-add/merge-check（旧路径未变）。校验位于 load_record 与任何写之前，merge-check/post-merge 未动。旧码对照 12 failures 恰为 12 个拒绝断言。11/11 证据哈希与 spec_sha256 匹配；scope 恰四文件；551 文件只读快照一致；真实塔 29/28/drift 0。残余（不阻塞）：校验仅在 cmd_envelope_new，手写信封+queue-add 仍是旁路；baseline 只校验存在/类型/>=1，低值或过期值不会被拒（post-merge 只做 >= 比较）；外部旧工具不再能省略字段；布尔/浮点已正确拒绝。另：卡面 main baseline 246 已过期，实际冻结基线 261。",
+    "at": "2026-10-22T20:34:59+08:00"
+  },
+  "decision": {
+    "id": "D-RUN-B-029",
+    "actor": "owner",
+    "text": "owner approved RUN-2026-10-22-B; card 3/3 independent reviewer PASS",
+    "at": "2026-10-22T20:34:59+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-029/CLOSEOUT.md",
+    "at": "2026-10-22T20:34:59+08:00"
+  },
+  "created_at": "2026-10-22T20:17:41+08:00",
+  "updated_at": "2026-10-22T20:34:59+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-029/MERGE.md",
+  "delivered_at": "2026-10-22T20:24:30+08:00",
+  "accepted_at": "2026-10-22T20:34:59+08:00"
+}
