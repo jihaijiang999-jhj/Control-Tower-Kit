@@ -1,0 +1,68 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-030",
+  "task": "PILOT-030",
+  "repository": "..",
+  "branch": "pilot/PILOT-030",
+  "base": "main",
+  "implementation_head_sha": "330ed4cdd0a9286e4ba0429b4c4b00247780b9b4",
+  "envelope_path": "merge-envelopes/ENV-PILOT-030.json",
+  "created_at": "2026-10-23T01:56:44+08:00",
+  "scope": "PILOT-030: require baselines when queueing an envelope",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 266,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-030/evidence/towerctl.py",
+      "sha256": "7700334c03806b38a448cc938f4e6bad8c4ef4022f7afa7eef1c9f21b084e204"
+    },
+    {
+      "path": "tasks/PILOT-030/evidence/test_envelope_baseline.py",
+      "sha256": "476596e8028af8ce5a6cfbdaaae3c88c2a240586b6fb1c6873df43d749426e42"
+    },
+    {
+      "path": "tasks/PILOT-030/evidence/test-output.txt",
+      "sha256": "679eaab3f53796ba58f176d7c5b4c3960c93cafbe66a6ac4a7f02b4037df5fb2"
+    },
+    {
+      "path": "tasks/PILOT-030/evidence/queue-probe.txt",
+      "sha256": "c8a91dbec5a98c085cc91c6fecc4dad5a64d311b59e548f02c35cb24c3ed3e48"
+    },
+    {
+      "path": "tasks/PILOT-030/evidence/real-run.txt",
+      "sha256": "f74e885d2329a3ea2f1767a35b90249b2d631759ed8440fd6c31240cb40dec7a"
+    },
+    {
+      "path": "tasks/PILOT-030/evidence/probe-old-code.txt",
+      "sha256": "d12de485c495c7eb20a4472cf42c8f3ae11a8a55a1011382bf826f02e11958df"
+    },
+    {
+      "path": "tasks/PILOT-030/evidence/commit.txt",
+      "sha256": "d88c5f8c18cf4ec7d15a92325fa493959843748f6008be96b10d53c987df49aa"
+    },
+    {
+      "path": "tasks/PILOT-030/evidence/diff.txt",
+      "sha256": "b19850e2c686c52a692e5421b4db79b50e30026f7a17ed1809202749f7a35065"
+    }
+  ],
+  "envelope_head_sha": "fc494570c187ceb0900195c039c79c63f9851fa2",
+  "status": "POST_MERGE_VERIFIED",
+  "pr_number": 15,
+  "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/15",
+  "remote_merged": true,
+  "remote_merged_at": "2026-10-23T01:59:54+08:00",
+  "merge_commit": "aa88f76f29e9e149d56253e19739d4f191904228",
+  "merged_at": "2026-10-23T01:59:55+08:00",
+  "supervisor": "sup-run-c-verify",
+  "merge_mode": "pr",
+  "check_conclusion": "success",
+  "tests_count": 2,
+  "tower_tests_count": 271,
+  "post_merge_at": "2026-10-23T02:06:31+08:00",
+  "post_merge_note": "queue baseline gate; root 2/2, tower 271/266 (retry after committing pre-approved specs)"
+}

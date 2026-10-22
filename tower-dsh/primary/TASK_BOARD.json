@@ -291,7 +291,17 @@
       "reviewer": "subagent:rev-run-b-029",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-029/MERGE.md",
       "updated_at": "2026-10-22T20:34:59+08:00"
+    },
+    {
+      "id": "PILOT-030",
+      "title": "queue-add 也强制 baseline：堵住手写信封入队旁路",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-run-c-030",
+      "reviewer": "subagent:rev-run-c-030",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-030/MERGE.md",
+      "updated_at": "2026-10-23T01:56:40+08:00"
     }
   ],
-  "updated_at": "2026-10-22T20:34:59+08:00"
+  "updated_at": "2026-10-23T01:56:40+08:00"
 }
