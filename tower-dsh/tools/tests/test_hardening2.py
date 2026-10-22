@@ -173,7 +173,13 @@ class PathSafetyTestCase(unittest.TestCase):
         })
         self.outside_envelope = self.outside / "envelope.json"
         write_json(self.outside_envelope, {
-            "envelope_id": "ENV-OUTSIDE", "task": TASK_ID})
+            "envelope_id": "ENV-OUTSIDE", "task": TASK_ID,
+            # PILOT-029: both count baselines are mandatory on envelope-new.
+            "tests_baseline": 1, "tower_tests_baseline": 1})
+        self.envelope_file = self.root / "envelope.json"
+        write_json(self.envelope_file, {
+            "envelope_id": ENVELOPE_ID, "task": TASK_ID,
+            "tests_baseline": 1, "tower_tests_baseline": 1})
 
     def tearDown(self) -> None:
         self._tmp.cleanup()
@@ -316,7 +322,7 @@ class PathSafetyTestCase(unittest.TestCase):
     # -- 12. a traversal --task is rejected before the envelope gate ----
     def test_envelope_new_rejects_task_traversal(self) -> None:
         cp = run_cli(self.root, "envelope-new", "--task", "../x",
-                     "--file", str(self.root / "specs" / "task.spec.json"))
+                     "--file", str(self.envelope_file))
         self.assert_fails(cp, "invalid id")
 
     # -- 13. repository outside root's parent is refused ----------------

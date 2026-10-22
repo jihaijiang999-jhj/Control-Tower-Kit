@@ -1,0 +1,89 @@
+test_absent_empty_or_non_list_evidence_is_ignored (test_state_verify.StateVerifyTestCase.test_absent_empty_or_non_list_evidence_is_ignored) ... ok
+test_accept_without_reviewed_checkback_is_illegal (test_state_verify.StateVerifyTestCase.test_accept_without_reviewed_checkback_is_illegal) ... FAIL
+test_board_status_drift_is_reported (test_state_verify.StateVerifyTestCase.test_board_status_drift_is_reported) ... ok
+test_broken_board_is_one_board_unreadable (test_state_verify.StateVerifyTestCase.test_broken_board_is_one_board_unreadable) ... ok
+test_broken_envelope_is_envelope_unreadable (test_state_verify.StateVerifyTestCase.test_broken_envelope_is_envelope_unreadable) ... ok
+test_broken_ledger_reports_errors_without_replay (test_state_verify.StateVerifyTestCase.test_broken_ledger_reports_errors_without_replay) ... ok
+test_broken_queue_is_one_queue_unreadable (test_state_verify.StateVerifyTestCase.test_broken_queue_is_one_queue_unreadable) ... ok
+test_broken_record_is_record_unreadable (test_state_verify.StateVerifyTestCase.test_broken_record_is_record_unreadable) ... ok
+test_checkback_fail_replays_rework_not_accepted (test_state_verify.StateVerifyTestCase.test_checkback_fail_replays_rework_not_accepted) ... ok
+test_clean_evidence_and_spec_exit_zero (test_state_verify.StateVerifyTestCase.test_clean_evidence_and_spec_exit_zero) ... ok
+test_clean_tower_has_no_illegal_transition (test_state_verify.StateVerifyTestCase.test_clean_tower_has_no_illegal_transition) ... ok
+test_closeout_after_task_new_is_illegal_transition (test_state_verify.StateVerifyTestCase.test_closeout_after_task_new_is_illegal_transition) ... FAIL
+test_consistent_tower_exits_zero (test_state_verify.StateVerifyTestCase.test_consistent_tower_exits_zero) ... ok
+test_correction_events_fold_and_merge_start_is_ignored (test_state_verify.StateVerifyTestCase.test_correction_events_fold_and_merge_start_is_ignored) ... ok
+test_correction_retry_transitions_are_legal (test_state_verify.StateVerifyTestCase.test_correction_retry_transitions_are_legal) ... ok
+test_deleted_board_is_one_board_unreadable (test_state_verify.StateVerifyTestCase.test_deleted_board_is_one_board_unreadable) ... ok
+test_deleted_envelope_is_envelope_missing (test_state_verify.StateVerifyTestCase.test_deleted_envelope_is_envelope_missing) ... ok
+test_deleted_queue_is_one_queue_unreadable (test_state_verify.StateVerifyTestCase.test_deleted_queue_is_one_queue_unreadable) ... ok
+test_deleted_record_is_record_missing (test_state_verify.StateVerifyTestCase.test_deleted_record_is_record_missing) ... ok
+test_entities_without_events_or_files_are_skipped (test_state_verify.StateVerifyTestCase.test_entities_without_events_or_files_are_skipped) ... ok
+test_envelope_status_drift_is_reported (test_state_verify.StateVerifyTestCase.test_envelope_status_drift_is_reported) ... ok
+test_escape_path_never_touches_filesystem (test_state_verify.StateVerifyTestCase.test_escape_path_never_touches_filesystem) ... ok
+test_evidence_absolute_path_outside_is_escape (test_state_verify.StateVerifyTestCase.test_evidence_absolute_path_outside_is_escape) ... ok
+test_evidence_and_spec_verify_never_writes (test_state_verify.StateVerifyTestCase.test_evidence_and_spec_verify_never_writes) ... ok
+test_evidence_content_rewritten_same_length_is_hash_mismatch (test_state_verify.StateVerifyTestCase.test_evidence_content_rewritten_same_length_is_hash_mismatch) ... ok
+test_evidence_drift_sorted_by_kind_target_path (test_state_verify.StateVerifyTestCase.test_evidence_drift_sorted_by_kind_target_path) ... ok
+test_evidence_entry_without_path_is_unreadable (test_state_verify.StateVerifyTestCase.test_evidence_entry_without_path_is_unreadable) ... ok
+test_evidence_file_deleted_is_missing (test_state_verify.StateVerifyTestCase.test_evidence_file_deleted_is_missing) ... ok
+test_evidence_path_escape_is_not_opened (test_state_verify.StateVerifyTestCase.test_evidence_path_escape_is_not_opened) ... ok
+test_hash_and_bytes_drift_can_both_be_reported (test_state_verify.StateVerifyTestCase.test_hash_and_bytes_drift_can_both_be_reported) ... ok
+test_invalid_sha256_evidence_entry_is_unreadable (test_state_verify.StateVerifyTestCase.test_invalid_sha256_evidence_entry_is_unreadable) ... ok
+test_merge_without_merge_start_is_illegal (test_state_verify.StateVerifyTestCase.test_merge_without_merge_start_is_illegal) ... FAIL
+test_non_dict_evidence_entry_is_unreadable (test_state_verify.StateVerifyTestCase.test_non_dict_evidence_entry_is_unreadable) ... ok
+test_nul_byte_evidence_path_is_unreadable_not_crash (test_state_verify.StateVerifyTestCase.test_nul_byte_evidence_path_is_unreadable_not_crash) ... ok
+test_nul_byte_spec_path_is_unreadable_not_crash (test_state_verify.StateVerifyTestCase.test_nul_byte_spec_path_is_unreadable_not_crash) ... ok
+test_post_merge_verified_from_waiting_is_illegal (test_state_verify.StateVerifyTestCase.test_post_merge_verified_from_waiting_is_illegal) ... FAIL
+test_queue_status_drift_is_reported (test_state_verify.StateVerifyTestCase.test_queue_status_drift_is_reported) ... ok
+test_record_and_board_same_wrong_value_report_both (test_state_verify.StateVerifyTestCase.test_record_and_board_same_wrong_value_report_both) ... ok
+test_record_bytes_only_changed_is_bytes_mismatch (test_state_verify.StateVerifyTestCase.test_record_bytes_only_changed_is_bytes_mismatch) ... ok
+test_record_sha256_only_changed_is_hash_mismatch (test_state_verify.StateVerifyTestCase.test_record_sha256_only_changed_is_hash_mismatch) ... ok
+test_record_status_drift_is_reported (test_state_verify.StateVerifyTestCase.test_record_status_drift_is_reported) ... ok
+test_redelivery_from_delivered_is_legal (test_state_verify.StateVerifyTestCase.test_redelivery_from_delivered_is_legal) ... ok
+test_skipped_reports_no_events_and_missing_rows (test_state_verify.StateVerifyTestCase.test_skipped_reports_no_events_and_missing_rows) ... ok
+test_spec_checked_only_when_both_fields_exist (test_state_verify.StateVerifyTestCase.test_spec_checked_only_when_both_fields_exist) ... ok
+test_spec_deleted_is_spec_missing (test_state_verify.StateVerifyTestCase.test_spec_deleted_is_spec_missing) ... ok
+test_spec_modified_is_hash_mismatch (test_state_verify.StateVerifyTestCase.test_spec_modified_is_hash_mismatch) ... ok
+test_spec_path_escape_is_not_opened (test_state_verify.StateVerifyTestCase.test_spec_path_escape_is_not_opened) ... ok
+test_state_verify_never_writes (test_state_verify.StateVerifyTestCase.test_state_verify_never_writes) ... ok
+test_state_verify_never_writes_with_bad_files (test_state_verify.StateVerifyTestCase.test_state_verify_never_writes_with_bad_files) ... ok
+test_symlink_escape_is_reported_without_hashing (test_state_verify.StateVerifyTestCase.test_symlink_escape_is_reported_without_hashing) ... skipped "platform refuses symlink creation: [WinError 1314] 客户端没有所需的特权。: 'C:\\\\Users\\\\mac\\\\AppData\\\\Local\\\\Temp\\\\towerctl-state-verify-8wq8xq0y-symlink-bait.txt' -> 'C:\\\\Users\\\\mac\\\\AppData\\\\Local\\\\Temp\\\\towerctl-state-verify-8wq8xq0y\\\\tasks\\\\T-001\\\\evidence\\\\link.txt'"
+test_task_new_rebuild_from_dispatched_is_legal (test_state_verify.StateVerifyTestCase.test_task_new_rebuild_from_dispatched_is_legal) ... ok
+test_unknown_event_types_are_ignored (test_state_verify.StateVerifyTestCase.test_unknown_event_types_are_ignored) ... ok
+
+======================================================================
+FAIL: test_accept_without_reviewed_checkback_is_illegal (test_state_verify.StateVerifyTestCase.test_accept_without_reviewed_checkback_is_illegal)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot028-oldcode-20261022-200019\tools\tests\test_state_verify.py", line 1127, in test_accept_without_reviewed_checkback_is_illegal
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 3, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0, 'evidence_checked': 0}
+
+======================================================================
+FAIL: test_closeout_after_task_new_is_illegal_transition (test_state_verify.StateVerifyTestCase.test_closeout_after_task_new_is_illegal_transition)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot028-oldcode-20261022-200019\tools\tests\test_state_verify.py", line 1108, in test_closeout_after_task_new_is_illegal_transition
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 3, 'envelopes': 2, 'drift': [], 'skipped': [], 'skipped_count': 0, 'evidence_checked': 0}
+
+======================================================================
+FAIL: test_merge_without_merge_start_is_illegal (test_state_verify.StateVerifyTestCase.test_merge_without_merge_start_is_illegal)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot028-oldcode-20261022-200019\tools\tests\test_state_verify.py", line 1145, in test_merge_without_merge_start_is_illegal
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 0, 'envelopes': 1, 'drift': [], 'skipped': [], 'skipped_count': 0, 'evidence_checked': 0}
+
+======================================================================
+FAIL: test_post_merge_verified_from_waiting_is_illegal (test_state_verify.StateVerifyTestCase.test_post_merge_verified_from_waiting_is_illegal)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot028-oldcode-20261022-200019\tools\tests\test_state_verify.py", line 1162, in test_post_merge_verified_from_waiting_is_illegal
+    self.assertEqual(code, 2, out)
+AssertionError: 0 != 2 : {'ok': True, 'tasks': 0, 'envelopes': 1, 'drift': [], 'skipped': [], 'skipped_count': 0, 'evidence_checked': 0}
+
+----------------------------------------------------------------------
+Ran 52 tests in 8.299s
+
+FAILED (failures=4, skipped=1)

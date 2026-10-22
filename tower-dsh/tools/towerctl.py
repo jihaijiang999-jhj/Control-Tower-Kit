@@ -1993,6 +1993,21 @@ def cmd_envelope_new(root: Path, args) -> None:
     task = check_task_id(task, "task")
     if task != task_id:
         fail([f"envelope task {task} != --task {task_id}"])
+    # Both count baselines are mandatory for a *new* envelope.  The post-merge
+    # gates treat them as opt-in, so an envelope that simply omitted them used
+    # to downgrade its own count checks silently; requiring them here (before
+    # any file, ledger or record write) closes that hole.  Legacy envelopes
+    # already on disk keep the old opt-in semantics in ``merge-check`` and
+    # ``post-merge``.
+    tests_baseline = env.get("tests_baseline")
+    tower_tests_baseline = env.get("tower_tests_baseline")
+    if not (isinstance(tests_baseline, int) and not isinstance(tests_baseline, bool)
+            and tests_baseline >= 1
+            and isinstance(tower_tests_baseline, int)
+            and not isinstance(tower_tests_baseline, bool)
+            and tower_tests_baseline >= 1):
+        fail(["envelope tests_baseline and tower_tests_baseline must be positive "
+              "integers (int >= 1)"])
     rec = load_record(root, task_id)
     if rec.get("status") not in ("accepted", "closed"):
         fail([f"task status {rec.get('status')} cannot submit envelope"])

@@ -1,0 +1,11 @@
+commit dcc4fcb81df5a0079ff1da0cc7a1625cfc87be34
+Author:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+AuthorDate: Thu Oct 22 20:00:36 2026 +0800
+Commit:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+CommitDate: Thu Oct 22 20:00:36 2026 +0800
+
+    PILOT-028: reject illegal state transitions
+
+ tower-dsh/tools/tests/test_state_verify.py | 164 +++++++++++++++++++++++++++++
+ tower-dsh/tools/towerctl.py                | 121 ++++++++++++++++++---
+ 2 files changed, 272 insertions(+), 13 deletions(-)

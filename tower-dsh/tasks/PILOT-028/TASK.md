@@ -1,0 +1,40 @@
+# PILOT-028 — state-verify 校验状态迁移合法性：跳步/乱序事件算 drift
+
+- Status: `ready`
+- Authority: `workspace_write`
+- Worktree: `pilot/worktrees/PILOT-028`
+
+## Scope
+
+- 重放时保留每个任务/信封的迁移序列（当前态 + 事件 + 下一态），按合法迁移表校验；非法迁移记 drift，kind=illegal_transition，target=任务/信封 id，expected=该事件允许的来源态列表，actual=实际来源态，event=事件类型
+- 任务合法表（依据真实 ledger 实测，2026-10-22）：TASK_NEW: 任意态→ready（允许重建卡，v1→v2 有先例）；DISPATCH: ready|rework；DELIVER: dispatched|delivered（重投递有先例）|rework；CHECKBACK: delivered|reviewed|rework；ACCEPT: reviewed；CLOSEOUT: accepted；其余事件不改变状态也不报错
+- 信封合法表（依据真实 ledger 实测）：ENVELOPE_NEW: 无|DRAFT|CORRECTION_REQUIRED；QUEUE_ADD: DRAFT；MERGE_START: WAITING|CORRECTION_REQUIRED；MERGE: MERGING；POST_MERGE_VERIFIED: MERGED|CORRECTION_REQUIRED；MERGE_BLOCKED: WAITING|MERGING|CORRECTION_REQUIRED；POST_MERGE_FAILED: MERGED|CORRECTION_REQUIRED；MERGE_START 仍不改变对外状态（仅内部 MERGING）
+- 真实塔必须 drift=[]：26 任务/26 信封的历史序列已实测全部落在上述表内；若实现中发现历史有表外迁移，必须逐条列出并如实报告，不得用放宽表的方式消除
+- 未知事件类型保持忽略；drift 排序沿用 (kind,target,path)
+- 新增 tests/test_state_verify.py 用例：TASK_NEW→CLOSEOUT 跳步、ACCEPT 未经 CHECKBACK、MERGE 未经 MERGE_START、POST_MERGE_VERIFIED 来自 WAITING、重建卡 TASK_NEW 允许、重投递 DELIVER 允许、CORRECTION_REQUIRED 重试路径允许、真实塔 0 drift
+
+## Allowed paths
+
+- `pilot/worktrees/PILOT-028/tower-dsh/tools/towerctl.py`
+- `pilot/worktrees/PILOT-028/tower-dsh/tools/tests/test_state_verify.py`
+
+## Forbidden
+
+- network
+- external dependencies
+- changes outside the task worktree
+- merge
+- production access
+- weakening or deleting existing test coverage
+- relaxing the transition table to hide real drift
+
+## Acceptance
+
+- cd pilot/worktrees/PILOT-028/tower-dsh && python -B -m unittest discover -s tools/tests -v 全部通过，总数 >= 246，且新增迁移用例覆盖 scope 列出的 8 类场景
+- 篡改 ledger 造出 TASK_NEW→CLOSEOUT（中间缺 DISPATCH/DELIVER/CHECKBACK/ACCEPT）→ exit 2，drift 含 kind=illegal_transition，target/expected/actual/event 字段齐全
+- ACCEPT 前无 CHECKBACK PASS、MERGE 前无 MERGE_START、POST_MERGE_VERIFIED 来自 WAITING 各自判红
+- 重建卡（dispatched→TASK_NEW）与重投递（delivered→DELIVER）不报非法
+- 真实塔 python tools/towerctl.py state-verify：exit 0、drift=[]、tasks=28/envelopes=27（本卡未交付信封前），skipped 仅 PILOT-025-VOID
+- python tools/towerctl.py spec-coverage 27/27、spec-lint --strict 6/6
+- git -C pilot/worktrees/PILOT-028 diff --name-only main..HEAD 恰好两个 allowed_paths 文件
+- 既有 state-verify 测试（坏文件/skipped/board/证据/规范）全绿

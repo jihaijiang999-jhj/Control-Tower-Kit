@@ -1,0 +1,80 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-028",
+  "task": "PILOT-028",
+  "repository": "..",
+  "branch": "pilot/PILOT-028",
+  "base": "main",
+  "implementation_head_sha": "dcc4fcb81df5a0079ff1da0cc7a1625cfc87be34",
+  "envelope_path": "merge-envelopes/ENV-PILOT-028.json",
+  "created_at": "2026-10-22T20:11:19+08:00",
+  "scope": "PILOT-028: reject illegal state transitions",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 252,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-028/evidence/towerctl.py",
+      "sha256": "b42f557ce98f7a877459805789c54c9af8578ffcc3f46455ddf41e780acc679f"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/test_state_verify.py",
+      "sha256": "9a870daf4a02b943c01493c76b89bb7f173284410988196a685dbc36dcde696f"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/test-output.txt",
+      "sha256": "9cf0c218387fb97a92ff5882200a416dd06fc970157ea2d0379198e41103013b"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/real-run.txt",
+      "sha256": "3b4cce9e33191f9306183124b9e8839d38b5105866d9d28f37dee243fd8028d5"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/illegal-probe.txt",
+      "sha256": "8c4a468480026ee2bfd200177376088e4d5d78dff50e15a210f947c2bf1776f2"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/real-transitions.txt",
+      "sha256": "4a63a2db681e793ed63101c51d58222f85b32aefd5f02937198ae28df54c9a4f"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/probe-old-code.txt",
+      "sha256": "7e641e5d817b49745beebc6951e2872d450d4cb24280f3af9fb98e35f93f0ce7"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/probe_transitions.py",
+      "sha256": "548301b954f7d6ab3e1ce7ca2952842145bfdf9fb0bff8219c9964f3c9412149"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/illegal_probe.py",
+      "sha256": "77b52c6bcf233e45f8a481d7bab41cc1825ca6918dd87e45bcd1f1e19a14a304"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/commit.txt",
+      "sha256": "93c6a813a8f76b5381985a9eb950921f92e4cba03a660cc2f12232eea2ee9ca9"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/diff.txt",
+      "sha256": "2f9ba91e3bf91a9d7d5c7b0a838bd9b645d4c142270ee12815d54b907e8d4b3d"
+    }
+  ],
+  "envelope_head_sha": "9adbfaecda5fdcba1ba358c0c2aeb69f822202bf",
+  "status": "POST_MERGE_VERIFIED",
+  "pr_number": 13,
+  "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/13",
+  "remote_merged": true,
+  "remote_merged_at": "2026-10-22T20:14:30+08:00",
+  "merge_commit": "188f12235fc8f2a53cdcc1eec5f96c0c6009025a",
+  "merged_at": "2026-10-22T20:14:32+08:00",
+  "supervisor": "sup-run-b-verify",
+  "merge_mode": "pr",
+  "check_conclusion": "success",
+  "tests_count": 2,
+  "tower_tests_count": 261,
+  "post_merge_at": "2026-10-22T20:17:33+08:00",
+  "post_merge_note": "transition legality; root 2/2, tower 261/252"
+}
