@@ -2460,8 +2460,8 @@ def write_task_merge_record(root: Path, env: dict, envelope_id: str,
 
     The closeout points at this file; it records the envelope, the
     implementation head, the merge commit, the verification time and the
-    post-merge checks (4/4 on success) so a task's completion is evidenced by
-    ``POST_MERGE_VERIFIED`` rather than by the merge alone.
+    post-merge checks (all checks must pass on success) so a task's completion
+    is evidenced by ``POST_MERGE_VERIFIED`` rather than by the merge alone.
     """
     task_id = str(env.get("task") or "")
     if not is_safe_id(task_id, TASK_ID_RE):
@@ -2501,6 +2501,21 @@ def parse_test_count(stdout: str | None, stderr: str | None) -> int | None:
     return int(matches[-1])
 
 
+def run_test_suite(argv: list[str], cwd: Path) -> subprocess.CompletedProcess:
+    """Run a test-suite child process with the tower's pinned env contract.
+
+    Read-only: the child inherits ``os.environ`` with UTF-8 stdio forced and
+    bytecode writing disabled so the verified tree stays clean.
+    """
+    child_env = dict(os.environ)
+    child_env["PYTHONIOENCODING"] = "utf-8"
+    child_env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return subprocess.run(
+        argv, cwd=str(cwd), capture_output=True, text=True, encoding="utf-8",
+        errors="replace", env=child_env,
+    )
+
+
 def cmd_post_merge(root: Path, args) -> None:
     envelope_id = check_package_id(args.envelope, "envelope")
     env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
@@ -2521,14 +2536,9 @@ def cmd_post_merge(root: Path, args) -> None:
     base = env.get("base", "main")
     a = env.get("implementation_head_sha")
     envelope_path = env.get("envelope_path")
-    env_vars = dict(os.environ)
-    env_vars["PYTHONDONTWRITEBYTECODE"] = "1"
-    env_vars["PYTHONIOENCODING"] = "utf-8"
-    tests = subprocess.run(
+    tests = run_test_suite(
         [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
-        cwd=str(repo), capture_output=True, text=True, encoding="utf-8",
-        errors="replace", env=env_vars,
-    )
+        repo)
     tests_count = parse_test_count(tests.stdout, tests.stderr)
     baseline = env.get("tests_baseline")
     baseline_ok = (isinstance(baseline, int) and not isinstance(baseline, bool)
@@ -2546,6 +2556,30 @@ def cmd_post_merge(root: Path, args) -> None:
             "ok": tests_count is not None and tests_count >= 1,
             "detail": f"ran {count_label}, baseline not set",
         }
+    # Opt-in second count gate for the authoritative tower suite one level down
+    # (``tools/tests``).  The root wrapper only asserts its own -- much smaller
+    # -- suite, so a legacy envelope without ``tower_tests_baseline`` keeps the
+    # old behaviour: the tower suite is neither run nor counted.  The tower
+    # root is the cwd because ``tools/tests`` lives inside it.
+    tower_baseline = env.get("tower_tests_baseline")
+    tower_baseline_ok = (isinstance(tower_baseline, int)
+                         and not isinstance(tower_baseline, bool)
+                         and tower_baseline >= 1)
+    tower_count = None
+    tower_check = None
+    if tower_baseline_ok:
+        tower_tests = run_test_suite(
+            [sys.executable, "-B", "-m", "unittest", "discover",
+             "-s", "tools/tests", "-v"], root)
+        tower_count = parse_test_count(tower_tests.stdout, tower_tests.stderr)
+        tower_check = {
+            "name": "tower tests count >= baseline",
+            "ok": (tower_tests.returncode == 0 and tower_count is not None
+                   and tower_count >= tower_baseline),
+            "detail": (f"exit {tower_tests.returncode}, "
+                       f"ran {tower_count or 'unknown'}, "
+                       f"baseline {tower_baseline}"),
+        }
     # The clean check runs before the review file is written, and it ignores
     # the state directories towerctl itself owns.  Both parts matter: the tower
     # root may live inside the verified repository, so writing the review first
@@ -2562,13 +2596,21 @@ def cmd_post_merge(root: Path, args) -> None:
         f"- tool_owned_paths_ignored: {tool_owned}\n"
         f"- test_exit: {tests.returncode}\n"
         f"- tests_count: {count_label}\n"
-        f"- tests_baseline: {baseline if baseline_ok else 'not set'}\n\n"
+        f"- tests_baseline: {baseline if baseline_ok else 'not set'}\n"
+        f"- tower_tests_count: "
+        f"{tower_count if tower_count is not None else 'unknown'}\n"
+        f"- tower_tests_baseline: "
+        f"{tower_baseline if tower_baseline_ok else 'not set'}\n\n"
         f"## Test output\n\n"
         f"{tests.stdout}\n{tests.stderr}\n", encoding="utf-8")
     checks = [
         {"name": "post-merge tests pass", "ok": tests.returncode == 0,
          "detail": f"exit {tests.returncode}"},
         count_check,
+    ]
+    if tower_check is not None:
+        checks.append(tower_check)
+    checks += [
         {"name": "implementation is ancestor of base",
          "ok": git(repo, "merge-base", "--is-ancestor", a, base).returncode == 0,
          "detail": f"{a}..{base}"},
@@ -2581,6 +2623,10 @@ def cmd_post_merge(root: Path, args) -> None:
     ]
     ok = args.result == "PASS" and all(c["ok"] for c in checks)
     env["tests_count"] = tests_count
+    if tower_baseline_ok:
+        # Written on both the verified and the failed path; a legacy envelope
+        # that never ran the tower gate keeps the key absent.
+        env["tower_tests_count"] = tower_count
     queue = load_queue(root)
     entry = next((e for e in queue.get("entries", [])
                   if e.get("envelope_id") == args.envelope), None)
@@ -2594,7 +2640,9 @@ def cmd_post_merge(root: Path, args) -> None:
         merge_record = write_task_merge_record(root, env, envelope_id, checks)
         append_supervision_ledger(root, "POST_MERGE_VERIFIED", "supervision",
                                   {"envelope": args.envelope,
-                                   "tests_count": tests_count, "checks": checks,
+                                   "tests_count": tests_count,
+                                   "tower_tests_count": tower_count,
+                                   "checks": checks,
                                    "merge_record": rel(root, merge_record)
                                    if merge_record is not None else ""})
         payload = {"ok": True, "envelope": args.envelope,
@@ -2611,7 +2659,9 @@ def cmd_post_merge(root: Path, args) -> None:
         save_queue(root, queue)
     append_supervision_ledger(root, "POST_MERGE_FAILED", "supervision",
                               {"envelope": args.envelope, "result": args.result,
-                               "tests_count": tests_count, "checks": checks})
+                               "tests_count": tests_count,
+                               "tower_tests_count": tower_count,
+                               "checks": checks})
     emit({"ok": False, "envelope": args.envelope, "status": "CORRECTION_REQUIRED",
           "checks": checks, "tests_count": tests_count,
           "review": rel(root, review_file)}, 2)

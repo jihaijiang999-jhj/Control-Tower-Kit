@@ -430,6 +430,17 @@ class PostMergeArtifactTestCase(unittest.TestCase):
         })
         self.init_repo()
         self.write_envelope()
+        # The envelope opts into the tower-suite count gate, so the artefact
+        # must record the sixth check; the suite itself is authored below.
+        tower_tests = self.root / "tools" / "tests"
+        tower_tests.mkdir(parents=True, exist_ok=True)
+        (tower_tests / "test_tower_smoke.py").write_text(
+            "import unittest\n\n\n"
+            "class TowerSmokeTest(unittest.TestCase):\n"
+            "    def test_tower_smoke(self):\n"
+            "        self.assertTrue(True)\n",
+            encoding="utf-8",
+        )
 
     def tearDown(self) -> None:
         self._tmp.cleanup()
@@ -481,6 +492,7 @@ class PostMergeArtifactTestCase(unittest.TestCase):
             "implementation_head_sha": self.implementation_head,
             "envelope_head_sha": self.envelope_head,
             "status": "DRAFT",
+            "tower_tests_baseline": 1,
         })
 
     def test_post_merge_success_writes_merge_md(self) -> None:
@@ -505,7 +517,7 @@ class PostMergeArtifactTestCase(unittest.TestCase):
         self.assertIn(self.implementation_head, text)
         self.assertIn(envelope["merge_commit"], text)
         self.assertIn("POST_MERGE_VERIFIED", text)
-        self.assertIn("Post-merge checks: 5/5", text)
+        self.assertIn("Post-merge checks: 6/6", text)
         self.assertIn("Verified at:", text)
 
 
