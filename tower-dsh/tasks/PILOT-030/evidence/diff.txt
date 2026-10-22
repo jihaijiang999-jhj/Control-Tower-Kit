@@ -1,0 +1,165 @@
+diff --git a/tower-dsh/tools/tests/test_envelope_baseline.py b/tower-dsh/tools/tests/test_envelope_baseline.py
+index 11134cd..fd3e19c 100644
+--- a/tower-dsh/tools/tests/test_envelope_baseline.py
++++ b/tower-dsh/tools/tests/test_envelope_baseline.py
+@@ -4,7 +4,9 @@
+ count gates, which keeps legacy envelopes working.  That opt-in was also a
+ silent escape hatch: an envelope that simply omitted a field skipped the gate.
+ ``envelope-new`` now rejects such an envelope before writing anything, so every
+-new envelope is counted against an explicit baseline.
++new envelope is counted against an explicit baseline.  A hand-written envelope
++file could still skip that command, so ``queue-add`` enforces the same rule for
++every envelope it admits to the merge queue (PILOT-030).
+ 
+ Run from the tower root (``tower-dsh``)::
+ 
+@@ -175,6 +177,33 @@ class EnvelopeBaselineTestCase(unittest.TestCase):
+         path = self.root / "ledger" / "supervision.jsonl"
+         return path.read_text(encoding="utf-8") if path.exists() else ""
+ 
++    def queue_bytes(self) -> bytes:
++        return (self.root / "supervision" / "MERGE_QUEUE.json").read_bytes()
++
++    def supervision_ledger_bytes(self) -> bytes:
++        path = self.root / "ledger" / "supervision.jsonl"
++        return path.read_bytes() if path.exists() else b""
++
++    def queue_entries(self) -> list:
++        return read_json(self.root / "supervision" / "MERGE_QUEUE.json")["entries"]
++
++    def queue_events(self) -> list:
++        events = [json.loads(line) for line in self.supervision_ledger().splitlines()
++                  if line.strip()]
++        return [e for e in events if e.get("type") == "QUEUE_ADD"]
++
++    def write_handwritten_envelope(self, missing=None) -> Path:
++        """Write the envelope file directly, bypassing ``envelope-new``."""
++        data = self.payload()
++        data.update({
++            "envelope_head_sha": self.envelope_head,
++            "status": "DRAFT",
++        })
++        if missing is not None:
++            del data[missing]
++        write_json(self.envelope_path(), data)
++        return self.envelope_path()
++
+     def snapshot(self) -> dict:
+         """Everything the rejected command could have changed."""
+         envelopes = self.root / "supervision" / "envelopes"
+@@ -208,6 +237,28 @@ class EnvelopeBaselineTestCase(unittest.TestCase):
+         self.assertEqual(self.record()["status"], "accepted")
+         return cp
+ 
++    def assert_queue_rejected(self, missing: str) -> subprocess.CompletedProcess:
++        self.write_handwritten_envelope(missing=missing)
++        before = self.snapshot()
++        queue_before = self.queue_bytes()
++        ledger_before = self.supervision_ledger_bytes()
++        cp = run_cli(self.root, "queue-add", "--envelope", ENVELOPE)
++        self.assertEqual(cp.returncode, 2,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        blob = cp.stdout + cp.stderr
++        # One error must name both fields and the valid form.
++        self.assertIn("tests_baseline", blob)
++        self.assertIn("tower_tests_baseline", blob)
++        self.assertIn("int >= 1", blob)
++        # No writes: the queue and supervision ledger are byte-identical and
++        # no QUEUE_ADD event was appended.
++        self.assertEqual(self.queue_bytes(), queue_before)
++        self.assertEqual(self.supervision_ledger_bytes(), ledger_before)
++        self.assertEqual(self.snapshot(), before)
++        self.assertNotIn("QUEUE_ADD", self.supervision_ledger())
++        self.assertEqual(self.queue_entries(), [])
++        return cp
++
+     # -- rejection -------------------------------------------------------
+     def test_missing_tests_baseline_is_rejected(self) -> None:
+         payload = self.payload()
+@@ -248,6 +299,59 @@ class EnvelopeBaselineTestCase(unittest.TestCase):
+         self.assertEqual(created[0]["payload"]["envelope"], ENVELOPE)
+         self.assertEqual(self.record()["status"], "accepted")
+ 
++    # -- queue-add gate (PILOT-030) --------------------------------------
++    def test_queue_add_rejects_handwritten_missing_tests_baseline(self) -> None:
++        self.assert_queue_rejected("tests_baseline")
++
++    def test_queue_add_rejects_handwritten_missing_tower_tests_baseline(self) -> None:
++        self.assert_queue_rejected("tower_tests_baseline")
++
++    def test_queue_add_accepts_handwritten_valid_baselines(self) -> None:
++        self.write_handwritten_envelope()
++        cp = run_cli(self.root, "queue-add", "--envelope", ENVELOPE)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        payload = json.loads(cp.stdout)
++        self.assertTrue(payload["ok"], msg=cp.stdout)
++        self.assertEqual(payload["status"], "WAITING")
++        entries = [e for e in self.queue_entries()
++                   if e.get("envelope_id") == ENVELOPE]
++        self.assertEqual(len(entries), 1, msg=self.queue_entries())
++        self.assertEqual(entries[0]["status"], "WAITING")
++        events = self.queue_events()
++        self.assertEqual(len(events), 1, msg=self.supervision_ledger())
++        self.assertEqual(events[0]["payload"]["envelope"], ENVELOPE)
++
++    def test_queue_add_accepts_envelope_created_by_envelope_new(self) -> None:
++        cp = run_cli(self.root, "envelope-new", "--task", TASK,
++                     "--file", str(self.envelope_file))
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        cp = run_cli(self.root, "queue-add", "--envelope", ENVELOPE)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertTrue(json.loads(cp.stdout)["ok"], msg=cp.stdout)
++        entries = [e for e in self.queue_entries()
++                   if e.get("envelope_id") == ENVELOPE]
++        self.assertEqual(len(entries), 1, msg=self.queue_entries())
++        self.assertEqual(entries[0]["status"], "WAITING")
++        self.assertEqual(len(self.queue_events()), 1,
++                         msg=self.supervision_ledger())
++
++    def test_duplicate_queue_add_is_still_rejected(self) -> None:
++        self.write_handwritten_envelope()
++        cp = run_cli(self.root, "queue-add", "--envelope", ENVELOPE)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        queue_before = self.queue_bytes()
++        ledger_before = self.supervision_ledger_bytes()
++        cp = run_cli(self.root, "queue-add", "--envelope", ENVELOPE)
++        self.assertEqual(cp.returncode, 2,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        # "already queued" keeps priority over the baseline gate.
++        self.assertIn("already queued", cp.stdout + cp.stderr)
++        self.assertEqual(self.queue_bytes(), queue_before)
++        self.assertEqual(self.supervision_ledger_bytes(), ledger_before)
++        self.assertEqual(len(self.queue_entries()), 1, msg=self.queue_entries())
++        self.assertEqual(len(self.queue_events()), 1,
++                         msg=self.supervision_ledger())
++
+     # -- legacy compatibility -------------------------------------------
+     def test_legacy_envelope_without_baselines_still_merge_checks(self) -> None:
+         # Written directly on purpose: envelope-new would refuse it, but an
+diff --git a/tower-dsh/tools/towerctl.py b/tower-dsh/tools/towerctl.py
+index 00683af..ee206d4 100644
+--- a/tower-dsh/tools/towerctl.py
++++ b/tower-dsh/tools/towerctl.py
+@@ -2056,6 +2056,22 @@ def cmd_queue_add(root: Path, args) -> None:
+     queue = load_queue(root)
+     if any(e.get("envelope_id") == envelope_id for e in queue.get("entries", [])):
+         fail([f"envelope already queued: {args.envelope}"])
++    # ``envelope-new`` requires both count baselines, but a hand-written
++    # ``supervision/envelopes/<id>.json`` never passes through it, so queueing
++    # it used to be the bypass: the post-merge gates treat the baselines as
++    # opt-in and an omitted field silently skipped its count check.  Enforce
++    # the same rule here, before any queue/ledger write, so the invariant holds
++    # for every envelope that can reach the merge queue.  Legacy envelopes
++    # already in the queue are untouched; only new additions are gated.
++    tests_baseline = env.get("tests_baseline")
++    tower_tests_baseline = env.get("tower_tests_baseline")
++    if not (isinstance(tests_baseline, int) and not isinstance(tests_baseline, bool)
++            and tests_baseline >= 1
++            and isinstance(tower_tests_baseline, int)
++            and not isinstance(tower_tests_baseline, bool)
++            and tower_tests_baseline >= 1):
++        fail(["envelope tests_baseline and tower_tests_baseline must be positive "
++              "integers (int >= 1)"])
+     queue.setdefault("entries", []).append({
+         "envelope_id": envelope_id,
+         "task": env.get("task"),

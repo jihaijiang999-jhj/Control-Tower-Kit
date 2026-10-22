@@ -1,0 +1,57 @@
+OLD-CODE CONTRAST (PILOT-030)
+main commit: 7f67141deda9e3bc561a5b3ab50aa613ec838233
+main towerctl.py blob: 00683af2882770a1d1b1123d89f8d30381b8aa3a
+new test file blob: fd3e19cf258186bb1d2de7a1dd8d6c129e1921f5
+Layout: temp tower with main's tools/towerctl.py (plus main's spec_coverage.py,
+spec_lint.py and run_tests.py) and PILOT-030's tools/tests/test_envelope_baseline.py.
+Command: python -B tools/run_tests.py --pattern test_envelope_baseline.py
+Expected: the two new queue-add rejection tests fail because old queue-add has no
+baseline gate; all other tests pass.
+TOWER_TEST_TMP=C:\Users\mac\AppData\Local\Temp\pilot030-old\.test-tmp\run-20261023-014553-53500
+test_duplicate_queue_add_is_still_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_duplicate_queue_add_is_still_rejected) ... ok
+test_invalid_baseline_values_are_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_invalid_baseline_values_are_rejected) ... ok
+test_legacy_envelope_without_baselines_still_merge_checks (test_envelope_baseline.EnvelopeBaselineTestCase.test_legacy_envelope_without_baselines_still_merge_checks) ... ok
+test_missing_tests_baseline_is_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_missing_tests_baseline_is_rejected) ... ok
+test_missing_tower_tests_baseline_is_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_missing_tower_tests_baseline_is_rejected) ... ok
+test_queue_add_accepts_envelope_created_by_envelope_new (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_accepts_envelope_created_by_envelope_new) ... ok
+test_queue_add_accepts_handwritten_valid_baselines (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_accepts_handwritten_valid_baselines) ... ok
+test_queue_add_rejects_handwritten_missing_tests_baseline (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_rejects_handwritten_missing_tests_baseline) ... FAIL
+test_queue_add_rejects_handwritten_missing_tower_tests_baseline (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_rejects_handwritten_missing_tower_tests_baseline) ... FAIL
+test_valid_baselines_create_draft_and_ledger_event (test_envelope_baseline.EnvelopeBaselineTestCase.test_valid_baselines_create_draft_and_ledger_event) ... ok
+
+======================================================================
+FAIL: test_queue_add_rejects_handwritten_missing_tests_baseline (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_rejects_handwritten_missing_tests_baseline)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot030-old\tools\tests\test_envelope_baseline.py", line 304, in test_queue_add_rejects_handwritten_missing_tests_baseline
+    self.assert_queue_rejected("tests_baseline")
+  File "C:\Users\mac\AppData\Local\Temp\pilot030-old\tools\tests\test_envelope_baseline.py", line 246, in assert_queue_rejected
+    self.assertEqual(cp.returncode, 2,
+AssertionError: 0 != 2 : stdout={
+  "ok": true,
+  "envelope": "ENV-BASE-001",
+  "status": "WAITING"
+}
+
+stderr=
+
+======================================================================
+FAIL: test_queue_add_rejects_handwritten_missing_tower_tests_baseline (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_rejects_handwritten_missing_tower_tests_baseline)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\AppData\Local\Temp\pilot030-old\tools\tests\test_envelope_baseline.py", line 307, in test_queue_add_rejects_handwritten_missing_tower_tests_baseline
+    self.assert_queue_rejected("tower_tests_baseline")
+  File "C:\Users\mac\AppData\Local\Temp\pilot030-old\tools\tests\test_envelope_baseline.py", line 246, in assert_queue_rejected
+    self.assertEqual(cp.returncode, 2,
+AssertionError: 0 != 2 : stdout={
+  "ok": true,
+  "envelope": "ENV-BASE-001",
+  "status": "WAITING"
+}
+
+stderr=
+
+----------------------------------------------------------------------
+Ran 10 tests in 6.299s
+
+FAILED (failures=2)

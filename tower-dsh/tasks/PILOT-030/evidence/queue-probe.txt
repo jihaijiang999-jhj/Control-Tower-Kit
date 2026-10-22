@@ -1,0 +1,78 @@
+TEMP-TOWER PROBE (PILOT-030 queue-add baseline gate)
+PROBE_ROOT=C:\Users\mac\AppData\Local\Temp\tower-pilot030-probe-cc503eal
+TCLI=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-030\tower-dsh\tools\towerctl.py
+
+== rejection: hand-written envelope missing tests_baseline ==
+envelope fields: base, branch, envelope_head_sha, envelope_id, envelope_path, implementation_head_sha, repository, schema, status, task, tower_tests_baseline
+[missing tests_baseline] exit=2
+stdout:
+{
+  "ok": false,
+  "errors": [
+    "envelope tests_baseline and tower_tests_baseline must be positive integers (int >= 1)"
+  ]
+}
+queue unchanged (sha/bytes/entries): True
+ledger unchanged (sha/bytes): True
+QUEUE_ADD events after rejection: 0
+before={"ledger_bytes": 0, "ledger_exists": true, "ledger_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "queue_add_events": 0, "queue_bytes": 59, "queue_entries": 0, "queue_exists": true, "queue_sha256": "5e3a1d4c65922f6078eadda94a7fc12a3b6c3d3d3147d5b1e0bdc79faa8d24e7"}
+after ={"ledger_bytes": 0, "ledger_exists": true, "ledger_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "queue_add_events": 0, "queue_bytes": 59, "queue_entries": 0, "queue_exists": true, "queue_sha256": "5e3a1d4c65922f6078eadda94a7fc12a3b6c3d3d3147d5b1e0bdc79faa8d24e7"}
+
+== rejection: hand-written envelope missing tower_tests_baseline ==
+envelope fields: base, branch, envelope_head_sha, envelope_id, envelope_path, implementation_head_sha, repository, schema, status, task, tests_baseline
+[missing tower_tests_baseline] exit=2
+stdout:
+{
+  "ok": false,
+  "errors": [
+    "envelope tests_baseline and tower_tests_baseline must be positive integers (int >= 1)"
+  ]
+}
+queue unchanged (sha/bytes/entries): True
+ledger unchanged (sha/bytes): True
+QUEUE_ADD events after rejection: 0
+before={"ledger_bytes": 0, "ledger_exists": true, "ledger_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "queue_add_events": 0, "queue_bytes": 59, "queue_entries": 0, "queue_exists": true, "queue_sha256": "5e3a1d4c65922f6078eadda94a7fc12a3b6c3d3d3147d5b1e0bdc79faa8d24e7"}
+after ={"ledger_bytes": 0, "ledger_exists": true, "ledger_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "queue_add_events": 0, "queue_bytes": 59, "queue_entries": 0, "queue_exists": true, "queue_sha256": "5e3a1d4c65922f6078eadda94a7fc12a3b6c3d3d3147d5b1e0bdc79faa8d24e7"}
+
+== acceptance: hand-written envelope with valid 1/1 baselines ==
+[valid 1/1] exit=0
+stdout:
+{
+  "ok": true,
+  "envelope": "ENV-PROBE-030",
+  "status": "WAITING"
+}
+queue={
+  "schema": "tower/merge-queue@1",
+  "entries": [
+    {
+      "envelope_id": "ENV-PROBE-030",
+      "task": "T-PROBE-030",
+      "branch": "feature/probe",
+      "base": "main",
+      "status": "WAITING",
+      "added_at": "2026-10-23T01:45:19+08:00"
+    }
+  ],
+  "updated_at": "2026-10-23T01:45:19+08:00"
+}
+queue entries: 1
+entry statuses: ['WAITING']
+QUEUE_ADD events: 1
+ledger changed (expected True): True
+
+== duplicate queue-add of the same envelope ==
+[duplicate queue-add] exit=2
+stdout:
+{
+  "ok": false,
+  "errors": [
+    "envelope already queued: ENV-PROBE-030"
+  ]
+}
+already-queued error present: True
+queue unchanged (sha/bytes/entries): True
+ledger unchanged (sha/bytes): True
+QUEUE_ADD events still: 1
+
+PROBE_COMPLETE

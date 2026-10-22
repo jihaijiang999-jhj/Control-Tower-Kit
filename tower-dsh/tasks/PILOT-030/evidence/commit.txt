@@ -1,0 +1,16 @@
+commit 330ed4cdd0a9286e4ba0429b4c4b00247780b9b4
+files vs main:
+tower-dsh/tools/tests/test_envelope_baseline.py
+tower-dsh/tools/towerctl.py
+
+commit 330ed4cdd0a9286e4ba0429b4c4b00247780b9b4
+Author:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+AuthorDate: Fri Oct 23 01:46:11 2026 +0800
+Commit:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+CommitDate: Fri Oct 23 01:46:11 2026 +0800
+
+    PILOT-030: require baselines when queueing an envelope
+
+ tower-dsh/tools/tests/test_envelope_baseline.py | 106 +++++++++++++++++++++++-
+ tower-dsh/tools/towerctl.py                     |  16 ++++
+ 2 files changed, 121 insertions(+), 1 deletion(-)
