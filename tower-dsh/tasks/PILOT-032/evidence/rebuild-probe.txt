@@ -1,0 +1,73 @@
+# Evidence: python -B evidence/rebuild_probe.py  (isolated temp towers)
+# branch pilot/PILOT-032, commit 236f783
+# process exit code: 0
+
+[
+  {
+    "case": "first TASK_NEW (None -> ready)",
+    "exit": 0,
+    "ok": true,
+    "tasks": 1,
+    "drift": []
+  },
+  {
+    "case": "dispatched -> TASK_NEW (in-flight rebuild)",
+    "exit": 0,
+    "ok": true,
+    "tasks": 1,
+    "drift": []
+  },
+  {
+    "case": "closed -> TASK_NEW (completed reset)",
+    "exit": 2,
+    "ok": false,
+    "tasks": 1,
+    "drift": [
+      {
+        "kind": "illegal_transition",
+        "target": "T-001",
+        "event": "TASK_NEW",
+        "expected": [
+          null,
+          "delivered",
+          "dispatched",
+          "ready",
+          "reviewed",
+          "rework"
+        ],
+        "actual": "closed"
+      }
+    ]
+  },
+  {
+    "case": "accepted -> TASK_NEW (completed reset)",
+    "exit": 2,
+    "ok": false,
+    "tasks": 1,
+    "drift": [
+      {
+        "kind": "illegal_transition",
+        "target": "T-001",
+        "event": "TASK_NEW",
+        "expected": [
+          null,
+          "delivered",
+          "dispatched",
+          "ready",
+          "reviewed",
+          "rework"
+        ],
+        "actual": "accepted"
+      }
+    ]
+  }
+]
+
+MATRIX
+case                                           exit    ok  drift
+first TASK_NEW (None -> ready)                    0  True  -
+dispatched -> TASK_NEW (in-flight rebuild)        0  True  -
+closed -> TASK_NEW (completed reset)              2 False  illegal_transition
+accepted -> TASK_NEW (completed reset)            2 False  illegal_transition
+
+EXIT=0

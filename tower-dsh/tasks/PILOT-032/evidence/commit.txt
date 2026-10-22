@@ -1,0 +1,24 @@
+commit 236f7830e49d8d096e8822ca6fa6d751933fde0b
+branch pilot/PILOT-032
+base   92c39b5
+subject PILOT-032: forbid rebuilding completed tasks via bare TASK_NEW
+
+git diff --name-only main..HEAD:
+tower-dsh/tools/tests/test_state_verify.py
+tower-dsh/tools/towerctl.py
+
+git status --short:
+?? evidence/
+
+git show --stat --format=fuller HEAD:
+commit 236f7830e49d8d096e8822ca6fa6d751933fde0b
+Author:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+AuthorDate: Fri Oct 23 02:38:46 2026 +0800
+Commit:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+CommitDate: Fri Oct 23 02:38:46 2026 +0800
+
+    PILOT-032: forbid rebuilding completed tasks via bare TASK_NEW
+
+ tower-dsh/tools/tests/test_state_verify.py | 99 ++++++++++++++++++++++++++++++
+ tower-dsh/tools/towerctl.py                | 26 ++++----
+ 2 files changed, 113 insertions(+), 12 deletions(-)

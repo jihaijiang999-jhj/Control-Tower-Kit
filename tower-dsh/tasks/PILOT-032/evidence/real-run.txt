@@ -1,0 +1,22 @@
+# Evidence: python -B tower-dsh/tools/towerctl.py --root <real tower> state-verify
+# real tower root: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh
+# mode: read-only  (branch pilot/PILOT-032, commit 236f783)
+# process exit code: 0
+
+{
+  "ok": true,
+  "tasks": 32,
+  "envelopes": 31,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 1,
+  "evidence_checked": 228
+}
+
+EXIT=0

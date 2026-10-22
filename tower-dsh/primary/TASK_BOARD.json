@@ -311,7 +311,17 @@
       "reviewer": "subagent:rev-run-c-031",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-031/MERGE.md",
       "updated_at": "2026-10-23T02:24:41+08:00"
+    },
+    {
+      "id": "PILOT-032",
+      "title": "完成卡不得静默重建：TASK_NEW 从 accepted/closed 记 illegal_transition",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-run-c-032",
+      "reviewer": "subagent:rev-run-c-032",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-032/MERGE.md",
+      "updated_at": "2026-10-23T02:56:33+08:00"
     }
   ],
-  "updated_at": "2026-10-23T02:24:41+08:00"
+  "updated_at": "2026-10-23T02:56:33+08:00"
 }
