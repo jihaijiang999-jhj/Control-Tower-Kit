@@ -271,7 +271,17 @@
       "reviewer": "subagent:rev-run-b-027",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-027/MERGE.md",
       "updated_at": "2026-10-22T19:40:05+08:00"
+    },
+    {
+      "id": "PILOT-028",
+      "title": "state-verify 校验状态迁移合法性：跳步/乱序事件算 drift",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-run-b-028",
+      "reviewer": "subagent:rev-run-b-028",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-028/MERGE.md",
+      "updated_at": "2026-10-22T20:11:12+08:00"
     }
   ],
-  "updated_at": "2026-10-22T19:40:05+08:00"
+  "updated_at": "2026-10-22T20:11:12+08:00"
 }

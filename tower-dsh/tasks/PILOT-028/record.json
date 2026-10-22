@@ -1,0 +1,151 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-028",
+  "title": "state-verify 校验状态迁移合法性：跳步/乱序事件算 drift",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "重放时保留每个任务/信封的迁移序列（当前态 + 事件 + 下一态），按合法迁移表校验；非法迁移记 drift，kind=illegal_transition，target=任务/信封 id，expected=该事件允许的来源态列表，actual=实际来源态，event=事件类型",
+    "任务合法表（依据真实 ledger 实测，2026-10-22）：TASK_NEW: 任意态→ready（允许重建卡，v1→v2 有先例）；DISPATCH: ready|rework；DELIVER: dispatched|delivered（重投递有先例）|rework；CHECKBACK: delivered|reviewed|rework；ACCEPT: reviewed；CLOSEOUT: accepted；其余事件不改变状态也不报错",
+    "信封合法表（依据真实 ledger 实测）：ENVELOPE_NEW: 无|DRAFT|CORRECTION_REQUIRED；QUEUE_ADD: DRAFT；MERGE_START: WAITING|CORRECTION_REQUIRED；MERGE: MERGING；POST_MERGE_VERIFIED: MERGED|CORRECTION_REQUIRED；MERGE_BLOCKED: WAITING|MERGING|CORRECTION_REQUIRED；POST_MERGE_FAILED: MERGED|CORRECTION_REQUIRED；MERGE_START 仍不改变对外状态（仅内部 MERGING）",
+    "真实塔必须 drift=[]：26 任务/26 信封的历史序列已实测全部落在上述表内；若实现中发现历史有表外迁移，必须逐条列出并如实报告，不得用放宽表的方式消除",
+    "未知事件类型保持忽略；drift 排序沿用 (kind,target,path)",
+    "新增 tests/test_state_verify.py 用例：TASK_NEW→CLOSEOUT 跳步、ACCEPT 未经 CHECKBACK、MERGE 未经 MERGE_START、POST_MERGE_VERIFIED 来自 WAITING、重建卡 TASK_NEW 允许、重投递 DELIVER 允许、CORRECTION_REQUIRED 重试路径允许、真实塔 0 drift"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-028/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-028/tower-dsh/tools/tests/test_state_verify.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "relaxing the transition table to hide real drift"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-028/tower-dsh && python -B -m unittest discover -s tools/tests -v 全部通过，总数 >= 246，且新增迁移用例覆盖 scope 列出的 8 类场景",
+    "篡改 ledger 造出 TASK_NEW→CLOSEOUT（中间缺 DISPATCH/DELIVER/CHECKBACK/ACCEPT）→ exit 2，drift 含 kind=illegal_transition，target/expected/actual/event 字段齐全",
+    "ACCEPT 前无 CHECKBACK PASS、MERGE 前无 MERGE_START、POST_MERGE_VERIFIED 来自 WAITING 各自判红",
+    "重建卡（dispatched→TASK_NEW）与重投递（delivered→DELIVER）不报非法",
+    "真实塔 python tools/towerctl.py state-verify：exit 0、drift=[]、tasks=28/envelopes=27（本卡未交付信封前），skipped 仅 PILOT-025-VOID",
+    "python tools/towerctl.py spec-coverage 27/27、spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-028 diff --name-only main..HEAD 恰好两个 allowed_paths 文件",
+    "既有 state-verify 测试（坏文件/skipped/board/证据/规范）全绿"
+  ],
+  "depends_on": [
+    "PILOT-027"
+  ],
+  "worktree": "pilot/worktrees/PILOT-028",
+  "spec_path": "pilot/PILOT-028.spec.json",
+  "spec_sha256": "802607116274f5a0cc5bd381aad67d56d48208d6e97bd40477ac4a0e6a1d01f5",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-run-b-028",
+  "dispatch": {
+    "executor": "subagent:exec-run-b-028",
+    "worktree": "pilot/worktrees/PILOT-028",
+    "at": "2026-10-22T19:51:43+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-028/evidence/towerctl.py",
+      "sha256": "b42f557ce98f7a877459805789c54c9af8578ffcc3f46455ddf41e780acc679f",
+      "bytes": 154657,
+      "at": "2026-10-22T20:00:49+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/test_state_verify.py",
+      "sha256": "9a870daf4a02b943c01493c76b89bb7f173284410988196a685dbc36dcde696f",
+      "bytes": 56575,
+      "at": "2026-10-22T20:00:49+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/test-output.txt",
+      "sha256": "9cf0c218387fb97a92ff5882200a416dd06fc970157ea2d0379198e41103013b",
+      "bytes": 36488,
+      "at": "2026-10-22T20:00:49+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/real-run.txt",
+      "sha256": "3b4cce9e33191f9306183124b9e8839d38b5105866d9d28f37dee243fd8028d5",
+      "bytes": 514,
+      "at": "2026-10-22T20:00:49+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/illegal-probe.txt",
+      "sha256": "8c4a468480026ee2bfd200177376088e4d5d78dff50e15a210f947c2bf1776f2",
+      "bytes": 1852,
+      "at": "2026-10-22T20:00:49+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/real-transitions.txt",
+      "sha256": "4a63a2db681e793ed63101c51d58222f85b32aefd5f02937198ae28df54c9a4f",
+      "bytes": 4980,
+      "at": "2026-10-22T20:00:49+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/probe-old-code.txt",
+      "sha256": "7e641e5d817b49745beebc6951e2872d450d4cb24280f3af9fb98e35f93f0ce7",
+      "bytes": 10198,
+      "at": "2026-10-22T20:00:49+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/probe_transitions.py",
+      "sha256": "548301b954f7d6ab3e1ce7ca2952842145bfdf9fb0bff8219c9964f3c9412149",
+      "bytes": 3554,
+      "at": "2026-10-22T20:00:49+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/illegal_probe.py",
+      "sha256": "77b52c6bcf233e45f8a481d7bab41cc1825ca6918dd87e45bcd1f1e19a14a304",
+      "bytes": 4551,
+      "at": "2026-10-22T20:00:49+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/commit.txt",
+      "sha256": "93c6a813a8f76b5381985a9eb950921f92e4cba03a660cc2f12232eea2ee9ca9",
+      "bytes": 571,
+      "at": "2026-10-22T20:00:49+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-028/evidence/diff.txt",
+      "sha256": "2f9ba91e3bf91a9d7d5c7b0a838bd9b645d4c142270ee12815d54b907e8d4b3d",
+      "bytes": 16802,
+      "at": "2026-10-22T20:00:49+08:00",
+      "id": "E-011"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-run-b-028",
+    "verdict": "PASS",
+    "note": "RUN-B 卡 2/3 PASS。261 tests OK(skipped=1)；独立 15 项临时塔探针全过：TASK_NEW→CLOSEOUT、ACCEPT 无 CHECKBACK、MERGE 无 MERGE_START、PMV 来自 WAITING 均 exit2 且 drift 仅 {kind,target,event,expected,actual}（无 path）；重建 TASK_NEW、重投递 DELIVER、CORRECTION_REQUIRED 重试路径均合法；未知事件忽略；同一实体多条非法保持 ledger 顺序。独立重导出现实迁移：10 任务对/8 信封对，全部在表内，常量与卡表一致；真实塔 exit0、tasks=28/envelopes=27/drift=[]、evidence_checked=200（旧码输出逐字节相同）。旧码对照恰 4 个新迁移测试失败。11/11 证据哈希与 spec_sha256 匹配；scope 恰两文件；530 文件只读快照一致；既有 drift/计数字节级不变。残余（不阻塞）：TASK_NEW 允许任意来源（重建先例，但重复 TASK_NEW 可静默重置已关闭卡，后续可加显式 rebuild 标记）；未来新增生命周期事件缺表项会默认放行（建议补表-折叠完整性测试）；POST_MERGE_FAILED 来自 MERGING 按表判红（暂无先例，可能是未来误报）；信封合法性使用独立 MERGING 通道需与状态同步；'真实塔 0 drift' 以实跑而非单测覆盖。",
+    "at": "2026-10-22T20:11:12+08:00"
+  },
+  "decision": {
+    "id": "D-RUN-B-028",
+    "actor": "owner",
+    "text": "owner approved RUN-2026-10-22-B; card 2/3 independent reviewer PASS",
+    "at": "2026-10-22T20:11:12+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-028/CLOSEOUT.md",
+    "at": "2026-10-22T20:11:12+08:00"
+  },
+  "created_at": "2026-10-22T19:51:43+08:00",
+  "updated_at": "2026-10-22T20:11:12+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-028/MERGE.md",
+  "delivered_at": "2026-10-22T20:00:49+08:00",
+  "accepted_at": "2026-10-22T20:11:12+08:00"
+}
