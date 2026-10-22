@@ -751,6 +751,21 @@ def envelope_checks(root: Path, env: dict) -> list[dict]:
 
     repo = resolve_repository(root, env.get("repository"))
     add("repository exists", repo.exists(), str(repo))
+    # A new-style envelope (both count baselines declared) must have reached
+    # the merge queue through ``queue-add``.  A hand-edited
+    # ``MERGE_QUEUE.json`` leaves no ``QUEUE_ADD`` event, so the queue entry
+    # would otherwise be accepted purely on the strength of the file.
+    # Envelopes predating the baseline requirement keep the old behaviour.
+    tests_baseline = env.get("tests_baseline")
+    tower_tests_baseline = env.get("tower_tests_baseline")
+    if (isinstance(tests_baseline, int) and not isinstance(tests_baseline, bool)
+            and tests_baseline >= 1
+            and isinstance(tower_tests_baseline, int)
+            and not isinstance(tower_tests_baseline, bool)
+            and tower_tests_baseline >= 1):
+        backed = ledger_has_queue_add(root, env.get("envelope_id"))
+        add("queue entry backed by ledger", backed,
+            f"QUEUE_ADD event {'present' if backed else 'missing'}")
     if not repo.exists():
         return checks
     branch = env.get("branch", "")
@@ -3213,6 +3228,22 @@ def ledger_events_in_seq_order(root: Path, name: str) -> list[dict]:
     return [event for _, event in sorted(rows, key=lambda pair: pair[0])]
 
 
+def ledger_has_queue_add(root: Path, envelope_id) -> bool:
+    """True iff one ``QUEUE_ADD`` event in ``ledger/supervision.jsonl`` names it.
+
+    Read-only.  Rows that are not JSON objects are ignored by
+    :func:`ledger_events_in_seq_order`; ``state-verify`` still refuses to replay
+    a ledger whose chain is broken.
+    """
+    for event in ledger_events_in_seq_order(root, "supervision"):
+        if event.get("type") != "QUEUE_ADD":
+            continue
+        payload = event.get("payload")
+        if isinstance(payload, dict) and payload.get("envelope") == envelope_id:
+            return True
+    return False
+
+
 def _sorted_states(states) -> list:
     """Sort allowed from-states for a drift row: ``None`` first, then names."""
     return sorted(states, key=lambda state: (state is not None, state or ""))
@@ -3325,9 +3356,13 @@ def state_verify_drift(root: Path) -> dict:
     from-state).  The final-state maps, counts and every other drift are
     unchanged by that check.
 
-    Entities without lifecycle events, a replayed task absent from a readable
+    A task without lifecycle events, a replayed task absent from a readable
     board, and a replayed envelope absent from a readable queue are reported
-    in ``skipped``; they are observations, never drift.
+    in ``skipped``; they are observations, never drift.  Envelopes are
+    different: a ``MERGE_QUEUE.json`` entry whose id has no replayed lifecycle
+    event is ``queue_unbacked`` and an envelope file whose id has no replayed
+    lifecycle event is ``envelope_unbacked``.  Both files can be written by
+    hand without touching the ledger, so neither is silently skipped.
 
     A readable record of a replayed task additionally has its claimed
     ``evidence`` entries and frozen ``spec_path``/``spec_sha256`` verified
@@ -3381,11 +3416,25 @@ def state_verify_drift(root: Path) -> dict:
             if child.is_dir() and (child / "record.json").is_file():
                 task_ids.add(child.name)
     envelope_ids = set(envelope_states)
+    envelope_file_ids: set[str] = set()
     envelopes_dir = root / "supervision" / "envelopes"
     if envelopes_dir.is_dir():
         for child in envelopes_dir.iterdir():
             if child.is_file() and child.suffix == ".json":
+                envelope_file_ids.add(child.stem)
                 envelope_ids.add(child.stem)
+
+    # A queue entry or envelope file that no replayed lifecycle event backs was
+    # written by hand, bypassing the ledger.  Report the queue bypass and the
+    # envelope bypass separately: one hand-written pair yields both rows.
+    for envelope_id in sorted(set(queue_entries) - set(envelope_states)):
+        drift.append({"kind": "queue_unbacked", "target": envelope_id,
+                      "expected": "QUEUE_ADD ledger event",
+                      "actual": "no lifecycle events"})
+    for envelope_id in sorted(envelope_file_ids - set(envelope_states)):
+        drift.append({"kind": "envelope_unbacked", "target": envelope_id,
+                      "expected": "ENVELOPE_NEW ledger event",
+                      "actual": "no lifecycle events"})
 
     for task_id in sorted(task_ids):
         expected = task_states.get(task_id)
@@ -3426,7 +3475,7 @@ def state_verify_drift(root: Path) -> dict:
     for envelope_id in sorted(envelope_ids):
         expected = envelope_states.get(envelope_id)
         if expected is None:
-            skip("envelope", envelope_id, "no_lifecycle_events")
+            # Already reported as queue_unbacked / envelope_unbacked above.
             continue
         if queue is not None:
             queue_entry = queue_entries.get(envelope_id)

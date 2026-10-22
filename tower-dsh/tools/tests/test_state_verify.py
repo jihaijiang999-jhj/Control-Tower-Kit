@@ -218,6 +218,10 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertTrue(out["ok"], out)
         self.assertEqual(out["drift"], [])
+        # A clean tower has nothing unbacked either: every envelope file is
+        # named by an ENVELOPE_NEW and every queue row by a QUEUE_ADD.
+        self.assertNotIn("queue_unbacked", self.drift_kinds(out))
+        self.assertNotIn("envelope_unbacked", self.drift_kinds(out))
         self.assertEqual(out["tasks"], 2)
         self.assertEqual(out["envelopes"], 2)
 
@@ -304,7 +308,7 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(out["drift"][0]["actual"], "POST_MERGE_VERIFIED")
 
     # -- 6. skip rules ---------------------------------------------------
-    def test_entities_without_events_or_files_are_skipped(self) -> None:
+    def test_entities_without_events_or_files_are_reported(self) -> None:
         self.build_base_tower()
         # T-003 has a record and a board row but no primary events: skipped.
         self.put_record("T-003", "ready")
@@ -318,8 +322,8 @@ class StateVerifyTestCase(unittest.TestCase):
         self.put_record("T-005", "ready")
         self.write_board({"T-001": "closed", "T-002": "reviewed",
                           "T-003": "ready"})
-        # ENV-T-009 has a queue entry and an envelope file but no events:
-        # skipped.
+        # ENV-T-009 has a queue entry and an envelope file but no events.  It
+        # is a hand-written pair, so it is drift on both sides, never skipped.
         self.write_queue({"ENV-T-001": "POST_MERGE_VERIFIED",
                           "ENV-T-002": "CORRECTION_REQUIRED",
                           "ENV-T-009": "WAITING"})
@@ -327,14 +331,22 @@ class StateVerifyTestCase(unittest.TestCase):
 
         out, code = self.state_verify()
 
-        self.assertEqual(code, 0, out)
-        self.assertTrue(out["ok"], out)
-        self.assertEqual(out["drift"], [])
+        self.assertEqual(code, 2, out)
+        self.assertFalse(out["ok"], out)
+        self.assertEqual(self.drift_kinds(out),
+                         ["envelope_unbacked", "queue_unbacked"])
+        self.assertEqual(out["drift"], [
+            {"kind": "envelope_unbacked", "target": "ENV-T-009",
+             "expected": "ENVELOPE_NEW ledger event",
+             "actual": "no lifecycle events"},
+            {"kind": "queue_unbacked", "target": "ENV-T-009",
+             "expected": "QUEUE_ADD ledger event",
+             "actual": "no lifecycle events"},
+        ])
         self.assertEqual(out["tasks"], 4)
         self.assertEqual(out["envelopes"], 2)
+        # Tasks without lifecycle events are still observations, not drift.
         self.assertEqual(out["skipped"], [
-            {"kind": "envelope", "target": "ENV-T-009",
-             "reason": "no_lifecycle_events"},
             {"kind": "task", "target": "T-003",
              "reason": "no_lifecycle_events"},
             {"kind": "task", "target": "T-004",
@@ -342,7 +354,54 @@ class StateVerifyTestCase(unittest.TestCase):
             {"kind": "task", "target": "T-005",
              "reason": "board_entry_missing"},
         ])
-        self.assertEqual(out["skipped_count"], 4)
+        self.assertEqual(out["skipped_count"], 3)
+
+    def test_task_without_events_stays_skipped(self) -> None:
+        self.build_base_tower()
+        # A record file alone is still a skipped task, never drift: the new
+        # unbacked rules apply to envelopes/queue entries only.
+        self.put_record("T-003", "ready")
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out["drift"], [])
+        self.assertIn({"kind": "task", "target": "T-003",
+                       "reason": "no_lifecycle_events"}, out["skipped"])
+        self.assertEqual(out["skipped_count"], 1)
+
+    def test_unbacked_queue_and_envelope_are_reported_separately(self) -> None:
+        self.build_base_tower()
+        # A queue row with no file and no events.
+        self.write_queue({"ENV-T-001": "POST_MERGE_VERIFIED",
+                          "ENV-T-002": "CORRECTION_REQUIRED",
+                          "ENV-T-010": "WAITING"})
+        # An envelope file with no queue row and no events.
+        self.put_envelope("ENV-T-011", "DRAFT")
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out),
+                         ["envelope_unbacked", "queue_unbacked"])
+        by_kind = {item["kind"]: item for item in out["drift"]}
+        self.assertEqual(by_kind["queue_unbacked"]["target"], "ENV-T-010")
+        self.assertEqual(by_kind["envelope_unbacked"]["target"], "ENV-T-011")
+        self.assertEqual(out["envelopes"], 2)
+        self.assertEqual(out["skipped"], [])
+
+    def test_ledger_has_queue_add_ignores_malformed_rows(self) -> None:
+        self.supervision("QUEUE_ADD", envelope="ENV-T-050")
+        ledger = self.root / "ledger" / "supervision.jsonl"
+        # Rows that are not JSON objects are not events: the helper skips them
+        # instead of raising, exactly like the replay.
+        ledger.write_text(ledger.read_text(encoding="utf-8")
+                          + "{not json\n"
+                          + json.dumps("not-an-object") + "\n",
+                          encoding="utf-8", newline="\n")
+
+        self.assertTrue(towerctl.ledger_has_queue_add(self.root, "ENV-T-050"))
+        self.assertFalse(towerctl.ledger_has_queue_add(self.root, "ENV-T-051"))
 
     # -- 7. strict read-only proof --------------------------------------
     def test_state_verify_never_writes(self) -> None:
@@ -552,11 +611,6 @@ class StateVerifyTestCase(unittest.TestCase):
         # ENV-T-003 replays but has no queue row: queue_entry_missing.
         self.supervision("ENVELOPE_NEW", envelope="ENV-T-003")
         self.put_envelope("ENV-T-003", "DRAFT")
-        # ENV-T-009 only has a queue row and a file: no_lifecycle_events.
-        self.write_queue({"ENV-T-001": "POST_MERGE_VERIFIED",
-                          "ENV-T-002": "CORRECTION_REQUIRED",
-                          "ENV-T-009": "WAITING"})
-        self.put_envelope("ENV-T-009", "DRAFT")
 
         out, code = self.state_verify()
 
@@ -568,14 +622,12 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(out["skipped"], [
             {"kind": "envelope", "target": "ENV-T-003",
              "reason": "queue_entry_missing"},
-            {"kind": "envelope", "target": "ENV-T-009",
-             "reason": "no_lifecycle_events"},
             {"kind": "task", "target": "T-003",
              "reason": "board_entry_missing"},
             {"kind": "task", "target": "T-004",
              "reason": "no_lifecycle_events"},
         ])
-        self.assertEqual(out["skipped_count"], 4)
+        self.assertEqual(out["skipped_count"], 3)
 
     # -- 15. read-only proof under bad files ----------------------------
     def test_state_verify_never_writes_with_bad_files(self) -> None:
