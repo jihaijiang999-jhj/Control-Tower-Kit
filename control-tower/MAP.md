@@ -6,6 +6,7 @@
 > 修订：2026-10-20T02:2x —— PILOT-011 落地（authority drift 可观测）；§3/§5/§6/§7 同步，新增 §6.2 排序陷阱。
 > 修订：2026-10-22T00:4x —— PILOT-022/023/024/025 落地（状态重放收紧、证据完整性、门禁解码、测试计数门）；§4.2 ∅10/∅11、§5、§6.9–6.11 同步。
 > 修订：2026-10-22T15:3x —— PILOT-026 落地（塔套件计数入闸）；∅11、§5、§6.11 同步。
+> 修订：2026-10-22T20:5x —— RUN-2026-10-22-B 批跑（027 runner/TMP、028 迁移合法性、029 baseline 必填）；∅10–∅12、§5、§6.12 同步。
 > 依据：`startup` / `wiring` / `status` / `handoff-check` / `spec-coverage` / `verify-ledger` 实跑输出 + 代码通读 + git 实值 + 一次测试复跑。
 > 标注约定：`[证]` 有可执行证据 / `[声]` 仅文档或口头声明 / `[无]` 未做 / `⊙` 单点 / `∅` 空白。
 
@@ -124,9 +125,9 @@
 | ∅7 | **授权态单写者** | `SeeMake-Control-Tower-Authority-State.md`：Active Tower / Single Writer / 保留闸 / repo+queue 锚点 | `--role supervisor` 是参数，不是身份；`CURRENT_STATE.primary` 只有一个字符串 | `state/AUTHORITY.json` + `towerctl authority-check`（写者≠活性塔即拒写） |
 | ∅8 | **判例集** | `rules-ref/治理判例集.md`：一次裁决 → 以后可引用的规则 | 5 条散在 `HANDOFF.md §6` | ledger 增加 `PRECEDENT` 事件 + `towerctl precedent --list` |
 | ∅9 | **包号防呆** | `_k3-ops/CURRENT`：包号比你所持新即停手 | `handoff-check` 只在 claim 时跑一次 §0 漂移 | 根目录 `CURRENT` + `startup` 强制比对 |
-| ∅10 | **状态重放** | （K3 也没有） | **已实现并持续收紧**（PILOT-021/022/023）：ledger 折叠状态并与 record/board/queue/envelope 比对；坏文件算 drift，合法跳过显式 `skipped`，board 取重放值；证据逐条校验 SHA-256/字节数，spec 校验冻结哈希。真实塔 26 任务/26 信封、177 条证据、drift 0（重建卡的 `PILOT-025-VOID` 按预期进 skipped） | 仍窄：不校验状态迁移合法性；带生命周期的非法信封 id 不进 drift/skipped；TOCTOU/hardlink 不在范围 |
-| ∅11 | **测试计数门** | （K3 也没有） | **已实现并加深**（PILOT-025/026）：`post-merge` 解析 `Ran N tests`；根套件按 `tests_baseline`、塔套件按 opt-in 的 `tower_tests_baseline` 设门（无 baseline 的旧信封走 legacy 或跳过）；空/缩水套件判红。真实塔首跑：根 `ran 2, baseline 2` + 塔 `ran 246, baseline 241`，6/6 | 计数 gate 是 opt-in：信封漏写字段会静默降级为旧路径（无 schema 强制）；非法 baseline（字符串/0/True/1.0）同样静默跳过 |
-| ∅12 | **证据可复现** | — | 134 测试依赖 `%TEMP%` ACL 与 Windows | 测试强制 `TMPDIR` 沙箱内建塔 + 干净环境复跑清单 |
+| ∅10 | **状态重放** | （K3 也没有） | **已实现并持续收紧**（PILOT-021/022/023/028）：ledger 折叠状态并与 record/board/queue/envelope 比对；坏文件算 drift，合法跳过显式 `skipped`，board 取重放值；证据逐条校验 SHA-256/字节数，spec 校验冻结哈希；状态迁移按真实历史表校验，跳步/乱序记 `illegal_transition`。真实塔 29 任务/29 信封、211 条证据、drift 0 | 仍窄：`TASK_NEW` 允许任意来源（重建先例，但重复 TASK_NEW 可静默重置已关闭卡）；未来新增生命周期事件若漏表会默认放行；TOCTOU/hardlink 不在范围 |
+| ∅11 | **测试计数门** | （K3 也没有） | **已实现并加深**（PILOT-025/026/029）：`post-merge` 解析 `Ran N tests`；根套件按 `tests_baseline`、塔套件按 `tower_tests_baseline` 设门；`envelope-new` 现在强制两个 baseline（int>=1），漏写直接 exit 2。真实塔首跑：根 `ran 2, baseline 2` + 塔 `ran 266, baseline 261`，6/6 | 仍窄：手写 `supervision/envelopes/*.json` + `queue-add` 可绕过 envelope-new；baseline 只校验存在/类型/>=1，低值或过期值不会被拒 |
+| ∅12 | **证据可复现** | — | **已实现切片**（PILOT-027）：`tools/run_tests.py` 把 `TMP/TEMP/TMPDIR` 指向仓内 `.test-tmp/run-*`，post-merge 与根门禁都走 runner；`REPRODUCE.md` 给出干净环境复跑清单；全套件 266 绿 | 仍窄：`.test-tmp` 不自动清理；运行器依赖 Windows 下的 core.longpaths 注入；直接 discovery 不走沙箱 |
 
 ---
 
@@ -141,12 +142,12 @@
 | merge 分支断言 | `[证]` | `cmd_merge:1919-1936`，不符即 `CORRECTION_REQUIRED` |
 | post-merge 六检 | `[证]` | 测试 / 根套件计数 / 塔套件计数（opt-in） / 实现是祖先 / 信封在 base / 工作树干净（PILOT-026 后） |
 | 路径越界防护 | `[证]` | `ensure_within` 覆盖 evidence / worktree / package / envelope / repository |
-| ledger 哈希链 | `[证]` | `verify-ledger` → primary 244 事件、supervision 135，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
+| ledger 哈希链 | `[证]` | `verify-ledger` → primary 268 事件、supervision 152，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
 | 条款→测试绑定 | `[证]` | `spec-coverage`：6 份规范 / 56 条款 / tool-check 27 / covered **27** / gaps 0 |
-| 测试全绿 | `[证]`（有条件） | `Ran 246 tests / OK`（本地 2026-10-22，PILOT-026 后）；GitHub Actions 在 PR #10/#11 上绿，v7 后零注解。**本地前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
+| 测试全绿 | `[证]`（有条件） | `Ran 266 tests / OK`（本地 2026-10-22，RUN-B 后）；GitHub Actions 在 PR #12–#14 上绿，v7 后零注解。**建议跑法**：`python -B tools/run_tests.py`（TMP 在仓内，避受限沙箱 ACL）；直接 discovery 仍可用，但受限模式下 `%TEMP%` 仍会让 134/134 在 0.05 s 内全 ERROR |
 | 29 条条款靠人 | `[声]` | 12 `review-check` + 17 `owner-gate`（`spec-coverage.manual` / `.owner`） |
 | "每次迭代全局正确" | `[无]` | 无对象层不变量、无趋势锚点、无状态重放 |
-| 26 个任务 / 26 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`；021 PR #6 `10fae79`；022 PR #7 `6a920a5`；023 PR #8 `a88388b`（假红修复后重试 4/4）；024 PR #9 `c4fb58f`；025 PR #10 `f265847`（5/5）；026 PR #11 `e73f1f5`（6/6：根 `ran 2, baseline 2` + 塔 `ran 246, baseline 241`），其余 post-merge 均 4/4） |
+| 29 个任务 / 29 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`；021 PR #6 `10fae79`；022 PR #7 `6a920a5`；023 PR #8 `a88388b`（假红修复后重试 4/4）；024 PR #9 `c4fb58f`；025 PR #10 `f265847`（5/5）；026 PR #11 `e73f1f5`；027 PR #12 `223b10b`（6/6，塔 `252/246`）；028 PR #13 `188f122`（6/6，塔 `261/252`）；029 PR #14 `ef72400`（6/6，塔 `266/261`），其余 post-merge 均 4/4） |
 
 ---
 
@@ -313,6 +314,18 @@ TypeError: can only concatenate str (not "NoneType") to str
 （副作用：`state-verify` 会把 `PILOT-025-VOID` 报进 `skipped`（`no_lifecycle_events`），这是留痕的可见代价，不是 drift。）
 
 **续篇（PILOT-026）**：塔套件计数也入闸——根套件按 `tests_baseline`、塔套件按 opt-in 的 `tower_tests_baseline` 各设一道。真实塔首跑 6/6：根 `ran 2, baseline 2`、塔 `ran 246, baseline 241`。同一张卡再次出现"卡面前提错"：写死"只改 hardening2 一行"在新检查 opt-in 时不成立（该 fixture 无 baseline，仍是 5/5），执行者用 13 行 fixture opt-in 让 `6/6` 真实成立，reviewer 判 ACCEPT。教训升级为：**卡面冲突要么修卡，要么在验收项内做最小可证明的补齐，并在记录里写明前提错误**——两条都允许，但都不能悄悄改断言。
+
+### 6.12 判例：批授权跑三张卡（RUN-2026-10-22-B）
+
+第一次按"批授权 + 固定卡序 + 硬停"跑：`PILOT-027`（runner/TMP 沙箱）→ `028`（迁移合法性）→ `029`（baseline 必填）。三张卡全部一次复核通过、零 rework、零硬停，耗时约 1.5 小时；owner 只批了一次。批授权机制本身有效：**loop 没有自行选题**，reviewer 每卡都核对"是否仍是章程里的下一步"。
+
+三条可复用判据：
+
+- **预批准物必须在 post-merge 前入库或不进塔根**：027 首次 post-merge 因 `PILOT-028/029.spec.json` 还是 untracked 而判"工作树脏"——这是自伤，不是实现缺陷；把两份已批准 spec 先提交后重试即绿。批运行里"提前把未来卡的材料放进塔根"等于给 clean 检查埋雷。
+- **审查者对环境 hack 的价值**：027 的三处偏差（runner 缺失时的窄回退、run 目录写 `.git` 哨兵、Windows `core.longpaths` 注入）都被 reviewer 逐条复现并判 ACCEPT；reviewer 还发现 fixture 只覆盖回退路径、runner 分支未被提交测试覆盖。没有独立复核，这些会被当成"绿了就行"。
+- **残余是政策，不是 bug**：`028` 的 `TASK_NEW` 任意来源（重建先例的副作用）、`029` 的手写信封旁路与低值 baseline、`012` 的 `.test-tmp` 不清理——都是已知且记录在案的政策缺口，下一批应优先处理"手写信封 + queue-add 旁路"。
+
+**判例**：批授权把注意力成本从"每卡一次"降到"每批一次"，但前提是**卡序锁定、验收可判定、硬停可执行、owner 可抽样**；任何一条缺失，批授权就退化成"无人看管的连跑"。
 
 ---
 
