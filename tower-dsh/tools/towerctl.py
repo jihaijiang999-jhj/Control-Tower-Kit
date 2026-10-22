@@ -2560,7 +2560,9 @@ def cmd_post_merge(root: Path, args) -> None:
     # (``tools/tests``).  The root wrapper only asserts its own -- much smaller
     # -- suite, so a legacy envelope without ``tower_tests_baseline`` keeps the
     # old behaviour: the tower suite is neither run nor counted.  The tower
-    # root is the cwd because ``tools/tests`` lives inside it.
+    # root is the cwd because ``tools/run_tests.py`` lives inside it; the
+    # runner points TMP/TEMP/TMPDIR at a repo-local sandbox so this gate also
+    # works in a restricted sandbox where ``%TEMP%`` ACLs are unusable.
     tower_baseline = env.get("tower_tests_baseline")
     tower_baseline_ok = (isinstance(tower_baseline, int)
                          and not isinstance(tower_baseline, bool)
@@ -2568,9 +2570,17 @@ def cmd_post_merge(root: Path, args) -> None:
     tower_count = None
     tower_check = None
     if tower_baseline_ok:
-        tower_tests = run_test_suite(
-            [sys.executable, "-B", "-m", "unittest", "discover",
-             "-s", "tools/tests", "-v"], root)
+        runner = root / "tools" / "run_tests.py"
+        if runner.is_file():
+            tower_argv = [sys.executable, "-B", "tools/run_tests.py"]
+        else:
+            # A minimal fixture (or a legacy tower root) may vendor only
+            # ``tools/tests``.  Fall back to plain discovery there so the gate
+            # still measures that suite instead of failing on a missing file;
+            # the real tower always ships the runner.
+            tower_argv = [sys.executable, "-B", "-m", "unittest", "discover",
+                          "-s", "tools/tests", "-v"]
+        tower_tests = run_test_suite(tower_argv, root)
         tower_count = parse_test_count(tower_tests.stdout, tower_tests.stderr)
         tower_check = {
             "name": "tower tests count >= baseline",
