@@ -8,6 +8,7 @@
 > 修订：2026-10-22T15:3x —— PILOT-026 落地（塔套件计数入闸）；∅11、§5、§6.11 同步。
 > 修订：2026-10-22T20:5x —— RUN-2026-10-22-B 批跑（027 runner/TMP、028 迁移合法性、029 baseline 必填）；∅10–∅12、§5、§6.12 同步。
 > 修订：2026-10-23T03:0x —— RUN-2026-10-23-C 批跑（030 queue-add 门、031 单调锚点、032 完成卡禁止重置）；∅10/∅11、§5、§6.13 同步。
+> 修订：2026-10-23T08:0x —— PILOT-033（队列/信封 unbacked 显形 + ledger-backed 合并门）；∅10/∅11、§5、§6.14 同步。
 > 依据：`startup` / `wiring` / `status` / `handoff-check` / `spec-coverage` / `verify-ledger` 实跑输出 + 代码通读 + git 实值 + 一次测试复跑。
 > 标注约定：`[证]` 有可执行证据 / `[声]` 仅文档或口头声明 / `[无]` 未做 / `⊙` 单点 / `∅` 空白。
 
@@ -126,9 +127,9 @@
 | ∅7 | **授权态单写者** | `SeeMake-Control-Tower-Authority-State.md`：Active Tower / Single Writer / 保留闸 / repo+queue 锚点 | `--role supervisor` 是参数，不是身份；`CURRENT_STATE.primary` 只有一个字符串 | `state/AUTHORITY.json` + `towerctl authority-check`（写者≠活性塔即拒写） |
 | ∅8 | **判例集** | `rules-ref/治理判例集.md`：一次裁决 → 以后可引用的规则 | 5 条散在 `HANDOFF.md §6` | ledger 增加 `PRECEDENT` 事件 + `towerctl precedent --list` |
 | ∅9 | **包号防呆** | `_k3-ops/CURRENT`：包号比你所持新即停手 | `handoff-check` 只在 claim 时跑一次 §0 漂移 | 根目录 `CURRENT` + `startup` 强制比对 |
-| ∅10 | **状态重放** | （K3 也没有） | **已实现并持续收紧**（PILOT-021/022/023/028/032）：ledger 折叠状态并与 record/board/queue/envelope 比对；坏文件算 drift，合法跳过显式 `skipped`，board 取重放值；证据逐条校验 SHA-256/字节数，spec 校验冻结哈希；状态迁移按真实历史表校验，跳步/乱序记 `illegal_transition`；`TASK_NEW` 只允许未完成状态重建，accepted/closed 重置判红。真实塔 32 任务/32 信封、237 条证据、drift 0 | 仍窄：`ready→TASK_NEW` 仍合法；未来新增生命周期事件若漏表会默认放行（建议完整性断言）；关闭卡无正式 reopen 流程；TOCTOU/hardlink 不在范围 |
-| ∅11 | **测试计数门** | （K3 也没有） | **已实现并合围**（PILOT-025/026/029/030/031）：`post-merge` 解析 `Ran N tests`；根/塔套件按 baseline 设门；`envelope-new` 与 `queue-add` 都强制两个 baseline；baseline 不得低于 ledger 里已验证 `tower_tests_count` 的最大值。真实塔：根 `2/2`、塔 `281/281`、anchor `281>=277`，7/7 | 仍窄：直接手改 `MERGE_QUEUE.json` 可绕过入队门；伪造/错误 verified 事件可抬高锚（fail-closed DoS）；锚不追溯旧事件；只校数量不校质量 |
-| ∅12 | **证据可复现** | — | **已实现切片**（PILOT-027）：`tools/run_tests.py` 把 `TMP/TEMP/TMPDIR` 指向仓内 `.test-tmp/run-*`，post-merge 与根门禁都走 runner；`REPRODUCE.md` 给出干净环境复跑清单；全套件 281 绿 | 仍窄：`.test-tmp` 不自动清理；运行器依赖 Windows 下的 core.longpaths 注入；直接 discovery 不走沙箱 |
+| ∅10 | **状态重放** | （K3 也没有） | **已实现并持续收紧**（PILOT-021/022/023/028/032/033）：ledger 折叠状态并与 record/board/queue/envelope 比对；坏文件算 drift，合法跳过显式 `skipped`，board 取重放值；证据逐条校验 SHA-256/字节数，spec 校验冻结哈希；状态迁移按真实历史表校验；`TASK_NEW` 只允许未完成状态重建；无事件的信封/队列条目记 `envelope_unbacked`/`queue_unbacked`，不再隐形。真实塔 33 任务/33 信封、246 条证据、drift 0 | 仍窄：`ready→TASK_NEW` 仍合法；未来新增生命周期事件若漏表会默认放行；关闭卡无正式 reopen 流程；TOCTOU/hardlink 不在范围 |
+| ∅11 | **测试计数门** | （K3 也没有） | **已实现并合围**（PILOT-025/026/029/030/031/033）：`post-merge` 解析 `Ran N tests`；根/塔套件按 baseline 设门；`envelope-new` 与 `queue-add` 都强制两个 baseline；baseline 不得低于 ledger 已验证最大值；merge-check/merge 对新式信封要求 `QUEUE_ADD` 来源。真实塔：根 `2/2`、塔 `287/281`、anchor `281>=281`，7/7 | 仍窄：merge-check 不验 ledger 哈希链，伪造 `QUEUE_ADD` 行可过；未强制 `ENVELOPE_NEW`；信封身份取文件内容而非请求 id（复制改 id 可过）；先写文件后写事件的半途失败会留持久 drift |
+| ∅12 | **证据可复现** | — | **已实现切片**（PILOT-027）：`tools/run_tests.py` 把 `TMP/TEMP/TMPDIR` 指向仓内 `.test-tmp/run-*`，post-merge 与根门禁都走 runner；`REPRODUCE.md` 给出干净环境复跑清单；全套件 287 绿 | 仍窄：`.test-tmp` 不自动清理；运行器依赖 Windows 下的 core.longpaths 注入；直接 discovery 不走沙箱 |
 
 ---
 
@@ -143,12 +144,12 @@
 | merge 分支断言 | `[证]` | `cmd_merge:1919-1936`，不符即 `CORRECTION_REQUIRED` |
 | post-merge 七检 | `[证]` | 测试 / 根套件计数 / 塔套件计数 / baseline 不回退 / 实现是祖先 / 信封在 base / 工作树干净（RUN-C 后；count 检查对旧信封 opt-in） |
 | 路径越界防护 | `[证]` | `ensure_within` 覆盖 evidence / worktree / package / envelope / repository |
-| ledger 哈希链 | `[证]` | `verify-ledger` → primary 292 事件、supervision 168，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
+| ledger 哈希链 | `[证]` | `verify-ledger` → primary 300 事件、supervision 173，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
 | 条款→测试绑定 | `[证]` | `spec-coverage`：6 份规范 / 56 条款 / tool-check 27 / covered **27** / gaps 0 |
-| 测试全绿 | `[证]`（有条件） | `Ran 281 tests / OK`（本地 2026-10-23，RUN-C 后）；GitHub Actions 在 PR #15–#17 上绿，v7 后零注解。**建议跑法**：`python -B tools/run_tests.py`（TMP 在仓内，避受限沙箱 ACL）；直接 discovery 仍可用，但受限模式下 `%TEMP%` 仍会让 134/134 在 0.05 s 内全 ERROR |
+| 测试全绿 | `[证]`（有条件） | `Ran 287 tests / OK`（本地 2026-10-23，PILOT-033 后）；GitHub Actions 在 PR #16–#18 上绿，v7 后零注解。**建议跑法**：`python -B tools/run_tests.py`（TMP 在仓内，避受限沙箱 ACL）；直接 discovery 仍可用，但受限模式下 `%TEMP%` 仍会让 134/134 在 0.05 s 内全 ERROR |
 | 29 条条款靠人 | `[声]` | 12 `review-check` + 17 `owner-gate`（`spec-coverage.manual` / `.owner`） |
 | "每次迭代全局正确" | `[无]` | 无对象层不变量、无趋势锚点、无状态重放 |
-| 32 个任务 / 32 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`；021 PR #6 `10fae79`；022 PR #7 `6a920a5`；023 PR #8 `a88388b`；024 PR #9 `c4fb58f`；025 PR #10 `f265847`；026 PR #11 `e73f1f5`；027 PR #12 `223b10b`（塔 `252/246`）；028 PR #13 `188f122`（塔 `261/252`）；029 PR #14 `ef72400`（塔 `266/261`）；030 PR #15 `aa88f76`（塔 `271/266`）；031 PR #16 `c9a7da6`（7/7，塔 `277/277`，anchor `277>=271`）；032 PR #17 `da5a25c`（7/7，塔 `281/281`，anchor `281>=277`），其余 post-merge 均 4/4） |
+| 33 个任务 / 33 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`；021 PR #6 `10fae79`；022 PR #7 `6a920a5`；023 PR #8 `a88388b`；024 PR #9 `c4fb58f`；025 PR #10 `f265847`；026 PR #11 `e73f1f5`；027 PR #12 `223b10b`；028 PR #13 `188f122`；029 PR #14 `ef72400`；030 PR #15 `aa88f76`；031 PR #16 `c9a7da6`（7/7）；032 PR #17 `da5a25c`（7/7）；033 PR #18 `eb8f03b`（7/7，塔 `287/281`，anchor `281>=281`），其余 post-merge 均 4/4） |
 
 ---
 
@@ -339,6 +340,19 @@ TypeError: can only concatenate str (not "NoneType") to str
 - **同一个错犯两次是流程问题**：RUN-B 与 RUN-C 的首次 post-merge 都因"提前放进塔根的后续 spec 仍未提交"判脏。第一次记了判例，第二次仍复现——说明"预批准物必须先入库"没有变成硬约束。下一批要么在 `run-charter` 里加一步“预批准 spec 先提交”，要么把未跟踪的 spec 视为 post-merge clean 检查的白名单（需权衡）。
 
 **判例**：门禁的演进不是"加更多检查"，而是**沿着攻击面把每一条能绕过的路径变成一条可判定的规则**；当一条残余被写进判例却仍在下一批复现时，说明它需要工具化，而不是再记一次。
+
+### 6.14 判例：让手写状态"显形"（PILOT-033）
+
+`PILOT-033` 收官 ∅11：`state-verify` 不再把无事件的信封/队列条目当 `skipped`，而是记 `envelope_unbacked` / `queue_unbacked`；`merge-check`/`merge` 对新式信封新增 `queue entry backed by ledger`，要求 `QUEUE_ADD` 事件存在。真实塔 33/33、287 tests、drift 0。
+
+独立复核给出的四条残余值得直接当下一批的输入：
+
+1. **R1 哈希链不在合并门前**：手写一行 `QUEUE_ADD` 可通过 `merge-check`（`verify-ledger` 能抓，但合并门不跑它）。合并门要么跑一次轻量链校验，要么拒绝非工具写入的队列条目。
+2. **R2 只认 `QUEUE_ADD`，不认 `ENVELOPE_NEW`**：手写信封 + 真 `queue-add` 会以 `illegal_transition` 被 state-verify 抓，但 merge 不看 state-verify。
+3. **R3 身份取自文件内容**：`envelope_checks` 用 `env["envelope_id"]` 而不是请求的 id；复制一个已背书信封改成新 id 即可通过。修法是 `env["envelope_id"] == args.envelope`。
+4. **R4 半写窗口**：`envelope-new`/`queue-add` 先写文件/队列再追加事件，中途失败会留下持久 drift 且不可重试；要么先事件后写文件，要么把半写识别成可恢复状态。
+
+**判例**：让隐藏状态"显形"只是第一步；**一个检测门不进入合并路径，就只是事后审计**。下一批应把 R1–R3 并入 `merge-check`，把 R4 变成可恢复事务，而不是再记一条残余。
 
 ---
 
