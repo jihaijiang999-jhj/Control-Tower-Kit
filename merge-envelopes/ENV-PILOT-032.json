@@ -1,0 +1,57 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-032",
+  "task": "PILOT-032",
+  "repository": "..",
+  "branch": "pilot/PILOT-032",
+  "base": "main",
+  "implementation_head_sha": "236f7830e49d8d096e8822ca6fa6d751933fde0b",
+  "envelope_path": "merge-envelopes/ENV-PILOT-032.json",
+  "created_at": "2026-10-23T02:56:37+08:00",
+  "scope": "PILOT-032: forbid rebuilding completed tasks via bare TASK_NEW",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 281,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-032/evidence/towerctl.py",
+      "sha256": "2fab47d11405bec7121d9fdb921804a7a10fcbd3212ada7db3b43228573d6ff5"
+    },
+    {
+      "path": "tasks/PILOT-032/evidence/test_state_verify.py",
+      "sha256": "25c32e3bd9ee4204c5983cc5147031380123526e69191017f45c7ac5c8bf31ef"
+    },
+    {
+      "path": "tasks/PILOT-032/evidence/test-output.txt",
+      "sha256": "6c3434d719723465bc7b8f4ed32dcc2f9f78d7a21c39edd722cc9d30730087ff"
+    },
+    {
+      "path": "tasks/PILOT-032/evidence/rebuild-probe.txt",
+      "sha256": "b35f1277866b4ca807f2c7d694f19a2567fd810e8f9f6a94e166146a8695eb3f"
+    },
+    {
+      "path": "tasks/PILOT-032/evidence/rebuild_probe.py",
+      "sha256": "bb289a50a4801bc526c48bda1a69f8d03a0d2d7a3560782c67efd8112d470bd4"
+    },
+    {
+      "path": "tasks/PILOT-032/evidence/real-run.txt",
+      "sha256": "e920add655fdbdecae0ac8ea786474f73e06db928811cfdd4f9beaa94436087e"
+    },
+    {
+      "path": "tasks/PILOT-032/evidence/probe-old-code.txt",
+      "sha256": "09d748699ada1f1c527ef469d2f74c8ce9f65630d3ed260cb9bbd8c7953d34d6"
+    },
+    {
+      "path": "tasks/PILOT-032/evidence/commit.txt",
+      "sha256": "8a3cbb271c2cd7fa81f9dc4a7f5f28a898aab141d5c9bc8c1a715ea3b5fbb181"
+    },
+    {
+      "path": "tasks/PILOT-032/evidence/diff.txt",
+      "sha256": "cd8f7f97fc12df38b2f1d5bfd9aca13f1b1a721e750622b5f159ea6d39177a49"
+    }
+  ]
+}
