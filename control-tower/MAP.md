@@ -5,6 +5,7 @@
 > 修订：2026-10-20T00:5x —— §6 由"漂移"改为"已闭合"，§1 phase 按实值更正，§8 口径同步。
 > 修订：2026-10-20T02:2x —— PILOT-011 落地（authority drift 可观测）；§3/§5/§6/§7 同步，新增 §6.2 排序陷阱。
 > 修订：2026-10-22T00:4x —— PILOT-022/023/024/025 落地（状态重放收紧、证据完整性、门禁解码、测试计数门）；§4.2 ∅10/∅11、§5、§6.9–6.11 同步。
+> 修订：2026-10-22T15:3x —— PILOT-026 落地（塔套件计数入闸）；∅11、§5、§6.11 同步。
 > 依据：`startup` / `wiring` / `status` / `handoff-check` / `spec-coverage` / `verify-ledger` 实跑输出 + 代码通读 + git 实值 + 一次测试复跑。
 > 标注约定：`[证]` 有可执行证据 / `[声]` 仅文档或口头声明 / `[无]` 未做 / `⊙` 单点 / `∅` 空白。
 
@@ -123,8 +124,8 @@
 | ∅7 | **授权态单写者** | `SeeMake-Control-Tower-Authority-State.md`：Active Tower / Single Writer / 保留闸 / repo+queue 锚点 | `--role supervisor` 是参数，不是身份；`CURRENT_STATE.primary` 只有一个字符串 | `state/AUTHORITY.json` + `towerctl authority-check`（写者≠活性塔即拒写） |
 | ∅8 | **判例集** | `rules-ref/治理判例集.md`：一次裁决 → 以后可引用的规则 | 5 条散在 `HANDOFF.md §6` | ledger 增加 `PRECEDENT` 事件 + `towerctl precedent --list` |
 | ∅9 | **包号防呆** | `_k3-ops/CURRENT`：包号比你所持新即停手 | `handoff-check` 只在 claim 时跑一次 §0 漂移 | 根目录 `CURRENT` + `startup` 强制比对 |
-| ∅10 | **状态重放** | （K3 也没有） | **已实现并持续收紧**（PILOT-021/022/023）：ledger 折叠状态并与 record/board/queue/envelope 比对；坏文件算 drift，合法跳过显式 `skipped`，board 取重放值；证据逐条校验 SHA-256/字节数，spec 校验冻结哈希。真实塔 25 任务/25 信封、167 条证据、drift 0（重建卡的 `PILOT-025-VOID` 按预期进 skipped） | 仍窄：不校验状态迁移合法性；带生命周期的非法信封 id 不进 drift/skipped；TOCTOU/hardlink 不在范围 |
-| ∅11 | **测试计数门** | （K3 也没有） | **已实现**（PILOT-025）：`post-merge` 解析 `Ran N tests`，信封 `tests_baseline` 设门；无 baseline 的旧信封按 legacy 要求 `>= 1`；空/缩水套件判红。真实塔首跑 `ran 2, baseline 2`（5/5） | 计数只覆盖 post-merge 跑的根套件（`tests/`），塔套件深度仍靠根门禁的 `>= 8`；后续可把塔套件计数也纳入 baseline |
+| ∅10 | **状态重放** | （K3 也没有） | **已实现并持续收紧**（PILOT-021/022/023）：ledger 折叠状态并与 record/board/queue/envelope 比对；坏文件算 drift，合法跳过显式 `skipped`，board 取重放值；证据逐条校验 SHA-256/字节数，spec 校验冻结哈希。真实塔 26 任务/26 信封、177 条证据、drift 0（重建卡的 `PILOT-025-VOID` 按预期进 skipped） | 仍窄：不校验状态迁移合法性；带生命周期的非法信封 id 不进 drift/skipped；TOCTOU/hardlink 不在范围 |
+| ∅11 | **测试计数门** | （K3 也没有） | **已实现并加深**（PILOT-025/026）：`post-merge` 解析 `Ran N tests`；根套件按 `tests_baseline`、塔套件按 opt-in 的 `tower_tests_baseline` 设门（无 baseline 的旧信封走 legacy 或跳过）；空/缩水套件判红。真实塔首跑：根 `ran 2, baseline 2` + 塔 `ran 246, baseline 241`，6/6 | 计数 gate 是 opt-in：信封漏写字段会静默降级为旧路径（无 schema 强制）；非法 baseline（字符串/0/True/1.0）同样静默跳过 |
 | ∅12 | **证据可复现** | — | 134 测试依赖 `%TEMP%` ACL 与 Windows | 测试强制 `TMPDIR` 沙箱内建塔 + 干净环境复跑清单 |
 
 ---
@@ -138,14 +139,14 @@
 | accept / close 强证据 | `[证]` | `cmd_accept:1022`、`cmd_close:1046` 内联 `check_evidence` |
 | reviewer 非空且 ≠ executor | `[证]` | `cmd_checkback:992-996` |
 | merge 分支断言 | `[证]` | `cmd_merge:1919-1936`，不符即 `CORRECTION_REQUIRED` |
-| post-merge 四检 | `[证]` | 测试 / 实现是祖先 / 信封在 base / 工作树干净（`2058-2070`） |
+| post-merge 六检 | `[证]` | 测试 / 根套件计数 / 塔套件计数（opt-in） / 实现是祖先 / 信封在 base / 工作树干净（PILOT-026 后） |
 | 路径越界防护 | `[证]` | `ensure_within` 覆盖 evidence / worktree / package / envelope / repository |
-| ledger 哈希链 | `[证]` | `verify-ledger` → primary 236 事件、supervision 130，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
+| ledger 哈希链 | `[证]` | `verify-ledger` → primary 244 事件、supervision 135，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
 | 条款→测试绑定 | `[证]` | `spec-coverage`：6 份规范 / 56 条款 / tool-check 27 / covered **27** / gaps 0 |
-| 测试全绿 | `[证]`（有条件） | `Ran 241 tests / OK`（本地 2026-10-22，PILOT-025 后）；GitHub Actions 在 PR #9/#10 上绿，v7 后零注解。**本地前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
+| 测试全绿 | `[证]`（有条件） | `Ran 246 tests / OK`（本地 2026-10-22，PILOT-026 后）；GitHub Actions 在 PR #10/#11 上绿，v7 后零注解。**本地前提是完全权限**：受限模式下 `TMP` 被重定向到 `%TEMP%\dsh-*`，`tempfile.mkdtemp` 用 0o700 建的目录拿不到沙箱写权限，134/134 会在 0.05 s 内全 ERROR（∅12 仍在） |
 | 29 条条款靠人 | `[声]` | 12 `review-check` + 17 `owner-gate`（`spec-coverage.manual` / `.owner`） |
 | "每次迭代全局正确" | `[无]` | 无对象层不变量、无趋势锚点、无状态重放 |
-| 25 个任务 / 25 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`；021 PR #6 `10fae79`；022 PR #7 `6a920a5`；023 PR #8 `a88388b`（假红修复后重试 4/4）；024 PR #9 `c4fb58f`；025 PR #10 `f265847`（5/5，`ran 2, baseline 2`），其余 post-merge 均 4/4） |
+| 26 个任务 / 26 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`；021 PR #6 `10fae79`；022 PR #7 `6a920a5`；023 PR #8 `a88388b`（假红修复后重试 4/4）；024 PR #9 `c4fb58f`；025 PR #10 `f265847`（5/5）；026 PR #11 `e73f1f5`（6/6：根 `ran 2, baseline 2` + 塔 `ran 246, baseline 241`），其余 post-merge 均 4/4） |
 
 ---
 
@@ -310,6 +311,8 @@ TypeError: can only concatenate str (not "NoneType") to str
 同一张卡还暴露了一个流程冲突：新增第 5 项检查会让 `MERGE.md` 从 `4/4` 变 `5/5`，而 `test_hardening2.py` 写死了 `4/4`；v1 卡的 `allowed_paths` 只列两个文件，**按卡面执行必然要么红、要么越界**。处置不是原地改 spec（spec 冻结），而是重建任务卡：v1 归档为 `tasks/PILOT-025-VOID/` + `pilot/PILOT-025.spec.v1.json`，v2 把第三个文件写进 `allowed_paths`，ledger 留下第二组 `TASK_NEW/SPEC_APPROVED`。判例：**卡面与验收冲突时，先修卡，再改代码；作废要留痕，不能悄悄放宽。**
 
 （副作用：`state-verify` 会把 `PILOT-025-VOID` 报进 `skipped`（`no_lifecycle_events`），这是留痕的可见代价，不是 drift。）
+
+**续篇（PILOT-026）**：塔套件计数也入闸——根套件按 `tests_baseline`、塔套件按 opt-in 的 `tower_tests_baseline` 各设一道。真实塔首跑 6/6：根 `ran 2, baseline 2`、塔 `ran 246, baseline 241`。同一张卡再次出现"卡面前提错"：写死"只改 hardening2 一行"在新检查 opt-in 时不成立（该 fixture 无 baseline，仍是 5/5），执行者用 13 行 fixture opt-in 让 `6/6` 真实成立，reviewer 判 ACCEPT。教训升级为：**卡面冲突要么修卡，要么在验收项内做最小可证明的补齐，并在记录里写明前提错误**——两条都允许，但都不能悄悄改断言。
 
 ---
 
