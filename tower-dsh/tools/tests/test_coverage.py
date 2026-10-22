@@ -939,8 +939,11 @@ class PolicyInvariantTestCase(unittest.TestCase):
         write_json(self.root / "supervision" / "MERGE_QUEUE.json",
                    {"schema": "tower/merge-queue@1", "entries": []})
         self.envelope_file = self.root / "envelope.json"
+        # PILOT-029: envelope-new requires both count baselines.
         write_json(self.envelope_file, {"envelope_id": "ENV-1",
-                                        "task": POLICY_TASK})
+                                        "task": POLICY_TASK,
+                                        "tests_baseline": 1,
+                                        "tower_tests_baseline": 1})
         self.record = {
             "schema": "tower/task@1",
             "id": POLICY_TASK,
