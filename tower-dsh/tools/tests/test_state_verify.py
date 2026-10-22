@@ -24,6 +24,10 @@ from unittest import mock
 
 TOOLS_DIR = Path(__file__).resolve().parents[1]
 TCLI = TOOLS_DIR / "towerctl.py"
+# PILOT-032: legal from-states for a TASK_NEW, in the drift sort order
+# (None first, then the state names alphabetically).
+TASK_NEW_ALLOWED = [None, "delivered", "dispatched", "ready", "reviewed",
+                    "rework"]
 
 sys.path.insert(0, str(TOOLS_DIR))
 import towerctl  # noqa: E402  (import after sys.path setup)
@@ -1181,6 +1185,101 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertEqual(out["drift"], [])
         self.assertEqual(self.illegal_transitions(out), [])
+
+    def test_first_task_new_from_none_is_legal(self) -> None:
+        # The first TASK_NEW folds None -> ready: creating a card is legal.
+        self.build_base_tower()
+        self.primary("TASK_NEW", task="T-003")
+        self.put_record("T-003", "ready")
+        self.write_board({"T-001": "closed", "T-002": "reviewed",
+                          "T-003": "ready"})
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out["drift"], [])
+        self.assertEqual(self.illegal_transitions(out), [])
+
+    def test_task_new_from_closed_is_illegal(self) -> None:
+        # PILOT-032: a bare TASK_NEW must not silently reset a completed card.
+        self.build_base_tower()
+        for event_type in ("TASK_NEW", "DISPATCH", "DELIVER"):
+            self.primary(event_type, task="T-003")
+        self.primary("CHECKBACK", task="T-003", verdict="PASS")
+        self.primary("ACCEPT", task="T-003", decision="D-001")
+        self.primary("CLOSEOUT", task="T-003",
+                     closeout="tasks/T-003/CLOSEOUT.md")
+        self.primary("TASK_NEW", task="T-003")
+        # The fold is unchanged (last writer wins), so record and board carry
+        # the replayed "ready": the transition is the only drift.
+        self.put_record("T-003", "ready")
+        self.write_board({"T-001": "closed", "T-002": "reviewed",
+                          "T-003": "ready"})
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.illegal_transitions(out), [{
+            "kind": "illegal_transition", "target": "T-003",
+            "event": "TASK_NEW", "expected": TASK_NEW_ALLOWED,
+            "actual": "closed"}])
+        # Completed states are exactly what TASK_NEW must not accept.
+        self.assertNotIn("accepted", TASK_NEW_ALLOWED)
+        self.assertNotIn("closed", TASK_NEW_ALLOWED)
+        self.assertEqual(self.drift_kinds(out), ["illegal_transition"])
+        self.assertEqual(out["tasks"], 3)
+
+    def test_task_new_from_accepted_is_illegal(self) -> None:
+        # ACCEPT folds to "accepted" but CLOSEOUT has not run yet: a rebuild
+        # at that point would still throw away an accepted card.
+        self.build_base_tower()
+        for event_type in ("TASK_NEW", "DISPATCH", "DELIVER"):
+            self.primary(event_type, task="T-003")
+        self.primary("CHECKBACK", task="T-003", verdict="PASS")
+        self.primary("ACCEPT", task="T-003", decision="D-001")
+        self.primary("TASK_NEW", task="T-003")
+        self.put_record("T-003", "ready")
+        self.write_board({"T-001": "closed", "T-002": "reviewed",
+                          "T-003": "ready"})
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.illegal_transitions(out), [{
+            "kind": "illegal_transition", "target": "T-003",
+            "event": "TASK_NEW", "expected": TASK_NEW_ALLOWED,
+            "actual": "accepted"}])
+        self.assertEqual(self.drift_kinds(out), ["illegal_transition"])
+
+    def test_mixed_ledger_reports_only_the_completed_reset(self) -> None:
+        self.build_base_tower()
+        # T-003: the legal PILOT-025 in-flight rebuild (dispatched -> ready).
+        for event_type in ("TASK_NEW", "DISPATCH", "TASK_NEW"):
+            self.primary(event_type, task="T-003")
+        # T-004: a full lifecycle, then a bare TASK_NEW tries to reset it.
+        for event_type in ("TASK_NEW", "DISPATCH", "DELIVER"):
+            self.primary(event_type, task="T-004")
+        self.primary("CHECKBACK", task="T-004", verdict="PASS")
+        self.primary("ACCEPT", task="T-004", decision="D-002")
+        self.primary("CLOSEOUT", task="T-004",
+                     closeout="tasks/T-004/CLOSEOUT.md")
+        self.primary("TASK_NEW", task="T-004")
+        self.put_record("T-003", "ready")
+        self.put_record("T-004", "ready")
+        self.write_board({"T-001": "closed", "T-002": "reviewed",
+                          "T-003": "ready", "T-004": "ready"})
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        # The legal rebuild is not reported; only the completed reset is.
+        self.assertEqual(self.illegal_transitions(out), [{
+            "kind": "illegal_transition", "target": "T-004",
+            "event": "TASK_NEW", "expected": TASK_NEW_ALLOWED,
+            "actual": "closed"}])
+        self.assertEqual(self.drift_kinds(out), ["illegal_transition"])
+        self.assertEqual(out["tasks"], 4)
+        self.assertEqual(out["skipped"], [])
 
     def test_redelivery_from_delivered_is_legal(self) -> None:
         # PILOT-001 precedent: DELIVER landed twice on a delivered card.
