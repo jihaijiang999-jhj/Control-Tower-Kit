@@ -2056,6 +2056,22 @@ def cmd_queue_add(root: Path, args) -> None:
     queue = load_queue(root)
     if any(e.get("envelope_id") == envelope_id for e in queue.get("entries", [])):
         fail([f"envelope already queued: {args.envelope}"])
+    # ``envelope-new`` requires both count baselines, but a hand-written
+    # ``supervision/envelopes/<id>.json`` never passes through it, so queueing
+    # it used to be the bypass: the post-merge gates treat the baselines as
+    # opt-in and an omitted field silently skipped its count check.  Enforce
+    # the same rule here, before any queue/ledger write, so the invariant holds
+    # for every envelope that can reach the merge queue.  Legacy envelopes
+    # already in the queue are untouched; only new additions are gated.
+    tests_baseline = env.get("tests_baseline")
+    tower_tests_baseline = env.get("tower_tests_baseline")
+    if not (isinstance(tests_baseline, int) and not isinstance(tests_baseline, bool)
+            and tests_baseline >= 1
+            and isinstance(tower_tests_baseline, int)
+            and not isinstance(tower_tests_baseline, bool)
+            and tower_tests_baseline >= 1):
+        fail(["envelope tests_baseline and tower_tests_baseline must be positive "
+              "integers (int >= 1)"])
     queue.setdefault("entries", []).append({
         "envelope_id": envelope_id,
         "task": env.get("task"),
