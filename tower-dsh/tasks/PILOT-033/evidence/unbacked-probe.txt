@@ -1,0 +1,49 @@
+PILOT-033 unbacked probe (isolated temp tower, real tower untouched)
+temp root: C:\Users\mac\AppData\Local\Temp\pilot033-probe-fljwbdm4\kit\tower-dsh
+QUEUE_ADD events: 0   ENVELOPE_NEW events: 0
+
+== state-verify ==
+exit=2
+{
+  "ok": false,
+  "tasks": 0,
+  "envelopes": 0,
+  "drift": [
+    {
+      "kind": "envelope_unbacked",
+      "target": "ENV-PROBE-001",
+      "expected": "ENVELOPE_NEW ledger event",
+      "actual": "no lifecycle events"
+    },
+    {
+      "kind": "queue_unbacked",
+      "target": "ENV-PROBE-001",
+      "expected": "QUEUE_ADD ledger event",
+      "actual": "no lifecycle events"
+    }
+  ],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "T-PROBE-001",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 1,
+  "evidence_checked": 0
+}
+
+== merge-check --envelope ENV-PROBE-001 ==
+exit=2
+{
+  "ok": false,
+  "envelope": "ENV-PROBE-001",
+  "errors": [
+    {
+      "name": "queue entry backed by ledger",
+      "ok": false,
+      "detail": "QUEUE_ADD event missing"
+    }
+  ]
+}
+

@@ -1,0 +1,12 @@
+commit 2bb439db253ab457827da3be422e1b1305e8f4c3
+Author:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+AuthorDate: Fri Oct 23 07:21:28 2026 +0800
+Commit:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+CommitDate: Fri Oct 23 07:21:28 2026 +0800
+
+    PILOT-033: require queue entries to be ledger-backed
+
+ tower-dsh/tools/tests/test_envelope_baseline.py | 77 ++++++++++++++++++++++
+ tower-dsh/tools/tests/test_state_verify.py      | 86 ++++++++++++++++++++-----
+ tower-dsh/tools/towerctl.py                     | 55 +++++++++++++++-
+ 3 files changed, 198 insertions(+), 20 deletions(-)

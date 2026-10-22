@@ -1,0 +1,68 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-033",
+  "task": "PILOT-033",
+  "repository": "..",
+  "branch": "pilot/PILOT-033",
+  "base": "main",
+  "implementation_head_sha": "2bb439db253ab457827da3be422e1b1305e8f4c3",
+  "envelope_path": "merge-envelopes/ENV-PILOT-033.json",
+  "created_at": "2026-10-23T07:32:08+08:00",
+  "scope": "PILOT-033: require queue entries to be ledger-backed",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 281,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-033/evidence/towerctl.py",
+      "sha256": "7776346e21f38aed450930f2a75ee64d66d91a06457c70711b9d8fc7bd3f83e2"
+    },
+    {
+      "path": "tasks/PILOT-033/evidence/test_state_verify.py",
+      "sha256": "2f6a22d29caf6ddfc70108c4cf36d564aed62a10541935cde36b83cd4eac67e8"
+    },
+    {
+      "path": "tasks/PILOT-033/evidence/test_envelope_baseline.py",
+      "sha256": "427a627b71c8d8e9f7b7c693376a7426f89475cbcde59ec9ea8504acaf337aa3"
+    },
+    {
+      "path": "tasks/PILOT-033/evidence/test-output.txt",
+      "sha256": "f5a1b7cb435b19663cbe719294682c19a724d3c90ba86b175ebb8bd05b6eb631"
+    },
+    {
+      "path": "tasks/PILOT-033/evidence/unbacked-probe.txt",
+      "sha256": "d03eb8e7abe5d78c57cdbd82c7685e1bd175f5a5625a7a6076db976300f33ddd"
+    },
+    {
+      "path": "tasks/PILOT-033/evidence/real-run.txt",
+      "sha256": "74399ffcc45d80b810be95d543f42131732baf49d723e1c0260596e3cb0a7f39"
+    },
+    {
+      "path": "tasks/PILOT-033/evidence/probe-old-code.txt",
+      "sha256": "9c7ae2ba5961345b2788e878d0e61a802b759fbbc3591ce28d55a735ac8bd61e"
+    },
+    {
+      "path": "tasks/PILOT-033/evidence/commit.txt",
+      "sha256": "b69b1dc89c08efd518331d2701f6e464ab43838eca8f95d58acb892d2eaf989f"
+    },
+    {
+      "path": "tasks/PILOT-033/evidence/diff.txt",
+      "sha256": "fd5964b90809350d40aceb711991a0a24245a382d1c95f921fb702890e4bbbea"
+    }
+  ],
+  "envelope_head_sha": "9e42abb6c08465058469a21ece6ae636fa510642",
+  "status": "MERGED",
+  "pr_number": 18,
+  "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/18",
+  "remote_merged": true,
+  "remote_merged_at": "2026-10-23T07:35:34+08:00",
+  "merge_commit": "eb8f03b53daf6b747f106714f2ac2e767b8154a5",
+  "merged_at": "2026-10-23T07:35:36+08:00",
+  "supervisor": "sup-033-verify",
+  "merge_mode": "pr",
+  "check_conclusion": "success"
+}

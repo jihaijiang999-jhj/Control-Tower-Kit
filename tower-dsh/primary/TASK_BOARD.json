@@ -321,7 +321,17 @@
       "reviewer": "subagent:rev-run-c-032",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-032/MERGE.md",
       "updated_at": "2026-10-23T02:56:33+08:00"
+    },
+    {
+      "id": "PILOT-033",
+      "title": "队列完整性：手写的 queue/envelope 不再隐形，merge-check 校验 QUEUE_ADD 来源",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-033",
+      "reviewer": "subagent:rev-033",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-033/MERGE.md",
+      "updated_at": "2026-10-23T07:31:59+08:00"
     }
   ],
-  "updated_at": "2026-10-23T02:56:33+08:00"
+  "updated_at": "2026-10-23T07:31:59+08:00"
 }

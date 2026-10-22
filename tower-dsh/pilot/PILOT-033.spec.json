@@ -1,0 +1,44 @@
+{
+  "schema": "tower/spec@1",
+  "id": "PILOT-033",
+  "title": "队列完整性：手写的 queue/envelope 不再隐形，merge-check 校验 QUEUE_ADD 来源",
+  "authority": "workspace_write",
+  "anchor": "∅11",
+  "why_now": "030 关掉了 queue-add 的口，但直接手改 MERGE_QUEUE.json 仍能把信封送进 merge-check/merge；而且完全手写的信封+队列条目没有任何 ledger 事件，state-verify 会把它当 no_lifecycle_events 跳过，等于隐形。",
+  "scope": [
+    "state-verify：队列条目对应的信封若没有任何生命周期事件，记 drift kind=queue_unbacked（target=envelope id，expected=QUEUE_ADD ledger event，actual=no lifecycle events）；信封文件若没有任何生命周期事件，记 drift kind=envelope_unbacked（expected=ENVELOPE_NEW ledger event，actual=no lifecycle events），不再以 skipped 静默放过",
+    "任务侧行为不变：无事件的任务/record 仍按既有规则 skipped，不新增 task 类 drift",
+    "merge-check / merge 共用的 envelope_checks 新增一项 queue entry backed by ledger：仅当信封同时带合法 tests_baseline 与 tower_tests_baseline（新式信封）时启用；ok = supervision ledger 中存在该信封的 QUEUE_ADD 事件；缺失即 exit 2（merge-check 与 merge 都拦截）；不带 baseline 的 legacy 信封不启用该检查，保持兼容",
+    "新增只读辅助 ledger_has_queue_add(root, envelope_id)：按 seq 顺序扫 supervision ledger，匹配 QUEUE_ADD + payload.envelope；坏行忽略",
+    "更新 tools/tests/test_state_verify.py：手写信封+队列（无事件）→ queue_unbacked/envelope_unbacked 两条 drift 且 exit 2；无事件任务仍 skipped；干净塔不产生新 drift；真实塔保持 0",
+    "更新 tools/tests/test_envelope_baseline.py：新式信封（带 baseline）没有 QUEUE_ADD → merge-check exit 2 且失败项为 queue entry backed by ledger；正常 envelope-new + queue-add 后 merge-check 通过该检查；legacy 无 baseline 信封的 merge-check 行为不变"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-033/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-033/tower-dsh/tools/tests/test_state_verify.py",
+    "pilot/worktrees/PILOT-033/tower-dsh/tools/tests/test_envelope_baseline.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "letting an envelope/queue entry without lifecycle events pass silently"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-033/tower-dsh && python -B tools/run_tests.py 全部通过，总数 >= 281（main 基线 281）",
+    "临时塔：手写 supervision/envelopes/ENV-X.json + 手写 MERGE_QUEUE 条目（无任何 ledger 事件）→ state-verify exit 2，drift 同时含 queue_unbacked 与 envelope_unbacked，target=ENV-X",
+    "同一临时塔：merge-check 对新式信封（带 1/1 baseline）报 queue entry backed by ledger ok=false，exit 2；补上 ENVELOPE_NEW+QUEUE_ADD 事件后同一检查 ok=true",
+    "正常流程（envelope-new + queue-add）产生的信封：merge-check 通过 queue entry backed by ledger",
+    "legacy 信封（无 baseline）的 merge-check 不因缺少该检查而失败（兼容）",
+    "无事件任务仍按 no_lifecycle_events 进 skipped；干净塔不出现 queue_unbacked/envelope_unbacked",
+    "真实塔 state-verify：exit 0、tasks=33/envelopes=32、drift=[]（历史 32 信封全部有事件）",
+    "真实塔 post-merge：7/7，tower 计数与 anchor 检查通过",
+    "python tools/towerctl.py spec-coverage 27/27、spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-033 diff --name-only main..HEAD 恰好三个 allowed_paths 文件"
+  ],
+  "depends_on": ["PILOT-032"],
+  "worktree": "pilot/worktrees/PILOT-033"
+}
