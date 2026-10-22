@@ -1,0 +1,163 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-027",
+  "title": "测试运行器收口：TMP 指向仓内沙箱，受限环境可复跑",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "新增 tower-dsh/tools/run_tests.py：默认在塔根下创建 .test-tmp/run-<时间戳>-<pid>/，把 TMPDIR/TEMP/TMP 指向它，再以 sys.executable -B -m unittest discover -s <suite> -p <pattern> -v 运行；支持 --suite/--pattern/--tmp-root；运行前打印 TOWER_TEST_TMP=<路径>；退出码等于子进程；运行目录保留不自动删除（已在 gitignore）",
+    "post-merge 的塔套件门改用运行器（cwd=塔根，argv=[python,-B,tools/run_tests.py]），仍解析 Ran N tests 并按 tower_tests_baseline 设门；根套件门不变",
+    "根门禁 tests/test_tower_gates.py 的内层塔套件也改用运行器（cwd=TOWER），保留 returncode==0 与 Ran N>=8 断言",
+    "仓库 .gitignore 增加 tower-dsh/.test-tmp/；REPRODUCE.md 写清干净环境复跑清单（Python 3.12、命令、TMP 位置、预期 Ran 246+、失败保留现场、清理方式）",
+    "新增 tools/tests/test_run_tests.py：验证 TMP/TEMP/TMPDIR 指向仓内路径且三个值一致、子进程继承、退出码透传、--suite/--pattern 可指向临时小套件（避免递归）、.test-tmp 被 gitignore、默认路径在塔根内",
+    "不修改现有测试的 tempfile 用法（运行器通过环境变量全局生效）；不改 post-merge 的计数/证据语义"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-027/tower-dsh/tools/run_tests.py",
+    "pilot/worktrees/PILOT-027/tower-dsh/tools/tests/test_run_tests.py",
+    "pilot/worktrees/PILOT-027/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-027/tests/test_tower_gates.py",
+    "pilot/worktrees/PILOT-027/.gitignore",
+    "pilot/worktrees/PILOT-027/tower-dsh/REPRODUCE.md"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "hiding failures by swallowing child exit codes"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-027/tower-dsh && python -B tools/run_tests.py 全部通过，总数 >= 246（main 基线 246），输出含 TOWER_TEST_TMP= 且路径在塔根内",
+    "直接 python -B -m unittest discover -s tools/tests -v 仍然通过（向后兼容，不强制运行器）",
+    "test_run_tests.py 覆盖：TMP/TEMP/TMPDIR 三值一致且在塔根内、子进程可见、失败套件退出码非 0 透传、--suite/--pattern 跑临时小套件不递归、.test-tmp 被 gitignore",
+    "post-merge fixture：tower_tests_baseline=1 且塔套件 1 个测试时，检查 detail 仍为 exit 0, ran 1, baseline 1（运行器接入未破坏计数）",
+    "在真实塔完成本卡 post-merge：6/6，塔套件计数 ran >= 246、baseline 246（本卡信封），review 含 tower_tests_count",
+    "REPRODUCE.md 含可复制命令、预期输出与失败保留现场说明",
+    "python tools/towerctl.py spec-coverage 27/27、spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-027 diff --name-only main..HEAD 恰好六个 allowed_paths 文件",
+    "原有 post-merge/计数/门禁测试全绿"
+  ],
+  "depends_on": [
+    "PILOT-026"
+  ],
+  "worktree": "pilot/worktrees/PILOT-027",
+  "spec_path": "pilot/PILOT-027.spec.json",
+  "spec_sha256": "9eb37e266ccc99192ed903eb5a10a5a83d9985db49402c3678e2fef643133591",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-run-b-027",
+  "dispatch": {
+    "executor": "subagent:exec-run-b-027",
+    "worktree": "pilot/worktrees/PILOT-027",
+    "at": "2026-10-22T19:08:28+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-027/evidence/test-output.txt",
+      "sha256": "09adfbc3037fafe1a20970154ed84a41680a2011bcd32359ce5639aa962a3a7d",
+      "bytes": 71968,
+      "at": "2026-10-22T19:24:31+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/direct-discovery.txt",
+      "sha256": "94d946f8e045f3cfb7c9816f505bfec370d3087c83fbdda99747b9b7f2a1e254",
+      "bytes": 70692,
+      "at": "2026-10-22T19:24:31+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/real-run.txt",
+      "sha256": "0b80f9a01aa73f46fe979437144c66c0bfab6060d59ec9a5c34654e9769dd032",
+      "bytes": 514,
+      "at": "2026-10-22T19:24:31+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/probe-old-code.txt",
+      "sha256": "30ed6882db9d194530f2634c4f80078555153899e1786c9145623e2a2fdcb298",
+      "bytes": 2681,
+      "at": "2026-10-22T19:24:31+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/commit.txt",
+      "sha256": "492964c92717cfe0371aa03da5e3da89d362c4ccde6041aca1d34d5f80e10afa",
+      "bytes": 2053,
+      "at": "2026-10-22T19:24:31+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/diff.txt",
+      "sha256": "598504f5a5b08c172c62466834f5031255529de3ac71f40666f2b2c1a34ae256",
+      "bytes": 22119,
+      "at": "2026-10-22T19:24:31+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/gitignore.txt",
+      "sha256": "318493ab76cf99415bb2220450c1b247845f7ab27677aaea2b6d54263e970e95",
+      "bytes": 271,
+      "at": "2026-10-22T19:24:31+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/run_tests.py",
+      "sha256": "d0bcfe6ad685f19f7c65b0fc0ccbdc8e00575a30bd485916a9d78f1b58a2f091",
+      "bytes": 5376,
+      "at": "2026-10-22T19:24:31+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/test_run_tests.py",
+      "sha256": "36fc77fff0caf5df7e36e32eb0139acd7342223beedcb3c278928b8d5d677e1b",
+      "bytes": 8888,
+      "at": "2026-10-22T19:24:31+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/towerctl.py",
+      "sha256": "51b4936b02809c9e56ddb9cd550d45426b6c12b9743e2266deef4791c6831ccb",
+      "bytes": 149771,
+      "at": "2026-10-22T19:24:31+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/REPRODUCE.md",
+      "sha256": "46f2d04a8341293f48e234f770a6230526af5d5c41312e277b42cad169d583cc",
+      "bytes": 3388,
+      "at": "2026-10-22T19:24:31+08:00",
+      "id": "E-011"
+    },
+    {
+      "path": "tasks/PILOT-027/evidence/test_tower_gates.py",
+      "sha256": "81cdb2f6e6f5e0daa0e3c401eeb0386c37a11c11794af3d6cc00329d6ccfd5f8",
+      "bytes": 2979,
+      "at": "2026-10-22T19:24:31+08:00",
+      "id": "E-012"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-run-b-027",
+    "verdict": "PASS",
+    "note": "RUN-B 卡 1/3 PASS。252 tests OK(skipped=1)；runner 两次不同 TMP、banner 首行、--suite/--pattern 精确选择、失败码透传；TMP/TEMP/TMPDIR 一致且指向塔内；.test-tmp 已 gitignore。三处偏差均判 ACCEPT：①runner 缺失时窄回退（fixture 只 vendor tools/tests；真实塔必走 runner，reviewer 另用 runner 分支探针 17/17 绿）；②run 目录写一行 .git gitfile 做仓库隔离（无它则 authority_drift 2 失败、handoff_generic 1 失败；仅 gitignore 范围、无 tracked 写入）；③Windows 下经 GIT_CONFIG_* 注入 core.longpaths（仅子进程、保留已有项；关闭则 20 failures+2 errors 全 Filename too long）。证据 12/12 哈希匹配；spec_sha256=9eb37e2...匹配；scope 恰六文件；502 文件只读快照一致；state-verify 27/26/drift 0/189。残余（不阻塞）：.git 假哨兵语义、longpaths 继承、fixture 只覆盖回退路径、.test-tmp 不自动清理（已文档化）。AC5 真实塔 post-merge 留待 supervision。",
+    "at": "2026-10-22T19:40:04+08:00"
+  },
+  "decision": {
+    "id": "D-RUN-B-027",
+    "actor": "owner",
+    "text": "owner approved RUN-2026-10-22-B; card 1/3 independent reviewer PASS",
+    "at": "2026-10-22T19:40:04+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-027/CLOSEOUT.md",
+    "at": "2026-10-22T19:40:05+08:00"
+  },
+  "created_at": "2026-10-22T19:08:28+08:00",
+  "updated_at": "2026-10-22T19:40:05+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-027/MERGE.md",
+  "delivered_at": "2026-10-22T19:24:31+08:00",
+  "accepted_at": "2026-10-22T19:40:04+08:00"
+}

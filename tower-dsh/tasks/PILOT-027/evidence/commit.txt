@@ -1,0 +1,44 @@
+﻿PILOT-027 commit
+===============
+sha: fb2a3b1cd5258f70dd6df61027138654a469d31b
+subject: PILOT-027: run tests under a repo-local TMP sandbox
+branch: pilot/PILOT-027
+base: fd31f99 (docs: approve RUN-2026-10-22-B batch charter)
+author: mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+committed_at: 2026-10-22T19:23:09+08:00
+
+git diff --name-only main..HEAD (exactly six):
+  .gitignore
+  tests/test_tower_gates.py
+  tower-dsh/REPRODUCE.md
+  tower-dsh/tools/run_tests.py
+  tower-dsh/tools/tests/test_run_tests.py
+  tower-dsh/tools/towerctl.py
+count: 6
+
+git show --stat:
+fb2a3b1 PILOT-027: run tests under a repo-local TMP sandbox
+ .gitignore                              |   3 +
+ tests/test_tower_gates.py               |   2 +-
+ tower-dsh/REPRODUCE.md                  | 100 ++++++++++++++
+ tower-dsh/tools/run_tests.py            | 135 ++++++++++++++++++
+ tower-dsh/tools/tests/test_run_tests.py | 234 ++++++++++++++++++++++++++++++++
+ tower-dsh/tools/towerctl.py             |  18 ++-
+ 6 files changed, 487 insertions(+), 5 deletions(-)
+
+tests (final tree):
+  runner : Ran 252 tests in 86.145s -> OK, exit 0
+  direct : Ran 252 tests in 84.204s -> OK, exit 0
+  TOWER_TEST_TMP=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-027\tower-dsh\.test-tmp\run-20261022-192009-41640
+
+git status --short after commit:
+?? evidence/
+
+evidence manifest:
+  test-output.txt        runner run, exit 0, Ran 252 tests, OK (skipped=1)
+  direct-discovery.txt   python -B -m unittest discover -s tools/tests -v, exit 0, Ran 252, OK
+  real-run.txt           read-only state-verify vs real tower: ok=true, drift=[], evidence_checked=177
+  probe-old-code.txt     new tests vs main code: test_run_tests ImportError (errors=1, exit 1);
+                         test_tower_gates gate call exit 2 (can't open tools/run_tests.py, failures=1, exit 1)
+  diff.txt               git diff main..HEAD
+  six source copies      byte-identical to HEAD (verified by SHA-256)
