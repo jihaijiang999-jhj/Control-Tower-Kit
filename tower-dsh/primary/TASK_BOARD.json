@@ -351,7 +351,17 @@
       "reviewer": "subagent:rev-035",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-035/MERGE.md",
       "updated_at": "2026-10-23T17:01:32+08:00"
+    },
+    {
+      "id": "PILOT-036",
+      "title": "信任边界收口：缺失/不可读 ledger 不再算链 ok、identity 精确比较、ENVELOPE_NEW 绑定 head/task",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:84acc730-6e26-4667-a2df-93f5055815b5",
+      "reviewer": "subagent:ca85fa50-d817-4714-a0b7-563237d90ba8",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-036/MERGE.md",
+      "updated_at": "2026-10-23T18:27:03+08:00"
     }
   ],
-  "updated_at": "2026-10-23T17:01:32+08:00"
+  "updated_at": "2026-10-23T18:27:03+08:00"
 }

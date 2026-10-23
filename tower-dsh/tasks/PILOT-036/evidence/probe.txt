@@ -1,0 +1,75 @@
+=== PILOT-036 trust-boundary probe ===
+tool     : C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-036\tower-dsh\tools\towerctl.py
+tool_sha : 209d7782f9c5b22685bf9ec3f537eecb27c2d3a32a4daf34fd787801f53b6ffa
+python   : 3.12.10
+
+--- scenario missing-ledger ---
+[1] missing supervision ledger (valid tower, ledger/supervision.jsonl removed)
+  verify-ledger --ledger supervision: exit=2 traceback=no one_json=yes ok=False
+    errors=["supervision: ledger missing: ledger/supervision.jsonl"]
+  merge-check --envelope 42: exit=2 traceback=no one_json=yes ok=False
+    error[ledger chain intact] ok=false detail='supervision: ledger missing: ledger/supervision.jsonl'
+    queue_status=WAITING
+
+--- scenario empty-ledger ---
+[2] empty supervision ledger (existing file, zero events)
+  verify-ledger: exit=0 traceback=no one_json=yes ok=True
+  verify-ledger --ledger supervision: exit=0 traceback=no one_json=yes ok=True
+
+--- scenario unreadable-supervision ---
+[3] unreadable supervision ledger (ledger/supervision.jsonl replaced by a directory)
+  verify-ledger --ledger supervision: exit=2 traceback=no one_json=yes ok=False
+    errors=["supervision: ledger unreadable: ledger/supervision.jsonl: [Errno 13] Permission denied: 'C:\\\\Users\\\\mac\\\\AppData\\\\Local\\\\Temp\\\\tower-trust-probe-myg318uo\\\\03-unreadable-supervision\\\\kit\\\\tower-dsh\\\\ledger\\\\supervision.jsonl'"]
+  merge-check --envelope 42: exit=2 traceback=no one_json=yes ok=False
+    error[ledger chain intact] ok=false detail="supervision: ledger unreadable: ledger/supervision.jsonl: [Errno 13] Permission denied: 'C:\\\\Users\\\\mac\\\\AppData\\\\Local\\\\Temp\\\\tower-trust-probe-myg318uo\\\\03-unreadable-supervision\\\\kit\\\\tower-dsh\\\\ledger\\\\supervision.jsonl'"
+    queue_status=WAITING
+
+--- scenario unreadable-primary ---
+[4] unreadable primary ledger (ledger/primary.jsonl replaced by a directory)
+  verify-ledger --ledger primary: exit=2 traceback=no one_json=yes ok=False
+    errors=["primary: ledger unreadable: ledger/primary.jsonl: [Errno 13] Permission denied: 'C:\\\\Users\\\\mac\\\\AppData\\\\Local\\\\Temp\\\\tower-trust-probe-myg318uo\\\\04-unreadable-primary\\\\kit\\\\tower-dsh\\\\ledger\\\\primary.jsonl'"]
+  merge-check --envelope 42: exit=2 traceback=no one_json=yes ok=False
+    error[ledger chain intact] ok=false detail="primary: ledger unreadable: ledger/primary.jsonl: [Errno 13] Permission denied: 'C:\\\\Users\\\\mac\\\\AppData\\\\Local\\\\Temp\\\\tower-trust-probe-myg318uo\\\\04-unreadable-primary\\\\kit\\\\tower-dsh\\\\ledger\\\\primary.jsonl'"
+    queue_status=WAITING
+
+--- scenario integer-envelope-id ---
+[5] integer envelope_id 42, request '42' (str(42) == '42')
+  merge-check --envelope 42: exit=2 traceback=no one_json=yes ok=False
+    errors=["envelope identity matches request: file declares 42, request '42'"]
+    command_level_identity=failed (plain string)
+    queue_status=WAITING
+  merge --role supervisor --supervisor sup-test --envelope 42: exit=2 traceback=no one_json=yes ok=False
+    errors=["envelope identity matches request: file declares 42, request '42'"]
+    command_level_identity=failed (plain string)
+    queue_status=WAITING
+  merge-check --envelope 42 (id restored as string): exit=0 traceback=no one_json=yes ok=True
+    check[envelope identity matches request] ok=True detail="file='42' request='42'"
+    check[ledger chain intact] ok=True detail='ok'
+    check[envelope_new recorded] ok=True detail='ENVELOPE_NEW event present'
+    check[queue entry backed by ledger] ok=True detail='QUEUE_ADD event present'
+
+--- scenario envelope-new-head ---
+[6] ENVELOPE_NEW head mismatch (event head='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', envelope 'eb682928fb2c7e97c16355e7bd413173b05d0e00')
+  merge-check --envelope 42: exit=2 traceback=no one_json=yes ok=False
+    error[envelope_new recorded] ok=false detail='ENVELOPE_NEW event present but binding mismatch: head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa != eb682928fb2c7e97c16355e7bd413173b05d0e00'
+  merge --role supervisor --supervisor sup-test --envelope 42: exit=2 traceback=no one_json=yes ok=False
+    error[envelope_new recorded] ok=false detail='ENVELOPE_NEW event present but binding mismatch: head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa != eb682928fb2c7e97c16355e7bd413173b05d0e00'
+    queue_status=CORRECTION_REQUIRED
+
+--- scenario envelope-new-task ---
+[7] ENVELOPE_NEW task mismatch (event task='T-OTHER-001', envelope 'T-TRUST-001')
+  merge-check --envelope 42: exit=2 traceback=no one_json=yes ok=False
+    error[envelope_new recorded] ok=false detail='ENVELOPE_NEW event present but binding mismatch: task T-OTHER-001 != T-TRUST-001'
+  merge --role supervisor --supervisor sup-test --envelope 42: exit=2 traceback=no one_json=yes ok=False
+    error[envelope_new recorded] ok=false detail='ENVELOPE_NEW event present but binding mismatch: task T-OTHER-001 != T-TRUST-001'
+    queue_status=CORRECTION_REQUIRED
+
+--- scenario valid-tower ---
+[8] valid tower (envelope-new + queue-add, matching ENVELOPE_NEW)
+  merge-check --envelope 42: exit=0 traceback=no one_json=yes ok=True
+    check[envelope identity matches request] ok=True detail="file='42' request='42'"
+    check[ledger chain intact] ok=True detail='ok'
+    check[envelope_new recorded] ok=True detail='ENVELOPE_NEW event present'
+    check[queue entry backed by ledger] ok=True detail='QUEUE_ADD event present'
+
+=== probe done ===

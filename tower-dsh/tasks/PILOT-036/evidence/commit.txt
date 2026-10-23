@@ -1,0 +1,17 @@
+dab951f PILOT-036: trust-boundary closure (missing/unreadable ledger, exact envelope identity, ENVELOPE_NEW head/task binding)
+c0a7e27 spec: PILOT-036 trust-boundary closure (missing/unreadable ledger, exact identity, ENVELOPE_NEW head/task binding)
+ba99741 docs: close out the 2026-10-23 window (PILOT-022..035)
+8aa76af docs: MAP records RUN-D (merge-gate self-verification, half-write repair)
+2cf83b7 state: ENV-PILOT-035 POST_MERGE_VERIFIED
+commit dab951fe0ce7a5fc94eabc83186792ae24c76eb7
+Author: mac <mac@local>
+Date:   Fri Oct 23 18:13:14 2026 +0800
+
+    PILOT-036: trust-boundary closure (missing/unreadable ledger, exact envelope identity, ENVELOPE_NEW head/task binding)
+
+ tower-dsh/tools/tests/test_ledger_chain.py        |   6 +
+ tower-dsh/tools/tests/test_ledger_lock_windows.py |   6 +
+ tower-dsh/tools/tests/test_trust_boundary.py      | 525 ++++++++++++++++++++++
+ tower-dsh/tools/towerctl.py                       | 129 ++++--
+ 4 files changed, 640 insertions(+), 26 deletions(-)
+dab951fe0ce7a5fc94eabc83186792ae24c76eb7

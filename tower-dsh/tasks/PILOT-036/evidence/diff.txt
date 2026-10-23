@@ -1,0 +1,756 @@
+diff --git a/tower-dsh/tools/tests/test_ledger_chain.py b/tower-dsh/tools/tests/test_ledger_chain.py
+index d04298a..0b6fc1f 100644
+--- a/tower-dsh/tools/tests/test_ledger_chain.py
++++ b/tower-dsh/tools/tests/test_ledger_chain.py
+@@ -46,6 +46,12 @@ class LedgerChainTestCase(unittest.TestCase):
+         self.root = Path(self._tmp.name)
+         (self.root / "ledger").mkdir(parents=True, exist_ok=True)
+         self.ledger = self.root / "ledger" / "primary.jsonl"
++        # ``verify-ledger`` with no ``--ledger`` verifies both files, and a
++        # missing ledger is now a failure (PILOT-036) rather than an intact
++        # empty chain.  The success-path fixture therefore provides the empty
++        # supervision ledger it asks the verifier to check; an existing empty
++        # file is still intact.
++        (self.root / "ledger" / "supervision.jsonl").touch()
+ 
+     def tearDown(self) -> None:
+         self._tmp.cleanup()
+diff --git a/tower-dsh/tools/tests/test_ledger_lock_windows.py b/tower-dsh/tools/tests/test_ledger_lock_windows.py
+index 936a0bf..1cb2e86 100644
+--- a/tower-dsh/tools/tests/test_ledger_lock_windows.py
++++ b/tower-dsh/tools/tests/test_ledger_lock_windows.py
+@@ -85,6 +85,12 @@ class LedgerLockWindowsTestCase(unittest.TestCase):
+         self.root = Path(self._tmp.name)
+         (self.root / "ledger").mkdir(parents=True, exist_ok=True)
+         self.ledger = self.root / "ledger" / "primary.jsonl"
++        # ``verify-ledger`` with no ``--ledger`` verifies both files, and a
++        # missing ledger is now a failure (PILOT-036) rather than an intact
++        # empty chain.  The success-path fixture therefore provides the empty
++        # supervision ledger it asks the verifier to check; an existing empty
++        # file is still intact.
++        (self.root / "ledger" / "supervision.jsonl").touch()
+ 
+     def tearDown(self) -> None:
+         towerctl.LEDGER_LOCK_POLL_INTERVAL = self._old_poll
+diff --git a/tower-dsh/tools/tests/test_trust_boundary.py b/tower-dsh/tools/tests/test_trust_boundary.py
+new file mode 100644
+index 0000000..67ab3d8
+--- /dev/null
++++ b/tower-dsh/tools/tests/test_trust_boundary.py
+@@ -0,0 +1,525 @@
++"""PILOT-036: trust-boundary closure for the merge gate.
++
++Three residual holes used to let the merge gate believe the chain held:
++
++* a *missing* or *unreadable* ``ledger/<name>.jsonl`` verified as an intact
++  empty chain (or crashed with a traceback), so ``verify-ledger`` and the
++  envelope's ``ledger chain intact`` check both said "ok";
++* the command-level envelope identity compared ``str(... or "")``, so a JSON
++  declaration of ``42`` passed for the requested id ``"42"``;
++* ``ENVELOPE_NEW`` was matched by envelope id alone; it now has to bind the
++  envelope ``task`` and ``envelope_head_sha`` as well.
++
++Every test drives the real CLI in a subprocess over an isolated tower root.
++The envelope id is deliberately the integer-looking ``"42"`` so the identity
++tests exercise the exact case ``str(42) == "42"`` used to accept.
++
++Run from the tower root (``tower-dsh``)::
++
++    python -B tools/run_tests.py
++"""
++from __future__ import annotations
++
++import hashlib
++import json
++import os
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++TOOLS_DIR = Path(__file__).resolve().parents[1]
++TCLI = TOOLS_DIR / "towerctl.py"
++TASK = "T-TRUST-001"
++ENVELOPE = "42"
++ENVELOPE_PATH = f"merge-envelopes/{ENVELOPE}.json"
++BRANCH = "feature/trust"
++FIXED_TIME = "2026-10-22T00:00:00+08:00"
++GENESIS = "GENESIS"
++
++GIT_IDENTITY = {
++    "GIT_AUTHOR_NAME": "Tower Test",
++    "GIT_AUTHOR_EMAIL": "tower@example.invalid",
++    "GIT_COMMITTER_NAME": "Tower Test",
++    "GIT_COMMITTER_EMAIL": "tower@example.invalid",
++}
++
++
++def canonical_hash(event: dict) -> str:
++    """Independent re-implementation of the documented canonical hash."""
++    body = {k: v for k, v in event.items() if k != "hash"}
++    canonical = json.dumps(body, ensure_ascii=False, sort_keys=True,
++                           separators=(",", ":")).encode("utf-8")
++    return hashlib.sha256(canonical).hexdigest()
++
++
++def write_json(path: Path, data) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
++                    encoding="utf-8")
++
++
++def read_json(path: Path):
++    return json.loads(path.read_text(encoding="utf-8"))
++
++
++def run_git(repo: Path, *args: str) -> subprocess.CompletedProcess:
++    env = dict(os.environ)
++    env.update(GIT_IDENTITY)
++    return subprocess.run(["git", "-C", str(repo), *args],
++                          capture_output=True, text=True, encoding="utf-8",
++                          env=env)
++
++
++class TrustBoundaryTestCase(unittest.TestCase):
++    """Missing/unreadable ledgers, exact identity and ENVELOPE_NEW binding."""
++
++    def setUp(self) -> None:
++        self._tmp = tempfile.TemporaryDirectory(
++            prefix="towerctl-trust-boundary-", ignore_cleanup_errors=True)
++        self.kit = Path(self._tmp.name) / "kit"
++        self.root = self.kit / "tower-dsh"
++        for directory in ("primary", "supervision/envelopes", "ledger",
++                          f"tasks/{TASK}/evidence"):
++            (self.root / directory).mkdir(parents=True, exist_ok=True)
++        (self.root / "ledger" / "primary.jsonl").touch()
++        (self.root / "ledger" / "supervision.jsonl").touch()
++        proof = self.root / "tasks" / TASK / "evidence" / "proof.txt"
++        proof.write_text("proof\n", encoding="utf-8")
++        write_json(self.root / "tasks" / TASK / "record.json", {
++            "schema": "tower/task@1",
++            "id": TASK,
++            "title": "trust boundary",
++            "status": "accepted",
++            "executor": "exec-a",
++            "review": {"reviewer": "rev-a", "verdict": "PASS"},
++            "evidence": [{
++                "id": "E-001",
++                "path": f"tasks/{TASK}/evidence/proof.txt",
++                "sha256": hashlib.sha256(proof.read_bytes()).hexdigest(),
++                "bytes": proof.stat().st_size,
++                "at": FIXED_TIME,
++            }],
++        })
++        write_json(self.root / "primary" / "CURRENT_STATE.json", {
++            "schema": "tower/current-state@1",
++            "tower_id": "tower-dsh",
++            "role": "primary",
++            "primary": {"id": "ctl-primary"},
++            "owner": {"name": "mac"},
++            "phase": "TEST",
++        })
++        write_json(self.root / "supervision" / "CURRENT_STATE.json", {
++            "schema": "tower/supervision-state@1",
++            "role": "supervision",
++            "phase": "TEST",
++            "supervisor": {"id": "sup-1"},
++        })
++        write_json(self.root / "supervision" / "MERGE_QUEUE.json",
++                   {"schema": "tower/merge-queue@1", "entries": []})
++        self.init_repo()
++        self.envelope_file = self.root / "envelope.json"
++        self.write_payload(self.payload())
++
++    def tearDown(self) -> None:
++        self._tmp.cleanup()
++
++    # -- fixtures --------------------------------------------------------
++    def git(self, *args: str) -> subprocess.CompletedProcess:
++        return run_git(self.kit, *args)
++
++    def commit_all(self, message: str) -> str:
++        add = self.git("add", "-A")
++        self.assertEqual(add.returncode, 0, msg=add.stderr)
++        commit = self.git("-c", "commit.gpgsign=false", "commit", "-m", message)
++        self.assertEqual(commit.returncode, 0, msg=commit.stdout + commit.stderr)
++        return self.git("rev-parse", "HEAD").stdout.strip()
++
++    def init_repo(self) -> None:
++        self.kit.mkdir(parents=True, exist_ok=True)
++        self.assertEqual(self.git("init").returncode, 0)
++        self.assertEqual(
++            self.git("symbolic-ref", "HEAD", "refs/heads/main").returncode, 0)
++        (self.kit / "README.md").write_text("base\n", encoding="utf-8")
++        (self.kit / "merge-envelopes").mkdir()
++        self.commit_all("base")
++        self.assertEqual(self.git("checkout", "-b", BRANCH).returncode, 0)
++        (self.kit / "feature.txt").write_text("implementation\n",
++                                              encoding="utf-8")
++        self.implementation_head = self.commit_all("implementation")
++        write_json(self.kit / ENVELOPE_PATH, {"envelope_id": ENVELOPE})
++        self.envelope_head = self.commit_all("envelope")
++        self.assertEqual(self.git("checkout", "main").returncode, 0)
++
++    def payload(self, **overrides) -> dict:
++        data = {
++            "schema": "tower/merge-envelope@1",
++            "envelope_id": ENVELOPE,
++            "task": TASK,
++            "repository": "..",
++            "branch": BRANCH,
++            "base": "main",
++            "envelope_path": ENVELOPE_PATH,
++            "implementation_head_sha": self.implementation_head,
++            "tests_baseline": 1,
++            "tower_tests_baseline": 1,
++        }
++        data.update(overrides)
++        return data
++
++    def write_payload(self, payload: dict) -> None:
++        write_json(self.envelope_file, payload)
++
++    def envelope_path(self, name: str = ENVELOPE) -> Path:
++        return self.root / "supervision" / "envelopes" / f"{name}.json"
++
++    def supervision_ledger_path(self) -> Path:
++        return self.root / "ledger" / "supervision.jsonl"
++
++    def run_cli(self, *args: str) -> subprocess.CompletedProcess:
++        env = dict(os.environ)
++        env.update(GIT_IDENTITY)
++        env["PYTHONIOENCODING"] = "utf-8"
++        env["PYTHONUTF8"] = "1"
++        return subprocess.run(
++            [sys.executable, "-B", str(TCLI), "--root", str(self.root), *args],
++            capture_output=True, text=True, encoding="utf-8", env=env,
++        )
++
++    def create_valid_tower(self) -> None:
++        """Envelope + queue entry through the real commands (2 ledger events)."""
++        cp = self.run_cli("envelope-new", "--task", TASK,
++                          "--file", str(self.envelope_file))
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        cp = self.run_cli("queue-add", "--envelope", ENVELOPE)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++
++    # -- ledger helpers --------------------------------------------------
++    def ledger_events(self) -> list[dict]:
++        text = self.supervision_ledger_path().read_text(encoding="utf-8")
++        return [json.loads(line) for line in text.splitlines() if line.strip()]
++
++    def write_ledger_events(self, events: list[dict]) -> None:
++        """Rewrite the supervision ledger with a freshly recomputed chain."""
++        previous = GENESIS
++        lines = []
++        for seq, event in enumerate(events, 1):
++            event["seq"] = seq
++            event["prev_hash"] = previous
++            event["hash"] = canonical_hash(event)
++            previous = event["hash"]
++            lines.append(json.dumps(event, ensure_ascii=False) + "\n")
++        self.supervision_ledger_path().write_text(
++            "".join(lines), encoding="utf-8", newline="\n")
++
++    def envelope_new_event(self, events: list[dict] | None = None) -> dict:
++        """The ``ENVELOPE_NEW`` event, taken from ``events`` when given."""
++        if events is None:
++            events = self.ledger_events()
++        return next(event for event in events
++                    if event.get("type") == "ENVELOPE_NEW")
++
++    def queue_entries(self) -> list:
++        return read_json(self.root / "supervision" / "MERGE_QUEUE.json")["entries"]
++
++    def assert_single_json(self, cp: subprocess.CompletedProcess) -> dict:
++        """``stdout`` must be exactly one JSON object, with no traceback."""
++        self.assertNotIn("Traceback", cp.stderr,
++                         msg=f"stderr={cp.stderr}")
++        text = cp.stdout.strip()
++        self.assertTrue(text.startswith("{") and text.endswith("}"),
++                        msg=f"stdout is not one JSON object: {cp.stdout!r}")
++        return json.loads(text)
++
++    # -- A. missing / unreadable ledgers ---------------------------------
++    def test_missing_supervision_ledger_fails_verify_ledger(self) -> None:
++        self.create_valid_tower()
++        self.supervision_ledger_path().unlink()
++
++        cp = self.run_cli("verify-ledger", "--ledger", "supervision")
++
++        self.assertEqual(cp.returncode, 2,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        payload = self.assert_single_json(cp)
++        self.assertFalse(payload["ok"])
++        self.assertEqual(payload["errors"],
++                         ["supervision: ledger missing: ledger/supervision.jsonl"])
++        report = payload["files"]["supervision"]
++        # A missing file is not an empty chain: exactly one error, no events.
++        self.assertEqual(report["errors"],
++                         ["ledger missing: ledger/supervision.jsonl"])
++        self.assertFalse(report["exists"])
++        self.assertEqual(report["events"], 0)
++        self.assertEqual(report["legacy_unhashed"], 0)
++
++    def test_missing_supervision_ledger_fails_only_chain_check(self) -> None:
++        self.create_valid_tower()
++        self.supervision_ledger_path().unlink()
++
++        cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
++
++        self.assertEqual(cp.returncode, 2,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        payload = self.assert_single_json(cp)
++        self.assertFalse(payload["ok"])
++        # Every non-ledger check is green; the missing ledger is the only
++        # failure, so the merge gate cannot be talked into "ok".
++        self.assertEqual([c["name"] for c in payload["errors"]],
++                         ["ledger chain intact"])
++        detail = payload["errors"][0]["detail"]
++        self.assertTrue(detail.startswith("supervision: ledger missing"),
++                        msg=detail)
++
++    def test_unreadable_supervision_ledger_fails_verify_ledger(self) -> None:
++        self.create_valid_tower()
++        path = self.supervision_ledger_path()
++        path.unlink()
++        path.mkdir()
++
++        cp = self.run_cli("verify-ledger", "--ledger", "supervision")
++
++        self.assertEqual(cp.returncode, 2,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        # Parsing succeeds only when the command emitted exactly one JSON.
++        payload = self.assert_single_json(cp)
++        self.assertFalse(payload["ok"])
++        self.assertIn("ledger unreadable", " ".join(payload["errors"]))
++        report = payload["files"]["supervision"]
++        self.assertEqual(len(report["errors"]), 1, msg=report)
++        self.assertTrue(
++            report["errors"][0].startswith(
++                "ledger unreadable: ledger/supervision.jsonl: "),
++            msg=report["errors"])
++        self.assertEqual(report["events"], 0)
++
++    def test_unreadable_supervision_ledger_fails_chain_check(self) -> None:
++        self.create_valid_tower()
++        path = self.supervision_ledger_path()
++        path.unlink()
++        path.mkdir()
++
++        cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
++
++        self.assertEqual(cp.returncode, 2,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        payload = self.assert_single_json(cp)
++        self.assertFalse(payload["ok"])
++        self.assertEqual([c["name"] for c in payload["errors"]],
++                         ["ledger chain intact"])
++        detail = payload["errors"][0]["detail"]
++        self.assertTrue(detail.startswith("supervision: ledger unreadable"),
++                        msg=detail)
++
++    def test_unreadable_primary_ledger_is_reported_by_both_gates(self) -> None:
++        self.create_valid_tower()
++        path = self.root / "ledger" / "primary.jsonl"
++        path.unlink()
++        path.mkdir()
++
++        verify = self.run_cli("verify-ledger", "--ledger", "primary")
++        self.assertEqual(verify.returncode, 2,
++                         msg=f"stdout={verify.stdout}\nstderr={verify.stderr}")
++        report = self.assert_single_json(verify)["files"]["primary"]
++        self.assertIn("ledger unreadable", " ".join(report["errors"]))
++        self.assertEqual(len(report["errors"]), 1, msg=report)
++
++        check = self.run_cli("merge-check", "--envelope", ENVELOPE)
++        self.assertEqual(check.returncode, 2,
++                         msg=f"stdout={check.stdout}\nstderr={check.stderr}")
++        payload = self.assert_single_json(check)
++        self.assertEqual([c["name"] for c in payload["errors"]],
++                         ["ledger chain intact"])
++        detail = payload["errors"][0]["detail"]
++        self.assertTrue(detail.startswith("primary: ledger unreadable"),
++                        msg=detail)
++
++    def test_empty_supervision_ledger_is_intact(self) -> None:
++        # setUp already touched both ledgers empty.  What was missing is the
++        # *file*, not the *events*: an existing empty ledger verifies clean.
++        self.assertEqual(self.supervision_ledger_path().read_text(
++            encoding="utf-8"), "")
++
++        cp = self.run_cli("verify-ledger")
++
++        self.assertEqual(cp.returncode, 0,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        payload = self.assert_single_json(cp)
++        self.assertTrue(payload["ok"], msg=cp.stdout)
++        self.assertEqual(payload["errors"], [])
++        report = payload["files"]["supervision"]
++        self.assertTrue(report["exists"])
++        self.assertEqual(report["events"], 0)
++        self.assertEqual(report["legacy_unhashed"], 0)
++        self.assertEqual(report["errors"], [])
++
++    # -- B. exact command-level identity ---------------------------------
++    def test_integer_envelope_id_rejected_by_merge_check(self) -> None:
++        self.create_valid_tower()
++        record = read_json(self.envelope_path())
++        # A JSON integer whose ``str()`` equals the requested id: the old
++        # ``str(...)`` normalisation let it through the command-level gate.
++        record["envelope_id"] = 42
++        write_json(self.envelope_path(), record)
++
++        cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
++
++        self.assertEqual(cp.returncode, 2,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        payload = self.assert_single_json(cp)
++        self.assertFalse(payload["ok"])
++        # Command-level identity failures are plain strings, not check dicts.
++        self.assertIsInstance(payload["errors"], list)
++        self.assertTrue(payload["errors"], msg=payload)
++        for error in payload["errors"]:
++            self.assertIsInstance(error, str, msg=payload)
++        self.assertTrue(payload["errors"][0].startswith(
++            "envelope identity matches request:"), msg=payload["errors"][0])
++        self.assertIn("42", payload["errors"][0])
++
++        # The same tower with the id put back as the string no longer fails
++        # on identity (the rest of the tower is valid, so it fully passes).
++        record["envelope_id"] = ENVELOPE
++        write_json(self.envelope_path(), record)
++        cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
++        self.assertEqual(cp.returncode, 0,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        payload = self.assert_single_json(cp)
++        self.assertTrue(payload["ok"], msg=cp.stdout)
++        identity = next(check for check in payload["checks"]
++                        if check["name"] == "envelope identity matches request")
++        self.assertTrue(identity["ok"], msg=identity)
++
++    def test_integer_envelope_id_rejected_by_merge(self) -> None:
++        self.create_valid_tower()
++        record = read_json(self.envelope_path())
++        record["envelope_id"] = 42
++        write_json(self.envelope_path(), record)
++        ledger_before = self.supervision_ledger_path().read_bytes()
++        queue_before = read_json(self.root / "supervision" / "MERGE_QUEUE.json")
++
++        cp = self.run_cli("merge", "--role", "supervisor",
++                          "--supervisor", "sup-test", "--envelope", ENVELOPE)
++
++        self.assertEqual(cp.returncode, 2,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        payload = self.assert_single_json(cp)
++        self.assertFalse(payload["ok"])
++        self.assertTrue(all(isinstance(error, str)
++                            for error in payload["errors"]), msg=payload)
++        self.assertTrue(payload["errors"][0].startswith(
++            "envelope identity matches request:"), msg=payload["errors"][0])
++        # The command gate fires before any queue/ledger write.
++        entries = self.queue_entries()
++        self.assertEqual(len(entries), 1, msg=entries)
++        self.assertEqual(entries[0]["status"], "WAITING")
++        self.assertNotEqual(entries[0]["status"], "MERGING")
++        self.assertEqual(
++            read_json(self.root / "supervision" / "MERGE_QUEUE.json"),
++            queue_before)
++        self.assertEqual(self.supervision_ledger_path().read_bytes(),
++                         ledger_before)
++        self.assertNotIn("MERGE_START",
++                         self.supervision_ledger_path().read_text(
++                             encoding="utf-8"))
++
++    # -- C. ENVELOPE_NEW binds head and task -----------------------------
++    def test_envelope_new_head_mismatch_fails_merge_check(self) -> None:
++        self.create_valid_tower()
++        events = self.ledger_events()
++        created = self.envelope_new_event(events)
++        other_head = "a" * 40
++        created["payload"]["head"] = other_head
++        self.write_ledger_events(events)
++
++        cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
++
++        self.assertEqual(cp.returncode, 2,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        payload = self.assert_single_json(cp)
++        self.assertFalse(payload["ok"])
++        self.assertEqual([c["name"] for c in payload["errors"]],
++                         ["envelope_new recorded"])
++        detail = payload["errors"][0]["detail"]
++        self.assertIn("head", detail)
++        self.assertIn(other_head, detail)
++
++        # Restoring the recorded head clears exactly this failure.
++        created["payload"]["head"] = self.envelope_head
++        self.write_ledger_events(events)
++        cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
++        self.assertEqual(cp.returncode, 0,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        payload = self.assert_single_json(cp)
++        checks = {check["name"]: check for check in payload["checks"]}
++        self.assertTrue(checks["envelope_new recorded"]["ok"], msg=cp.stdout)
++        self.assertEqual(checks["envelope_new recorded"]["detail"],
++                         "ENVELOPE_NEW event present")
++
++    def test_envelope_new_task_mismatch_fails_merge_check(self) -> None:
++        self.create_valid_tower()
++        events = self.ledger_events()
++        created = self.envelope_new_event(events)
++        created["payload"]["task"] = "T-OTHER-001"
++        self.write_ledger_events(events)
++
++        cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
++
++        self.assertEqual(cp.returncode, 2,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        payload = self.assert_single_json(cp)
++        self.assertFalse(payload["ok"])
++        self.assertEqual([c["name"] for c in payload["errors"]],
++                         ["envelope_new recorded"])
++        detail = payload["errors"][0]["detail"]
++        self.assertIn("task", detail)
++        self.assertIn("T-OTHER-001", detail)
++
++    def test_envelope_new_binding_mismatch_blocks_merge(self) -> None:
++        self.create_valid_tower()
++        events = self.ledger_events()
++        created = self.envelope_new_event(events)
++        created["payload"]["head"] = "b" * 40
++        self.write_ledger_events(events)
++
++        cp = self.run_cli("merge", "--role", "supervisor",
++                          "--supervisor", "sup-test", "--envelope", ENVELOPE)
++
++        self.assertEqual(cp.returncode, 2,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        payload = self.assert_single_json(cp)
++        self.assertFalse(payload["ok"])
++        self.assertEqual([c["name"] for c in payload["errors"]],
++                         ["envelope_new recorded"])
++        # Blocked before MERGING: the entry asks for a correction and no merge
++        # was started (no MERGE_START event, envelope still DRAFT).
++        entries = self.queue_entries()
++        self.assertEqual(len(entries), 1, msg=entries)
++        self.assertEqual(entries[0]["status"], "CORRECTION_REQUIRED")
++        text = self.supervision_ledger_path().read_text(encoding="utf-8")
++        self.assertIn("MERGE_BLOCKED", text)
++        self.assertNotIn("MERGE_START", text)
++        self.assertEqual(read_json(self.envelope_path())["status"], "DRAFT")
++
++    # -- D. clean tower regression ---------------------------------------
++    def test_valid_tower_passes_merge_check(self) -> None:
++        self.create_valid_tower()
++
++        cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
++
++        self.assertEqual(cp.returncode, 0,
++                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        payload = self.assert_single_json(cp)
++        self.assertTrue(payload["ok"], msg=cp.stdout)
++        checks = {check["name"]: check for check in payload["checks"]}
++        self.assertTrue(all(check["ok"] for check in payload["checks"]),
++                        msg=cp.stdout)
++        self.assertEqual(checks["ledger chain intact"]["detail"], "ok")
++        self.assertEqual(checks["envelope_new recorded"]["detail"],
++                         "ENVELOPE_NEW event present")
++        self.assertEqual(checks["queue entry backed by ledger"]["detail"],
++                         "QUEUE_ADD event present")
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tower-dsh/tools/towerctl.py b/tower-dsh/tools/towerctl.py
+index 7a98ff7..f269951 100644
+--- a/tower-dsh/tools/towerctl.py
++++ b/tower-dsh/tools/towerctl.py
+@@ -776,22 +776,62 @@ def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
+         # Both ledger files must verify end-to-end: a forged row can name the
+         # envelope and still be detected here as a broken hash chain.
+         chain_errors: list[str] = []
++        reports: dict[str, dict] = {}
+         for ledger_name in ("primary", "supervision"):
++            report = verify_ledger_file(root, ledger_name)
++            reports[ledger_name] = report
+             chain_errors.extend(
+                 f"{ledger_name}: {error}"
+-                for error in verify_ledger_file(root, ledger_name)["errors"])
++                for error in report["errors"])
+         add("ledger chain intact", not chain_errors,
+             chain_errors[0] if chain_errors else "ok")
+-        # ``ENVELOPE_NEW`` is the only event that brings an envelope into
+-        # existence.  Requiring it (not just ``QUEUE_ADD``) stops a hand-written
+-        # envelope from being queued by appending a single valid queue event.
+-        recorded = ledger_has_event(
+-            root, "supervision", "ENVELOPE_NEW", env.get("envelope_id"))
+-        add("envelope_new recorded", recorded,
+-            f"ENVELOPE_NEW event {'present' if recorded else 'missing'}")
+-        backed = ledger_has_queue_add(root, env.get("envelope_id"))
+-        add("queue entry backed by ledger", backed,
+-            f"QUEUE_ADD event {'present' if backed else 'missing'}")
++        # The two lifecycle checks below read ``ledger/supervision.jsonl``.
++        # When that file itself is missing or unreadable they cannot tell "no
++        # event" from "no ledger" and would report a misleading
++        # ``ENVELOPE_NEW event missing``; the chain check above already fails
++        # the envelope and blocks the merge, so they are skipped in exactly
++        # that one case.  A readable ledger with a broken chain still runs
++        # them: their verdicts are then independent evidence.
++        supervision = reports["supervision"]
++        supervision_available = supervision["exists"] and not any(
++            error.startswith("ledger unreadable:")
++            for error in supervision["errors"])
++        if supervision_available:
++            # ``ENVELOPE_NEW`` is the only event that brings an envelope into
++            # existence.  Requiring it (not just ``QUEUE_ADD``) stops a
++            # hand-written envelope from being queued by appending a single
++            # valid queue event.  The event must also bind the envelope's
++            # task and head: an event that names the id but a different
++            # task/head does not belong to this envelope.
++            created = ledger_events_naming(
++                root, "supervision", "ENVELOPE_NEW", env.get("envelope_id"))
++            if not created:
++                add("envelope_new recorded", False, "ENVELOPE_NEW event missing")
++            else:
++                envelope_task = env.get("task")
++                envelope_head = env.get("envelope_head_sha")
++                bound = next(
++                    (payload for payload in created
++                     if payload.get("task") == envelope_task
++                     and payload.get("head") == envelope_head), None)
++                if bound is not None:
++                    add("envelope_new recorded", True,
++                        "ENVELOPE_NEW event present")
++                else:
++                    payload = created[0]
++                    mismatch: list[str] = []
++                    if payload.get("task") != envelope_task:
++                        mismatch.append(
++                            f"task {payload.get('task')} != {envelope_task}")
++                    if payload.get("head") != envelope_head:
++                        mismatch.append(
++                            f"head {payload.get('head')} != {envelope_head}")
++                    add("envelope_new recorded", False,
++                        "ENVELOPE_NEW event present but binding mismatch: "
++                        + "; ".join(mismatch))
++            backed = ledger_has_queue_add(root, env.get("envelope_id"))
++            add("queue entry backed by ledger", backed,
++                f"QUEUE_ADD event {'present' if backed else 'missing'}")
+     if not repo.exists():
+         return checks
+     branch = env.get("branch", "")
+@@ -2150,10 +2190,14 @@ def cmd_merge_check(root: Path, args) -> None:
+     if not env_path.exists():
+         fail([f"envelope not found: {args.envelope}"])
+     env = jload(env_path)
+-    declared = str(env.get("envelope_id") or "")
++    # Exact comparison, with no ``str()`` normalisation: a JSON declaration
++    # of ``42`` is not the requested id ``"42"``.  Command-level failures are
++    # plain strings (``errors``), not check dictionaries.
++    declared = env.get("envelope_id")
+     if declared != envelope_id:
+         fail([f"envelope identity matches request: file declares "
+-              f"{declared or '(missing)'!r}, request {envelope_id!r}"])
++              f"{declared if declared is not None else '(missing)'!r}, "
++              f"request {envelope_id!r}"])
+     checks = envelope_checks(root, env, expected_id=envelope_id)
+     queue = load_queue(root)
+     entry = next((e for e in queue.get("entries", [])
+@@ -2405,11 +2449,14 @@ def cmd_merge(root: Path, args) -> None:
+     env = jload(env_path)
+     # The requested id is authoritative: every later decision (queue entry,
+     # git head, status transitions) is keyed on it, so a file whose declared
+-    # id differs must be rejected before any of that work happens.
+-    declared = str(env.get("envelope_id") or "")
++    # id differs must be rejected before any of that work happens.  The
++    # comparison is exact (no ``str()`` normalisation): a JSON declaration of
++    # ``42`` must not pass for the requested id ``"42"``.
++    declared = env.get("envelope_id")
+     if declared != envelope_id:
+         fail([f"envelope identity matches request: file declares "
+-              f"{declared or '(missing)'!r}, request {envelope_id!r}"])
++              f"{declared if declared is not None else '(missing)'!r}, "
++              f"request {envelope_id!r}"])
+     if env.get("status") in ("MERGED", "POST_MERGE_VERIFIED"):
+         fail([f"envelope already {env.get('status')}"])
+     queue = load_queue(root)
+@@ -2884,16 +2931,33 @@ def cmd_status(root: Path, args) -> None:
+ 
+ 
+ def verify_ledger_file(root: Path, name: str) -> dict:
+-    """Validate one ledger file: JSON, seq continuity, hashes and prev links."""
++    """Validate one ledger file: presence, JSON, seq, hashes and prev links.
++
++    A missing ledger is a *failed* verification, not an empty one: the old
++    code parsed it as zero rows and reported no errors, so every caller read
++    "the file is not there" as "the chain is intact".  An existing empty file
++    is still a valid empty chain.  Any read error (a directory in place of the
++    file, an ACL denial, ...) becomes one ``ledger unreadable`` error instead
++    of a traceback, so the CLI can always emit exactly one JSON payload.
++    """
+     path = root / "ledger" / LEDGER_FILES[name]
+-    rows = ledger_rows(path)
+     result = {
+         "path": rel(root, path),
+-        "exists": path.exists(),
++        "exists": False,
+         "events": 0,
+         "legacy_unhashed": 0,
+         "errors": [],
+     }
++    if not path.exists():
++        result["errors"].append(f"ledger missing: {rel(root, path)}")
++        return result
++    result["exists"] = True
++    try:
++        rows = ledger_rows(path)
++    except OSError as exc:
++        result["errors"].append(
++            f"ledger unreadable: {rel(root, path)}: {exc}")
++        return result
+     expected_seq = 1
+     expected_prev = GENESIS_PREV_HASH
+     chain_started = False
+@@ -3282,6 +3346,25 @@ def ledger_events_in_seq_order(root: Path, name: str) -> list[dict]:
+     return [event for _, event in sorted(rows, key=lambda pair: pair[0])]
+ 
+ 
++def ledger_events_naming(root: Path, name: str, event_type: str,
++                         envelope_id) -> list[dict]:
++    """Payloads of ``event_type`` events in ``ledger/<name>.jsonl`` naming it.
++
++    Read-only.  A caller that needs more than existence (the ``ENVELOPE_NEW``
++    binding check) can inspect the payloads; :func:`ledger_has_event` is the
++    boolean wrapper.  Rows that are not JSON objects are ignored, exactly like
++    :func:`ledger_has_event`.
++    """
++    payloads = []
++    for event in ledger_events_in_seq_order(root, name):
++        if event.get("type") != event_type:
++            continue
++        payload = event.get("payload")
++        if isinstance(payload, dict) and payload.get("envelope") == envelope_id:
++            payloads.append(payload)
++    return payloads
++
++
+ def ledger_has_event(root: Path, name: str, event_type: str,
+                      envelope_id) -> bool:
+     """True iff one ``event_type`` event in ``ledger/<name>.jsonl`` names it.
+@@ -3290,13 +3373,7 @@ def ledger_has_event(root: Path, name: str, event_type: str,
+     :func:`ledger_events_in_seq_order`; ``state-verify`` still refuses to replay
+     a ledger whose chain is broken.
+     """
+-    for event in ledger_events_in_seq_order(root, name):
+-        if event.get("type") != event_type:
+-            continue
+-        payload = event.get("payload")
+-        if isinstance(payload, dict) and payload.get("envelope") == envelope_id:
+-            return True
+-    return False
++    return bool(ledger_events_naming(root, name, event_type, envelope_id))
+ 
+ 
+ def ledger_has_queue_add(root: Path, envelope_id) -> bool:

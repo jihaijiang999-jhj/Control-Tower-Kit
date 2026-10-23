@@ -375,6 +375,18 @@
       "merge_mode": "pr",
       "pr_number": 20,
       "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/20"
+    },
+    {
+      "envelope_id": "ENV-PILOT-036",
+      "task": "PILOT-036",
+      "implementation_head_sha": "dab951fe0ce7a5fc94eabc83186792ae24c76eb7",
+      "envelope_head_sha": "43b9401e33503beb0fd21c9fdf938212caa449c2",
+      "merge_commit": "d8ef20fcaa074a8742a1729459bfad1797636f48",
+      "supervisor": "sup-pilot036-verify",
+      "at": "2026-10-23T18:30:47+08:00",
+      "merge_mode": "pr",
+      "pr_number": 21,
+      "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/21"
     }
   ]
 }
