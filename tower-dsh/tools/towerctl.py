@@ -776,22 +776,62 @@ def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
         # Both ledger files must verify end-to-end: a forged row can name the
         # envelope and still be detected here as a broken hash chain.
         chain_errors: list[str] = []
+        reports: dict[str, dict] = {}
         for ledger_name in ("primary", "supervision"):
+            report = verify_ledger_file(root, ledger_name)
+            reports[ledger_name] = report
             chain_errors.extend(
                 f"{ledger_name}: {error}"
-                for error in verify_ledger_file(root, ledger_name)["errors"])
+                for error in report["errors"])
         add("ledger chain intact", not chain_errors,
             chain_errors[0] if chain_errors else "ok")
-        # ``ENVELOPE_NEW`` is the only event that brings an envelope into
-        # existence.  Requiring it (not just ``QUEUE_ADD``) stops a hand-written
-        # envelope from being queued by appending a single valid queue event.
-        recorded = ledger_has_event(
-            root, "supervision", "ENVELOPE_NEW", env.get("envelope_id"))
-        add("envelope_new recorded", recorded,
-            f"ENVELOPE_NEW event {'present' if recorded else 'missing'}")
-        backed = ledger_has_queue_add(root, env.get("envelope_id"))
-        add("queue entry backed by ledger", backed,
-            f"QUEUE_ADD event {'present' if backed else 'missing'}")
+        # The two lifecycle checks below read ``ledger/supervision.jsonl``.
+        # When that file itself is missing or unreadable they cannot tell "no
+        # event" from "no ledger" and would report a misleading
+        # ``ENVELOPE_NEW event missing``; the chain check above already fails
+        # the envelope and blocks the merge, so they are skipped in exactly
+        # that one case.  A readable ledger with a broken chain still runs
+        # them: their verdicts are then independent evidence.
+        supervision = reports["supervision"]
+        supervision_available = supervision["exists"] and not any(
+            error.startswith("ledger unreadable:")
+            for error in supervision["errors"])
+        if supervision_available:
+            # ``ENVELOPE_NEW`` is the only event that brings an envelope into
+            # existence.  Requiring it (not just ``QUEUE_ADD``) stops a
+            # hand-written envelope from being queued by appending a single
+            # valid queue event.  The event must also bind the envelope's
+            # task and head: an event that names the id but a different
+            # task/head does not belong to this envelope.
+            created = ledger_events_naming(
+                root, "supervision", "ENVELOPE_NEW", env.get("envelope_id"))
+            if not created:
+                add("envelope_new recorded", False, "ENVELOPE_NEW event missing")
+            else:
+                envelope_task = env.get("task")
+                envelope_head = env.get("envelope_head_sha")
+                bound = next(
+                    (payload for payload in created
+                     if payload.get("task") == envelope_task
+                     and payload.get("head") == envelope_head), None)
+                if bound is not None:
+                    add("envelope_new recorded", True,
+                        "ENVELOPE_NEW event present")
+                else:
+                    payload = created[0]
+                    mismatch: list[str] = []
+                    if payload.get("task") != envelope_task:
+                        mismatch.append(
+                            f"task {payload.get('task')} != {envelope_task}")
+                    if payload.get("head") != envelope_head:
+                        mismatch.append(
+                            f"head {payload.get('head')} != {envelope_head}")
+                    add("envelope_new recorded", False,
+                        "ENVELOPE_NEW event present but binding mismatch: "
+                        + "; ".join(mismatch))
+            backed = ledger_has_queue_add(root, env.get("envelope_id"))
+            add("queue entry backed by ledger", backed,
+                f"QUEUE_ADD event {'present' if backed else 'missing'}")
     if not repo.exists():
         return checks
     branch = env.get("branch", "")
@@ -2150,10 +2190,14 @@ def cmd_merge_check(root: Path, args) -> None:
     if not env_path.exists():
         fail([f"envelope not found: {args.envelope}"])
     env = jload(env_path)
-    declared = str(env.get("envelope_id") or "")
+    # Exact comparison, with no ``str()`` normalisation: a JSON declaration
+    # of ``42`` is not the requested id ``"42"``.  Command-level failures are
+    # plain strings (``errors``), not check dictionaries.
+    declared = env.get("envelope_id")
     if declared != envelope_id:
         fail([f"envelope identity matches request: file declares "
-              f"{declared or '(missing)'!r}, request {envelope_id!r}"])
+              f"{declared if declared is not None else '(missing)'!r}, "
+              f"request {envelope_id!r}"])
     checks = envelope_checks(root, env, expected_id=envelope_id)
     queue = load_queue(root)
     entry = next((e for e in queue.get("entries", [])
@@ -2405,11 +2449,14 @@ def cmd_merge(root: Path, args) -> None:
     env = jload(env_path)
     # The requested id is authoritative: every later decision (queue entry,
     # git head, status transitions) is keyed on it, so a file whose declared
-    # id differs must be rejected before any of that work happens.
-    declared = str(env.get("envelope_id") or "")
+    # id differs must be rejected before any of that work happens.  The
+    # comparison is exact (no ``str()`` normalisation): a JSON declaration of
+    # ``42`` must not pass for the requested id ``"42"``.
+    declared = env.get("envelope_id")
     if declared != envelope_id:
         fail([f"envelope identity matches request: file declares "
-              f"{declared or '(missing)'!r}, request {envelope_id!r}"])
+              f"{declared if declared is not None else '(missing)'!r}, "
+              f"request {envelope_id!r}"])
     if env.get("status") in ("MERGED", "POST_MERGE_VERIFIED"):
         fail([f"envelope already {env.get('status')}"])
     queue = load_queue(root)
@@ -2884,16 +2931,33 @@ def cmd_status(root: Path, args) -> None:
 
 
 def verify_ledger_file(root: Path, name: str) -> dict:
-    """Validate one ledger file: JSON, seq continuity, hashes and prev links."""
+    """Validate one ledger file: presence, JSON, seq, hashes and prev links.
+
+    A missing ledger is a *failed* verification, not an empty one: the old
+    code parsed it as zero rows and reported no errors, so every caller read
+    "the file is not there" as "the chain is intact".  An existing empty file
+    is still a valid empty chain.  Any read error (a directory in place of the
+    file, an ACL denial, ...) becomes one ``ledger unreadable`` error instead
+    of a traceback, so the CLI can always emit exactly one JSON payload.
+    """
     path = root / "ledger" / LEDGER_FILES[name]
-    rows = ledger_rows(path)
     result = {
         "path": rel(root, path),
-        "exists": path.exists(),
+        "exists": False,
         "events": 0,
         "legacy_unhashed": 0,
         "errors": [],
     }
+    if not path.exists():
+        result["errors"].append(f"ledger missing: {rel(root, path)}")
+        return result
+    result["exists"] = True
+    try:
+        rows = ledger_rows(path)
+    except OSError as exc:
+        result["errors"].append(
+            f"ledger unreadable: {rel(root, path)}: {exc}")
+        return result
     expected_seq = 1
     expected_prev = GENESIS_PREV_HASH
     chain_started = False
@@ -3282,6 +3346,25 @@ def ledger_events_in_seq_order(root: Path, name: str) -> list[dict]:
     return [event for _, event in sorted(rows, key=lambda pair: pair[0])]
 
 
+def ledger_events_naming(root: Path, name: str, event_type: str,
+                         envelope_id) -> list[dict]:
+    """Payloads of ``event_type`` events in ``ledger/<name>.jsonl`` naming it.
+
+    Read-only.  A caller that needs more than existence (the ``ENVELOPE_NEW``
+    binding check) can inspect the payloads; :func:`ledger_has_event` is the
+    boolean wrapper.  Rows that are not JSON objects are ignored, exactly like
+    :func:`ledger_has_event`.
+    """
+    payloads = []
+    for event in ledger_events_in_seq_order(root, name):
+        if event.get("type") != event_type:
+            continue
+        payload = event.get("payload")
+        if isinstance(payload, dict) and payload.get("envelope") == envelope_id:
+            payloads.append(payload)
+    return payloads
+
+
 def ledger_has_event(root: Path, name: str, event_type: str,
                      envelope_id) -> bool:
     """True iff one ``event_type`` event in ``ledger/<name>.jsonl`` names it.
@@ -3290,13 +3373,7 @@ def ledger_has_event(root: Path, name: str, event_type: str,
     :func:`ledger_events_in_seq_order`; ``state-verify`` still refuses to replay
     a ledger whose chain is broken.
     """
-    for event in ledger_events_in_seq_order(root, name):
-        if event.get("type") != event_type:
-            continue
-        payload = event.get("payload")
-        if isinstance(payload, dict) and payload.get("envelope") == envelope_id:
-            return True
-    return False
+    return bool(ledger_events_naming(root, name, event_type, envelope_id))
 
 
 def ledger_has_queue_add(root: Path, envelope_id) -> bool:
