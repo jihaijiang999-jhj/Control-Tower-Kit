@@ -303,10 +303,10 @@
       "task": "PILOT-034",
       "branch": "pilot/PILOT-034",
       "base": "main",
-      "status": "MERGED",
+      "status": "POST_MERGE_VERIFIED",
       "added_at": "2026-10-23T16:34:18+08:00",
       "merge_commit": "7f122b8fd92d01a3b3f1b86c64ec2a42c979970e"
     }
   ],
-  "updated_at": "2026-10-23T16:38:11+08:00"
+  "updated_at": "2026-10-23T16:41:56+08:00"
 }
