@@ -312,10 +312,10 @@
       "task": "PILOT-035",
       "branch": "pilot/PILOT-035",
       "base": "main",
-      "status": "MERGED",
+      "status": "POST_MERGE_VERIFIED",
       "added_at": "2026-10-23T17:01:44+08:00",
       "merge_commit": "a7e429daf7cc84334c220c1bb440d87998553512"
     }
   ],
-  "updated_at": "2026-10-23T17:05:28+08:00"
+  "updated_at": "2026-10-23T17:09:23+08:00"
 }
