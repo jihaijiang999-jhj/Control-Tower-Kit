@@ -85,6 +85,12 @@ class LedgerLockWindowsTestCase(unittest.TestCase):
         self.root = Path(self._tmp.name)
         (self.root / "ledger").mkdir(parents=True, exist_ok=True)
         self.ledger = self.root / "ledger" / "primary.jsonl"
+        # ``verify-ledger`` with no ``--ledger`` verifies both files, and a
+        # missing ledger is now a failure (PILOT-036) rather than an intact
+        # empty chain.  The success-path fixture therefore provides the empty
+        # supervision ledger it asks the verifier to check; an existing empty
+        # file is still intact.
+        (self.root / "ledger" / "supervision.jsonl").touch()
 
     def tearDown(self) -> None:
         towerctl.LEDGER_LOCK_POLL_INTERVAL = self._old_poll
