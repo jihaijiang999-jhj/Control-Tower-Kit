@@ -341,7 +341,17 @@
       "reviewer": "subagent:rev-034",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-034/MERGE.md",
       "updated_at": "2026-10-23T16:34:12+08:00"
+    },
+    {
+      "id": "PILOT-035",
+      "title": "半写窗口可恢复：queue-add 检测队列条目存在但 QUEUE_ADD 缺失时补事件",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-035",
+      "reviewer": "subagent:rev-035",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-035/MERGE.md",
+      "updated_at": "2026-10-23T17:01:32+08:00"
     }
   ],
-  "updated_at": "2026-10-23T16:34:12+08:00"
+  "updated_at": "2026-10-23T17:01:32+08:00"
 }

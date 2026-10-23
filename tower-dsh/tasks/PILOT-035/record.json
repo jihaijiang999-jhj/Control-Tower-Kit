@@ -1,0 +1,137 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-035",
+  "title": "半写窗口可恢复：queue-add 检测队列条目存在但 QUEUE_ADD 缺失时补事件",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "cmd_queue_add 在完成 baseline 校验后，若队列中已存在该信封条目：若 supervision ledger 已有 QUEUE_ADD → 保持现有 exit 2 already queued；若缺失（半写）→ 追加 QUEUE_ADD 事件、保持条目状态 WAITING，并输出 ok=true repaired=true（不重复追加条目）",
+    "修复路径必须先通过 baseline 校验：半写条目若信封缺 baseline 或取值非法，仍 exit 2 且不追加事件",
+    "修复路径写入的 QUEUE_ADD 事件使用与正常路径相同的 append_supervision_ledger（哈希链）；成功后 state-verify 不再报该信封 queue_unbacked",
+    "正常路径（条目不存在）行为不变；envelope-new / merge-check / post-merge 不变",
+    "更新 tools/tests/test_envelope_baseline.py：手工构造“队列条目在、事件缺失”的半写塔 → queue-add exit 0、repaired=true、恰一条 QUEUE_ADD、条目仍 WAITING、state-verify 无 queue_unbacked；半写但信封缺 baseline → exit 2 且无事件；事件已存在的重复入队 → 仍 exit 2 already queued"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-035/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-035/tower-dsh/tools/tests/test_envelope_baseline.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "repairing a queue entry whose envelope violates the baseline gate"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-035/tower-dsh && python -B tools/run_tests.py 全部通过，总数 >= 287（main 基线 287）",
+    "半写塔（合法 1/1 信封 + 手写 WAITING 条目 + 无 QUEUE_ADD）→ queue-add exit 0、输出 repaired=true、ledger 恰一条 QUEUE_ADD、队列仍一条 WAITING、state-verify 无 queue_unbacked",
+    "半写塔但信封缺 tower_tests_baseline → queue-add exit 2、无新事件、条目保持原样",
+    "已正常入队的信封重复 queue-add → 仍 exit 2 already queued，事件数不变",
+    "正常首次入队行为不变（exit 0、一条事件）",
+    "真实塔 state-verify：exit 0、tasks=35/envelopes=34、drift=[]",
+    "真实塔 post-merge：7/7，塔计数/anchor 检查通过",
+    "python tools/towerctl.py spec-coverage 27/27、spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-035 diff --name-only main..HEAD 恰好两个 allowed_paths 文件"
+  ],
+  "depends_on": [
+    "PILOT-034"
+  ],
+  "worktree": "pilot/worktrees/PILOT-035",
+  "spec_path": "pilot/PILOT-035.spec.json",
+  "spec_sha256": "19c3bf418477405ca5303fafd3aae90b24c4070a7d4ca18323c954a7676897ef",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-035",
+  "dispatch": {
+    "executor": "subagent:exec-035",
+    "worktree": "pilot/worktrees/PILOT-035",
+    "at": "2026-10-23T16:42:05+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-035/evidence/towerctl.py",
+      "sha256": "7bc2e030eaaa7ac017746350268966d47b578a038140544427b84c15f3c5a2eb",
+      "bytes": 165312,
+      "at": "2026-10-23T16:51:03+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/test_envelope_baseline.py",
+      "sha256": "353c46d0b1f21fe88c106dd3f3f565ca589ac45ac6dbf436834579a7643d204e",
+      "bytes": 32493,
+      "at": "2026-10-23T16:51:03+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/test-output.txt",
+      "sha256": "2ab06bf10a82a365604892b96befaaf4e2b0e44370441305defc0fdd95ecb1d4",
+      "bytes": 42136,
+      "at": "2026-10-23T16:51:03+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/repair-probe.txt",
+      "sha256": "03516ea86fba4e191a765be3437fb96b46ec78ef5df648927fa97ff056acdf02",
+      "bytes": 1780,
+      "at": "2026-10-23T16:51:03+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/repair_probe.py",
+      "sha256": "1f2a6378ae79479580735dfaad945a29ca0978e72f0f33ad6b325448a2f7b3ef",
+      "bytes": 7255,
+      "at": "2026-10-23T16:51:03+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/real-run.txt",
+      "sha256": "713c6fa1bb24662847f47bd846a081465ec471b3467d7eaba76ac482e3f2d217",
+      "bytes": 256,
+      "at": "2026-10-23T16:51:03+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/probe-old-code.txt",
+      "sha256": "5f494aaa7dd3c58d062b80a1a7ef1cd3dd9228057483c84f148d41984b974fa6",
+      "bytes": 5130,
+      "at": "2026-10-23T16:51:03+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/commit.txt",
+      "sha256": "29f2b34dafe3772c8e23882a8598a42c767344eb14c4d81df18e716425e88bab",
+      "bytes": 561,
+      "at": "2026-10-23T16:51:03+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/diff.txt",
+      "sha256": "f526d75feaa740ce9a9f85adf968a1494261d3881e157f8a96501cdf3f14f77e",
+      "bytes": 6884,
+      "at": "2026-10-23T16:51:03+08:00",
+      "id": "E-009"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-035",
+    "verdict": "PASS",
+    "note": "035 PASS。293 tests OK(skipped=1)；独立 11 塔 57/57 断言：真实半写（有 ENVELOPE_NEW、队列在、事件缺失）→ queue-add exit0 repaired=true、恰一条 QUEUE_ADD、队列字节不变、state-verify 不再有 queue_unbacked；缺 baseline 的半写 → exit2 且零写入；正常重复仍 already queued；首次入队无 repaired 键；信封缺失在修复前失败；伪造坏链 QUEUE_ADD 抑制修复但链检查/verify-ledger 拦截；非 WAITING 条目修复时 stdout 报 WAITING 但保留原状态（P5 残余）；反向半写不在范围。旧码对照恰 2 个修复测试失败。9/9 证据哈希与 spec_sha256 匹配；scope 恰两文件；673 文件只读快照一致；真实塔 35/34/drift 0。残余（不阻塞）：修复不造 ENVELOPE_NEW（手写信封修复后仍被 merge 的 envelope_new 检查拦）；非 WAITING 条目状态与 stdout 不一致；坏链行抑制修复；反向半写未处理；重复条目与 task 字段分歧；queue-add 不把信封状态同步为 WAITING（既有）。",
+    "at": "2026-10-23T17:01:32+08:00"
+  },
+  "decision": {
+    "id": "D-RUN-D-035",
+    "actor": "owner",
+    "text": "owner approved RUN-2026-10-23-D; card 2/2 PASS",
+    "at": "2026-10-23T17:01:32+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-035/CLOSEOUT.md",
+    "at": "2026-10-23T17:01:32+08:00"
+  },
+  "created_at": "2026-10-23T16:42:05+08:00",
+  "updated_at": "2026-10-23T17:01:32+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-035/MERGE.md",
+  "delivered_at": "2026-10-23T16:51:03+08:00",
+  "accepted_at": "2026-10-23T17:01:32+08:00"
+}

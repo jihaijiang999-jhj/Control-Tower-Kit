@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "tasks": 35,
+  "envelopes": 34,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 1,
+  "evidence_checked": 255
+}

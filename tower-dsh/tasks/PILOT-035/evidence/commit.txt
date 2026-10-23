@@ -1,0 +1,11 @@
+commit 92128a89da4aca182e166409962b513ed125bd88
+Author:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+AuthorDate: Fri Oct 23 16:49:21 2026 +0800
+Commit:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+CommitDate: Fri Oct 23 16:49:21 2026 +0800
+
+    PILOT-035: repair half-written queue entries
+
+ tower-dsh/tools/tests/test_envelope_baseline.py | 65 ++++++++++++++++++++++++-
+ tower-dsh/tools/towerctl.py                     | 21 +++++++-
+ 2 files changed, 83 insertions(+), 3 deletions(-)

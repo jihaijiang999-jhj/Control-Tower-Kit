@@ -1,0 +1,551 @@
+TOWER_TEST_TMP=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-035\tower-dsh\.test-tmp\run-20261023-164549-40712
+python : test_clean_repository_with_tasks_and_pilot_is_empty (test_authority_drift.AuthorityDriftTestCase.test_clean_re
+pository_with_tasks_and_pilot_is_empty) ... ok
+所在位置 行:1 字符: 218
++ ... .\evidence; python -B tools/run_tests.py *> ..\evidence\test-output.t ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (test_clean_repo...s_empty) ... ok:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+test_deleting_handoffs_directory_is_reported (test_authority_drift.AuthorityDriftTestCase.test_deleting_handoffs_direct
+ory_is_reported) ... ok
+test_deleting_ledger_directory_is_reported (test_authority_drift.AuthorityDriftTestCase.test_deleting_ledger_directory_
+is_reported) ... ok
+test_gitignored_pilot_worktrees_are_not_authority_drift (test_authority_drift.AuthorityDriftTestCase.test_gitignored_pi
+lot_worktrees_are_not_authority_drift) ... ok
+test_handoff_activate_requires_commit_without_committing (test_authority_drift.AuthorityDriftTestCase.test_handoff_acti
+vate_requires_commit_without_committing) ... ok
+test_ledger_and_handoffs_changes_are_reported (test_authority_drift.AuthorityDriftTestCase.test_ledger_and_handoffs_cha
+nges_are_reported) ... ok
+test_modified_task_record_is_authority_drift (test_authority_drift.AuthorityDriftTestCase.test_modified_task_record_is_
+authority_drift) ... ok
+test_new_uncommitted_pilot_spec_is_authority_drift (test_authority_drift.AuthorityDriftTestCase.test_new_uncommitted_pi
+lot_spec_is_authority_drift) ... ok
+test_non_ascii_path_is_reported_without_escapes (test_authority_drift.AuthorityDriftTestCase.test_non_ascii_path_is_rep
+orted_without_escapes) ... ok
+test_startup_count_matches_status_count (test_authority_drift.AuthorityDriftTestCase.test_startup_count_matches_status_
+count) ... ok
+test_startup_count_zero_on_clean_repository (test_authority_drift.AuthorityDriftTestCase.test_startup_count_zero_on_cle
+an_repository) ... ok
+test_status_clean_repository_reports_empty_drift (test_authority_drift.AuthorityDriftTestCase.test_status_clean_reposit
+ory_reports_empty_drift) ... ok
+test_status_outside_git_repository_reports_null (test_authority_drift.AuthorityDriftTestCase.test_status_outside_git_re
+pository_reports_null) ... ok
+test_status_reports_uncommitted_primary_state (test_authority_drift.AuthorityDriftTestCase.test_status_reports_uncommit
+ted_primary_state) ... ok
+test_supervision_state_outside_owned_dirs_still_counts (test_authority_drift.AuthorityDriftTestCase.test_supervision_st
+ate_outside_owned_dirs_still_counts) ... ok
+test_tasks_and_pilot_outside_git_repository_report_null (test_authority_drift.AuthorityDriftTestCase.test_tasks_and_pil
+ot_outside_git_repository_report_null) ... ok
+test_uncommitted_review_file_is_not_authority_drift (test_authority_drift.AuthorityDriftTestCase.test_uncommitted_revie
+w_file_is_not_authority_drift) ... ok
+test_all_gate_commands_are_present (test_ci_gate.CiGateWorkflowTestCase.test_all_gate_commands_are_present) ... ok
+test_continue_on_error_is_gone_and_status_is_last (test_ci_gate.CiGateWorkflowTestCase.test_continue_on_error_is_gone_a
+nd_status_is_last) ... ok
+test_gate_commands_run_in_order (test_ci_gate.CiGateWorkflowTestCase.test_gate_commands_run_in_order) ... ok
+test_workflow_checks_out_before_setting_up_python (test_ci_gate.CiGateWorkflowTestCase.test_workflow_checks_out_before_
+setting_up_python) ... ok
+test_workflow_exists_and_is_not_empty (test_ci_gate.CiGateWorkflowTestCase.test_workflow_exists_and_is_not_empty) ... o
+k
+test_workflow_requests_read_only_permissions (test_ci_gate.CiGateWorkflowTestCase.test_workflow_requests_read_only_perm
+issions) ... ok
+test_workflow_runs_on_windows_with_python_312 (test_ci_gate.CiGateWorkflowTestCase.test_workflow_runs_on_windows_with_p
+ython_312) ... ok
+test_workflow_triggers_are_all_present (test_ci_gate.CiGateWorkflowTestCase.test_workflow_triggers_are_all_present) ...
+ ok
+test_workflow_uses_tower_dsh_working_directory (test_ci_gate.CiGateWorkflowTestCase.test_workflow_uses_tower_dsh_workin
+g_directory) ... ok
+test_workflow_uses_v7_actions (test_ci_gate.CiGateWorkflowTestCase.test_workflow_uses_v7_actions)
+PILOT-020: the Node.js 20 deprecation notices are gone. ... ok
+test_codeowners_has_default_owner (test_ci_gate.CodeownersTestCase.test_codeowners_has_default_owner) ... ok
+test_merged_is_not_completion_until_post_merge_verified (test_coverage.CompletionGateTestCase.test_merged_is_not_comple
+tion_until_post_merge_verified) ... ok
+test_binding_to_unknown_clause_id_exits_two (test_coverage.CoverageGateTestCase.test_binding_to_unknown_clause_id_exits
+_two) ... ok
+test_binding_to_unknown_test_id_exits_two (test_coverage.CoverageGateTestCase.test_binding_to_unknown_test_id_exits_two
+) ... ok
+test_bindings_and_tests_dir_overrides (test_coverage.CoverageGateTestCase.test_bindings_and_tests_dir_overrides) ... ok
+test_manual_and_owner_clauses_do_not_fail (test_coverage.CoverageGateTestCase.test_manual_and_owner_clauses_do_not_fail
+) ... ok
+test_real_tower_root_is_fully_covered (test_coverage.CoverageGateTestCase.test_real_tower_root_is_fully_covered) ... ok
+test_unbound_tool_check_clause_exits_two (test_coverage.CoverageGateTestCase.test_unbound_tool_check_clause_exits_two) 
+... ok
+test_handoff_activate_requires_acceptance (test_coverage.HandoffInvariantTestCase.test_handoff_activate_requires_accept
+ance) ... ok
+test_handoff_check_detects_multiple_section0_drifts (test_coverage.HandoffInvariantTestCase.test_handoff_check_detects_
+multiple_section0_drifts) ... ok
+test_handoff_check_detects_section0_drift (test_coverage.HandoffInvariantTestCase.test_handoff_check_detects_section0_d
+rift) ... ok
+test_handoff_check_detects_tampered_handoff_and_selfcheck (test_coverage.HandoffInvariantTestCase.test_handoff_check_de
+tects_tampered_handoff_and_selfcheck) ... ok
+test_handoff_check_rejects_tampered_handoff_hash (test_coverage.HandoffInvariantTestCase.test_handoff_check_rejects_tam
+pered_handoff_hash) ... ok
+test_handoff_claim_rejects_source_controller (test_coverage.HandoffInvariantTestCase.test_handoff_claim_rejects_source_
+controller) ... ok
+test_handoff_receipt_and_accept_before_claim_are_rejected (test_coverage.HandoffInvariantTestCase.test_handoff_receipt_
+and_accept_before_claim_are_rejected) ... ok
+test_envelope_check_rejects_extra_files_in_envelope_commit (test_coverage.MergeInvariantTestCase.test_envelope_check_re
+jects_extra_files_in_envelope_commit) ... ok
+test_envelope_check_requires_accepted_task_and_valid_evidence (test_coverage.MergeInvariantTestCase.test_envelope_check
+_requires_accepted_task_and_valid_evidence) ... ok
+test_envelope_check_requires_base_ancestor_of_implementation (test_coverage.MergeInvariantTestCase.test_envelope_check_
+requires_base_ancestor_of_implementation) ... ok
+test_envelope_check_requires_parent_equal_implementation (test_coverage.MergeInvariantTestCase.test_envelope_check_requ
+ires_parent_equal_implementation) ... ok
+test_merge_check_requires_independent_reviewer (test_coverage.MergeInvariantTestCase.test_merge_check_requires_independ
+ent_reviewer) ... ok
+test_accept_requires_pass_review (test_coverage.PolicyInvariantTestCase.test_accept_requires_pass_review) ... ok
+test_envelope_new_requires_accepted_task_and_pass_review (test_coverage.PolicyInvariantTestCase.test_envelope_new_requi
+res_accepted_task_and_pass_review) ... ok
+test_merge_rejects_envelope_not_queued (test_coverage.PolicyInvariantTestCase.test_merge_rejects_envelope_not_queued) .
+.. ok
+test_merge_rejects_supervisor_equal_primary (test_coverage.PolicyInvariantTestCase.test_merge_rejects_supervisor_equal_
+primary) ... ok
+test_every_state_change_writes_ledger_event (test_coverage.TaskInvariantTestCase.test_every_state_change_writes_ledger_
+event) ... ok
+test_state_transitions_reject_skips (test_coverage.TaskInvariantTestCase.test_state_transitions_reject_skips) ... ok
+test_delivery_repairs_legacy_duplicate_ids (test_deliver_ids.DeliverIdsTestCase.test_delivery_repairs_legacy_duplicate_
+ids) ... ok
+test_redelivery_after_content_change_updates_hash_only (test_deliver_ids.DeliverIdsTestCase.test_redelivery_after_conte
+nt_change_updates_hash_only) ... ok
+test_redelivery_mixed_order_keeps_ids_unique_and_delivery_consistent (test_deliver_ids.DeliverIdsTestCase.test_redelive
+ry_mixed_order_keeps_ids_unique_and_delivery_consistent) ... ok
+test_same_path_delivered_twice_keeps_one_id (test_deliver_ids.DeliverIdsTestCase.test_same_path_delivered_twice_keeps_o
+ne_id) ... ok
+test_three_files_in_one_delivery_are_numbered_in_order (test_deliver_ids.DeliverIdsTestCase.test_three_files_in_one_del
+ivery_are_numbered_in_order) ... ok
+test_copied_envelope_identity_is_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_copied_envelope_identit
+y_is_rejected) ... ok
+test_duplicate_queue_add_is_still_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_duplicate_queue_add_is
+_still_rejected) ... ok
+test_forged_queue_add_row_fails_ledger_chain_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_forged_queue_a
+dd_row_fails_ledger_chain_check) ... ok
+test_handwritten_queue_entry_blocks_merge (test_envelope_baseline.EnvelopeBaselineTestCase.test_handwritten_queue_entry
+_blocks_merge) ... ok
+test_handwritten_queue_entry_fails_merge_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_handwritten_queue_
+entry_fails_merge_check) ... ok
+test_identity_check_names_both_ids_when_called_directly (test_envelope_baseline.EnvelopeBaselineTestCase.test_identity_
+check_names_both_ids_when_called_directly) ... ok
+test_invalid_baseline_values_are_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_invalid_baseline_values
+_are_rejected) ... ok
+test_legacy_envelope_without_baselines_still_merge_checks (test_envelope_baseline.EnvelopeBaselineTestCase.test_legacy_
+envelope_without_baselines_still_merge_checks) ... ok
+test_missing_tests_baseline_is_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_missing_tests_baseline_is
+_rejected) ... ok
+test_missing_tower_tests_baseline_is_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_missing_tower_tests
+_baseline_is_rejected) ... ok
+test_queue_add_accepts_envelope_created_by_envelope_new (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add
+_accepts_envelope_created_by_envelope_new) ... ok
+test_queue_add_accepts_handwritten_valid_baselines (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_acce
+pts_handwritten_valid_baselines) ... ok
+test_queue_add_backs_merge_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_backs_merge_check) ...
+ ok
+test_queue_add_rejects_handwritten_missing_tests_baseline (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_a
+dd_rejects_handwritten_missing_tests_baseline) ... ok
+test_queue_add_rejects_handwritten_missing_tower_tests_baseline (test_envelope_baseline.EnvelopeBaselineTestCase.test_q
+ueue_add_rejects_handwritten_missing_tower_tests_baseline) ... ok
+test_queue_add_repair_still_requires_baselines (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_repair_s
+till_requires_baselines) ... ok
+test_queue_add_repairs_half_written_queue_entry (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_repairs
+_half_written_queue_entry) ... ok
+test_queue_add_without_envelope_new_fails_merge_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_w
+ithout_envelope_new_fails_merge_check) ... ok
+test_valid_baselines_create_draft_and_ledger_event (test_envelope_baseline.EnvelopeBaselineTestCase.test_valid_baseline
+s_create_draft_and_ledger_event) ... ok
+test_accept_rejects_evidence_hash_mismatch (test_gates.TowerGateTestCase.test_accept_rejects_evidence_hash_mismatch) ..
+. ok
+test_accept_rejects_missing_evidence (test_gates.TowerGateTestCase.test_accept_rejects_missing_evidence) ... ok
+test_accept_then_close_happy_path (test_gates.TowerGateTestCase.test_accept_then_close_happy_path) ... ok
+test_check_ready_rejects_legacy_card_without_spec_path (test_gates.TowerGateTestCase.test_check_ready_rejects_legacy_ca
+rd_without_spec_path) ... ok
+test_check_ready_rejects_spec_changed_after_gate_pass (test_gates.TowerGateTestCase.test_check_ready_rejects_spec_chang
+ed_after_gate_pass) ... ok
+test_check_review_rejects_empty_reviewer (test_gates.TowerGateTestCase.test_check_review_rejects_empty_reviewer) ... ok
+test_check_spec_passes_and_records_gate_for_valid_spec (test_gates.TowerGateTestCase.test_check_spec_passes_and_records
+_gate_for_valid_spec) ... ok
+test_check_spec_rejects_legacy_card_without_spec_path (test_gates.TowerGateTestCase.test_check_spec_rejects_legacy_card
+_without_spec_path) ... ok
+test_checkback_normalizes_reviewer (test_gates.TowerGateTestCase.test_checkback_normalizes_reviewer) ... ok
+test_checkback_rejects_reviewer_equal_to_executor (test_gates.TowerGateTestCase.test_checkback_rejects_reviewer_equal_t
+o_executor) ... ok
+test_checkback_rejects_whitespace_only_reviewer (test_gates.TowerGateTestCase.test_checkback_rejects_whitespace_only_re
+viewer) ... ok
+test_close_rejects_evidence_hash_mismatch (test_gates.TowerGateTestCase.test_close_rejects_evidence_hash_mismatch) ... 
+ok
+test_close_rejects_missing_task_md (test_gates.TowerGateTestCase.test_close_rejects_missing_task_md) ... ok
+test_dispatch_rejects_legacy_card_without_spec_path (test_gates.TowerGateTestCase.test_dispatch_rejects_legacy_card_wit
+hout_spec_path) ... ok
+test_dispatch_rejects_missing_spec_gate (test_gates.TowerGateTestCase.test_dispatch_rejects_missing_spec_gate) ... ok
+test_dispatch_rejects_missing_task_md (test_gates.TowerGateTestCase.test_dispatch_rejects_missing_task_md) ... ok
+test_dispatch_rejects_spec_changed_after_task_new (test_gates.TowerGateTestCase.test_dispatch_rejects_spec_changed_afte
+r_task_new) ... ok
+test_dispatch_succeeds_when_spec_gate_is_fresh (test_gates.TowerGateTestCase.test_dispatch_succeeds_when_spec_gate_is_f
+resh) ... ok
+test_merge_rejects_current_branch_not_envelope_base (test_gates.TowerGateTestCase.test_merge_rejects_current_branch_not
+_envelope_base) ... ok
+test_merge_rejects_queue_entry_not_waiting (test_gates.TowerGateTestCase.test_merge_rejects_queue_entry_not_waiting) ..
+. ok
+test_run_cli_passes_git_identity (test_git_config_isolation.CoverageRunCliIdentityTestCase.test_run_cli_passes_git_iden
+tity) ... ok
+test_run_cli_passes_git_identity (test_git_config_isolation.Hardening2RunCliIdentityTestCase.test_run_cli_passes_git_id
+entity) ... ok
+test_default_envelope_uses_newest_added (test_handoff_generic.HandoffGenericTestCase.test_default_envelope_uses_newest_
+added) ... ok
+test_default_task_uses_newest_open_task (test_handoff_generic.HandoffGenericTestCase.test_default_task_uses_newest_open
+_task) ... ok
+test_default_task_uses_single_open_task (test_handoff_generic.HandoffGenericTestCase.test_default_task_uses_single_open
+_task) ... ok
+test_explicit_envelope_is_selected (test_handoff_generic.HandoffGenericTestCase.test_explicit_envelope_is_selected) ...
+ ok
+test_explicit_task_drives_sections_0_3_4_7 (test_handoff_generic.HandoffGenericTestCase.test_explicit_task_drives_secti
+ons_0_3_4_7) ... ok
+test_explicit_unknown_envelope_fails (test_handoff_generic.HandoffGenericTestCase.test_explicit_unknown_envelope_fails)
+ ... ok
+test_generated_package_passes_handoff_check (test_handoff_generic.HandoffGenericTestCase.test_generated_package_passes_
+handoff_check) ... ok
+test_handoff_check_uses_package_task_and_envelope (test_handoff_generic.HandoffGenericTestCase.test_handoff_check_uses_
+package_task_and_envelope) ... ok
+test_legacy_package_matches_task_by_evidence_hashes (test_handoff_generic.HandoffGenericTestCase.test_legacy_package_ma
+tches_task_by_evidence_hashes) ... ok
+test_missing_git_paths_yield_empty_hashes (test_handoff_generic.HandoffGenericTestCase.test_missing_git_paths_yield_emp
+ty_hashes) ... ok
+test_profile_worktree_is_not_reused_for_another_task (test_handoff_generic.HandoffGenericTestCase.test_profile_worktree
+_is_not_reused_for_another_task) ... ok
+test_section1_reflects_live_state_without_phase2_text (test_handoff_generic.HandoffGenericTestCase.test_section1_reflec
+ts_live_state_without_phase2_text) ... ok
+test_section4_lists_all_open_tasks (test_handoff_generic.HandoffGenericTestCase.test_section4_lists_all_open_tasks) ...
+ ok
+test_section4_reports_no_open_tasks (test_handoff_generic.HandoffGenericTestCase.test_section4_reports_no_open_tasks) .
+.. ok
+test_normal_contention_is_not_an_immediate_timeout (test_hardening2.LedgerLockDeadlineTestCase.test_normal_contention_i
+s_not_an_immediate_timeout) ... ok
+test_persistent_permission_error_without_lock_hits_deadline (test_hardening2.LedgerLockDeadlineTestCase.test_persistent
+_permission_error_without_lock_hits_deadline) ... ok
+test_close_closeout_has_no_not_performed (test_hardening2.PathSafetyTestCase.test_close_closeout_has_no_not_performed) 
+... ok
+test_deliver_accepts_evidence_inside_root (test_hardening2.PathSafetyTestCase.test_deliver_accepts_evidence_inside_root
+) ... ok
+test_deliver_rejects_evidence_outside_root (test_hardening2.PathSafetyTestCase.test_deliver_rejects_evidence_outside_ro
+ot) ... ok
+test_dispatch_accepts_worktree_inside_root (test_hardening2.PathSafetyTestCase.test_dispatch_accepts_worktree_inside_ro
+ot) ... ok
+test_dispatch_rejects_worktree_outside_root (test_hardening2.PathSafetyTestCase.test_dispatch_rejects_worktree_outside_
+root) ... ok
+test_envelope_id_traversal_is_rejected (test_hardening2.PathSafetyTestCase.test_envelope_id_traversal_is_rejected) ... 
+ok
+test_envelope_new_rejects_file_outside_root (test_hardening2.PathSafetyTestCase.test_envelope_new_rejects_file_outside_
+root) ... ok
+test_envelope_new_rejects_task_traversal (test_hardening2.PathSafetyTestCase.test_envelope_new_rejects_task_traversal) 
+... ok
+test_envelope_repository_outside_parent_is_rejected (test_hardening2.PathSafetyTestCase.test_envelope_repository_outsid
+e_parent_is_rejected) ... ok
+test_envelope_repository_parent_is_allowed (test_hardening2.PathSafetyTestCase.test_envelope_repository_parent_is_allow
+ed) ... ok
+test_evidence_path_under_pilot_worktrees_is_accepted (test_hardening2.PathSafetyTestCase.test_evidence_path_under_pilot
+_worktrees_is_accepted) ... ok
+test_handoff_package_traversal_is_rejected (test_hardening2.PathSafetyTestCase.test_handoff_package_traversal_is_reject
+ed) ... ok
+test_merge_check_missing_record_emits_single_json_object (test_hardening2.PathSafetyTestCase.test_merge_check_missing_r
+ecord_emits_single_json_object) ... ok
+test_package_id_with_dotdot_segment_is_rejected (test_hardening2.PathSafetyTestCase.test_package_id_with_dotdot_segment
+_is_rejected) ... ok
+test_task_id_traversal_is_rejected (test_hardening2.PathSafetyTestCase.test_task_id_traversal_is_rejected) ... ok
+test_task_new_rejects_spec_outside_root (test_hardening2.PathSafetyTestCase.test_task_new_rejects_spec_outside_root) ..
+. ok
+test_task_new_rejects_worktree_outside_root (test_hardening2.PathSafetyTestCase.test_task_new_rejects_worktree_outside_
+root) ... ok
+test_post_merge_success_writes_merge_md (test_hardening2.PostMergeArtifactTestCase.test_post_merge_success_writes_merge
+_md) ... ok
+test_concurrent_appends_keep_sequence_and_chain (test_ledger_chain.LedgerChainTestCase.test_concurrent_appends_keep_seq
+uence_and_chain) ... ok
+test_deleted_row_breaks_seq_continuity (test_ledger_chain.LedgerChainTestCase.test_deleted_row_breaks_seq_continuity) .
+.. ok
+test_held_lock_times_out (test_ledger_chain.LedgerChainTestCase.test_held_lock_times_out) ... ok
+test_legacy_prefix_is_counted_and_chained (test_ledger_chain.LedgerChainTestCase.test_legacy_prefix_is_counted_and_chai
+ned) ... ok
+test_new_events_carry_valid_hash_chain (test_ledger_chain.LedgerChainTestCase.test_new_events_carry_valid_hash_chain) .
+.. ok
+test_stale_lock_is_cleared (test_ledger_chain.LedgerChainTestCase.test_stale_lock_is_cleared) ... warning: removed stal
+e ledger lock C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-035\tower-dsh\.
+test-tmp\run-20261023-164549-40712\towerctl-ledger-t8tbvmgr\ledger\.lock
+ok
+test_supervision_ledger_chains (test_ledger_chain.LedgerChainTestCase.test_supervision_ledger_chains) ... ok
+test_tampered_hash_is_detected (test_ledger_chain.LedgerChainTestCase.test_tampered_hash_is_detected) ... ok
+test_tampered_payload_is_detected (test_ledger_chain.LedgerChainTestCase.test_tampered_payload_is_detected) ... ok
+test_tampered_prev_hash_is_detected (test_ledger_chain.LedgerChainTestCase.test_tampered_prev_hash_is_detected) ... ok
+test_unhashed_row_after_chain_start_is_detected (test_ledger_chain.LedgerChainTestCase.test_unhashed_row_after_chain_st
+art_is_detected) ... ok
+test_held_lock_still_times_out (test_ledger_lock_windows.LedgerLockWindowsTestCase.test_held_lock_still_times_out) ... 
+ok
+test_large_batch_160_appends_keeps_chain (test_ledger_lock_windows.LedgerLockWindowsTestCase.test_large_batch_160_appen
+ds_keeps_chain) ... ok
+test_lock_helpers_tolerate_windows_oserrors (test_ledger_lock_windows.LedgerLockWindowsTestCase.test_lock_helpers_toler
+ate_windows_oserrors) ... ok
+test_posix_permission_error_is_not_swallowed (test_ledger_lock_windows.LedgerLockWindowsTestCase.test_posix_permission_
+error_is_not_swallowed) ... ok
+test_stale_lock_is_cleared_and_write_succeeds (test_ledger_lock_windows.LedgerLockWindowsTestCase.test_stale_lock_is_cl
+eared_and_write_succeeds) ... warning: removed stale ledger lock C:\Users\mac\Documents\deepseek-harness\default-worksp
+ace\tower-dsh\pilot\worktrees\PILOT-035\tower-dsh\.test-tmp\run-20261023-164549-40712\towerctl-lock-win-12mdwwtt\ledger
+\.lock
+ok
+test_stress_20_rounds_of_concurrent_appends (test_ledger_lock_windows.LedgerLockWindowsTestCase.test_stress_20_rounds_o
+f_concurrent_appends) ... ok
+test_windows_permission_error_is_treated_as_contention (test_ledger_lock_windows.LedgerLockWindowsTestCase.test_windows
+_permission_error_is_treated_as_contention) ... ok
+test_bare_no_checks_substring_blocks_immediately (test_merge_pr_mode.PrMergeTestCase.test_bare_no_checks_substring_bloc
+ks_immediately) ... ok
+test_check_timeout_blocks_with_timeout_reason (test_merge_pr_mode.PrMergeTestCase.test_check_timeout_blocks_with_timeou
+t_reason) ... ok
+test_create_has_no_json_flag_and_number_comes_from_url (test_merge_pr_mode.PrMergeTestCase.test_create_has_no_json_flag
+_and_number_comes_from_url) ... ok
+test_existing_pr_falls_back_to_pr_view (test_merge_pr_mode.PrMergeTestCase.test_existing_pr_falls_back_to_pr_view) ... 
+ok
+test_failing_checks_block_with_correction_required (test_merge_pr_mode.PrMergeTestCase.test_failing_checks_block_with_c
+orrection_required) ... ok
+test_ff_failure_preserves_pr_state_and_retry_is_idempotent (test_merge_pr_mode.PrMergeTestCase.test_ff_failure_preserve
+s_pr_state_and_retry_is_idempotent) ... ok
+test_keyword_free_check_failure_blocks_immediately (test_merge_pr_mode.PrMergeTestCase.test_keyword_free_check_failure_
+blocks_immediately) ... ok
+test_local_mode_keeps_local_merge (test_merge_pr_mode.PrMergeTestCase.test_local_mode_keeps_local_merge) ... ok
+test_missing_checks_phrase_is_still_retried (test_merge_pr_mode.PrMergeTestCase.test_missing_checks_phrase_is_still_ret
+ried) ... ok
+test_missing_gh_executable_fails_with_hint (test_merge_pr_mode.PrMergeTestCase.test_missing_gh_executable_fails_with_hi
+nt) ... ok
+test_mode_defaults_to_local (test_merge_pr_mode.PrMergeTestCase.test_mode_defaults_to_local) ... ok
+test_no_checks_registration_deadline_is_bounded (test_merge_pr_mode.PrMergeTestCase.test_no_checks_registration_deadlin
+e_is_bounded) ... ok
+test_no_checks_registration_is_retried_until_green (test_merge_pr_mode.PrMergeTestCase.test_no_checks_registration_is_r
+etried_until_green) ... ok
+test_non_executable_gh_target_fails_without_merging (test_merge_pr_mode.PrMergeTestCase.test_non_executable_gh_target_f
+ails_without_merging) ... ok
+test_pending_exit_code_is_retried_until_green (test_merge_pr_mode.PrMergeTestCase.test_pending_exit_code_is_retried_unt
+il_green) ... ok
+test_pr_mode_merges_and_records_pr_metadata (test_merge_pr_mode.PrMergeTestCase.test_pr_mode_merges_and_records_pr_meta
+data) ... ok
+test_push_failure_blocks_without_touching_gh (test_merge_pr_mode.PrMergeTestCase.test_push_failure_blocks_without_touch
+ing_gh) ... ok
+test_real_check_failure_is_not_retried_away (test_merge_pr_mode.PrMergeTestCase.test_real_check_failure_is_not_retried_
+away) ... ok
+test_unauthenticated_gh_blocks_before_merging (test_merge_pr_mode.PrMergeTestCase.test_unauthenticated_gh_blocks_before
+_merging) ... ok
+test_environment_forces_cp1252_stdio (test_output_encoding.OutputEncodingTestCase.test_environment_forces_cp1252_stdio)
+Guards the other tests: without this they could pass vacuously. ... ok
+test_startup_output_is_utf8_json_with_chinese_title (test_output_encoding.OutputEncodingTestCase.test_startup_output_is
+_utf8_json_with_chinese_title) ... ok
+test_startup_survives_cp1252_console (test_output_encoding.OutputEncodingTestCase.test_startup_survives_cp1252_console)
+ ... ok
+test_status_output_is_utf8_json_with_chinese_title (test_output_encoding.OutputEncodingTestCase.test_status_output_is_u
+tf8_json_with_chinese_title) ... ok
+test_status_survives_cp1252_console (test_output_encoding.OutputEncodingTestCase.test_status_survives_cp1252_console) .
+.. ok
+test_bare_towerctl_is_accepted (test_policy_lint.PolicyLintTestCase.test_bare_towerctl_is_accepted) ... ok
+test_duplicate_failure_id_fails (test_policy_lint.PolicyLintTestCase.test_duplicate_failure_id_fails) ... ok
+test_empty_judgment_method_fails (test_policy_lint.PolicyLintTestCase.test_empty_judgment_method_fails) ... ok
+test_invalid_clause_enforcement_fails (test_policy_lint.PolicyLintTestCase.test_invalid_clause_enforcement_fails) ... o
+k
+test_invalid_clause_level_fails (test_policy_lint.PolicyLintTestCase.test_invalid_clause_level_fails) ... ok
+test_invalid_policy_id_fails (test_policy_lint.PolicyLintTestCase.test_invalid_policy_id_fails) ... ok
+test_missing_clause_id_fails (test_policy_lint.PolicyLintTestCase.test_missing_clause_id_fails) ... ok
+test_missing_policy_section_fails (test_policy_lint.PolicyLintTestCase.test_missing_policy_section_fails) ... ok
+test_real_tower_root_lints_six_documents (test_policy_lint.PolicyLintTestCase.test_real_tower_root_lints_six_documents)
+ ... ok
+test_real_tower_root_strict_passes (test_policy_lint.PolicyLintTestCase.test_real_tower_root_strict_passes) ... ok
+test_strict_bare_pipe_column_mismatch_fails (test_policy_lint.PolicyLintTestCase.test_strict_bare_pipe_column_mismatch_
+fails) ... ok
+test_strict_chinese_command_text_passes (test_policy_lint.PolicyLintTestCase.test_strict_chinese_command_text_passes) .
+.. ok
+test_strict_duplicate_section_number_fails (test_policy_lint.PolicyLintTestCase.test_strict_duplicate_section_number_fa
+ils) ... ok
+test_strict_fixtures_pass_without_strict (test_policy_lint.PolicyLintTestCase.test_strict_fixtures_pass_without_strict)
+ ... ok
+test_strict_plain_text_command_fails (test_policy_lint.PolicyLintTestCase.test_strict_plain_text_command_fails) ... ok
+test_strict_table_interrupted_by_blank_line_fails (test_policy_lint.PolicyLintTestCase.test_strict_table_interrupted_by
+_blank_line_fails) ... ok
+test_towerctl_subcommand_is_accepted (test_policy_lint.PolicyLintTestCase.test_towerctl_subcommand_is_accepted) ... ok
+test_valid_policy_passes (test_policy_lint.PolicyLintTestCase.test_valid_policy_passes) ... ok
+test_anchor_allows_baseline_above_last_verified (test_post_merge.PostMergeTestCase.test_anchor_allows_baseline_above_la
+st_verified) ... ok
+test_anchor_allows_baseline_equal_to_last_verified (test_post_merge.PostMergeTestCase.test_anchor_allows_baseline_equal
+_to_last_verified) ... ok
+test_anchor_blocks_baseline_below_last_verified (test_post_merge.PostMergeTestCase.test_anchor_blocks_baseline_below_la
+st_verified) ... ok
+test_anchor_check_absent_without_verified_history (test_post_merge.PostMergeTestCase.test_anchor_check_absent_without_v
+erified_history) ... ok
+test_anchor_ignores_invalid_counts_and_broken_rows (test_post_merge.PostMergeTestCase.test_anchor_ignores_invalid_count
+s_and_broken_rows) ... ok
+test_anchor_uses_max_of_multiple_verified_events (test_post_merge.PostMergeTestCase.test_anchor_uses_max_of_multiple_ve
+rified_events) ... ok
+test_count_gate_fails_when_suite_is_below_baseline (test_post_merge.PostMergeTestCase.test_count_gate_fails_when_suite_
+is_below_baseline) ... ok
+test_count_gate_passes_when_baseline_met (test_post_merge.PostMergeTestCase.test_count_gate_passes_when_baseline_met) .
+.. ok
+test_fail_is_retryable_after_correction (test_post_merge.PostMergeTestCase.test_fail_is_retryable_after_correction) ...
+ ok
+test_failure_appends_ledger_event (test_post_merge.PostMergeTestCase.test_failure_appends_ledger_event) ... ok
+test_legacy_envelope_fails_when_no_tests_remain (test_post_merge.PostMergeTestCase.test_legacy_envelope_fails_when_no_t
+ests_remain) ... ok
+test_legacy_envelope_without_baseline_passes (test_post_merge.PostMergeTestCase.test_legacy_envelope_without_baseline_p
+asses) ... ok
+test_legacy_envelope_without_tower_baseline_skips_gate (test_post_merge.PostMergeTestCase.test_legacy_envelope_without_
+tower_baseline_skips_gate) ... ok
+test_parse_test_count_unit_cases (test_post_merge.PostMergeTestCase.test_parse_test_count_unit_cases) ... ok
+test_preexisting_review_file_does_not_fail_clean_check (test_post_merge.PostMergeTestCase.test_preexisting_review_file_
+does_not_fail_clean_check) ... ok
+test_rejects_envelope_that_was_never_merged (test_post_merge.PostMergeTestCase.test_rejects_envelope_that_was_never_mer
+ged) ... ok
+test_success_appends_ledger_event (test_post_merge.PostMergeTestCase.test_success_appends_ledger_event) ... ok
+test_tower_count_gate_fails_when_suite_exits_nonzero (test_post_merge.PostMergeTestCase.test_tower_count_gate_fails_whe
+n_suite_exits_nonzero) ... ok
+test_tower_count_gate_fails_when_suite_is_below_baseline (test_post_merge.PostMergeTestCase.test_tower_count_gate_fails
+_when_suite_is_below_baseline) ... ok
+test_tower_count_gate_fails_when_tools_tests_missing (test_post_merge.PostMergeTestCase.test_tower_count_gate_fails_whe
+n_tools_tests_missing) ... ok
+test_tower_count_gate_passes_when_baseline_met (test_post_merge.PostMergeTestCase.test_tower_count_gate_passes_when_bas
+eline_met) ... ok
+test_unrelated_dirty_file_still_blocks (test_post_merge.PostMergeTestCase.test_unrelated_dirty_file_still_blocks) ... o
+k
+test_tower_test_tmp_printed_before_child_output (test_run_tests.BannerOrdering.test_tower_test_tmp_printed_before_child
+_output) ... ok
+test_default_suite_resolves_inside_tower_root (test_run_tests.Defaults.test_default_suite_resolves_inside_tower_root) .
+.. ok
+test_test_tmp_is_gitignored (test_run_tests.GitIgnore.test_test_tmp_is_gitignored) ... ok
+test_external_suite_pattern_selects_exactly_one_test (test_run_tests.TmpSandbox.test_external_suite_pattern_selects_exa
+ctly_one_test)
+--suite outside tools/tests + --pattern filters to one green test. ... ok
+test_failing_suite_returns_non_zero (test_run_tests.TmpSandbox.test_failing_suite_returns_non_zero) ... ok
+test_runner_sets_repo_local_tmp_env (test_run_tests.TmpSandbox.test_runner_sets_repo_local_tmp_env)
+Default tmp-root lives in the tower root; the child sees it as TMP. ... ok
+test_bad_file_does_not_block_good_file (test_spec_lint.SpecLintTestCase.test_bad_file_does_not_block_good_file) ... ok
+test_duplicate_state_fails (test_spec_lint.SpecLintTestCase.test_duplicate_state_fails) ... ok
+test_duplicate_transition_id_fails (test_spec_lint.SpecLintTestCase.test_duplicate_transition_id_fails) ... ok
+test_invalid_enforcement_fails (test_spec_lint.SpecLintTestCase.test_invalid_enforcement_fails) ... ok
+test_invalid_id_fails (test_spec_lint.SpecLintTestCase.test_invalid_id_fails) ... ok
+test_missing_front_matter_fails (test_spec_lint.SpecLintTestCase.test_missing_front_matter_fails) ... ok
+test_missing_section_fails (test_spec_lint.SpecLintTestCase.test_missing_section_fails) ... ok
+test_missing_specs_directory_fails (test_spec_lint.SpecLintTestCase.test_missing_specs_directory_fails) ... ok
+test_non_backtick_command_text_is_skipped (test_spec_lint.SpecLintTestCase.test_non_backtick_command_text_is_skipped) .
+.. ok
+test_real_specs_directory_passes (test_spec_lint.SpecLintTestCase.test_real_specs_directory_passes) ... ok
+test_transition_undeclared_state_fails (test_spec_lint.SpecLintTestCase.test_transition_undeclared_state_fails) ... ok
+test_unknown_command_fails (test_spec_lint.SpecLintTestCase.test_unknown_command_fails) ... ok
+test_unreachable_state_fails (test_spec_lint.SpecLintTestCase.test_unreachable_state_fails) ... ok
+test_absent_empty_or_non_list_evidence_is_ignored (test_state_verify.StateVerifyTestCase.test_absent_empty_or_non_list_
+evidence_is_ignored) ... ok
+test_accept_without_reviewed_checkback_is_illegal (test_state_verify.StateVerifyTestCase.test_accept_without_reviewed_c
+heckback_is_illegal) ... ok
+test_board_status_drift_is_reported (test_state_verify.StateVerifyTestCase.test_board_status_drift_is_reported) ... ok
+test_broken_board_is_one_board_unreadable (test_state_verify.StateVerifyTestCase.test_broken_board_is_one_board_unreada
+ble) ... ok
+test_broken_envelope_is_envelope_unreadable (test_state_verify.StateVerifyTestCase.test_broken_envelope_is_envelope_unr
+eadable) ... ok
+test_broken_ledger_reports_errors_without_replay (test_state_verify.StateVerifyTestCase.test_broken_ledger_reports_erro
+rs_without_replay) ... ok
+test_broken_queue_is_one_queue_unreadable (test_state_verify.StateVerifyTestCase.test_broken_queue_is_one_queue_unreada
+ble) ... ok
+test_broken_record_is_record_unreadable (test_state_verify.StateVerifyTestCase.test_broken_record_is_record_unreadable)
+ ... ok
+test_checkback_fail_replays_rework_not_accepted (test_state_verify.StateVerifyTestCase.test_checkback_fail_replays_rewo
+rk_not_accepted) ... ok
+test_clean_evidence_and_spec_exit_zero (test_state_verify.StateVerifyTestCase.test_clean_evidence_and_spec_exit_zero) .
+.. ok
+test_clean_tower_has_no_illegal_transition (test_state_verify.StateVerifyTestCase.test_clean_tower_has_no_illegal_trans
+ition) ... ok
+test_closeout_after_task_new_is_illegal_transition (test_state_verify.StateVerifyTestCase.test_closeout_after_task_new_
+is_illegal_transition) ... ok
+test_consistent_tower_exits_zero (test_state_verify.StateVerifyTestCase.test_consistent_tower_exits_zero) ... ok
+test_correction_events_fold_and_merge_start_is_ignored (test_state_verify.StateVerifyTestCase.test_correction_events_fo
+ld_and_merge_start_is_ignored) ... ok
+test_correction_retry_transitions_are_legal (test_state_verify.StateVerifyTestCase.test_correction_retry_transitions_ar
+e_legal) ... ok
+test_deleted_board_is_one_board_unreadable (test_state_verify.StateVerifyTestCase.test_deleted_board_is_one_board_unrea
+dable) ... ok
+test_deleted_envelope_is_envelope_missing (test_state_verify.StateVerifyTestCase.test_deleted_envelope_is_envelope_miss
+ing) ... ok
+test_deleted_queue_is_one_queue_unreadable (test_state_verify.StateVerifyTestCase.test_deleted_queue_is_one_queue_unrea
+dable) ... ok
+test_deleted_record_is_record_missing (test_state_verify.StateVerifyTestCase.test_deleted_record_is_record_missing) ...
+ ok
+test_entities_without_events_or_files_are_reported (test_state_verify.StateVerifyTestCase.test_entities_without_events_
+or_files_are_reported) ... ok
+test_envelope_status_drift_is_reported (test_state_verify.StateVerifyTestCase.test_envelope_status_drift_is_reported) .
+.. ok
+test_escape_path_never_touches_filesystem (test_state_verify.StateVerifyTestCase.test_escape_path_never_touches_filesys
+tem) ... ok
+test_evidence_absolute_path_outside_is_escape (test_state_verify.StateVerifyTestCase.test_evidence_absolute_path_outsid
+e_is_escape) ... ok
+test_evidence_and_spec_verify_never_writes (test_state_verify.StateVerifyTestCase.test_evidence_and_spec_verify_never_w
+rites) ... ok
+test_evidence_content_rewritten_same_length_is_hash_mismatch (test_state_verify.StateVerifyTestCase.test_evidence_conte
+nt_rewritten_same_length_is_hash_mismatch) ... ok
+test_evidence_drift_sorted_by_kind_target_path (test_state_verify.StateVerifyTestCase.test_evidence_drift_sorted_by_kin
+d_target_path) ... ok
+test_evidence_entry_without_path_is_unreadable (test_state_verify.StateVerifyTestCase.test_evidence_entry_without_path_
+is_unreadable) ... ok
+test_evidence_file_deleted_is_missing (test_state_verify.StateVerifyTestCase.test_evidence_file_deleted_is_missing) ...
+ ok
+test_evidence_path_escape_is_not_opened (test_state_verify.StateVerifyTestCase.test_evidence_path_escape_is_not_opened)
+ ... ok
+test_first_task_new_from_none_is_legal (test_state_verify.StateVerifyTestCase.test_first_task_new_from_none_is_legal) .
+.. ok
+test_hash_and_bytes_drift_can_both_be_reported (test_state_verify.StateVerifyTestCase.test_hash_and_bytes_drift_can_bot
+h_be_reported) ... ok
+test_invalid_sha256_evidence_entry_is_unreadable (test_state_verify.StateVerifyTestCase.test_invalid_sha256_evidence_en
+try_is_unreadable) ... ok
+test_ledger_has_queue_add_ignores_malformed_rows (test_state_verify.StateVerifyTestCase.test_ledger_has_queue_add_ignor
+es_malformed_rows) ... ok
+test_merge_without_merge_start_is_illegal (test_state_verify.StateVerifyTestCase.test_merge_without_merge_start_is_ille
+gal) ... ok
+test_mixed_ledger_reports_only_the_completed_reset (test_state_verify.StateVerifyTestCase.test_mixed_ledger_reports_onl
+y_the_completed_reset) ... ok
+test_non_dict_evidence_entry_is_unreadable (test_state_verify.StateVerifyTestCase.test_non_dict_evidence_entry_is_unrea
+dable) ... ok
+test_nul_byte_evidence_path_is_unreadable_not_crash (test_state_verify.StateVerifyTestCase.test_nul_byte_evidence_path_
+is_unreadable_not_crash) ... ok
+test_nul_byte_spec_path_is_unreadable_not_crash (test_state_verify.StateVerifyTestCase.test_nul_byte_spec_path_is_unrea
+dable_not_crash) ... ok
+test_post_merge_verified_from_waiting_is_illegal (test_state_verify.StateVerifyTestCase.test_post_merge_verified_from_w
+aiting_is_illegal) ... ok
+test_queue_status_drift_is_reported (test_state_verify.StateVerifyTestCase.test_queue_status_drift_is_reported) ... ok
+test_record_and_board_same_wrong_value_report_both (test_state_verify.StateVerifyTestCase.test_record_and_board_same_wr
+ong_value_report_both) ... ok
+test_record_bytes_only_changed_is_bytes_mismatch (test_state_verify.StateVerifyTestCase.test_record_bytes_only_changed_
+is_bytes_mismatch) ... ok
+test_record_sha256_only_changed_is_hash_mismatch (test_state_verify.StateVerifyTestCase.test_record_sha256_only_changed
+_is_hash_mismatch) ... ok
+test_record_status_drift_is_reported (test_state_verify.StateVerifyTestCase.test_record_status_drift_is_reported) ... o
+k
+test_redelivery_from_delivered_is_legal (test_state_verify.StateVerifyTestCase.test_redelivery_from_delivered_is_legal)
+ ... ok
+test_skipped_reports_no_events_and_missing_rows (test_state_verify.StateVerifyTestCase.test_skipped_reports_no_events_a
+nd_missing_rows) ... ok
+test_spec_checked_only_when_both_fields_exist (test_state_verify.StateVerifyTestCase.test_spec_checked_only_when_both_f
+ields_exist) ... ok
+test_spec_deleted_is_spec_missing (test_state_verify.StateVerifyTestCase.test_spec_deleted_is_spec_missing) ... ok
+test_spec_modified_is_hash_mismatch (test_state_verify.StateVerifyTestCase.test_spec_modified_is_hash_mismatch) ... ok
+test_spec_path_escape_is_not_opened (test_state_verify.StateVerifyTestCase.test_spec_path_escape_is_not_opened) ... ok
+test_state_verify_never_writes (test_state_verify.StateVerifyTestCase.test_state_verify_never_writes) ... ok
+test_state_verify_never_writes_with_bad_files (test_state_verify.StateVerifyTestCase.test_state_verify_never_writes_wit
+h_bad_files) ... ok
+test_symlink_escape_is_reported_without_hashing (test_state_verify.StateVerifyTestCase.test_symlink_escape_is_reported_
+without_hashing) ... skipped "platform refuses symlink creation: [WinError 1314] �ͻ���û���������Ȩ��: 'C:\\\\Users\\\\ma
+c\\\\Documents\\\\deepseek-harness\\\\default-workspace\\\\tower-dsh\\\\pilot\\\\worktrees\\\\PILOT-035\\\\tower-dsh\\\
+\.test-tmp\\\\run-20261023-164549-40712\\\\towerctl-state-verify-3u4n80py-symlink-bait.txt' -> 'C:\\\\Users\\\\mac\\\\D
+ocuments\\\\deepseek-harness\\\\default-workspace\\\\tower-dsh\\\\pilot\\\\worktrees\\\\PILOT-035\\\\tower-dsh\\\\.test
+-tmp\\\\run-20261023-164549-40712\\\\towerctl-state-verify-3u4n80py\\\\tasks\\\\T-001\\\\evidence\\\\link.txt'"
+test_task_new_from_accepted_is_illegal (test_state_verify.StateVerifyTestCase.test_task_new_from_accepted_is_illegal) .
+.. ok
+test_task_new_from_closed_is_illegal (test_state_verify.StateVerifyTestCase.test_task_new_from_closed_is_illegal) ... o
+k
+test_task_new_rebuild_from_dispatched_is_legal (test_state_verify.StateVerifyTestCase.test_task_new_rebuild_from_dispat
+ched_is_legal) ... ok
+test_task_without_events_stays_skipped (test_state_verify.StateVerifyTestCase.test_task_without_events_stays_skipped) .
+.. ok
+test_unbacked_queue_and_envelope_are_reported_separately (test_state_verify.StateVerifyTestCase.test_unbacked_queue_and
+_envelope_are_reported_separately) ... ok
+test_unknown_event_types_are_ignored (test_state_verify.StateVerifyTestCase.test_unknown_event_types_are_ignored) ... o
+k
+
+----------------------------------------------------------------------
+Ran 293 tests in 114.351s
+
+OK (skipped=1)

@@ -1,0 +1,77 @@
+TOWER_TEST_TMP=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-035\evidence\old-code\.test-tmp\run-20261023-164854-74444
+python : test_copied_envelope_identity_is_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_copied_envelop
+e_identity_is_rejected) ... ok
+所在位置 行:1 字符: 129
++ ... ew($false); python -B tools/run_tests.py --pattern test_envelope_base ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (test_copied_env...ejected) ... ok:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+test_duplicate_queue_add_is_still_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_duplicate_queue_add_is
+_still_rejected) ... ok
+test_forged_queue_add_row_fails_ledger_chain_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_forged_queue_a
+dd_row_fails_ledger_chain_check) ... ok
+test_handwritten_queue_entry_blocks_merge (test_envelope_baseline.EnvelopeBaselineTestCase.test_handwritten_queue_entry
+_blocks_merge) ... ok
+test_handwritten_queue_entry_fails_merge_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_handwritten_queue_
+entry_fails_merge_check) ... ok
+test_identity_check_names_both_ids_when_called_directly (test_envelope_baseline.EnvelopeBaselineTestCase.test_identity_
+check_names_both_ids_when_called_directly) ... ok
+test_invalid_baseline_values_are_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_invalid_baseline_values
+_are_rejected) ... ok
+test_legacy_envelope_without_baselines_still_merge_checks (test_envelope_baseline.EnvelopeBaselineTestCase.test_legacy_
+envelope_without_baselines_still_merge_checks) ... ok
+test_missing_tests_baseline_is_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_missing_tests_baseline_is
+_rejected) ... ok
+test_missing_tower_tests_baseline_is_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_missing_tower_tests
+_baseline_is_rejected) ... ok
+test_queue_add_accepts_envelope_created_by_envelope_new (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add
+_accepts_envelope_created_by_envelope_new) ... ok
+test_queue_add_accepts_handwritten_valid_baselines (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_acce
+pts_handwritten_valid_baselines) ... ok
+test_queue_add_backs_merge_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_backs_merge_check) ...
+ ok
+test_queue_add_rejects_handwritten_missing_tests_baseline (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_a
+dd_rejects_handwritten_missing_tests_baseline) ... ok
+test_queue_add_rejects_handwritten_missing_tower_tests_baseline (test_envelope_baseline.EnvelopeBaselineTestCase.test_q
+ueue_add_rejects_handwritten_missing_tower_tests_baseline) ... ok
+test_queue_add_repair_still_requires_baselines (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_repair_s
+till_requires_baselines) ... FAIL
+test_queue_add_repairs_half_written_queue_entry (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_repairs
+_half_written_queue_entry) ... FAIL
+test_queue_add_without_envelope_new_fails_merge_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_w
+ithout_envelope_new_fails_merge_check) ... ok
+test_valid_baselines_create_draft_and_ledger_event (test_envelope_baseline.EnvelopeBaselineTestCase.test_valid_baseline
+s_create_draft_and_ledger_event) ... ok
+
+======================================================================
+FAIL: test_queue_add_repair_still_requires_baselines (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_re
+pair_still_requires_baselines)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-035\evidence\old-code
+\tools\tests\test_envelope_baseline.py", line 410, in test_queue_add_repair_still_requires_baselines
+    self.assertIn("tests_baseline", blob)
+AssertionError: 'tests_baseline' not found in '{\n  "ok": false,\n  "errors": [\n    "envelope already queued: ENV-BASE
+-001"\n  ]\n}\n'
+
+======================================================================
+FAIL: test_queue_add_repairs_half_written_queue_entry (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_r
+epairs_half_written_queue_entry)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-035\evidence\old-code
+\tools\tests\test_envelope_baseline.py", line 375, in test_queue_add_repairs_half_written_queue_entry
+    self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+AssertionError: 2 != 0 : {
+  "ok": false,
+  "errors": [
+    "envelope already queued: ENV-BASE-001"
+  ]
+}
+
+
+----------------------------------------------------------------------
+Ran 19 tests in 13.390s
+
+FAILED (failures=2)

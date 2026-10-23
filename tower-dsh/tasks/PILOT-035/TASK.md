@@ -1,0 +1,40 @@
+# PILOT-035 — 半写窗口可恢复：queue-add 检测队列条目存在但 QUEUE_ADD 缺失时补事件
+
+- Status: `ready`
+- Authority: `workspace_write`
+- Worktree: `pilot/worktrees/PILOT-035`
+
+## Scope
+
+- cmd_queue_add 在完成 baseline 校验后，若队列中已存在该信封条目：若 supervision ledger 已有 QUEUE_ADD → 保持现有 exit 2 already queued；若缺失（半写）→ 追加 QUEUE_ADD 事件、保持条目状态 WAITING，并输出 ok=true repaired=true（不重复追加条目）
+- 修复路径必须先通过 baseline 校验：半写条目若信封缺 baseline 或取值非法，仍 exit 2 且不追加事件
+- 修复路径写入的 QUEUE_ADD 事件使用与正常路径相同的 append_supervision_ledger（哈希链）；成功后 state-verify 不再报该信封 queue_unbacked
+- 正常路径（条目不存在）行为不变；envelope-new / merge-check / post-merge 不变
+- 更新 tools/tests/test_envelope_baseline.py：手工构造“队列条目在、事件缺失”的半写塔 → queue-add exit 0、repaired=true、恰一条 QUEUE_ADD、条目仍 WAITING、state-verify 无 queue_unbacked；半写但信封缺 baseline → exit 2 且无事件；事件已存在的重复入队 → 仍 exit 2 already queued
+
+## Allowed paths
+
+- `pilot/worktrees/PILOT-035/tower-dsh/tools/towerctl.py`
+- `pilot/worktrees/PILOT-035/tower-dsh/tools/tests/test_envelope_baseline.py`
+
+## Forbidden
+
+- network
+- external dependencies
+- changes outside the task worktree
+- merge
+- production access
+- weakening or deleting existing test coverage
+- repairing a queue entry whose envelope violates the baseline gate
+
+## Acceptance
+
+- cd pilot/worktrees/PILOT-035/tower-dsh && python -B tools/run_tests.py 全部通过，总数 >= 287（main 基线 287）
+- 半写塔（合法 1/1 信封 + 手写 WAITING 条目 + 无 QUEUE_ADD）→ queue-add exit 0、输出 repaired=true、ledger 恰一条 QUEUE_ADD、队列仍一条 WAITING、state-verify 无 queue_unbacked
+- 半写塔但信封缺 tower_tests_baseline → queue-add exit 2、无新事件、条目保持原样
+- 已正常入队的信封重复 queue-add → 仍 exit 2 already queued，事件数不变
+- 正常首次入队行为不变（exit 0、一条事件）
+- 真实塔 state-verify：exit 0、tasks=35/envelopes=34、drift=[]
+- 真实塔 post-merge：7/7，塔计数/anchor 检查通过
+- python tools/towerctl.py spec-coverage 27/27、spec-lint --strict 6/6
+- git -C pilot/worktrees/PILOT-035 diff --name-only main..HEAD 恰好两个 allowed_paths 文件

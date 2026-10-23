@@ -1,0 +1,47 @@
+== PILOT-035 half-written queue window probe ==
+towerctl=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-035\tower-dsh\tools\towerctl.py
+
+== CASE 1: half-write (queue entry, no QUEUE_ADD) -> repair ==
+precondition QUEUE_ADD count=0
+before repair: state-verify rc=2 ok=False drift_count=3
+before repair: queue_unbacked=[{"kind": "queue_unbacked", "target": "ENV-PROBE-001", "expected": "QUEUE_ADD ledger event", "actual": "no lifecycle events"}]
+queue-add rc=0
+queue-add stdout={
+  "ok": true,
+  "envelope": "ENV-PROBE-001",
+  "status": "WAITING",
+  "repaired": true
+}
+queue-add stderr=
+QUEUE_ADD count after=1
+QUEUE_ADD payloads=[{"envelope": "ENV-PROBE-001", "task": "T-PROBE-001"}]
+queue entries after=[{"envelope_id": "ENV-PROBE-001", "task": "T-PROBE-001", "branch": "feature/probe", "base": "main", "status": "WAITING", "added_at": "2026-10-23T00:00:00+08:00"}]
+after repair: state-verify rc=2 ok=False drift_count=3
+after repair: queue_unbacked=[]
+CASE 1: PASS
+
+== CASE 2: half-write with missing tower_tests_baseline -> reject ==
+queue-add rc=2
+queue-add stdout={
+  "ok": false,
+  "errors": [
+    "envelope tests_baseline and tower_tests_baseline must be positive integers (int >= 1)"
+  ]
+}
+queue-add stderr=
+queue bytes unchanged=True; entries=[{"envelope_id": "ENV-PROBE-001", "task": "T-PROBE-001", "branch": "feature/probe", "base": "main", "status": "WAITING", "added_at": "2026-10-23T00:00:00+08:00"}]
+CASE 2: PASS
+
+== CASE 3: already-properly-queued retry -> duplicate ==
+queue-add rc=2
+queue-add stdout={
+  "ok": false,
+  "errors": [
+    "envelope already queued: ENV-PROBE-001"
+  ]
+}
+QUEUE_ADD count unchanged=1
+entry count unchanged=1
+CASE 3: PASS
+
+PROBE OK (3/3 scenarios)
