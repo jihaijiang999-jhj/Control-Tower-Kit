@@ -1,0 +1,15 @@
+PILOT-034 temp-tower merge-gate probe matrix
+command: python -B evidence/probe_merge_gate.py
+run_at: 2026-10-23T16:23:01+08:00
+scenarios: forged chain, missing ENVELOPE_NEW, copied-id envelope, normal flow, legacy
+
+PILOT-034 merge-gate probe matrix (temp towers only)
+tool=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-034\tower-dsh\tools\towerctl.py
+
+[PASS] normal flow (envelope-new + queue-add): merge-check exit 0; identity/chain/envelope_new/queue all ok
+[PASS] forged QUEUE_ADD row (broken hash chain): merge-check exit 2; failing=ledger chain intact (row 2: hash mismatch (event tampered)); verify-ledger exit 2
+[PASS] QUEUE_ADD without ENVELOPE_NEW: merge-check exit 2; failing=envelope_new recorded (ENVELOPE_NEW event missing)
+[PASS] copied envelope content under a new id: merge-check exit 2; failing=envelope identity matches request (file declares ENV-BASE-001, request ENV-COPY-001)
+[PASS] legacy envelope (no baselines): merge-check exit 0; the three new-style checks are absent
+
+PROBE RESULT: 5/5 scenarios as expected
