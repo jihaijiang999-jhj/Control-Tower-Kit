@@ -1,101 +1,84 @@
-# NEXT WINDOW — 木塔问答与画像
+# NEXT WINDOW — tower-dsh（2026-10-23 收官版）
 
-> 给新窗口的第一条消息用。本文件不是权威状态；权威状态在 `primary/CURRENT_STATE.json`
-> 与 `handoffs/HANDOFF-PILOT-002/`。
->
-> **快照声明**：下面"当前状态"一段是 HANDOFF-PILOT-002 收官时的值。之后已推进到
-> PILOT-020（16+ 张卡、178+ 测试、CI 门 + 分支保护 + `--mode pr` 合并）。要拿实值，
-> 读 `primary/TASK_BOARD.json`、`supervision/MERGE_QUEUE.json`、`control-tower/MAP.md`，
-> 不要读本文件的数字。
+> 给新窗口的第一条消息用。**本文件不是权威状态**；权威在 `primary/CURRENT_STATE.json`、
+> `primary/TASK_BOARD.json`、`supervision/MERGE_QUEUE.json`。
+> 最近一次完整窗口摘要：`control-tower/SESSION-CLOSEOUT-2026-10-23.md`。
+> 地图与判例：`control-tower/MAP.md`（§6.9–§6.15）。
 
-## 当前状态（2026-10-19 收官时）
+## 当前状态（2026-10-23 收官时）
 
 | 项 | 值 |
 |---|---|
 | 代号 | **应县木塔 / Yingxian**（`YX-001`） |
-| 任务 | `PILOT-001` … `PILOT-010` 全部 `closed`；10 个 envelope 全部 `POST_MERGE_VERIFIED` |
-| 规范 | 6 份（4 workflow + 2 policy），`spec-lint --strict` 6/6 |
-| 覆盖 | 56 条条款：27 条 tool-check（27/27 有测试）、12 条 review-check、17 条 owner-gate |
-| 测试 | **134** 个 |
-| 门禁 | spec 强制 / 证据强制 / merge 分支断言 / post-merge 可重试 / handoff 参数化 / ledger 哈希链 / 路径防护 |
-| 阶段 | `READY_FOR_PRACTICE` |
+| 任务 | `PILOT-001` … `PILOT-035` 全部 `closed`；35 个信封全部 `POST_MERGE_VERIFIED` |
+| 测试 | `Ran 293 tests / OK（skipped=1）` |
+| 状态自洽 | `state-verify` → 35 任务 / 35 信封 / 264 条证据 / drift 0；skipped 仅 `PILOT-025-VOID` |
+| 账本 | primary 316 / supervision 183 事件，0 error（legacy 未哈希 53/26，按 INV-05 只计不判） |
+| CI | PR #7…#20 全绿；main 最近 run `39929889654` success |
+| 阶段 | `HANDOFF_ACTIVE`；`authority_dirty_count=0`；工作树干净 |
 
-## 新窗口要做的两件事
+## 新窗口读序
 
-1. **控制塔问答**：回答现实的工程/开发问题，必须结合本塔现状（引用文件、命令、数字），不空谈。
-2. **画一张控制塔地图/画像**：把组件关系、数据流、单点、空白画出来，产出 `control-tower/MAP.md`。
+1. `TOWER.md`
+2. `START-HERE.md`
+3. `shared/PROJECT_PROFILE.json`、`shared/AUTHORITY_MODEL.json`
+4. `primary/CURRENT_STATE.json`
+5. `primary/TASK_BOARD.json`
+6. `supervision/MERGE_QUEUE.json`
+7. `control-tower/MAP.md`（§6.9–§6.15：状态重放/计数门/迁移/队列完整性/合并门）
+8. `control-tower/SESSION-CLOSEOUT-2026-10-23.md`
+9. `RUN-2026-10-22-B.md`、`RUN-2026-10-23-C.md`、`RUN-2026-10-23-D.md`（批授权样本）
 
-## 第一条消息（复制到新窗口）
+## 自检
 
-```text
-你是 tower-dsh 的接续 controller，代号 ctl-yingxian-qa-001。
-工作区：C:\Users\mac\Documents\deepseek-harness\default-workspace
-塔根：C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh
-
-先读：
-1. tower-dsh/NEXT-WINDOW.md
-2. tower-dsh/handoffs/HANDOFF-PILOT-002/HANDOFF.md
-3. tower-dsh/primary/CURRENT_STATE.json
-4. tower-dsh/TOWER.md、START-HERE.md、RED-LINES.md、CHANGE-LEVELS.md
-5. tower-dsh/specs/WF-TASK.md、WF-MERGE.md、WF-HANDOFF.md、WF-LEDGER.md
-
-然后依次执行：
+```powershell
 cd tower-dsh
 python tools/towerctl.py startup
 python tools/towerctl.py wiring
 python tools/towerctl.py status
-python tools/towerctl.py handoff-check --package HANDOFF-PILOT-002
-python tools/towerctl.py handoff-claim --package HANDOFF-PILOT-002 --controller ctl-yingxian-qa-001
-python tools/towerctl.py handoff-receipt --package HANDOFF-PILOT-002 --controller ctl-yingxian-qa-001
-python tools/towerctl.py handoff-accept --package HANDOFF-PILOT-002 --controller ctl-yingxian-qa-001
-python tools/towerctl.py handoff-activate --package HANDOFF-PILOT-002 --controller ctl-yingxian-qa-001
-
-自检后报告一句结果，然后进入问答。
-问答与画图阶段只读：不改状态、不 merge、不碰生产、不外部调用。
-地图产出写到 control-tower/MAP.md。
+python tools/towerctl.py state-verify
+python -B tools/run_tests.py
 ```
 
-## 问答纪律
+`wiring` 不通过 = `ORPHANED`，停止并修接线。`state-verify` 出现 drift = 先停，不继续加卡。
 
-- 每个回答分三截：**本塔现状**（文件/命令/数字）→ **一般工程判断** → **对本塔的影响**。
-- 不确定就写“不确定”，不为了好听承诺未实现的能力。
-- 区分“已实现 / 已测 / 仅文档 / 尚未做”。
+## 下一张卡（候选，需 owner 拍板）
+
+1. **`PILOT-036` 信任边界收口**（推荐，最小）：
+   - 缺失/不可读 ledger 不再算 `ledger chain intact`（缺失=错，不可读=干净 exit 2）；
+   - 命令级 identity 改精确比较（不再 `str()`）；
+   - `ENVELOPE_NEW` 绑定 head/task（不只 id）。
+2. **∅5 对象层画像**：需要 owner 指定一个真实对象/项目，冻结不变量 + `profile-check`。
+3. **∅7 授权态单写者**：`state/AUTHORITY.json` + `authority-check`，把 `--role supervisor` 从字符串变成可判定身份。
+4. **∅6 趋势/熔断、∅8 判例集、∅9 包号防呆**：均未做，可单卡切入。
+
+## 硬约束（不要忘）
+
+- **Primary 不 merge**；merge 走 `--role supervisor --supervisor <id>` 且 supervisor ≠ primary。
+- **状态提交只在 envelope 之后**；不早于 `envelope-new`，否则 base 祖先断言会红。
+- **spec 冻结**：`task-new` 后改 spec 必须重建卡（v1 归档留痕），不能原地改。
+- **预批准 spec 先入库**：批跑时先把整批 spec 提交，否则 post-merge 的 clean 检查会判脏（已犯两次）。
+- **卡面与验收冲突**：先修卡，或做最小可证明补齐并在记录里写明前提错误。
+- 四闸（merge / 外部调用 / 部署·生产数据 / L0 文档写 main）永远归 owner。
+- 每张卡必须有独立 reviewer（`reviewer != executor`，read-only，亲跑证据）；作者自查不算。
+
+## 批授权跑法（推荐）
+
+1. 写 `RUN-<date>-X.md` 章程（卡序、预算、硬停、检查点） + 整批 spec，一次提交；
+2. owner 批准后建 goal（`max_goal_rounds` 覆盖卡数），逐卡执行；
+3. 每卡 post-merge 给四段摘要（不要求回复）；命中硬停立即停；
+4. 完成后更新 `MAP.md` 判例与 `SESSION-CLOSEOUT`，push、看 CI。
+
+## 已知残余（详见 MAP ∅10–∅12 与 §6.14/§6.15）
+
+- `ready→TASK_NEW` 仍合法；未来生命周期事件漏表会默认放行；关闭卡无正式 reopen 流程。
+- legacy（无 baseline）信封可降级绕过新式合并检查；链可重算伪造（tamper-evident）。
+- 缺失 ledger 算 `ok`、不可读 ledger 会 traceback；`ENVELOPE_NEW` 只绑 id。
+- 035 修复不造 `ENVELOPE_NEW`；非 WAITING 半写 stdout 报 WAITING；反向半写未处理。
+- `.test-tmp` 不自动清理；runner 依赖 Windows `core.longpaths`；直接 discovery 不走沙箱。
+- 分支保护对 admin 无效（owner 可直推）；真实项目 pilot 未接。
 
 ## 停点格式（硬规则）
 
-**任何一次停下来，必须给全这四段。缺任何一段等于没有交接。**
-
-```text
-① 现状    —— 现在到哪一步；用数字、哈希、状态值，不用形容词
-② 下一步  —— 只给一步（默认），最多两步
-③ 执行口令 —— 用户复制这一句就能推进：
-              本窗口继续 -> 一句短语（如"继续 019"）
-              换新窗口   -> 自包含的完整 prompt（路径 + 读序 + 当前卡 + 流程 + 约束）
-④ 判据    —— 怎么算这一步做完了；可执行、可验证（命令 + 阈值）
-```
-
-反面例子（2026-10-20 之前的停点）：只报"019 执行中、018 已合并 + 测试数字"，
-没有 ②③④ —— 用户无法判断下一步，也无法把工作交给另一个窗口。
-
-配套约束：
-
-- 停点时**不许**只说"进行中"；进行中也要说清"卡在谁身上、回来之后我做什么"。
-- 给出的执行口令必须**可直接粘贴**，不要求用户补齐路径或参数。
-- 判据必须能被第三方复算（命令 + 期望输出），不能写"看起来没问题"。
-
-## 地图要求
-
-- 一张主图（ASCII 或 Mermaid 均可）。
-- 每条边标注：**数据流方向、触发命令、失败后果**。
-- 标出**单点**：只有一个人/一个文件/一个命令的地方。
-- 标出**空白**：远端 PR/分支保护、Console、多任务并发、真实项目 pilot。
-- 标出**已证明**与**仅声明**的边界（用 `spec-coverage` 的数字说话）。
-
-## 收官时的已知 backlog
-
-- P1-6 程序性身份（`--role supervisor` 是字符串）；
-- P1-14 合并队列只校验状态，不做真互斥；
-- 远端 PR / 分支保护未接；
-- Console / presets（Phase 4）未做；
-- lint strict 只识别小写裸命令；根目录 md 丢 front matter 会被静默跳过；
-- 覆盖提取器对非 TestCase / 继承方法有盲点（当前仓库未触发）。
+任何一次停下来，必须给全四段：**① 现状（数字/哈希/状态） ② 下一步（一步） ③ 执行口令（可直接粘贴） ④ 判据（命令+阈值）**。
+缺任何一段等于没有交接。
