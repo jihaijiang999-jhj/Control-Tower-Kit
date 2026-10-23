@@ -59,7 +59,7 @@
     }
   ],
   "envelope_head_sha": "43b9401e33503beb0fd21c9fdf938212caa449c2",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "pr_number": 21,
   "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/21",
   "remote_merged": true,
@@ -68,5 +68,9 @@
   "merged_at": "2026-10-23T18:30:47+08:00",
   "supervisor": "sup-pilot036-verify",
   "merge_mode": "pr",
-  "check_conclusion": "success"
+  "check_conclusion": "success",
+  "tests_count": 2,
+  "tower_tests_count": 305,
+  "post_merge_at": "2026-10-23T18:35:25+08:00",
+  "post_merge_note": "trust-boundary closure: missing/unreadable ledger fatal, exact envelope identity, ENVELOPE_NEW binds task+head"
 }
