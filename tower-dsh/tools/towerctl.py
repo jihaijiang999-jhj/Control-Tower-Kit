@@ -743,12 +743,22 @@ def add_merge_ledger(root: Path, entry: dict) -> None:
     jdump(path, ledger)
 
 
-def envelope_checks(root: Path, env: dict) -> list[dict]:
+def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
     checks: list[dict] = []
 
     def add(name: str, ok: bool, detail: str) -> None:
         checks.append({"name": name, "ok": bool(ok), "detail": detail})
 
+    # The envelope file's id is not authoritative on its own: a copy of a
+    # merged envelope saved under another name would otherwise inherit its
+    # history.  The CLI callers also compare the id before running any check
+    # (so a mismatch cannot leak a partial verdict); this check exists so
+    # ``envelope_checks`` is self-contained when called directly with an
+    # expected id.  Callers that do not know the requested id skip it.
+    if expected_id is not None:
+        declared = env.get("envelope_id")
+        add("envelope identity matches request", declared == expected_id,
+            f"file={declared!r} request={expected_id!r}")
     repo = resolve_repository(root, env.get("repository"))
     add("repository exists", repo.exists(), str(repo))
     # A new-style envelope (both count baselines declared) must have reached
@@ -763,6 +773,22 @@ def envelope_checks(root: Path, env: dict) -> list[dict]:
             and isinstance(tower_tests_baseline, int)
             and not isinstance(tower_tests_baseline, bool)
             and tower_tests_baseline >= 1):
+        # Both ledger files must verify end-to-end: a forged row can name the
+        # envelope and still be detected here as a broken hash chain.
+        chain_errors: list[str] = []
+        for ledger_name in ("primary", "supervision"):
+            chain_errors.extend(
+                f"{ledger_name}: {error}"
+                for error in verify_ledger_file(root, ledger_name)["errors"])
+        add("ledger chain intact", not chain_errors,
+            chain_errors[0] if chain_errors else "ok")
+        # ``ENVELOPE_NEW`` is the only event that brings an envelope into
+        # existence.  Requiring it (not just ``QUEUE_ADD``) stops a hand-written
+        # envelope from being queued by appending a single valid queue event.
+        recorded = ledger_has_event(
+            root, "supervision", "ENVELOPE_NEW", env.get("envelope_id"))
+        add("envelope_new recorded", recorded,
+            f"ENVELOPE_NEW event {'present' if recorded else 'missing'}")
         backed = ledger_has_queue_add(root, env.get("envelope_id"))
         add("queue entry backed by ledger", backed,
             f"QUEUE_ADD event {'present' if backed else 'missing'}")
@@ -995,7 +1021,7 @@ def cmd_task_new(root: Path, args) -> None:
           "task_md": rel(root, tdir / "TASK.md")})
 
 
-def ledger_has_event(root: Path, event_type: str, task: str) -> bool:
+def ledger_has_task_event(root: Path, event_type: str, task: str) -> bool:
     ledger = root / "ledger" / "primary.jsonl"
     if not ledger.exists():
         return False
@@ -1043,7 +1069,7 @@ def cmd_check(root: Path, args) -> None:
                     errors.append("spec file changed since task-new; rebuild the task card instead of editing in place")
                 else:
                     errors += validate_spec(jload(full))
-        if not ledger_has_event(root, "SPEC_APPROVED", args.task):
+        if not ledger_has_task_event(root, "SPEC_APPROVED", args.task):
             errors.append("SPEC_APPROVED ledger event missing; run spec-approve first")
         if not errors and rec.get("spec_gate") != "PASS":
             rec["spec_gate"] = "PASS"
@@ -2107,7 +2133,11 @@ def cmd_merge_check(root: Path, args) -> None:
     if not env_path.exists():
         fail([f"envelope not found: {args.envelope}"])
     env = jload(env_path)
-    checks = envelope_checks(root, env)
+    declared = str(env.get("envelope_id") or "")
+    if declared != envelope_id:
+        fail([f"envelope identity matches request: file declares "
+              f"{declared or '(missing)'!r}, request {envelope_id!r}"])
+    checks = envelope_checks(root, env, expected_id=envelope_id)
     queue = load_queue(root)
     entry = next((e for e in queue.get("entries", [])
                   if e.get("envelope_id") == envelope_id), None)
@@ -2356,6 +2386,13 @@ def cmd_merge(root: Path, args) -> None:
     if not env_path.exists():
         fail([f"envelope not found: {args.envelope}"])
     env = jload(env_path)
+    # The requested id is authoritative: every later decision (queue entry,
+    # git head, status transitions) is keyed on it, so a file whose declared
+    # id differs must be rejected before any of that work happens.
+    declared = str(env.get("envelope_id") or "")
+    if declared != envelope_id:
+        fail([f"envelope identity matches request: file declares "
+              f"{declared or '(missing)'!r}, request {envelope_id!r}"])
     if env.get("status") in ("MERGED", "POST_MERGE_VERIFIED"):
         fail([f"envelope already {env.get('status')}"])
     queue = load_queue(root)
@@ -2389,7 +2426,7 @@ def cmd_merge(root: Path, args) -> None:
             f"current branch {current_branch} != envelope base {base}; "
             "checkout the envelope.base branch before merging"
         ])
-    checks = envelope_checks(root, env)
+    checks = envelope_checks(root, env, expected_id=envelope_id)
     checks.append({"name": "queued", "ok": entry is not None,
                    "detail": entry.get("status") if entry else "missing"})
     if not all(c["ok"] for c in checks):
@@ -3228,6 +3265,23 @@ def ledger_events_in_seq_order(root: Path, name: str) -> list[dict]:
     return [event for _, event in sorted(rows, key=lambda pair: pair[0])]
 
 
+def ledger_has_event(root: Path, name: str, event_type: str,
+                     envelope_id) -> bool:
+    """True iff one ``event_type`` event in ``ledger/<name>.jsonl`` names it.
+
+    Read-only.  Rows that are not JSON objects are ignored by
+    :func:`ledger_events_in_seq_order`; ``state-verify`` still refuses to replay
+    a ledger whose chain is broken.
+    """
+    for event in ledger_events_in_seq_order(root, name):
+        if event.get("type") != event_type:
+            continue
+        payload = event.get("payload")
+        if isinstance(payload, dict) and payload.get("envelope") == envelope_id:
+            return True
+    return False
+
+
 def ledger_has_queue_add(root: Path, envelope_id) -> bool:
     """True iff one ``QUEUE_ADD`` event in ``ledger/supervision.jsonl`` names it.
 
@@ -3235,13 +3289,7 @@ def ledger_has_queue_add(root: Path, envelope_id) -> bool:
     :func:`ledger_events_in_seq_order`; ``state-verify`` still refuses to replay
     a ledger whose chain is broken.
     """
-    for event in ledger_events_in_seq_order(root, "supervision"):
-        if event.get("type") != "QUEUE_ADD":
-            continue
-        payload = event.get("payload")
-        if isinstance(payload, dict) and payload.get("envelope") == envelope_id:
-            return True
-    return False
+    return ledger_has_event(root, "supervision", "QUEUE_ADD", envelope_id)
 
 
 def _sorted_states(states) -> list:

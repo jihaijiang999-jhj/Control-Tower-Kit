@@ -25,6 +25,8 @@ from pathlib import Path
 
 TOOLS_DIR = Path(__file__).resolve().parents[1]
 TCLI = TOOLS_DIR / "towerctl.py"
+sys.path.insert(0, str(TOOLS_DIR))
+import towerctl  # noqa: E402  (import after sys.path setup)
 TASK = "T-BASE-001"
 ENVELOPE = "ENV-BASE-001"
 LEGACY_ENVELOPE = "ENV-LEGACY-001"
@@ -367,7 +369,7 @@ class EnvelopeBaselineTestCase(unittest.TestCase):
     def test_handwritten_queue_entry_fails_merge_check(self) -> None:
         # New-style envelope (both baselines) with no ENVELOPE_NEW and a queue
         # row with no QUEUE_ADD: every file-level check passes, so only the
-        # ledger-backed check can reject the hand-written queue bypass.
+        # two ledger lifecycle checks can reject the hand-written bypass.
         self.write_handwritten_envelope()
         self.handwrite_queue_entry()
         self.assertNotIn("QUEUE_ADD", self.supervision_ledger())
@@ -379,9 +381,16 @@ class EnvelopeBaselineTestCase(unittest.TestCase):
                          msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
         payload = json.loads(cp.stdout)
         self.assertFalse(payload["ok"])
-        self.assertEqual(payload["errors"], [{
-            "name": "queue entry backed by ledger", "ok": False,
-            "detail": "QUEUE_ADD event missing"}])
+        # PILOT-034 adds the lifecycle gate: a hand-written envelope never
+        # produced ENVELOPE_NEW either, so both ledger checks fail.
+        self.assertEqual([c["name"] for c in payload["errors"]],
+                         ["envelope_new recorded",
+                          "queue entry backed by ledger"])
+        details = {c["name"]: c["detail"] for c in payload["errors"]}
+        self.assertEqual(details["envelope_new recorded"],
+                         "ENVELOPE_NEW event missing")
+        self.assertEqual(details["queue entry backed by ledger"],
+                         "QUEUE_ADD event missing")
 
     def test_handwritten_queue_entry_blocks_merge(self) -> None:
         self.write_handwritten_envelope()
@@ -394,9 +403,9 @@ class EnvelopeBaselineTestCase(unittest.TestCase):
                          msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
         payload = json.loads(cp.stdout)
         self.assertFalse(payload["ok"])
-        self.assertEqual(payload["errors"], [{
-            "name": "queue entry backed by ledger", "ok": False,
-            "detail": "QUEUE_ADD event missing"}])
+        self.assertEqual([c["name"] for c in payload["errors"]],
+                         ["envelope_new recorded",
+                          "queue entry backed by ledger"])
         # The shared check fails before any git merge: the entry is marked for
         # correction and never reaches MERGING/MERGED.
         self.assertEqual(self.queue_entries()[0]["status"], "CORRECTION_REQUIRED")
@@ -420,10 +429,143 @@ class EnvelopeBaselineTestCase(unittest.TestCase):
                          msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
         payload = json.loads(cp.stdout)
         self.assertTrue(payload["ok"], msg=cp.stdout)
-        check = next(c for c in payload["checks"]
-                     if c["name"] == "queue entry backed by ledger")
+        checks = {c["name"]: c for c in payload["checks"]}
+        self.assertTrue(checks["envelope identity matches request"]["ok"],
+                        msg=cp.stdout)
+        self.assertTrue(checks["ledger chain intact"]["ok"], msg=cp.stdout)
+        self.assertEqual(checks["ledger chain intact"]["detail"], "ok")
+        self.assertTrue(checks["envelope_new recorded"]["ok"], msg=cp.stdout)
+        self.assertEqual(checks["envelope_new recorded"]["detail"],
+                         "ENVELOPE_NEW event present")
+        check = checks["queue entry backed by ledger"]
         self.assertTrue(check["ok"])
         self.assertEqual(check["detail"], "QUEUE_ADD event present")
+
+    # -- self-verifying merge gate (PILOT-034) ---------------------------
+    def append_forged_queue_add(self, envelope: str = ENVELOPE) -> None:
+        """Append a parsed-but-unchained ``QUEUE_ADD`` row to the ledger.
+
+        The row names the envelope and carries the correct ``seq``/``prev_hash``
+        so only the hash chain itself betrays the forgery.
+        """
+        path = self.root / "ledger" / "supervision.jsonl"
+        text = path.read_text(encoding="utf-8") if path.exists() else ""
+        rows = [json.loads(line) for line in text.splitlines() if line.strip()]
+        event = {
+            "seq": (rows[-1].get("seq", 0) + 1) if rows else 1,
+            "at": FIXED_TIME,
+            "type": "QUEUE_ADD",
+            "actor": "primary",
+            "payload": {"envelope": envelope, "task": TASK},
+            "prev_hash": (rows[-1].get("hash") if rows else None) or "GENESIS",
+            "hash": "f" * 64,
+        }
+        with path.open("a", encoding="utf-8", newline="\n") as fh:
+            fh.write(json.dumps(event, ensure_ascii=False) + "\n")
+
+    def test_forged_queue_add_row_fails_ledger_chain_check(self) -> None:
+        # A forged row can name the envelope and satisfy the queue-backed
+        # check; only chain verification detects the tampering.
+        cp = run_cli(self.root, "envelope-new", "--task", TASK,
+                     "--file", str(self.envelope_file))
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        self.handwrite_queue_entry()
+        self.append_forged_queue_add()
+
+        cp = run_cli(self.root, "merge-check", "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 2,
+                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        payload = json.loads(cp.stdout)
+        self.assertFalse(payload["ok"])
+        self.assertEqual([c["name"] for c in payload["errors"]],
+                         ["ledger chain intact"])
+        detail = payload["errors"][0]["detail"]
+        self.assertTrue(detail.startswith("supervision: "), msg=detail)
+        self.assertIn("hash mismatch", detail)
+
+        # The same tower, read by the ledger verifier: same verdict.
+        cp = run_cli(self.root, "verify-ledger", "--ledger", "supervision")
+        self.assertEqual(cp.returncode, 2,
+                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        self.assertFalse(json.loads(cp.stdout)["ok"])
+
+        # merge refuses on the same broken chain and never starts merging.
+        cp = run_cli(self.root, "merge", "--role", "supervisor",
+                     "--supervisor", "sup-1", "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 2,
+                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        self.assertIn("ledger chain intact", cp.stdout)
+        self.assertNotIn("MERGE_START", self.supervision_ledger())
+
+    def test_queue_add_without_envelope_new_fails_merge_check(self) -> None:
+        # ``queue-add`` appends a perfectly valid QUEUE_ADD but cannot
+        # manufacture ENVELOPE_NEW: queueing a hand-written envelope is not
+        # enough to pass the merge gate.
+        self.write_handwritten_envelope()
+        cp = run_cli(self.root, "queue-add", "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        self.assertIn("QUEUE_ADD", self.supervision_ledger())
+        self.assertNotIn("ENVELOPE_NEW", self.supervision_ledger())
+
+        cp = run_cli(self.root, "merge-check", "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 2,
+                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        payload = json.loads(cp.stdout)
+        self.assertFalse(payload["ok"])
+        self.assertEqual([c["name"] for c in payload["errors"]],
+                         ["envelope_new recorded"])
+        self.assertEqual(payload["errors"][0]["detail"],
+                         "ENVELOPE_NEW event missing")
+
+    def test_copied_envelope_identity_is_rejected(self) -> None:
+        # Copy a fully backed envelope's JSON under a new filename/id: the
+        # file content still names the original, and the requested id is
+        # authoritative.
+        cp = run_cli(self.root, "envelope-new", "--task", TASK,
+                     "--file", str(self.envelope_file))
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        cp = run_cli(self.root, "queue-add", "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+
+        copy_id = "ENV-COPY-001"
+        write_json(self.envelope_path(copy_id), read_json(self.envelope_path()))
+        queue = read_json(self.root / "supervision" / "MERGE_QUEUE.json")
+        queue["entries"].append({
+            "envelope_id": copy_id, "task": TASK,
+            "branch": BRANCH, "base": "main",
+            "status": "WAITING", "added_at": FIXED_TIME,
+        })
+        write_json(self.root / "supervision" / "MERGE_QUEUE.json", queue)
+
+        cp = run_cli(self.root, "merge-check", "--envelope", copy_id)
+        self.assertEqual(cp.returncode, 2,
+                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        payload = json.loads(cp.stdout)
+        self.assertFalse(payload["ok"])
+        # The command-level identity gate fires before any check, so the only
+        # error is a string naming the declared id and the requested id.
+        blob = json.dumps(payload)
+        self.assertIn("envelope identity matches request", blob)
+        self.assertIn(ENVELOPE, blob)
+        self.assertIn(copy_id, blob)
+        self.assertEqual(len(payload["errors"]), 1)
+        self.assertIsInstance(payload["errors"][0], str)
+
+    def test_identity_check_names_both_ids_when_called_directly(self) -> None:
+        # Direct callers pass ``expected_id``; the same binding is a check.
+        env = self.payload()
+        env.update({"envelope_head_sha": self.envelope_head, "status": "DRAFT"})
+        checks = towerctl.envelope_checks(self.root, env,
+                                          expected_id="ENV-OTHER-001")
+        identity = next(c for c in checks
+                        if c["name"] == "envelope identity matches request")
+        self.assertFalse(identity["ok"])
+        self.assertIn(ENVELOPE, identity["detail"])
+        self.assertIn("ENV-OTHER-001", identity["detail"])
+
+        # Without an expected id the check is absent (legacy direct callers).
+        names = [c["name"] for c in towerctl.envelope_checks(self.root, env)]
+        self.assertNotIn("envelope identity matches request", names)
 
     # -- legacy compatibility -------------------------------------------
     def test_legacy_envelope_without_baselines_still_merge_checks(self) -> None:
@@ -456,10 +598,16 @@ class EnvelopeBaselineTestCase(unittest.TestCase):
         self.assertTrue(payload["ok"], msg=cp.stdout)
         self.assertNotIn("int >= 1", cp.stdout)
         self.assertNotIn("tests_baseline", cp.stdout)
-        # Legacy envelopes keep the old opt-in semantics: the new ledger-backed
-        # check is not injected when the baselines are absent.
-        self.assertNotIn("queue entry backed by ledger",
-                         [c["name"] for c in payload["checks"]])
+        # Legacy envelopes keep the old opt-in semantics: the three new-style
+        # ledger checks are not injected when the baselines are absent.  The
+        # identity binding (a CLI-level requirement) still applies.
+        names = [c["name"] for c in payload["checks"]]
+        for name in ("ledger chain intact", "envelope_new recorded",
+                     "queue entry backed by ledger"):
+            self.assertNotIn(name, names)
+        identity = next(c for c in payload["checks"]
+                        if c["name"] == "envelope identity matches request")
+        self.assertTrue(identity["ok"])
 
 
 if __name__ == "__main__":
