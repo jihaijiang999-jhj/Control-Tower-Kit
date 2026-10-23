@@ -10,6 +10,7 @@
 > 修订：2026-10-23T03:0x —— RUN-2026-10-23-C 批跑（030 queue-add 门、031 单调锚点、032 完成卡禁止重置）；∅10/∅11、§5、§6.13 同步。
 > 修订：2026-10-23T08:0x —— PILOT-033（队列/信封 unbacked 显形 + ledger-backed 合并门）；∅10/∅11、§5、§6.14 同步。
 > 修订：2026-10-23T17:1x —— RUN-2026-10-23-D 批跑（034 合并门自验、035 半写修复）；∅11、§5、§6.15 同步。
+> 修订：2026-10-23T18:4x —— PILOT-036 落地（信任边界收口：缺失/不可读 ledger 在合并门 fatal、命令级 identity 精确到类型、`ENVELOPE_NEW` 同一条事件绑 task+head）；∅11、§5、新增 §6.16。
 > 依据：`startup` / `wiring` / `status` / `handoff-check` / `spec-coverage` / `verify-ledger` 实跑输出 + 代码通读 + git 实值 + 一次测试复跑。
 > 标注约定：`[证]` 有可执行证据 / `[声]` 仅文档或口头声明 / `[无]` 未做 / `⊙` 单点 / `∅` 空白。
 
@@ -129,7 +130,7 @@
 | ∅8 | **判例集** | `rules-ref/治理判例集.md`：一次裁决 → 以后可引用的规则 | 5 条散在 `HANDOFF.md §6` | ledger 增加 `PRECEDENT` 事件 + `towerctl precedent --list` |
 | ∅9 | **包号防呆** | `_k3-ops/CURRENT`：包号比你所持新即停手 | `handoff-check` 只在 claim 时跑一次 §0 漂移 | 根目录 `CURRENT` + `startup` 强制比对 |
 | ∅10 | **状态重放** | （K3 也没有） | **已实现并持续收紧**（PILOT-021/022/023/028/032/033）：ledger 折叠状态并与 record/board/queue/envelope 比对；坏文件算 drift，合法跳过显式 `skipped`，board 取重放值；证据逐条校验 SHA-256/字节数，spec 校验冻结哈希；状态迁移按真实历史表校验；`TASK_NEW` 只允许未完成状态重建；无事件的信封/队列条目记 `envelope_unbacked`/`queue_unbacked`，不再隐形。真实塔 35 任务/35 信封、264 条证据、drift 0 | 仍窄：`ready→TASK_NEW` 仍合法；未来新增生命周期事件若漏表会默认放行；关闭卡无正式 reopen 流程；TOCTOU/hardlink 不在范围 |
-| ∅11 | **测试计数门** | （K3 也没有） | **已实现并合围**（PILOT-025/026/029/030/031/033/034/035）：`post-merge` 解析 `Ran N tests`；根/塔套件按 baseline 设门；`envelope-new`/`queue-add` 都强制 baseline；baseline 不得低于 ledger 已验证最大值；merge-check/merge 对新式信封自验 `ledger chain intact` + `ENVELOPE_NEW` + `QUEUE_ADD` + 身份绑定；`queue-add` 可修复半写条目。真实塔：根 `2/2`、塔 `293/291`、anchor `291>=291`，7/7 | 仍窄：legacy（无 baseline）信封仍可降级绕过新检查；哈希链可被重算伪造（tamper-evident 非防篡改）；缺失/不可读 ledger 未被当作错误；任意坏行会阻塞全部新式合并；链校验 O(ledger) |
+| ∅11 | **测试计数门** | （K3 也没有） | **已实现并合围**（PILOT-025/026/029/030/031/033/034/035/036）：`post-merge` 解析 `Ran N tests`；根/塔套件按 baseline 设门；`envelope-new`/`queue-add` 都强制 baseline；baseline 不得低于 ledger 已验证最大值；merge-check/merge 对新式信封自验 `ledger chain intact` + `ENVELOPE_NEW` + `QUEUE_ADD` + 身份绑定；`queue-add` 可修复半写条目；036 让链检查对缺失/不可读 **fatal**（缺失=错、不可读=干净 exit 2，不 traceback）、命令级 identity 精确到类型、`ENVELOPE_NEW` 同一条事件绑 `envelope+task+head`。真实塔：根 `2/2`、塔 `305/293`、anchor `293`，7/7 | 仍窄：legacy（无 baseline）信封仍可降级绕过新检查；哈希链无密钥，可被“追加一行正确 prev_hash/hash”伪造（tamper-evident 非防篡改）；`envelope_head_sha` 两边同时缺失时 `None==None` 可过绑定检查（git 检查仍拦 merge）；任意坏行会阻塞全部新式合并；链校验 O(ledger)；验证与读取之间的 TOCTOU 未吞 OSError（有意“宁可红”） |
 | ∅12 | **证据可复现** | — | **已实现切片**（PILOT-027）：`tools/run_tests.py` 把 `TMP/TEMP/TMPDIR` 指向仓内 `.test-tmp/run-*`，post-merge 与根门禁都走 runner；`REPRODUCE.md` 给出干净环境复跑清单；全套件 287 绿 | 仍窄：`.test-tmp` 不自动清理；运行器依赖 Windows 下的 core.longpaths 注入；直接 discovery 不走沙箱 |
 
 ---
@@ -145,12 +146,12 @@
 | merge 分支断言 | `[证]` | `cmd_merge:1919-1936`，不符即 `CORRECTION_REQUIRED` |
 | post-merge 七检 | `[证]` | 测试 / 根套件计数 / 塔套件计数 / baseline 不回退 / 实现是祖先 / 信封在 base / 工作树干净（RUN-C 后；count 检查对旧信封 opt-in） |
 | 路径越界防护 | `[证]` | `ensure_within` 覆盖 evidence / worktree / package / envelope / repository |
-| ledger 哈希链 | `[证]` | `verify-ledger` → primary 316 事件、supervision 183，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判） |
+| ledger 哈希链 | `[证]` | `verify-ledger` → primary 324 事件、supervision 188，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判）；缺失/不可读现为验证失败（PILOT-036） |
 | 条款→测试绑定 | `[证]` | `spec-coverage`：6 份规范 / 56 条款 / tool-check 27 / covered **27** / gaps 0 |
-| 测试全绿 | `[证]`（有条件） | `Ran 293 tests / OK`（本地 2026-10-23，PILOT-035 后）；GitHub Actions 在 PR #18–#20 上绿，v7 后零注解。**建议跑法**：`python -B tools/run_tests.py`（TMP 在仓内，避受限沙箱 ACL）；直接 discovery 仍可用，但受限模式下 `%TEMP%` 仍会让 134/134 在 0.05 s 内全 ERROR |
+| 测试全绿 | `[证]`（有条件） | `Ran 305 tests / OK（skipped=1）`（本地 2026-10-23，PILOT-036 后）；GitHub Actions 在 PR #18–#21 上绿，v7 后零注解。**建议跑法**：`python -B tools/run_tests.py`（TMP 在仓内，避受限沙箱 ACL）；直接 discovery 仍可用，但受限模式下 `%TEMP%` 仍会让 134/134 在 0.05 s 内全 ERROR |
 | 29 条条款靠人 | `[声]` | 12 `review-check` + 17 `owner-gate`（`spec-coverage.manual` / `.owner`） |
 | "每次迭代全局正确" | `[无]` | 无对象层不变量、无趋势锚点、无状态重放 |
-| 35 个任务 / 35 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`；021 PR #6 `10fae79`；022 PR #7 `6a920a5`；023 PR #8 `a88388b`；024 PR #9 `c4fb58f`；025 PR #10 `f265847`；026 PR #11 `e73f1f5`；027 PR #12 `223b10b`；028 PR #13 `188f122`；029 PR #14 `ef72400`；030 PR #15 `aa88f76`；031 PR #16 `c9a7da6`；032 PR #17 `da5a25c`；033 PR #18 `eb8f03b`；034 PR #19 `7f122b8`（7/7，塔 `291/287`）；035 PR #20 `a7e429d`（7/7，塔 `293/291`，anchor `291>=291`），其余 post-merge 均 4/4） |
+| 36 个任务 / 36 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`；021 PR #6 `10fae79`；022 PR #7 `6a920a5`；023 PR #8 `a88388b`；024 PR #9 `c4fb58f`；025 PR #10 `f265847`；026 PR #11 `e73f1f5`；027 PR #12 `223b10b`；028 PR #13 `188f122`；029 PR #14 `ef72400`；030 PR #15 `aa88f76`；031 PR #16 `c9a7da6`；032 PR #17 `da5a25c`；033 PR #18 `eb8f03b`；034 PR #19 `7f122b8`（7/7，塔 `291/287`）；035 PR #20 `a7e429d`（7/7，塔 `293/291`，anchor `291>=291`）；036 PR #21 `d8ef20f`（7/7，塔 `305/293`，anchor `293`），其余 post-merge 均 4/4） |
 
 ---
 
@@ -366,6 +367,20 @@ TypeError: can only concatenate str (not "NoneType") to str
 - **链是“可发现篡改”，不是“防篡改”**：SHA-256 无密钥，能重算；真正的边界是“只有 towerctl 写 ledger + 锁串行化 + verify-ledger 可审计”。034 的残余（legacy 降级、重算伪造、缺失/不可读 ledger）应作为下一批输入，而不是当成已解决。
 
 **判例**：门禁成熟的标志不是“检查更多”，而是**审计器与门分工明确、修复由写者负责、并清楚写下哪些残余仍靠信任而非机制**。
+
+### 6.16 判例：信任边界的三个“以为链成立”（PILOT-036）
+
+`PILOT-036` 收掉 034/035 留下的三个口：**缺失/不可读 ledger 不再算链 ok**（缺失=错、不可读=干净 `exit 2` 单 JSON、已存在空文件仍 intact）、**命令级 envelope identity 精确到类型**（不再 `str(... or "")`，JSON 的 `42` 不能冒充请求的 `"42"`）、**`ENVELOPE_NEW` 同一条事件绑 `envelope + task + head`**（只绑 id 的事件不继承历史）。实测：`Ran 305 / OK`、10/10 证据哈希、PR #21 `d8ef20f`、post-merge 7/7（塔 `305/293`）；独立 reviewer 用自建 `%TEMP%` 塔复现旧码对照 4/4：缺账本旧 `verify-ledger` exit 0、目录账本旧码 traceback、整数 id 旧码命令级放行、错 head 的旧 `merge` **真的 MERGED**——新码四项全拒。
+
+可复用判据：
+
+- **“文件不在”不是“链完整”**：空文件与缺失是两件事——存在但空=合法空链，不存在/不可读=验证失败。凡“读一个东西再判断它干净”的审计器，都必须先把缺/空/坏三种输入分开裁决；否则消失会被读成清白（036 之前，删掉整个 ledger 反而让链检查 `ok`）。
+- **归一化比较就是隐式放宽类型**：`str(env.get("envelope_id") or "")` 让 `42` 与 `"42"` 等价。identity 这类“谁是谁”的判断必须精确到类型；且失败要落在**命令级字符串 `errors`**，不能混进 check 字典列表——门与审计的边界一糊，`merge` 与 `merge-check` 的失败形状就会分叉。
+- **绑定要绑到不可复制的字段**：只绑 id 的 `ENVELOPE_NEW` 能被“名字对、内容不对”的事件满足；绑 `task + head` 之后，同一 id 的复用不再继承历史，且 detail 必须点名哪一项不符（运维不必猜）。
+- **消歧不是削弱，但前提要写死**：`supervision_available` 只在 supervision ledger 缺失/不可读时跳过两个依赖它的 lifecycle 检查（否则会额外误报 `ENVELOPE_NEW missing`），前提是链检查 fatal。**允许跳过的前提，是“被跳过项依赖的失败已经致命”**——这个前提必须成为不变量测试，否则未来把链降级成 warning 时，检查会静默消失。
+- **残余要按“攻击成本”写，不按“已关门”写**：无密钥链仍可“追加一行正确 prev_hash/hash”伪造（比“重算整链”更弱的前提），036 只是把成本从“手写信封”抬到“手写信封+写一行账”；`envelope_head_sha` 两边同时缺失时 `None==None` 可过绑定检查（git 检查仍拦 merge，属“靠兜底”，应改显式失败）；legacy（无 baseline）路径按设计不查链/绑定；验证与读取之间 ledger 变不可读仍可能 traceback（`ledger_events_in_seq_order` 有意不吞 OSError：宁可红，不可静默当空）。
+
+**判例**：门禁的可信度不取决于检查条数，而取决于**每条检查对“输入不存在”和“输入不可读”都有明确裁决**；把这两种输入留给异常处理，等于把门交给 traceback。
 
 ---
 
