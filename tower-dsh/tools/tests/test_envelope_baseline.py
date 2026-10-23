@@ -346,13 +346,76 @@ class EnvelopeBaselineTestCase(unittest.TestCase):
         cp = run_cli(self.root, "queue-add", "--envelope", ENVELOPE)
         self.assertEqual(cp.returncode, 2,
                          msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
-        # "already queued" keeps priority over the baseline gate.
+        # A ledger-backed entry is a real duplicate, not a half-write.
         self.assertIn("already queued", cp.stdout + cp.stderr)
         self.assertEqual(self.queue_bytes(), queue_before)
         self.assertEqual(self.supervision_ledger_bytes(), ledger_before)
         self.assertEqual(len(self.queue_entries()), 1, msg=self.queue_entries())
         self.assertEqual(len(self.queue_events()), 1,
                          msg=self.supervision_ledger())
+
+    # -- half-written queue window repair (PILOT-035) --------------------
+    def test_queue_add_repairs_half_written_queue_entry(self) -> None:
+        # Crash residue: the queue entry landed, the ``QUEUE_ADD`` event did
+        # not.  ``state-verify`` reports ``queue_unbacked`` and the old retry
+        # refused the entry as a duplicate forever.
+        self.write_handwritten_envelope()
+        self.handwrite_queue_entry()
+        self.assertEqual(self.queue_events(), [])
+        before = run_cli(self.root, "state-verify")
+        self.assertEqual(before.returncode, 2,
+                         msg=before.stdout + before.stderr)
+        self.assertIn({"kind": "queue_unbacked", "target": ENVELOPE,
+                       "expected": "QUEUE_ADD ledger event",
+                       "actual": "no lifecycle events"},
+                      json.loads(before.stdout)["drift"])
+
+        cp = run_cli(self.root, "queue-add", "--envelope", ENVELOPE)
+
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        payload = json.loads(cp.stdout)
+        self.assertTrue(payload["ok"], msg=cp.stdout)
+        self.assertEqual(payload["envelope"], ENVELOPE)
+        self.assertEqual(payload["status"], "WAITING")
+        self.assertIs(payload.get("repaired"), True, msg=cp.stdout)
+        # Exactly one new event backs the existing entry; the entry itself is
+        # neither duplicated nor rewritten.
+        events = self.queue_events()
+        self.assertEqual(len(events), 1, msg=self.supervision_ledger())
+        self.assertEqual(events[0]["payload"]["envelope"], ENVELOPE)
+        self.assertEqual(events[0]["payload"]["task"], TASK)
+        entries = self.queue_entries()
+        self.assertEqual(len(entries), 1, msg=entries)
+        self.assertEqual(entries[0]["envelope_id"], ENVELOPE)
+        self.assertEqual(entries[0]["status"], "WAITING")
+        # The repair clears the exact drift it was written for.
+        after = run_cli(self.root, "state-verify")
+        kinds = [row["kind"] for row in json.loads(after.stdout)["drift"]]
+        self.assertNotIn("queue_unbacked", kinds, msg=after.stdout)
+
+    def test_queue_add_repair_still_requires_baselines(self) -> None:
+        # The repair sits behind the same baseline gate as a first-time add: a
+        # half-written entry whose envelope lacks a baseline stays rejected and
+        # appends neither an event nor a second entry.
+        self.write_handwritten_envelope(missing="tower_tests_baseline")
+        self.handwrite_queue_entry()
+        queue_before = self.queue_bytes()
+        ledger_before = self.supervision_ledger_bytes()
+
+        cp = run_cli(self.root, "queue-add", "--envelope", ENVELOPE)
+
+        self.assertEqual(cp.returncode, 2,
+                         msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
+        blob = cp.stdout + cp.stderr
+        self.assertIn("tests_baseline", blob)
+        self.assertIn("tower_tests_baseline", blob)
+        self.assertIn("int >= 1", blob)
+        self.assertEqual(self.queue_bytes(), queue_before)
+        self.assertEqual(self.supervision_ledger_bytes(), ledger_before)
+        self.assertEqual(self.queue_events(), [])
+        entries = self.queue_entries()
+        self.assertEqual(len(entries), 1, msg=entries)
+        self.assertEqual(entries[0]["status"], "WAITING")
 
     # -- ledger-backed queue requirement (PILOT-033) ---------------------
     def handwrite_queue_entry(self) -> None:

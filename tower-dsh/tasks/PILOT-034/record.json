@@ -1,0 +1,139 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-034",
+  "title": "合并门自验：ledger 链完整、ENVELOPE_NEW 存在、信封身份绑定请求 id",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "cmd_merge_check 与 cmd_merge 在读取信封后校验 env.envelope_id 与命令行 --envelope 的请求 id 严格相等；不等即 exit 2（错误点名文件内容 id 与请求 id），不进入后续检查",
+    "envelope_checks 新增可选参数 expected_id；两个调用方传入请求 id，新增检查 envelope identity matches request（ok = env.envelope_id == expected_id）；直接调用而不传 expected_id 时跳过该检查（兼容测试）",
+    "envelope_checks 对新式信封（同时带合法 tests_baseline 与 tower_tests_baseline）新增两项检查：ledger chain intact（primary 与 supervision 两份 ledger 的 verify_ledger_file 均无 errors；detail 为第一条错误或 ok）；envelope_new recorded（supervision ledger 中存在该信封的 ENVELOPE_NEW 事件）",
+    "保留 033 的 queue entry backed by ledger 检查与 legacy 信封的兼容（旧信封不启用上述新式检查）",
+    "新增只读辅助 ledger_has_event(root, name, event_type, envelope_id)；复用 ledger_events_in_seq_order，坏行忽略",
+    "更新 tools/tests/test_envelope_baseline.py：伪造一行 QUEUE_ADD（坏哈希链）→ merge-check exit 2 且失败项含 ledger chain intact；只追加 QUEUE_ADD 不追加 ENVELOPE_NEW → envelope_new recorded 失败；把已背书信封内容复制为另一个 id 文件名并入队 → merge-check --envelope <新id> 因 identity 失败；正常 envelope-new+queue-add 通过全部新检查；legacy 信封行为不变"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-034/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-034/tower-dsh/tools/tests/test_envelope_baseline.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "trusting a file's self-declared identity without matching the requested id"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-034/tower-dsh && python -B tools/run_tests.py 全部通过，总数 >= 287（main 基线 287）",
+    "伪造 QUEUE_ADD 行（哈希链破坏）后 merge-check 新式信封 → exit 2，失败项含 ledger chain intact；同一塔 verify-ledger 也报错",
+    "只追加 QUEUE_ADD、不追加 ENVELOPE_NEW → merge-check exit 2，失败项含 envelope_new recorded",
+    "把已背书信封的 JSON 复制为 ENV-OTHER 文件名并入队 → merge-check --envelope ENV-OTHER exit 2，失败项含 envelope identity matches request",
+    "正常 envelope-new + queue-add 的信封 → merge-check 全部检查通过（新检查 ok）",
+    "legacy 信封（无 baseline）→ merge-check 仍通过（不启用新式检查）",
+    "真实塔 state-verify：exit 0、tasks=34/envelopes=33、drift=[]",
+    "真实塔 post-merge：7/7，塔计数/anchor 检查通过",
+    "python tools/towerctl.py spec-coverage 27/27、spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-034 diff --name-only main..HEAD 恰好两个 allowed_paths 文件"
+  ],
+  "depends_on": [
+    "PILOT-033"
+  ],
+  "worktree": "pilot/worktrees/PILOT-034",
+  "spec_path": "pilot/PILOT-034.spec.json",
+  "spec_sha256": "16b5f2131ac3ad447e2995973e18f13d1678012ade67c57f8474c886859d3d99",
+  "spec_gate": "PASS",
+  "executor": "subagent:exec-034",
+  "dispatch": {
+    "executor": "subagent:exec-034",
+    "worktree": "pilot/worktrees/PILOT-034",
+    "at": "2026-10-23T16:12:28+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-034/evidence/towerctl.py",
+      "sha256": "ef723ebbcd73f7332e8c269ec18b3c70a45db4856f680276a66175d8cbb64f9c",
+      "bytes": 164280,
+      "at": "2026-10-23T16:23:49+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/test_envelope_baseline.py",
+      "sha256": "bd8c4fc1489bae7038e5586cad0f9c32f078a0ce5f825998a2d6d116456641d3",
+      "bytes": 29167,
+      "at": "2026-10-23T16:23:49+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/test-output.txt",
+      "sha256": "c594bd9f07fbcbcefbcf33a24254530c5abdf710c31989cd662e1d5b45c7efa4",
+      "bytes": 40813,
+      "at": "2026-10-23T16:23:49+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/merge-gate-probe.txt",
+      "sha256": "29be52fad4ecc1ce69a925211cc0d1282347c85f596af0d839d7822e11f42761",
+      "bytes": 1079,
+      "at": "2026-10-23T16:23:49+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/real-run.txt",
+      "sha256": "5db65752f5bf1abbcccbd611f9a3a137af453ef1aa4fa9530633aa9b7ad4483d",
+      "bytes": 562,
+      "at": "2026-10-23T16:23:49+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/probe-old-code.txt",
+      "sha256": "711405277e096f77fa534148d08fc27f4c241711c7dca39475ff11146e914b48",
+      "bytes": 14459,
+      "at": "2026-10-23T16:23:49+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/probe_merge_gate.py",
+      "sha256": "b8c5b54d5d81f75ebfa343410a949b4e7361c843db7c2fb6b5023e3b46b8bd8d",
+      "bytes": 13348,
+      "at": "2026-10-23T16:23:49+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/commit.txt",
+      "sha256": "417752f7505b1979ce33a16013a483b40db2290ab9739ef4fb5e4f0b2e01d671",
+      "bytes": 691,
+      "at": "2026-10-23T16:23:49+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/diff.txt",
+      "sha256": "64d740536358ff98da78532110cfe9899ca4a6e270cc9c171580ed08c799385b",
+      "bytes": 19732,
+      "at": "2026-10-23T16:23:49+08:00",
+      "id": "E-009"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:rev-034",
+    "verdict": "PASS",
+    "note": "034 PASS。291 tests OK(skipped=1)；独立 10/10 探针：伪造 QUEUE_ADD（坏链）→ merge-check exit2 且失败项仅 ledger chain intact（verify-ledger 同红）；只有 QUEUE_ADD 无 ENVELOPE_NEW → envelope_new recorded 失败；复制信封改 id → merge-check 与 merge 均在命令级 identity 失败且无副作用；正常流程四项新检查全 ok；legacy 三项新式检查缺省；伪造 primary 行同样被链检查抓；删除 primary.jsonl 仍显示链 ok（R4）；ledger 不可读会 traceback exit1（R5）。真实塔 34/33/drift 0、verify-ledger 0 error。旧码对照 5 failures/3 errors 恰为新用例。9/9 证据哈希与 spec_sha256 匹配；scope 恰两文件；634 文件只读快照一致。非阻塞：F1 命令级 identity 用 str() 比较（exact check 仍拦），F2 identity 不随 baseline 门（更严）；残余 R1 legacy 降级仍可绕过、R2 链可重算伪造（tamper-evident 非防篡改）、R3 任意坏行阻塞全部门、R4 缺失 ledger 不算错、R5 不可读 ledger 崩溃、R6 O(ledger) 成本、R7 ENVELOPE_NEW 只绑 id。",
+    "at": "2026-10-23T16:34:12+08:00"
+  },
+  "decision": {
+    "id": "D-RUN-D-034",
+    "actor": "owner",
+    "text": "owner approved RUN-2026-10-23-D; card 1/2 PASS",
+    "at": "2026-10-23T16:34:12+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-034/CLOSEOUT.md",
+    "at": "2026-10-23T16:34:12+08:00"
+  },
+  "created_at": "2026-10-23T16:12:28+08:00",
+  "updated_at": "2026-10-23T16:34:12+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-034/MERGE.md",
+  "delivered_at": "2026-10-23T16:23:49+08:00",
+  "accepted_at": "2026-10-23T16:34:12+08:00"
+}

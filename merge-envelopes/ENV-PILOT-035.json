@@ -1,0 +1,57 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-035",
+  "task": "PILOT-035",
+  "repository": "..",
+  "branch": "pilot/PILOT-035",
+  "base": "main",
+  "implementation_head_sha": "92128a89da4aca182e166409962b513ed125bd88",
+  "envelope_path": "merge-envelopes/ENV-PILOT-035.json",
+  "created_at": "2026-10-23T17:01:43+08:00",
+  "scope": "PILOT-035: repair half-written queue entries",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 291,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-035/evidence/towerctl.py",
+      "sha256": "7bc2e030eaaa7ac017746350268966d47b578a038140544427b84c15f3c5a2eb"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/test_envelope_baseline.py",
+      "sha256": "353c46d0b1f21fe88c106dd3f3f565ca589ac45ac6dbf436834579a7643d204e"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/test-output.txt",
+      "sha256": "2ab06bf10a82a365604892b96befaaf4e2b0e44370441305defc0fdd95ecb1d4"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/repair-probe.txt",
+      "sha256": "03516ea86fba4e191a765be3437fb96b46ec78ef5df648927fa97ff056acdf02"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/repair_probe.py",
+      "sha256": "1f2a6378ae79479580735dfaad945a29ca0978e72f0f33ad6b325448a2f7b3ef"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/real-run.txt",
+      "sha256": "713c6fa1bb24662847f47bd846a081465ec471b3467d7eaba76ac482e3f2d217"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/probe-old-code.txt",
+      "sha256": "5f494aaa7dd3c58d062b80a1a7ef1cd3dd9228057483c84f148d41984b974fa6"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/commit.txt",
+      "sha256": "29f2b34dafe3772c8e23882a8598a42c767344eb14c4d81df18e716425e88bab"
+    },
+    {
+      "path": "tasks/PILOT-035/evidence/diff.txt",
+      "sha256": "f526d75feaa740ce9a9f85adf968a1494261d3881e157f8a96501cdf3f14f77e"
+    }
+  ]
+}

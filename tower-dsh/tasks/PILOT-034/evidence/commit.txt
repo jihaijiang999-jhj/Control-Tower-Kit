@@ -1,0 +1,15 @@
+commit 40fe65c59ec705e2b1369a773682e5fd201154e3
+Author:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+AuthorDate: Fri Oct 23 16:23:34 2026 +0800
+Commit:     mac (jihaijiang999-jhj) <254049034+jihaijiang999-jhj@users.noreply.github.com>
+CommitDate: Fri Oct 23 16:23:34 2026 +0800
+
+    PILOT-034: merge gate verifies ledger chain, envelope_new and identity
+
+ tower-dsh/tools/tests/test_envelope_baseline.py | 174 ++++++++++++++++++++++--
+ tower-dsh/tools/towerctl.py                     |  66 +++++++--
+ 2 files changed, 218 insertions(+), 22 deletions(-)
+
+files changed vs main:
+tower-dsh/tools/tests/test_envelope_baseline.py
+tower-dsh/tools/towerctl.py

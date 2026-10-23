@@ -1,0 +1,319 @@
+PILOT-034 old-code contrast
+old code : main:tower-dsh/tools/towerctl.py (envelope_checks(root, env), no identity/chain/ENVELOPE_NEW gate)
+new tests: worktree tower-dsh/tools/tests/test_envelope_baseline.py (17 tests)
+temp root: evidence/old-code-probe/tmp (no real-tower writes)
+run_at: 2026-10-23T16:23:13+08:00
+expect: the new gate tests fail/error against main's towerctl; pre-existing tests still pass
+
+test_copied_envelope_identity_is_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_copied_envelope_identity_is_rejected) ... FAIL
+test_duplicate_queue_add_is_still_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_duplicate_queue_add_is_still_rejected) ... ok
+test_forged_queue_add_row_fails_ledger_chain_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_forged_queue_add_row_fails_ledger_chain_check) ... FAIL
+test_handwritten_queue_entry_blocks_merge (test_envelope_baseline.EnvelopeBaselineTestCase.test_handwritten_queue_entry_blocks_merge) ... FAIL
+test_handwritten_queue_entry_fails_merge_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_handwritten_queue_entry_fails_merge_check) ... FAIL
+test_identity_check_names_both_ids_when_called_directly (test_envelope_baseline.EnvelopeBaselineTestCase.test_identity_check_names_both_ids_when_called_directly) ... ERROR
+test_invalid_baseline_values_are_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_invalid_baseline_values_are_rejected) ... ok
+test_legacy_envelope_without_baselines_still_merge_checks (test_envelope_baseline.EnvelopeBaselineTestCase.test_legacy_envelope_without_baselines_still_merge_checks) ... ERROR
+test_missing_tests_baseline_is_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_missing_tests_baseline_is_rejected) ... ok
+test_missing_tower_tests_baseline_is_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_missing_tower_tests_baseline_is_rejected) ... ok
+test_queue_add_accepts_envelope_created_by_envelope_new (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_accepts_envelope_created_by_envelope_new) ... ok
+test_queue_add_accepts_handwritten_valid_baselines (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_accepts_handwritten_valid_baselines) ... ok
+test_queue_add_backs_merge_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_backs_merge_check) ... ERROR
+test_queue_add_rejects_handwritten_missing_tests_baseline (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_rejects_handwritten_missing_tests_baseline) ... ok
+test_queue_add_rejects_handwritten_missing_tower_tests_baseline (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_rejects_handwritten_missing_tower_tests_baseline) ... ok
+test_queue_add_without_envelope_new_fails_merge_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_without_envelope_new_fails_merge_check) ... FAIL
+test_valid_baselines_create_draft_and_ledger_event (test_envelope_baseline.EnvelopeBaselineTestCase.test_valid_baselines_create_draft_and_ledger_event) ... ok
+
+======================================================================
+ERROR: test_identity_check_names_both_ids_when_called_directly (test_envelope_baseline.EnvelopeBaselineTestCase.test_identity_check_names_both_ids_when_called_directly)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-034\evidence\old-code-probe\tower-dsh\tools\tests\test_envelope_baseline.py", line 558, in test_identity_check_names_both_ids_when_called_directly
+    checks = towerctl.envelope_checks(self.root, env,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: envelope_checks() got an unexpected keyword argument 'expected_id'
+
+======================================================================
+ERROR: test_legacy_envelope_without_baselines_still_merge_checks (test_envelope_baseline.EnvelopeBaselineTestCase.test_legacy_envelope_without_baselines_still_merge_checks)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-034\evidence\old-code-probe\tower-dsh\tools\tests\test_envelope_baseline.py", line 608, in test_legacy_envelope_without_baselines_still_merge_checks
+    identity = next(c for c in payload["checks"]
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
+
+======================================================================
+ERROR: test_queue_add_backs_merge_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_backs_merge_check)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-034\evidence\old-code-probe\tower-dsh\tools\tests\test_envelope_baseline.py", line 433, in test_queue_add_backs_merge_check
+    self.assertTrue(checks["envelope identity matches request"]["ok"],
+                    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'envelope identity matches request'
+
+======================================================================
+FAIL: test_copied_envelope_identity_is_rejected (test_envelope_baseline.EnvelopeBaselineTestCase.test_copied_envelope_identity_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-034\evidence\old-code-probe\tower-dsh\tools\tests\test_envelope_baseline.py", line 541, in test_copied_envelope_identity_is_rejected
+    self.assertEqual(cp.returncode, 2,
+AssertionError: 0 != 2 : stdout={
+  "ok": true,
+  "envelope": "ENV-COPY-001",
+  "checks": [
+    {
+      "name": "repository exists",
+      "ok": true,
+      "detail": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-034\\evidence\\old-code-probe\\tmp\\towerctl-envelope-baseline-jo1qfhlf\\kit"
+    },
+    {
+      "name": "queue entry backed by ledger",
+      "ok": true,
+      "detail": "QUEUE_ADD event present"
+    },
+    {
+      "name": "branch head == envelope head",
+      "ok": true,
+      "detail": "738b20f90ae9fe02a614eff7fce6ac5760806d52 vs 738b20f90ae9fe02a614eff7fce6ac5760806d52"
+    },
+    {
+      "name": "envelope parent == implementation head",
+      "ok": true,
+      "detail": "9cab79bf5ffd30c5e2491129c6845cf1c665be35 vs 9cab79bf5ffd30c5e2491129c6845cf1c665be35"
+    },
+    {
+      "name": "envelope commit only changes envelope path",
+      "ok": true,
+      "detail": "['merge-envelopes/ENV-BASE-001.json'] vs [merge-envelopes/ENV-BASE-001.json]"
+    },
+    {
+      "name": "base main is ancestor of implementation",
+      "ok": true,
+      "detail": "main..9cab79bf5ffd30c5e2491129c6845cf1c665be35"
+    },
+    {
+      "name": "task record",
+      "ok": true,
+      "detail": "T-BASE-001"
+    },
+    {
+      "name": "task accepted/closed",
+      "ok": true,
+      "detail": "accepted"
+    },
+    {
+      "name": "review PASS",
+      "ok": true,
+      "detail": "PASS"
+    },
+    {
+      "name": "reviewer != executor",
+      "ok": true,
+      "detail": "rev-a vs exec-a"
+    },
+    {
+      "name": "evidence hashes valid",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "queued",
+      "ok": true,
+      "detail": "WAITING"
+    }
+  ]
+}
+
+stderr=
+
+======================================================================
+FAIL: test_forged_queue_add_row_fails_ledger_chain_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_forged_queue_add_row_fails_ledger_chain_check)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-034\evidence\old-code-probe\tower-dsh\tools\tests\test_envelope_baseline.py", line 476, in test_forged_queue_add_row_fails_ledger_chain_check
+    self.assertEqual(cp.returncode, 2,
+AssertionError: 0 != 2 : stdout={
+  "ok": true,
+  "envelope": "ENV-BASE-001",
+  "checks": [
+    {
+      "name": "repository exists",
+      "ok": true,
+      "detail": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-034\\evidence\\old-code-probe\\tmp\\towerctl-envelope-baseline-gpc3kqg_\\kit"
+    },
+    {
+      "name": "queue entry backed by ledger",
+      "ok": true,
+      "detail": "QUEUE_ADD event present"
+    },
+    {
+      "name": "branch head == envelope head",
+      "ok": true,
+      "detail": "660b71b4190ca8c85b91d2cdbddb76deeb91255d vs 660b71b4190ca8c85b91d2cdbddb76deeb91255d"
+    },
+    {
+      "name": "envelope parent == implementation head",
+      "ok": true,
+      "detail": "f9dd51204a05f8852518bf178782a9be0b4cdc48 vs f9dd51204a05f8852518bf178782a9be0b4cdc48"
+    },
+    {
+      "name": "envelope commit only changes envelope path",
+      "ok": true,
+      "detail": "['merge-envelopes/ENV-BASE-001.json'] vs [merge-envelopes/ENV-BASE-001.json]"
+    },
+    {
+      "name": "base main is ancestor of implementation",
+      "ok": true,
+      "detail": "main..f9dd51204a05f8852518bf178782a9be0b4cdc48"
+    },
+    {
+      "name": "task record",
+      "ok": true,
+      "detail": "T-BASE-001"
+    },
+    {
+      "name": "task accepted/closed",
+      "ok": true,
+      "detail": "accepted"
+    },
+    {
+      "name": "review PASS",
+      "ok": true,
+      "detail": "PASS"
+    },
+    {
+      "name": "reviewer != executor",
+      "ok": true,
+      "detail": "rev-a vs exec-a"
+    },
+    {
+      "name": "evidence hashes valid",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "queued",
+      "ok": true,
+      "detail": "WAITING"
+    }
+  ]
+}
+
+stderr=
+
+======================================================================
+FAIL: test_handwritten_queue_entry_blocks_merge (test_envelope_baseline.EnvelopeBaselineTestCase.test_handwritten_queue_entry_blocks_merge)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-034\evidence\old-code-probe\tower-dsh\tools\tests\test_envelope_baseline.py", line 406, in test_handwritten_queue_entry_blocks_merge
+    self.assertEqual([c["name"] for c in payload["errors"]],
+AssertionError: Lists differ: ['queue entry backed by ledger'] != ['envelope_new recorded', 'queue entry backed by ledger']
+
+First differing element 0:
+'queue entry backed by ledger'
+'envelope_new recorded'
+
+Second list contains 1 additional elements.
+First extra element 1:
+'queue entry backed by ledger'
+
+- ['queue entry backed by ledger']
++ ['envelope_new recorded', 'queue entry backed by ledger']
+
+======================================================================
+FAIL: test_handwritten_queue_entry_fails_merge_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_handwritten_queue_entry_fails_merge_check)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-034\evidence\old-code-probe\tower-dsh\tools\tests\test_envelope_baseline.py", line 386, in test_handwritten_queue_entry_fails_merge_check
+    self.assertEqual([c["name"] for c in payload["errors"]],
+AssertionError: Lists differ: ['queue entry backed by ledger'] != ['envelope_new recorded', 'queue entry backed by ledger']
+
+First differing element 0:
+'queue entry backed by ledger'
+'envelope_new recorded'
+
+Second list contains 1 additional elements.
+First extra element 1:
+'queue entry backed by ledger'
+
+- ['queue entry backed by ledger']
++ ['envelope_new recorded', 'queue entry backed by ledger']
+
+======================================================================
+FAIL: test_queue_add_without_envelope_new_fails_merge_check (test_envelope_baseline.EnvelopeBaselineTestCase.test_queue_add_without_envelope_new_fails_merge_check)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-034\evidence\old-code-probe\tower-dsh\tools\tests\test_envelope_baseline.py", line 511, in test_queue_add_without_envelope_new_fails_merge_check
+    self.assertEqual(cp.returncode, 2,
+AssertionError: 0 != 2 : stdout={
+  "ok": true,
+  "envelope": "ENV-BASE-001",
+  "checks": [
+    {
+      "name": "repository exists",
+      "ok": true,
+      "detail": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-034\\evidence\\old-code-probe\\tmp\\towerctl-envelope-baseline-nwm3u1wi\\kit"
+    },
+    {
+      "name": "queue entry backed by ledger",
+      "ok": true,
+      "detail": "QUEUE_ADD event present"
+    },
+    {
+      "name": "branch head == envelope head",
+      "ok": true,
+      "detail": "1bb0e8b22087e2d6fd47b451021705603ac79692 vs 1bb0e8b22087e2d6fd47b451021705603ac79692"
+    },
+    {
+      "name": "envelope parent == implementation head",
+      "ok": true,
+      "detail": "5d75dde30d9539693a54406f14928cfd8f979b0c vs 5d75dde30d9539693a54406f14928cfd8f979b0c"
+    },
+    {
+      "name": "envelope commit only changes envelope path",
+      "ok": true,
+      "detail": "['merge-envelopes/ENV-BASE-001.json'] vs [merge-envelopes/ENV-BASE-001.json]"
+    },
+    {
+      "name": "base main is ancestor of implementation",
+      "ok": true,
+      "detail": "main..5d75dde30d9539693a54406f14928cfd8f979b0c"
+    },
+    {
+      "name": "task record",
+      "ok": true,
+      "detail": "T-BASE-001"
+    },
+    {
+      "name": "task accepted/closed",
+      "ok": true,
+      "detail": "accepted"
+    },
+    {
+      "name": "review PASS",
+      "ok": true,
+      "detail": "PASS"
+    },
+    {
+      "name": "reviewer != executor",
+      "ok": true,
+      "detail": "rev-a vs exec-a"
+    },
+    {
+      "name": "evidence hashes valid",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "queued",
+      "ok": true,
+      "detail": "WAITING"
+    }
+  ]
+}
+
+stderr=
+
+----------------------------------------------------------------------
+Ran 17 tests in 11.746s
+
+FAILED (failures=5, errors=3)

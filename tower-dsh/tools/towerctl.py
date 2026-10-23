@@ -2095,8 +2095,6 @@ def cmd_queue_add(root: Path, args) -> None:
         fail([f"envelope not found: {args.envelope}"])
     env = jload(env_path)
     queue = load_queue(root)
-    if any(e.get("envelope_id") == envelope_id for e in queue.get("entries", [])):
-        fail([f"envelope already queued: {args.envelope}"])
     # ``envelope-new`` requires both count baselines, but a hand-written
     # ``supervision/envelopes/<id>.json`` never passes through it, so queueing
     # it used to be the bypass: the post-merge gates treat the baselines as
@@ -2113,6 +2111,25 @@ def cmd_queue_add(root: Path, args) -> None:
             and tower_tests_baseline >= 1):
         fail(["envelope tests_baseline and tower_tests_baseline must be positive "
               "integers (int >= 1)"])
+    # The queue entry is written before the ledger event, so a crash between
+    # the two leaves a WAITING entry with no ``QUEUE_ADD``: a persistent
+    # ``queue_unbacked`` that a retry used to refuse as "already queued".
+    # After the baseline gate has admitted the envelope, an existing entry is
+    # a half-write iff the ledger never recorded its ``QUEUE_ADD``; finish
+    # that one write (event only, entry untouched) instead of dead-ending.
+    # A ledger-backed entry is a real duplicate and still fails.  The repair
+    # never runs for an envelope the baseline gate rejects, above.
+    existing = next((e for e in queue.get("entries", [])
+                     if e.get("envelope_id") == envelope_id), None)
+    if existing is not None:
+        if ledger_has_queue_add(root, envelope_id):
+            fail([f"envelope already queued: {args.envelope}"])
+        append_supervision_ledger(root, "QUEUE_ADD", "primary",
+                                  {"envelope": args.envelope,
+                                   "task": env.get("task")})
+        emit({"ok": True, "envelope": args.envelope, "status": "WAITING",
+              "repaired": True})
+        return
     queue.setdefault("entries", []).append({
         "envelope_id": envelope_id,
         "task": env.get("task"),

@@ -1,0 +1,21 @@
+PILOT-034 real-tower read-only probe
+command: python -B tower-dsh/tools/towerctl.py --root C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh state-verify
+mode: read-only (state-verify emits JSON only; no tower writes)
+run_at: 2026-10-23T16:22:58+08:00
+expect: ok=true, tasks=34, envelopes=33, drift=[]
+
+{
+  "ok": true,
+  "tasks": 34,
+  "envelopes": 33,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 1,
+  "evidence_checked": 246
+}

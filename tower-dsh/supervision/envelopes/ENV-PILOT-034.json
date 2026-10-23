@@ -1,0 +1,72 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-034",
+  "task": "PILOT-034",
+  "repository": "..",
+  "branch": "pilot/PILOT-034",
+  "base": "main",
+  "implementation_head_sha": "40fe65c59ec705e2b1369a773682e5fd201154e3",
+  "envelope_path": "merge-envelopes/ENV-PILOT-034.json",
+  "created_at": "2026-10-23T16:34:18+08:00",
+  "scope": "PILOT-034: merge gate verifies ledger chain, envelope_new and identity",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 287,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-034/evidence/towerctl.py",
+      "sha256": "ef723ebbcd73f7332e8c269ec18b3c70a45db4856f680276a66175d8cbb64f9c"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/test_envelope_baseline.py",
+      "sha256": "bd8c4fc1489bae7038e5586cad0f9c32f078a0ce5f825998a2d6d116456641d3"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/test-output.txt",
+      "sha256": "c594bd9f07fbcbcefbcf33a24254530c5abdf710c31989cd662e1d5b45c7efa4"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/merge-gate-probe.txt",
+      "sha256": "29be52fad4ecc1ce69a925211cc0d1282347c85f596af0d839d7822e11f42761"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/real-run.txt",
+      "sha256": "5db65752f5bf1abbcccbd611f9a3a137af453ef1aa4fa9530633aa9b7ad4483d"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/probe-old-code.txt",
+      "sha256": "711405277e096f77fa534148d08fc27f4c241711c7dca39475ff11146e914b48"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/probe_merge_gate.py",
+      "sha256": "b8c5b54d5d81f75ebfa343410a949b4e7361c843db7c2fb6b5023e3b46b8bd8d"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/commit.txt",
+      "sha256": "417752f7505b1979ce33a16013a483b40db2290ab9739ef4fb5e4f0b2e01d671"
+    },
+    {
+      "path": "tasks/PILOT-034/evidence/diff.txt",
+      "sha256": "64d740536358ff98da78532110cfe9899ca4a6e270cc9c171580ed08c799385b"
+    }
+  ],
+  "envelope_head_sha": "431e05a0026349b2dd19e60df5420b86797c3752",
+  "status": "POST_MERGE_VERIFIED",
+  "pr_number": 19,
+  "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/19",
+  "remote_merged": true,
+  "remote_merged_at": "2026-10-23T16:38:09+08:00",
+  "merge_commit": "7f122b8fd92d01a3b3f1b86c64ec2a42c979970e",
+  "merged_at": "2026-10-23T16:38:11+08:00",
+  "supervisor": "sup-run-d-verify",
+  "merge_mode": "pr",
+  "check_conclusion": "success",
+  "tests_count": 2,
+  "tower_tests_count": 291,
+  "post_merge_at": "2026-10-23T16:41:56+08:00",
+  "post_merge_note": "merge gate self-verification; root 2/2, tower 291/287, anchor 281"
+}
