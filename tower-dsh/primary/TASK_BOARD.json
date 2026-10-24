@@ -361,7 +361,17 @@
       "reviewer": "subagent:ca85fa50-d817-4714-a0b7-563237d90ba8",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-036/MERGE.md",
       "updated_at": "2026-10-23T18:27:03+08:00"
+    },
+    {
+      "id": "PILOT-037",
+      "title": "授权态单写者：state/AUTHORITY.json + authority-check，把 merge 权限从字符串变成登记身份",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:ecd81442-d4f0-4fc0-9b9a-94b037923b74",
+      "reviewer": "subagent:50413a27-baf7-4c93-876d-f183fe168d6b",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-037/MERGE.md",
+      "updated_at": "2026-10-24T18:46:51+08:00"
     }
   ],
-  "updated_at": "2026-10-23T18:27:03+08:00"
+  "updated_at": "2026-10-24T18:46:51+08:00"
 }

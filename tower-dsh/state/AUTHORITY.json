@@ -1,0 +1,17 @@
+{
+  "schema": "tower/authority-state@1",
+  "tower_id": "tower-dsh",
+  "owner": "mac",
+  "primary": {
+    "id": "ctl-yingxian-qa-001"
+  },
+  "supervision": {
+    "id": "sup-phase2-pilot"
+  },
+  "merge_authority": "sup-phase2-pilot",
+  "revision": 1,
+  "set_by": "mac",
+  "decision": "D-PILOT-037",
+  "set_at": "2026-10-24T18:46:56+08:00",
+  "note": "PILOT-037 backfill: pin registered supervisor as merge authority"
+}

@@ -1,0 +1,1284 @@
+new tool: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-037\tower-dsh\tools\towerctl.py
+== probe 1: authority-set happy path ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\01-set\\kit\\tower-dsh', 'authority-set', '--supervisor', 'sup-phase2-pilot', '--decision', 'D-PILOT-037', '--by', 'mac']
+{
+  "exit": 0,
+  "merge_authority": "sup-phase2-pilot",
+  "ok": true,
+  "path": "state/AUTHORITY.json",
+  "revision": 1
+}
+file=state/AUTHORITY.json exists=True revision=1 authority_events=1
+
+== probe 1b: authority-check configured ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\01-set\\kit\\tower-dsh', 'authority-check']
+{
+  "authority_checks": [
+    {
+      "detail": "state/AUTHORITY.json",
+      "name": "authority state file readable",
+      "ok": true
+    },
+    {
+      "detail": "schema 'tower/authority-state@1'",
+      "name": "authority schema is tower/authority-state@1",
+      "ok": true
+    },
+    {
+      "detail": "AUTHORITY_SET revision 1",
+      "name": "authority state backed by ledger",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority field types",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority tower_id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'mac' vs primary state 'mac'",
+      "name": "authority owner matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'ctl-probe-primary' vs primary state 'ctl-probe-primary'",
+      "name": "authority primary.id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'sup-phase2-pilot' vs supervision state 'sup-phase2-pilot'",
+      "name": "authority supervision.id matches supervision state",
+      "ok": true
+    },
+    {
+      "detail": "merge authority 'sup-phase2-pilot' vs primary 'ctl-probe-primary'",
+      "name": "merge authority differs from primary",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority ledger payload types",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": true
+    }
+  ],
+  "exit": 0,
+  "failed_checks": [],
+  "ok": true,
+  "status": "configured"
+}
+
+== probe 2: authority-set --by mallory ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\02-by\\kit\\tower-dsh', 'authority-set', '--supervisor', 'sup-phase2-pilot', '--decision', 'D-X', '--by', 'mallory']
+{
+  "errors": [
+    "only the registered owner may set authority: --by 'mallory' != owner 'mac'"
+  ],
+  "exit": 2,
+  "ok": false
+}
+file_exists=False authority_events=0
+
+== probe 3: authority-set --supervisor <primary.id> ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\03-primary\\kit\\tower-dsh', 'authority-set', '--supervisor', 'ctl-probe-primary', '--decision', 'D-X', '--by', 'mac']
+{
+  "errors": [
+    "--supervisor 'ctl-probe-primary' is not the registered supervisor 'sup-phase2-pilot'",
+    "--supervisor 'ctl-probe-primary' must differ from primary.id 'ctl-probe-primary'"
+  ],
+  "exit": 2,
+  "ok": false
+}
+file_exists=False authority_events=0
+
+== probe 4: authority-set --supervisor sup-rogue ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\04-sup\\kit\\tower-dsh', 'authority-set', '--supervisor', 'sup-rogue', '--decision', 'D-X', '--by', 'mac']
+{
+  "errors": [
+    "--supervisor 'sup-rogue' is not the registered supervisor 'sup-phase2-pilot'"
+  ],
+  "exit": 2,
+  "ok": false
+}
+file_exists=False authority_events=0
+
+== probe 5a: authority-check after tamper ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\05-tamper\\kit\\tower-dsh', 'authority-check']
+{
+  "authority_checks": [
+    {
+      "detail": "state/AUTHORITY.json",
+      "name": "authority state file readable",
+      "ok": true
+    },
+    {
+      "detail": "schema 'tower/authority-state@1'",
+      "name": "authority schema is tower/authority-state@1",
+      "ok": true
+    },
+    {
+      "detail": "AUTHORITY_SET revision 1",
+      "name": "authority state backed by ledger",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority field types",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority tower_id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'mac' vs primary state 'mac'",
+      "name": "authority owner matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'ctl-probe-primary' vs primary state 'ctl-probe-primary'",
+      "name": "authority primary.id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'sup-phase2-pilot' vs supervision state 'sup-phase2-pilot'",
+      "name": "authority supervision.id matches supervision state",
+      "ok": true
+    },
+    {
+      "detail": "merge authority 'sup-rogue' vs primary 'ctl-probe-primary'",
+      "name": "merge authority differs from primary",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority ledger payload types",
+      "ok": true
+    },
+    {
+      "detail": "mismatch: merge_authority 'sup-rogue' != 'sup-phase2-pilot'",
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": false
+    }
+  ],
+  "exit": 2,
+  "failed_checks": [
+    {
+      "detail": "mismatch: merge_authority 'sup-rogue' != 'sup-phase2-pilot'",
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": false
+    }
+  ],
+  "ok": false,
+  "status": "configured"
+}
+
+== probe 5b: state-verify after tamper ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\05-tamper\\kit\\tower-dsh', 'state-verify']
+{
+  "drift": [
+    {
+      "actual": {
+        "decision": "D-PILOT-037",
+        "merge_authority": "sup-rogue",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": 1,
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:47+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-dsh"
+      },
+      "expected": {
+        "decision": "D-PILOT-037",
+        "merge_authority": "sup-phase2-pilot",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": 1,
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:47+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-dsh"
+      },
+      "kind": "authority_mismatch",
+      "target": "AUTHORITY"
+    }
+  ],
+  "exit": 2,
+  "ok": false,
+  "skipped": [
+    {
+      "kind": "task",
+      "reason": "no_lifecycle_events",
+      "target": "T-PROBE-001"
+    }
+  ]
+}
+
+== probe 6a: authority-check after delete ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\06-missing\\kit\\tower-dsh', 'authority-check']
+{
+  "authority_checks": [
+    {
+      "detail": "ledger/primary.jsonl has an AUTHORITY_SET event but state/AUTHORITY.json is missing",
+      "name": "authority state file present",
+      "ok": false
+    },
+    {
+      "detail": "AUTHORITY_SET revision 1",
+      "name": "authority state backed by ledger",
+      "ok": true
+    }
+  ],
+  "exit": 2,
+  "failed_checks": [
+    {
+      "detail": "ledger/primary.jsonl has an AUTHORITY_SET event but state/AUTHORITY.json is missing",
+      "name": "authority state file present",
+      "ok": false
+    }
+  ],
+  "ok": false,
+  "status": "configured"
+}
+
+== probe 6b: state-verify after delete ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\06-missing\\kit\\tower-dsh', 'state-verify']
+{
+  "drift": [
+    {
+      "actual": "missing",
+      "expected": "state/AUTHORITY.json matching the last AUTHORITY_SET event",
+      "kind": "authority_missing",
+      "target": "AUTHORITY"
+    },
+    {
+      "actual": "no lifecycle events",
+      "expected": "QUEUE_ADD ledger event",
+      "kind": "queue_unbacked",
+      "target": "ENV-PROBE-001"
+    }
+  ],
+  "exit": 2,
+  "ok": false,
+  "skipped": [
+    {
+      "kind": "task",
+      "reason": "no_lifecycle_events",
+      "target": "T-PROBE-001"
+    }
+  ]
+}
+
+== probe 6c: merge with event but no file ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\06-missing\\kit\\tower-dsh', 'merge', '--role', 'supervisor', '--supervisor', 'sup-phase2-pilot', '--envelope', 'ENV-PROBE-001']
+{
+  "errors": [
+    "authority state file present: ledger/primary.jsonl has an AUTHORITY_SET event but state/AUTHORITY.json is missing"
+  ],
+  "exit": 2,
+  "ok": false
+}
+queue_status=WAITING MERGE_START=False
+
+== probe 7a: authority-check with file only ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\07-unbacked\\kit\\tower-dsh', 'authority-check']
+{
+  "authority_checks": [
+    {
+      "detail": "state/AUTHORITY.json",
+      "name": "authority state file readable",
+      "ok": true
+    },
+    {
+      "detail": "schema 'tower/authority-state@1'",
+      "name": "authority schema is tower/authority-state@1",
+      "ok": true
+    },
+    {
+      "detail": "state/AUTHORITY.json exists but ledger/primary.jsonl has no AUTHORITY_SET event",
+      "name": "authority state backed by ledger",
+      "ok": false
+    },
+    {
+      "detail": "ok",
+      "name": "authority field types",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority tower_id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'mac' vs primary state 'mac'",
+      "name": "authority owner matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'ctl-probe-primary' vs primary state 'ctl-probe-primary'",
+      "name": "authority primary.id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'sup-phase2-pilot' vs supervision state 'sup-phase2-pilot'",
+      "name": "authority supervision.id matches supervision state",
+      "ok": true
+    },
+    {
+      "detail": "merge authority 'sup-phase2-pilot' vs primary 'ctl-probe-primary'",
+      "name": "merge authority differs from primary",
+      "ok": true
+    },
+    {
+      "detail": "no usable AUTHORITY_SET event to compare against",
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": false
+    }
+  ],
+  "exit": 2,
+  "failed_checks": [
+    {
+      "detail": "state/AUTHORITY.json exists but ledger/primary.jsonl has no AUTHORITY_SET event",
+      "name": "authority state backed by ledger",
+      "ok": false
+    },
+    {
+      "detail": "no usable AUTHORITY_SET event to compare against",
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": false
+    }
+  ],
+  "ok": false,
+  "status": "configured"
+}
+
+== probe 7b: state-verify with file only ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\07-unbacked\\kit\\tower-dsh', 'state-verify']
+{
+  "drift": [
+    {
+      "actual": "file only",
+      "expected": "AUTHORITY_SET ledger event",
+      "kind": "authority_unbacked",
+      "target": "AUTHORITY"
+    }
+  ],
+  "exit": 2,
+  "ok": false,
+  "skipped": [
+    {
+      "kind": "task",
+      "reason": "no_lifecycle_events",
+      "target": "T-PROBE-001"
+    }
+  ]
+}
+
+== probe 8a: merge --supervisor rogue ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\08-pin\\kit\\tower-dsh', 'merge', '--role', 'supervisor', '--supervisor', 'rogue', '--envelope', 'ENV-PROBE-001']
+{
+  "errors": [
+    "merge authority mismatch: state pins sup-phase2-pilot, request rogue"
+  ],
+  "exit": 2,
+  "ok": false
+}
+
+== probe 8b: merge --supervisor <pin> (passes identity) ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\08-pin\\kit\\tower-dsh', 'merge', '--role', 'supervisor', '--supervisor', 'sup-phase2-pilot', '--envelope', 'ENV-PROBE-001']
+{
+  "errors": [
+    "envelope not found: ENV-PROBE-001"
+  ],
+  "exit": 2,
+  "ok": false
+}
+
+== probe 8c: merge-check configured ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\08-pin\\kit\\tower-dsh', 'merge-check', '--envelope', 'ENV-PROBE-001']
+{
+  "authority_checks": [
+    {
+      "detail": "merge authority pinned: sup-phase2-pilot",
+      "name": "merge authority pinned",
+      "ok": true
+    }
+  ],
+  "exit": 0,
+  "failed_checks": [],
+  "ok": true
+}
+
+== probe 9a: merge-check legacy ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\09-legacy\\kit\\tower-dsh', 'merge-check', '--envelope', 'ENV-PROBE-001']
+{
+  "authority_checks": [
+    {
+      "detail": "legacy: no AUTHORITY_SET",
+      "name": "merge authority",
+      "ok": true
+    }
+  ],
+  "exit": 0,
+  "failed_checks": [],
+  "ok": true
+}
+
+== probe 9b: authority-check legacy ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\09-legacy\\kit\\tower-dsh', 'authority-check']
+{
+  "authority_checks": [
+    {
+      "detail": "legacy: no state/AUTHORITY.json and no AUTHORITY_SET event",
+      "name": "authority state",
+      "ok": true
+    }
+  ],
+  "exit": 0,
+  "failed_checks": [],
+  "ok": true,
+  "status": "legacy"
+}
+
+== probe 10a: authority-set re-run repair ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\10-rerun\\kit\\tower-dsh', 'authority-set', '--supervisor', 'sup-phase2-pilot', '--decision', 'D-PILOT-037-RERUN', '--by', 'mac']
+{
+  "exit": 0,
+  "merge_authority": "sup-phase2-pilot",
+  "ok": true,
+  "path": "state/AUTHORITY.json",
+  "revision": 2
+}
+revision=2 authority_events=2
+
+== probe 10b: authority-check after repair ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\10-rerun\\kit\\tower-dsh', 'authority-check']
+{
+  "authority_checks": [
+    {
+      "detail": "state/AUTHORITY.json",
+      "name": "authority state file readable",
+      "ok": true
+    },
+    {
+      "detail": "schema 'tower/authority-state@1'",
+      "name": "authority schema is tower/authority-state@1",
+      "ok": true
+    },
+    {
+      "detail": "AUTHORITY_SET revision 2",
+      "name": "authority state backed by ledger",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority field types",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority tower_id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'mac' vs primary state 'mac'",
+      "name": "authority owner matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'ctl-probe-primary' vs primary state 'ctl-probe-primary'",
+      "name": "authority primary.id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'sup-phase2-pilot' vs supervision state 'sup-phase2-pilot'",
+      "name": "authority supervision.id matches supervision state",
+      "ok": true
+    },
+    {
+      "detail": "merge authority 'sup-phase2-pilot' vs primary 'ctl-probe-primary'",
+      "name": "merge authority differs from primary",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority ledger payload types",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": true
+    }
+  ],
+  "exit": 0,
+  "failed_checks": [],
+  "ok": true,
+  "status": "configured"
+}
+
+== probe 11a: authority-check after decision tamper ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\11-fields\\kit\\tower-dsh', 'authority-check']
+{
+  "authority_checks": [
+    {
+      "detail": "state/AUTHORITY.json",
+      "name": "authority state file readable",
+      "ok": true
+    },
+    {
+      "detail": "schema 'tower/authority-state@1'",
+      "name": "authority schema is tower/authority-state@1",
+      "ok": true
+    },
+    {
+      "detail": "AUTHORITY_SET revision 1",
+      "name": "authority state backed by ledger",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority field types",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority tower_id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'mac' vs primary state 'mac'",
+      "name": "authority owner matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'ctl-probe-primary' vs primary state 'ctl-probe-primary'",
+      "name": "authority primary.id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'sup-phase2-pilot' vs supervision state 'sup-phase2-pilot'",
+      "name": "authority supervision.id matches supervision state",
+      "ok": true
+    },
+    {
+      "detail": "merge authority 'sup-phase2-pilot' vs primary 'ctl-probe-primary'",
+      "name": "merge authority differs from primary",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority ledger payload types",
+      "ok": true
+    },
+    {
+      "detail": "mismatch: decision 'D-EVIL' != 'D-PILOT-037'",
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": false
+    }
+  ],
+  "exit": 2,
+  "failed_checks": [
+    {
+      "detail": "mismatch: decision 'D-EVIL' != 'D-PILOT-037'",
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": false
+    }
+  ],
+  "ok": false,
+  "status": "configured"
+}
+
+== probe 11b: state-verify after decision tamper ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\11-fields\\kit\\tower-dsh', 'state-verify']
+{
+  "drift": [
+    {
+      "actual": {
+        "decision": "D-EVIL",
+        "merge_authority": "sup-phase2-pilot",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": 1,
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:52+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-dsh"
+      },
+      "expected": {
+        "decision": "D-PILOT-037",
+        "merge_authority": "sup-phase2-pilot",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": 1,
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:52+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-dsh"
+      },
+      "kind": "authority_mismatch",
+      "target": "AUTHORITY"
+    }
+  ],
+  "exit": 2,
+  "ok": false,
+  "skipped": [
+    {
+      "kind": "task",
+      "reason": "no_lifecycle_events",
+      "target": "T-PROBE-001"
+    }
+  ]
+}
+
+== probe 11c: state-verify after tower_id tamper ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\11-fields\\kit\\tower-dsh', 'state-verify']
+{
+  "drift": [
+    {
+      "actual": {
+        "decision": "D-PILOT-037",
+        "merge_authority": "sup-phase2-pilot",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": 1,
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:52+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-evil"
+      },
+      "expected": {
+        "decision": "D-PILOT-037",
+        "merge_authority": "sup-phase2-pilot",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": 1,
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:52+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-dsh"
+      },
+      "kind": "authority_mismatch",
+      "target": "AUTHORITY"
+    }
+  ],
+  "exit": 2,
+  "ok": false,
+  "skipped": [
+    {
+      "kind": "task",
+      "reason": "no_lifecycle_events",
+      "target": "T-PROBE-001"
+    }
+  ]
+}
+
+== probe 12.1: revision=True ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\12-revision\\kit\\tower-dsh', 'authority-check']
+{
+  "authority_checks": [
+    {
+      "detail": "state/AUTHORITY.json",
+      "name": "authority state file readable",
+      "ok": true
+    },
+    {
+      "detail": "schema 'tower/authority-state@1'",
+      "name": "authority schema is tower/authority-state@1",
+      "ok": true
+    },
+    {
+      "detail": "AUTHORITY_SET revision 1",
+      "name": "authority state backed by ledger",
+      "ok": true
+    },
+    {
+      "detail": "file revision must be an int >= 1",
+      "name": "authority field types",
+      "ok": false
+    },
+    {
+      "detail": "ok",
+      "name": "authority tower_id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'mac' vs primary state 'mac'",
+      "name": "authority owner matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'ctl-probe-primary' vs primary state 'ctl-probe-primary'",
+      "name": "authority primary.id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'sup-phase2-pilot' vs supervision state 'sup-phase2-pilot'",
+      "name": "authority supervision.id matches supervision state",
+      "ok": true
+    },
+    {
+      "detail": "merge authority 'sup-phase2-pilot' vs primary 'ctl-probe-primary'",
+      "name": "merge authority differs from primary",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority ledger payload types",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": true
+    }
+  ],
+  "exit": 2,
+  "failed_checks": [
+    {
+      "detail": "file revision must be an int >= 1",
+      "name": "authority field types",
+      "ok": false
+    }
+  ],
+  "ok": false,
+  "status": "configured"
+}
+
+== probe 12.1b: state-verify revision=True ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\12-revision\\kit\\tower-dsh', 'state-verify']
+{
+  "drift": [
+    {
+      "actual": {
+        "decision": "D-PILOT-037",
+        "merge_authority": "sup-phase2-pilot",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": true,
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:53+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-dsh"
+      },
+      "expected": {
+        "decision": "D-PILOT-037",
+        "merge_authority": "sup-phase2-pilot",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": 1,
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:53+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-dsh"
+      },
+      "kind": "authority_mismatch",
+      "target": "AUTHORITY"
+    }
+  ],
+  "exit": 2,
+  "ok": false,
+  "skipped": [
+    {
+      "kind": "task",
+      "reason": "no_lifecycle_events",
+      "target": "T-PROBE-001"
+    }
+  ]
+}
+
+== probe 12.2: revision=1.0 ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\12-revision\\kit\\tower-dsh', 'authority-check']
+{
+  "authority_checks": [
+    {
+      "detail": "state/AUTHORITY.json",
+      "name": "authority state file readable",
+      "ok": true
+    },
+    {
+      "detail": "schema 'tower/authority-state@1'",
+      "name": "authority schema is tower/authority-state@1",
+      "ok": true
+    },
+    {
+      "detail": "AUTHORITY_SET revision 1",
+      "name": "authority state backed by ledger",
+      "ok": true
+    },
+    {
+      "detail": "file revision must be an int >= 1",
+      "name": "authority field types",
+      "ok": false
+    },
+    {
+      "detail": "ok",
+      "name": "authority tower_id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'mac' vs primary state 'mac'",
+      "name": "authority owner matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'ctl-probe-primary' vs primary state 'ctl-probe-primary'",
+      "name": "authority primary.id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'sup-phase2-pilot' vs supervision state 'sup-phase2-pilot'",
+      "name": "authority supervision.id matches supervision state",
+      "ok": true
+    },
+    {
+      "detail": "merge authority 'sup-phase2-pilot' vs primary 'ctl-probe-primary'",
+      "name": "merge authority differs from primary",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority ledger payload types",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": true
+    }
+  ],
+  "exit": 2,
+  "failed_checks": [
+    {
+      "detail": "file revision must be an int >= 1",
+      "name": "authority field types",
+      "ok": false
+    }
+  ],
+  "ok": false,
+  "status": "configured"
+}
+
+== probe 12.2b: state-verify revision=1.0 ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\12-revision\\kit\\tower-dsh', 'state-verify']
+{
+  "drift": [
+    {
+      "actual": {
+        "decision": "D-PILOT-037",
+        "merge_authority": "sup-phase2-pilot",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": 1.0,
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:53+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-dsh"
+      },
+      "expected": {
+        "decision": "D-PILOT-037",
+        "merge_authority": "sup-phase2-pilot",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": 1,
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:53+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-dsh"
+      },
+      "kind": "authority_mismatch",
+      "target": "AUTHORITY"
+    }
+  ],
+  "exit": 2,
+  "ok": false,
+  "skipped": [
+    {
+      "kind": "task",
+      "reason": "no_lifecycle_events",
+      "target": "T-PROBE-001"
+    }
+  ]
+}
+
+== probe 12.3: revision='1' ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\12-revision\\kit\\tower-dsh', 'authority-check']
+{
+  "authority_checks": [
+    {
+      "detail": "state/AUTHORITY.json",
+      "name": "authority state file readable",
+      "ok": true
+    },
+    {
+      "detail": "schema 'tower/authority-state@1'",
+      "name": "authority schema is tower/authority-state@1",
+      "ok": true
+    },
+    {
+      "detail": "AUTHORITY_SET revision 1",
+      "name": "authority state backed by ledger",
+      "ok": true
+    },
+    {
+      "detail": "file revision must be an int >= 1",
+      "name": "authority field types",
+      "ok": false
+    },
+    {
+      "detail": "ok",
+      "name": "authority tower_id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'mac' vs primary state 'mac'",
+      "name": "authority owner matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'ctl-probe-primary' vs primary state 'ctl-probe-primary'",
+      "name": "authority primary.id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'sup-phase2-pilot' vs supervision state 'sup-phase2-pilot'",
+      "name": "authority supervision.id matches supervision state",
+      "ok": true
+    },
+    {
+      "detail": "merge authority 'sup-phase2-pilot' vs primary 'ctl-probe-primary'",
+      "name": "merge authority differs from primary",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority ledger payload types",
+      "ok": true
+    },
+    {
+      "detail": "mismatch: revision '1' != 1",
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": false
+    }
+  ],
+  "exit": 2,
+  "failed_checks": [
+    {
+      "detail": "file revision must be an int >= 1",
+      "name": "authority field types",
+      "ok": false
+    },
+    {
+      "detail": "mismatch: revision '1' != 1",
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": false
+    }
+  ],
+  "ok": false,
+  "status": "configured"
+}
+
+== probe 12.3b: state-verify revision='1' ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\12-revision\\kit\\tower-dsh', 'state-verify']
+{
+  "drift": [
+    {
+      "actual": {
+        "decision": "D-PILOT-037",
+        "merge_authority": "sup-phase2-pilot",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": "1",
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:53+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-dsh"
+      },
+      "expected": {
+        "decision": "D-PILOT-037",
+        "merge_authority": "sup-phase2-pilot",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": 1,
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:53+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-dsh"
+      },
+      "kind": "authority_mismatch",
+      "target": "AUTHORITY"
+    }
+  ],
+  "exit": 2,
+  "ok": false,
+  "skipped": [
+    {
+      "kind": "task",
+      "reason": "no_lifecycle_events",
+      "target": "T-PROBE-001"
+    }
+  ]
+}
+
+== probe 12.4: revision=-1 ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\12-revision\\kit\\tower-dsh', 'authority-check']
+{
+  "authority_checks": [
+    {
+      "detail": "state/AUTHORITY.json",
+      "name": "authority state file readable",
+      "ok": true
+    },
+    {
+      "detail": "schema 'tower/authority-state@1'",
+      "name": "authority schema is tower/authority-state@1",
+      "ok": true
+    },
+    {
+      "detail": "AUTHORITY_SET revision 1",
+      "name": "authority state backed by ledger",
+      "ok": true
+    },
+    {
+      "detail": "file revision must be an int >= 1",
+      "name": "authority field types",
+      "ok": false
+    },
+    {
+      "detail": "ok",
+      "name": "authority tower_id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'mac' vs primary state 'mac'",
+      "name": "authority owner matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'ctl-probe-primary' vs primary state 'ctl-probe-primary'",
+      "name": "authority primary.id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'sup-phase2-pilot' vs supervision state 'sup-phase2-pilot'",
+      "name": "authority supervision.id matches supervision state",
+      "ok": true
+    },
+    {
+      "detail": "merge authority 'sup-phase2-pilot' vs primary 'ctl-probe-primary'",
+      "name": "merge authority differs from primary",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority ledger payload types",
+      "ok": true
+    },
+    {
+      "detail": "mismatch: revision -1 != 1",
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": false
+    }
+  ],
+  "exit": 2,
+  "failed_checks": [
+    {
+      "detail": "file revision must be an int >= 1",
+      "name": "authority field types",
+      "ok": false
+    },
+    {
+      "detail": "mismatch: revision -1 != 1",
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": false
+    }
+  ],
+  "ok": false,
+  "status": "configured"
+}
+
+== probe 12.4b: state-verify revision=-1 ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\12-revision\\kit\\tower-dsh', 'state-verify']
+{
+  "drift": [
+    {
+      "actual": {
+        "decision": "D-PILOT-037",
+        "merge_authority": "sup-phase2-pilot",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": -1,
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:53+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-dsh"
+      },
+      "expected": {
+        "decision": "D-PILOT-037",
+        "merge_authority": "sup-phase2-pilot",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": 1,
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:53+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-dsh"
+      },
+      "kind": "authority_mismatch",
+      "target": "AUTHORITY"
+    }
+  ],
+  "exit": 2,
+  "ok": false,
+  "skipped": [
+    {
+      "kind": "task",
+      "reason": "no_lifecycle_events",
+      "target": "T-PROBE-001"
+    }
+  ]
+}
+
+== probe 13: authority-set --decision '' ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\13-decision\\kit\\tower-dsh', 'authority-set', '--supervisor', 'sup-phase2-pilot', '--decision', '', '--by', 'mac']
+{
+  "errors": [
+    "--decision must be a non-empty string"
+  ],
+  "exit": 2,
+  "ok": false
+}
+file_exists=False authority_events=0
+
+== probe 14: authority-set with a directory in the way ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\14-writefail\\kit\\tower-dsh', 'authority-set', '--supervisor', 'sup-phase2-pilot', '--decision', 'D-X', '--by', 'mac']
+{
+  "errors": [
+    "cannot write state/AUTHORITY.json: [WinError 5] 拒绝访问。: 'C:\\\\Users\\\\mac\\\\Documents\\\\deepseek-harness\\\\default-workspace\\\\tower-dsh\\\\pilot\\\\worktrees\\\\PILOT-037\\\\scratch\\\\tmp\\\\probe\\\\14-writefail\\\\kit\\\\tower-dsh\\\\state\\\\AUTHORITY.json.tmp' -> 'C:\\\\Users\\\\mac\\\\Documents\\\\deepseek-harness\\\\default-workspace\\\\tower-dsh\\\\pilot\\\\worktrees\\\\PILOT-037\\\\scratch\\\\tmp\\\\probe\\\\14-writefail\\\\kit\\\\tower-dsh\\\\state\\\\AUTHORITY.json'"
+  ],
+  "exit": 2,
+  "ok": false
+}
+authority_events=0 traceback=False tmp_left=False
+
+== probe 15a: authority-check on a forged chain ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\15-forged\\kit\\tower-dsh', 'authority-check']
+{
+  "authority_checks": [
+    {
+      "detail": "state/AUTHORITY.json",
+      "name": "authority state file readable",
+      "ok": true
+    },
+    {
+      "detail": "schema 'tower/authority-state@1'",
+      "name": "authority schema is tower/authority-state@1",
+      "ok": true
+    },
+    {
+      "detail": "AUTHORITY_SET revision 1",
+      "name": "authority state backed by ledger",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority field types",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority tower_id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'mac' vs primary state 'mac'",
+      "name": "authority owner matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'ctl-probe-primary' vs primary state 'ctl-probe-primary'",
+      "name": "authority primary.id matches primary state",
+      "ok": true
+    },
+    {
+      "detail": "file 'sup-phase2-pilot' vs supervision state 'sup-phase2-pilot'",
+      "name": "authority supervision.id matches supervision state",
+      "ok": true
+    },
+    {
+      "detail": "merge authority 'sup-phase2-pilot' vs primary 'ctl-probe-primary'",
+      "name": "merge authority differs from primary",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority ledger payload types",
+      "ok": true
+    },
+    {
+      "detail": "ok",
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": true
+    }
+  ],
+  "exit": 2,
+  "failed_checks": [
+    {
+      "detail": "primary ledger chain broken: row 2: hash mismatch (event tampered)",
+      "name": "primary ledger chain intact",
+      "ok": false
+    }
+  ],
+  "ok": false,
+  "status": "configured"
+}
+
+== probe 15b: merge legacy envelope on forged chain ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\tower-dsh\\tools\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\15-forged\\kit\\tower-dsh', 'merge', '--role', 'supervisor', '--supervisor', 'sup-phase2-pilot', '--envelope', 'ENV-PROBE-001']
+{
+  "errors": [
+    "primary ledger chain intact: primary ledger chain broken: row 2: hash mismatch (event tampered)"
+  ],
+  "exit": 2,
+  "ok": false
+}
+queue_status=WAITING MERGE_START=False
+

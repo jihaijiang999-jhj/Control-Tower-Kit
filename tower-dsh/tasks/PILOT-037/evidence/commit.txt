@@ -1,0 +1,36 @@
+HEAD: 89e0afc9047121e0e436442e8f623402307391af
+title: PILOT-037: bind every authority field, strict types, fail-closed write, verify primary chain
+branch: pilot/PILOT-037
+
+--- git log --oneline -3 ---
+89e0afc PILOT-037: bind every authority field, strict types, fail-closed write, verify primary chain
+22cbe50 PILOT-037: authority state single-writer (AUTHORITY.json + authority-check + merge pinning)
+99dec46 spec: PILOT-037 authority state single-writer (state/AUTHORITY.json + authority-check + merge pinning)
+
+--- git show --stat ---
+commit 89e0afc9047121e0e436442e8f623402307391af
+Author:     mac <mac@local>
+AuthorDate: Sat Oct 24 18:25:31 2026 +0800
+Commit:     mac <mac@local>
+CommitDate: Sat Oct 24 18:25:31 2026 +0800
+
+    PILOT-037: bind every authority field, strict types, fail-closed write, verify primary chain
+
+ tower-dsh/tools/tests/test_authority_state.py | 139 ++++++++++++++++++
+ tower-dsh/tools/towerctl.py                   | 198 ++++++++++++++++++++++----
+ 2 files changed, 307 insertions(+), 30 deletions(-)
+
+--- git status --short ---
+?? scratch/
+
+--- git diff --name-only main..HEAD ---
+tower-dsh/tools/tests/test_authority_drift.py
+tower-dsh/tools/tests/test_authority_state.py
+tower-dsh/tools/tests/test_state_verify.py
+tower-dsh/tools/towerctl.py
+
+--- numstat main..HEAD ---
+49	7	tower-dsh/tools/tests/test_authority_drift.py
+635	0	tower-dsh/tools/tests/test_authority_state.py
+111	11	tower-dsh/tools/tests/test_state_verify.py
+475	4	tower-dsh/tools/towerctl.py

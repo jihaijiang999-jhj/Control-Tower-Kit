@@ -1,0 +1,141 @@
+old tool: git -C C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-037 show main:tower-dsh/tools/towerctl.py -> C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-037\scratch\old\towerctl.py (169275 bytes, sha256=209d7782f9c5b22685bf9ec3f537eecb27c2d3a32a4daf34fd787801f53b6ffa)
+
+All fixtures are the same bytes; only the tool differs.
+
+== A. configured tower: merge --supervisor rogue ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\old\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\old-a\\kit\\tower-dsh', 'merge', '--role', 'supervisor', '--supervisor', 'rogue', '--envelope', 'ENV-PROBE-001']
+--- old (main) ---
+{
+  "errors": [
+    "envelope not found: ENV-PROBE-001"
+  ],
+  "exit": 2,
+  "ok": false
+}
+--- new (worktree) ---
+{
+  "errors": [
+    "merge authority mismatch: state pins sup-phase2-pilot, request rogue"
+  ],
+  "exit": 2,
+  "ok": false
+}
+conclusion: old never mentions the registered merge authority; it continues to the envelope stage. new rejects with 'merge authority mismatch' before reading the envelope.
+
+== B. tampered state/AUTHORITY.json: state-verify ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\old\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\old-b\\kit\\tower-dsh', 'state-verify']
+--- old (main) ---
+{
+  "drift": [],
+  "exit": 0,
+  "ok": true,
+  "skipped": [
+    {
+      "kind": "task",
+      "reason": "no_lifecycle_events",
+      "target": "T-PROBE-001"
+    }
+  ]
+}
+--- new (worktree) ---
+{
+  "drift": [
+    {
+      "actual": {
+        "decision": "D-PILOT-037",
+        "merge_authority": "sup-rogue",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": 1,
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:56+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-dsh"
+      },
+      "expected": {
+        "decision": "D-PILOT-037",
+        "merge_authority": "sup-phase2-pilot",
+        "note": null,
+        "owner": "mac",
+        "primary_id": "ctl-probe-primary",
+        "revision": 1,
+        "schema": "tower/authority-state@1",
+        "set_at": "2026-10-24T18:21:56+08:00",
+        "set_by": "mac",
+        "supervision_id": "sup-phase2-pilot",
+        "tower_id": "tower-dsh"
+      },
+      "kind": "authority_mismatch",
+      "target": "AUTHORITY"
+    }
+  ],
+  "exit": 2,
+  "ok": false,
+  "skipped": [
+    {
+      "kind": "task",
+      "reason": "no_lifecycle_events",
+      "target": "T-PROBE-001"
+    }
+  ]
+}
+conclusion: old has no authority audit (drift []). new reports authority_mismatch with the pinned vs file merge_authority.
+
+== C. deleted state/AUTHORITY.json (event present): state-verify ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\old\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\old-c\\kit\\tower-dsh', 'state-verify']
+--- old (main) ---
+{
+  "drift": [],
+  "exit": 0,
+  "ok": true,
+  "skipped": [
+    {
+      "kind": "task",
+      "reason": "no_lifecycle_events",
+      "target": "T-PROBE-001"
+    }
+  ]
+}
+--- new (worktree) ---
+{
+  "drift": [
+    {
+      "actual": "missing",
+      "expected": "state/AUTHORITY.json matching the last AUTHORITY_SET event",
+      "kind": "authority_missing",
+      "target": "AUTHORITY"
+    }
+  ],
+  "exit": 2,
+  "ok": false,
+  "skipped": [
+    {
+      "kind": "task",
+      "reason": "no_lifecycle_events",
+      "target": "T-PROBE-001"
+    }
+  ]
+}
+conclusion: old has no authority audit (drift []). new reports authority_missing, so an event without its file fails closed.
+
+== D. forged AUTHORITY_SET (bad hash) + legacy envelope: merge ==
+cmd: ['C:\\Users\\mac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-B', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\old\\towerctl.py', '--root', 'C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-037\\scratch\\tmp\\probe\\old-d\\kit\\tower-dsh', 'merge', '--role', 'supervisor', '--supervisor', 'sup-phase2-pilot', '--envelope', 'ENV-PROBE-001']
+--- old (main) ---
+{
+  "exit": 0,
+  "ok": true,
+  "status": "MERGED"
+}
+queue_status=MERGED MERGE_START=True
+--- new (worktree) ---
+{
+  "errors": [
+    "primary ledger chain intact: primary ledger chain broken: row 2: hash mismatch (event tampered)"
+  ],
+  "exit": 2,
+  "ok": false
+}
+queue_status=WAITING MERGE_START=False
+conclusion: old trusts the forged AUTHORITY_SET row (no authority audit, legacy envelope skips the chain check) and merges. new verifies the primary chain for any AUTHORITY_SET and reports 'primary ledger chain broken', leaving the entry WAITING with no MERGE_START.
