@@ -491,6 +491,145 @@ class AuthorityStateTestCase(unittest.TestCase):
         self.assertEqual([item["kind"] for item in out["drift"]],
                          ["authority_unreadable"])
 
+    # -- 12. every bound field is compared, not just the five ids ---------
+    def append_forged_authority_event(self) -> None:
+        """Append a parseable AUTHORITY_SET row with a deliberately bad hash.
+
+        ``seq`` and ``prev_hash`` are correct so only the hash chain betrays
+        the forgery; the payload still equals the file, so the chain check is
+        the only thing that can reject it.
+        """
+        path = self.root / "ledger" / "primary.jsonl"
+        rows = [json.loads(line) for line in
+                path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        last = rows[-1]
+        forged = {
+            "seq": last["seq"] + 1,
+            "at": FIXED_TIME,
+            "type": "AUTHORITY_SET",
+            "actor": "primary",
+            "payload": last["payload"],
+            "prev_hash": last.get("hash") or "GENESIS",
+            "hash": "f" * 64,
+        }
+        with path.open("a", encoding="utf-8", newline="\n") as fh:
+            fh.write(json.dumps(forged, ensure_ascii=False) + "\n")
+
+    def test_each_bound_field_mismatch_is_detected(self) -> None:
+        self.assertEqual(self.run_cli(
+            "authority-set", "--supervisor", SUPERVISOR_ID,
+            "--decision", "D-X", "--by", "mac").returncode, 0)
+        original = self.authority_state()
+        cases = {
+            "set_by": "mallory",
+            "decision": "D-EVIL",
+            "set_at": FIXED_TIME,
+            "note": "injected",
+            "tower_id": "tower-evil",
+        }
+        for field, value in cases.items():
+            with self.subTest(field=field):
+                tampered = dict(original)
+                tampered[field] = value
+                write_json(self.authority_path(), tampered)
+
+                cp = self.run_cli("authority-check")
+                self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+                self.assertIn(field, cp.stdout)
+
+                cp = self.run_cli("state-verify")
+                self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+                out = json.loads(cp.stdout)
+                self.assertEqual([item["kind"] for item in out["drift"]],
+                                 ["authority_mismatch"], msg=out)
+                self.assertIn(field, json.dumps(out["drift"][0]),
+                              msg=out["drift"][0])
+            write_json(self.authority_path(), original)
+
+    # -- 13. revision types are strict, bool/float/str/negative rejected --
+    def test_invalid_revision_values_are_rejected(self) -> None:
+        self.assertEqual(self.run_cli(
+            "authority-set", "--supervisor", SUPERVISOR_ID,
+            "--decision", "D-X", "--by", "mac").returncode, 0)
+        original = self.authority_state()
+        for value in (True, 1.0, "1", -1):
+            with self.subTest(revision=value):
+                tampered = dict(original)
+                tampered["revision"] = value
+                write_json(self.authority_path(), tampered)
+
+                cp = self.run_cli("authority-check")
+                self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+                check = json.loads(cp.stdout)  # no traceback
+                self.assertFalse(check["ok"], check)
+                self.assertIn("revision", json.dumps(check))
+
+                cp = self.run_cli("state-verify")
+                self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+                out = json.loads(cp.stdout)  # no traceback
+                self.assertEqual([item["kind"] for item in out["drift"]],
+                                 ["authority_mismatch"], msg=out)
+            write_json(self.authority_path(), original)
+
+    # -- 14. an empty --decision writes nothing --------------------------
+    def test_authority_set_rejects_empty_decision(self) -> None:
+        cp = self.run_cli("authority-set", "--supervisor", SUPERVISOR_ID,
+                          "--decision", "", "--by", "mac")
+
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        self.assertIn("--decision", cp.stdout)
+        self.assert_zero_writes()
+
+    # -- 15. a write failure is one JSON, exit 2, and no event -----------
+    def test_authority_set_write_failure_adds_no_event(self) -> None:
+        # The target path is a directory, so the atomic replace inside
+        # ``jdump`` raises OSError after the temp file was written.
+        (self.root / "state" / "AUTHORITY.json").mkdir(parents=True)
+        ledger_before = (self.root / "ledger" / "primary.jsonl").read_bytes()
+
+        cp = self.run_cli("authority-set", "--supervisor", SUPERVISOR_ID,
+                          "--decision", "D-X", "--by", "mac")
+
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        self.assertNotIn("Traceback", cp.stdout + cp.stderr)
+        payload = json.loads(cp.stdout)  # a single JSON object
+        self.assertFalse(payload["ok"], payload)
+        self.assertIn("cannot write", json.dumps(payload["errors"]))
+        self.assertEqual(
+            (self.root / "ledger" / "primary.jsonl").read_bytes(),
+            ledger_before)
+        self.assertEqual(self.authority_events(), [])
+        self.assertFalse(
+            (self.root / "state" / "AUTHORITY.json.tmp").exists(),
+            msg="a failed write must not leave its temp file behind")
+
+    # -- 16. a forged AUTHORITY_SET cannot ride a legacy envelope ---------
+    def test_forged_authority_event_blocks_legacy_envelope_merge(self) -> None:
+        self.assertEqual(self.run_cli(
+            "authority-set", "--supervisor", SUPERVISOR_ID,
+            "--decision", "D-X", "--by", "mac").returncode, 0)
+        self.append_forged_authority_event()
+
+        cp = self.run_cli("authority-check")
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        check = json.loads(cp.stdout)
+        self.assertFalse(check["ok"], check)
+        self.assertIn("primary ledger chain broken", json.dumps(check))
+
+        self.write_legacy_envelope()
+        self.write_queue([{"envelope_id": ENVELOPE, "task": TASK,
+                           "branch": BRANCH, "base": "main",
+                           "status": "WAITING", "added_at": FIXED_TIME}])
+        cp = self.run_cli("merge", "--role", "supervisor",
+                          "--supervisor", SUPERVISOR_ID,
+                          "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        payload = json.loads(cp.stdout)
+        self.assertIn("primary ledger chain broken",
+                      json.dumps(payload["errors"]))
+        self.assertEqual(self.queue_entry()["status"], "WAITING")
+        self.assertNotIn("MERGE_START", self.supervision_ledger())
+
 
 if __name__ == "__main__":
     unittest.main()
