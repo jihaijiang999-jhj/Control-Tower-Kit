@@ -330,10 +330,10 @@
       "task": "PILOT-037",
       "branch": "pilot/PILOT-037",
       "base": "main",
-      "status": "MERGED",
+      "status": "POST_MERGE_VERIFIED",
       "added_at": "2026-10-24T18:47:14+08:00",
       "merge_commit": "895141c2af62ebec00a8ac038db0ff1be4415dc9"
     }
   ],
-  "updated_at": "2026-10-24T18:50:33+08:00"
+  "updated_at": "2026-10-24T18:55:25+08:00"
 }
