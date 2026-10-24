@@ -1,15 +1,17 @@
-"""Dirty-authority-state detection tests (PILOT-011, PILOT-017).
+"""Dirty-authority-state detection tests (PILOT-011, PILOT-017, PILOT-037).
 
 ``status`` / ``startup`` must report uncommitted authority state
 (``primary/``, ``supervision/``, ``ledger/``, ``handoffs/``, ``shared/``,
-``tasks/``, ``pilot/``) relative to the surrounding git repository, and
-``handoff-activate`` must ask for a commit without ever performing one.
+``tasks/``, ``pilot/``, ``state/``) relative to the surrounding git repository,
+and ``handoff-activate`` must ask for a commit without ever performing one.
 
 ``tasks/`` (task cards, evidence, records) and ``pilot/`` (specs, worktrees)
-were the gap closed by ``PILOT-017``.  Their gitignored subtrees
-(``pilot/repo``, ``pilot/worktrees``) must never show up as drift: the check
-stays a ``git status`` pathspec query, so git itself hides ignored untracked
-files instead of a hand-rolled directory walk.
+were the gap closed by ``PILOT-017``.  ``state/`` holds ``AUTHORITY.json`` and
+was added by ``PILOT-037`` so an uncommitted authority file is as visible as
+the ledger event it mirrors.  Their gitignored subtrees (``pilot/repo``,
+``pilot/worktrees``) must never show up as drift: the check stays a
+``git status`` pathspec query, so git itself hides ignored untracked files
+instead of a hand-rolled directory walk.
 
 Every test builds a throw-away tower root *inside* a throw-away git repository
 under ``tempfile`` and drives the real CLI through ``subprocess``, so no test
@@ -380,6 +382,46 @@ class AuthorityDriftTestCase(unittest.TestCase):
                                 env_extra={"GIT_CEILING_DIRECTORIES": str(root)})
         self.assertIsNone(data["authority_dirty"])
         self.assertIsNone(data["authority_dirty_count"])
+
+    # -- 15. state/AUTHORITY.json is authority state (PILOT-037) ---------
+    def test_uncommitted_authority_state_is_authority_drift(self) -> None:
+        write_json(self.root / "state" / "AUTHORITY.json", {
+            "schema": "tower/authority-state@1",
+            "tower_id": "tower-test",
+            "owner": "mac",
+            "primary": {"id": "ctl-test"},
+            "supervision": {"id": "sup-test"},
+            "merge_authority": "sup-test",
+            "revision": 1,
+            "set_by": "mac",
+            "decision": "D-TEST",
+            "set_at": FIXED_TIME,
+        })
+
+        data = self.status_json()
+
+        self.assertIn("tower-dsh/state/AUTHORITY.json",
+                      data["authority_dirty"])
+        self.assertEqual(data["authority_dirty_count"], 1)
+        # ``startup`` reports the same count: the new directory is watched by
+        # the same pathspec query, not by a second code path.
+        cp = self.run_cli("startup")
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        self.assertEqual(json.loads(cp.stdout)["authority_dirty_count"], 1)
+
+    def test_committed_authority_state_is_not_drift(self) -> None:
+        write_json(self.root / "state" / "AUTHORITY.json", {
+            "schema": "tower/authority-state@1",
+            "tower_id": "tower-test",
+            "merge_authority": "sup-test",
+            "revision": 1,
+        })
+        self.commit_all("record authority state")
+
+        data = self.status_json()
+
+        self.assertEqual(data["authority_dirty"], [])
+        self.assertEqual(data["authority_dirty_count"], 0)
 
 
 if __name__ == "__main__":

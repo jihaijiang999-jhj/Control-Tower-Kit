@@ -28,6 +28,10 @@ TCLI = TOOLS_DIR / "towerctl.py"
 # (None first, then the state names alphabetically).
 TASK_NEW_ALLOWED = [None, "delivered", "dispatched", "ready", "reviewed",
                     "rework"]
+# PILOT-037: a tower with neither state/AUTHORITY.json nor an AUTHORITY_SET
+# event is legacy.  That is one explicit skipped observation, never drift.
+AUTHORITY_SKIP = {"kind": "authority_state", "target": "AUTHORITY",
+                  "reason": "no_authority_state"}
 
 sys.path.insert(0, str(TOOLS_DIR))
 import towerctl  # noqa: E402  (import after sys.path setup)
@@ -347,6 +351,7 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(out["envelopes"], 2)
         # Tasks without lifecycle events are still observations, not drift.
         self.assertEqual(out["skipped"], [
+            AUTHORITY_SKIP,
             {"kind": "task", "target": "T-003",
              "reason": "no_lifecycle_events"},
             {"kind": "task", "target": "T-004",
@@ -354,7 +359,7 @@ class StateVerifyTestCase(unittest.TestCase):
             {"kind": "task", "target": "T-005",
              "reason": "board_entry_missing"},
         ])
-        self.assertEqual(out["skipped_count"], 3)
+        self.assertEqual(out["skipped_count"], 4)
 
     def test_task_without_events_stays_skipped(self) -> None:
         self.build_base_tower()
@@ -368,7 +373,7 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(out["drift"], [])
         self.assertIn({"kind": "task", "target": "T-003",
                        "reason": "no_lifecycle_events"}, out["skipped"])
-        self.assertEqual(out["skipped_count"], 1)
+        self.assertEqual(out["skipped_count"], 2)
 
     def test_unbacked_queue_and_envelope_are_reported_separately(self) -> None:
         self.build_base_tower()
@@ -388,7 +393,7 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(by_kind["queue_unbacked"]["target"], "ENV-T-010")
         self.assertEqual(by_kind["envelope_unbacked"]["target"], "ENV-T-011")
         self.assertEqual(out["envelopes"], 2)
-        self.assertEqual(out["skipped"], [])
+        self.assertEqual(out["skipped"], [AUTHORITY_SKIP])
 
     def test_ledger_has_queue_add_ignores_malformed_rows(self) -> None:
         self.supervision("QUEUE_ADD", envelope="ENV-T-050")
@@ -492,8 +497,8 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(out["drift"][0], {
             "kind": "record_missing", "target": "T-001",
             "expected": "closed", "actual": None})
-        self.assertEqual(out["skipped"], [])
-        self.assertEqual(out["skipped_count"], 0)
+        self.assertEqual(out["skipped"], [AUTHORITY_SKIP])
+        self.assertEqual(out["skipped_count"], 1)
 
     def test_broken_record_is_record_unreadable(self) -> None:
         self.build_base_tower()
@@ -526,8 +531,8 @@ class StateVerifyTestCase(unittest.TestCase):
             "kind": "board_unreadable", "target": "TASK_BOARD.json",
             "expected": "parseable JSON object", "actual": "missing"}])
         # No per-entity board noise and no board_entry_missing skip.
-        self.assertEqual(out["skipped"], [])
-        self.assertEqual(out["skipped_count"], 0)
+        self.assertEqual(out["skipped"], [AUTHORITY_SKIP])
+        self.assertEqual(out["skipped_count"], 1)
 
     def test_broken_board_is_one_board_unreadable(self) -> None:
         self.build_base_tower()
@@ -559,8 +564,8 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(out["drift"], [{
             "kind": "queue_unreadable", "target": "MERGE_QUEUE.json",
             "expected": "parseable JSON object", "actual": "missing"}])
-        self.assertEqual(out["skipped"], [])
-        self.assertEqual(out["skipped_count"], 0)
+        self.assertEqual(out["skipped"], [AUTHORITY_SKIP])
+        self.assertEqual(out["skipped_count"], 1)
 
     def test_broken_queue_is_one_queue_unreadable(self) -> None:
         self.build_base_tower()
@@ -620,6 +625,7 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(out["tasks"], 3)
         self.assertEqual(out["envelopes"], 3)
         self.assertEqual(out["skipped"], [
+            AUTHORITY_SKIP,
             {"kind": "envelope", "target": "ENV-T-003",
              "reason": "queue_entry_missing"},
             {"kind": "task", "target": "T-003",
@@ -627,7 +633,7 @@ class StateVerifyTestCase(unittest.TestCase):
             {"kind": "task", "target": "T-004",
              "reason": "no_lifecycle_events"},
         ])
-        self.assertEqual(out["skipped_count"], 3)
+        self.assertEqual(out["skipped_count"], 4)
 
     # -- 15. read-only proof under bad files ----------------------------
     def test_state_verify_never_writes_with_bad_files(self) -> None:
@@ -1331,7 +1337,7 @@ class StateVerifyTestCase(unittest.TestCase):
             "actual": "closed"}])
         self.assertEqual(self.drift_kinds(out), ["illegal_transition"])
         self.assertEqual(out["tasks"], 4)
-        self.assertEqual(out["skipped"], [])
+        self.assertEqual(out["skipped"], [AUTHORITY_SKIP])
 
     def test_redelivery_from_delivered_is_legal(self) -> None:
         # PILOT-001 precedent: DELIVER landed twice on a delivered card.
@@ -1402,6 +1408,100 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertEqual(out["drift"], [])
         self.assertEqual(self.illegal_transitions(out), [])
+
+    # -- 38. authority state (PILOT-037) --------------------------------
+    AUTHORITY_STATE = {
+        "schema": "tower/authority-state@1",
+        "tower_id": "tower-dsh",
+        "owner": "mac",
+        "primary": {"id": "ctl-primary"},
+        "supervision": {"id": "sup-1"},
+        "merge_authority": "sup-1",
+        "revision": 1,
+        "set_by": "mac",
+        "decision": "D-001",
+        "set_at": "2026-10-19T00:00:00+08:00",
+    }
+    AUTHORITY_PAYLOAD = {
+        "owner": "mac",
+        "primary_id": "ctl-primary",
+        "supervision_id": "sup-1",
+        "merge_authority": "sup-1",
+        "revision": 1,
+        "set_by": "mac",
+        "decision": "D-001",
+        "set_at": "2026-10-19T00:00:00+08:00",
+    }
+
+    def put_authority_file(self, **overrides) -> None:
+        state = dict(self.AUTHORITY_STATE)
+        state.update(overrides)
+        write_json(self.root / "state" / "AUTHORITY.json", state)
+
+    def put_authority_event(self, **overrides) -> dict:
+        payload = dict(self.AUTHORITY_PAYLOAD)
+        payload.update(overrides)
+        return self.primary("AUTHORITY_SET", **payload)
+
+    def test_legacy_authority_state_is_skipped_not_drift(self) -> None:
+        self.build_base_tower()
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 0, out)
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(out["drift"], [])
+        self.assertIn(AUTHORITY_SKIP, out["skipped"])
+        self.assertEqual(out["skipped"], [AUTHORITY_SKIP])
+
+    def test_authority_mismatch_is_drift_with_key_fields(self) -> None:
+        self.build_base_tower()
+        self.put_authority_event()
+        # Tamper with the file only: the ledger event stays authoritative.
+        self.put_authority_file(merge_authority="sup-rogue")
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertFalse(out["ok"], out)
+        self.assertEqual(self.drift_kinds(out), ["authority_mismatch"])
+        drift = out["drift"][0]
+        self.assertEqual(drift["target"], "AUTHORITY")
+        self.assertEqual(drift["expected"]["merge_authority"], "sup-1")
+        self.assertEqual(drift["actual"]["merge_authority"], "sup-rogue")
+        self.assertEqual(drift["expected"]["revision"], 1)
+        self.assertEqual(drift["actual"]["revision"], 1)
+
+    def test_authority_missing_is_drift(self) -> None:
+        self.build_base_tower()
+        self.put_authority_event()
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["authority_missing"])
+        self.assertEqual(out["drift"][0]["target"], "AUTHORITY")
+        self.assertEqual(out["drift"][0]["actual"], "missing")
+
+    def test_authority_unbacked_is_drift(self) -> None:
+        self.build_base_tower()
+        self.put_authority_file()
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["authority_unbacked"])
+        self.assertEqual(out["drift"][0]["actual"], "file only")
+
+    def test_authority_unreadable_is_drift(self) -> None:
+        self.build_base_tower()
+        (self.root / "state" / "AUTHORITY.json").mkdir(parents=True)
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["authority_unreadable"])
+        self.assertEqual(out["drift"][0]["actual"], "unparseable")
 
 
 if __name__ == "__main__":
