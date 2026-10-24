@@ -1503,6 +1503,71 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(self.drift_kinds(out), ["authority_unreadable"])
         self.assertEqual(out["drift"][0]["actual"], "unparseable")
 
+    # -- 39. authority requirement (PILOT-038) ---------------------------
+    # A required tower must keep both halves of the marker and a configured
+    # authority state.  These row shapes match every other drift row.
+    AUTHORITY_POLICY = {
+        "schema": "tower/authority-policy@1",
+        "tower_id": "tower-dsh",
+        "require_authority": True,
+        "set_by": "mac",
+        "decision": "D-001",
+        "set_at": "2026-10-19T00:00:00+08:00",
+    }
+
+    def put_policy(self, **overrides) -> None:
+        data = dict(self.AUTHORITY_POLICY)
+        data.update(overrides)
+        write_json(self.root / "shared" / "AUTHORITY_POLICY.json", data)
+
+    def put_required_event(self) -> dict:
+        return self.primary("AUTHORITY_REQUIRED", **self.AUTHORITY_POLICY)
+
+    def test_required_but_unconfigured_is_drift(self) -> None:
+        self.build_base_tower()
+        self.put_policy()
+        self.put_required_event()
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertFalse(out["ok"], out)
+        self.assertEqual(self.drift_kinds(out),
+                         ["authority_required_unconfigured"])
+        drift = out["drift"][0]
+        self.assertEqual(drift["target"], "AUTHORITY")
+        self.assertEqual(drift["actual"], "missing")
+        # A required tower is never reported as legacy.
+        self.assertNotIn(AUTHORITY_SKIP, out["skipped"])
+
+    def test_authority_policy_missing_is_drift(self) -> None:
+        self.build_base_tower()
+        self.put_authority_event()
+        self.put_authority_file()
+        self.put_required_event()
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["authority_policy_missing"])
+        drift = out["drift"][0]
+        self.assertEqual(drift["target"], "AUTHORITY_POLICY")
+        self.assertEqual(drift["actual"], "missing")
+
+    def test_authority_policy_unbacked_is_drift(self) -> None:
+        self.build_base_tower()
+        self.put_authority_event()
+        self.put_authority_file()
+        self.put_policy()
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["authority_policy_unbacked"])
+        drift = out["drift"][0]
+        self.assertEqual(drift["target"], "AUTHORITY_POLICY")
+        self.assertEqual(drift["actual"], "policy file only")
+
 
 if __name__ == "__main__":
     unittest.main()
