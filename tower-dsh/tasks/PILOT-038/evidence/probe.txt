@@ -1,0 +1,36 @@
+PILOT-038 probe: new code (required marker, downgrade attack)
+tool=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-038\tower-dsh\tools\towerctl.py
+fixture: authority-require exit=0 already=False repaired=True
+fixture: authority-set exit=0 revision=1
+fixture: policy={"schema": "tower/authority-policy@1", "tower_id": "tower-dsh", "require_authority": true, "set_by": "mac", "decision": "D-PROBE", "set_at": "2026-10-24T20:36:17+08:00"}
+fixture: AUTHORITY_REQUIRED events after truncation=1
+fixture: state/AUTHORITY.json deleted; trailing AUTHORITY_SET dropped
+
+new verify-ledger: exit=0 traceback=False
+  errors=[]
+
+new authority-check: exit=2 traceback=False
+  ok=False status=required_unconfigured requirement=required
+  failed_checks=["authority required"]
+  detail=["authority required but not configured: state/AUTHORITY.json is missing (shared/AUTHORITY_POLICY.json requires authority)"]
+
+new state-verify: exit=2 traceback=False
+  ok=False drift=["authority_required_unconfigured"]
+  skipped=["no_lifecycle_events"]
+
+new merge-check: exit=2 traceback=False
+  ok=False failed_checks=["merge authority"]
+  detail=["authority required: authority required but not configured: state/AUTHORITY.json is missing (shared/AUTHORITY_POLICY.json requires authority)"]
+
+new merge --supervisor rogue: exit=2 traceback=False
+  errors=["authority required: authority required but not configured: state/AUTHORITY.json is missing (shared/AUTHORITY_POLICY.json requires authority)"]
+  {"queue_status": "WAITING", "merge_start": false, "merging": false}
+
+new code: ledger/primary.jsonl replaced by a directory
+authority-set: exit=2 traceback=False single_json=True
+  errors=["cannot append AUTHORITY_SET to ledger/primary.jsonl: [Errno 13] Permission denied: 'C:\\\\Users\\\\mac\\\\Documents\\\\deepseek-harness\\\\default-workspace\\\\tower-dsh\\\\pilot\\\\worktrees\\\\PILOT-038\\\\scratch\\\\probe\\\\new-append\\\\kit\\\\tower-dsh\\\\ledger\\\\primary.jsonl'", "state/AUTHORITY.json was written but is unbacked; re-run authority-set once the ledger is writable"]
+authority-check after failure: exit=2 ok=False status=configured failed_checks=["authority state backed by ledger", "authority file matches last AUTHORITY_SET"]
+authority-require: exit=2 traceback=False single_json=True
+  errors=["cannot append AUTHORITY_REQUIRED to ledger/primary.jsonl: [Errno 13] Permission denied: 'C:\\\\Users\\\\mac\\\\Documents\\\\deepseek-harness\\\\default-workspace\\\\tower-dsh\\\\pilot\\\\worktrees\\\\PILOT-038\\\\scratch\\\\probe\\\\new-append\\\\kit\\\\tower-dsh\\\\ledger\\\\primary.jsonl'", "shared/AUTHORITY_POLICY.json was written but its ledger event is missing; re-run authority-require once the ledger is writable"]
+authority-check after failure: exit=2 ok=False status=required_unconfigured failed_checks=["authority requirement", "authority required"]
+repair: authority-set exit=0 authority-require exit=0 authority-check exit=0 ok=True status=configured requirement=required

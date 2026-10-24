@@ -1,0 +1,37 @@
+PILOT-038 old-vs-new probe
+old tool=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-038\scratch\old\towerctl.py (extracted from main)
+new tool=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-038\tower-dsh\tools\towerctl.py
+fixture: required tower (authority-require + authority-set), then
+         rm state/AUTHORITY.json + drop trailing AUTHORITY_SET
+
+$ verify-ledger
+  old: {"exit": 0, "traceback": false, "single_json": true, "ok": true}
+  new: {"exit": 0, "traceback": false, "single_json": true, "ok": true}
+
+$ authority-check
+  old: {"exit": 0, "traceback": false, "single_json": true, "ok": true, "status": "legacy"}
+  new: {"exit": 2, "traceback": false, "single_json": true, "ok": false, "status": "required_unconfigured"}
+
+$ state-verify
+  old: {"exit": 0, "traceback": false, "single_json": true, "ok": true, "drift": [], "skipped": ["no_authority_state", "no_lifecycle_events"]}
+  new: {"exit": 2, "traceback": false, "single_json": true, "ok": false, "drift": ["authority_required_unconfigured"], "skipped": ["no_lifecycle_events"]}
+
+$ merge-check
+  old: {"exit": 0, "traceback": false, "single_json": true, "ok": true, "authority_checks": [{"name": "merge authority", "ok": true, "detail": "legacy: no AUTHORITY_SET"}]}
+  new: {"exit": 2, "traceback": false, "single_json": true, "ok": false, "errors": [{"name": "merge authority", "ok": false, "detail": "authority required: authority required but not configured: state/AUTHORITY.json is missing (shared/AUTHORITY_POLICY.json requires authority)"}], "authority_checks": [{"name": "merge authority", "ok": false, "detail": "authority required: authority required but not configured: state/AUTHORITY.json is missing (shared/AUTHORITY_POLICY.json requires authority)"}]}
+
+$ merge --supervisor rogue
+  old: {"exit": 0, "traceback": false, "single_json": true, "ok": true, "status": "MERGED", "queue_status": "MERGED", "MERGE_START": true, "MERGING": false}
+  new: {"exit": 2, "traceback": false, "single_json": true, "ok": false, "errors": ["authority required: authority required but not configured: state/AUTHORITY.json is missing (shared/AUTHORITY_POLICY.json requires authority)"], "queue_status": "WAITING", "MERGE_START": false, "MERGING": false}
+
+append failure: ledger/primary.jsonl replaced by a directory
+  old authority-set: exit=1 traceback=True single_json=False
+    stdout_head=''
+    stderr_tail=['    return io.open(self, mode, buffering, encoding, errors, newline)', '           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^', "PermissionError: [Errno 13] Permission denied: 'C:\\\\Users\\\\mac\\\\Documents\\\\deepseek-harness\\\\default-workspace\\\\tower-dsh\\\\pilot\\\\worktrees\\\\PILOT-038\\\\scratch\\\\probe\\\\old-append-compare\\\\kit\\\\tower-dsh\\\\ledger\\\\primary.jsonl'"]
+    authority-check: exit=2 ok=False status=configured
+  new authority-set: exit=2 traceback=False single_json=True
+    stdout_head='{\n  "ok": false,\n  "errors": [\n    "cannot append AUTHORITY_SET to ledger/primary.jsonl: [Errno 13] Permission denied: \'C:\\\\\\\\Users\\\\\\\\mac\\\\\\\\Documents\\\\\\\\deeps'
+    stderr_tail=[]
+    authority-check: exit=2 ok=False status=configured
+  old authority-require: command does not exist (PILOT-038 only)
+  new authority-require on a directory ledger: covered above in probe.txt (clean exit 2, single JSON, required_unconfigured)

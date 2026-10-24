@@ -1,0 +1,150 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-038",
+  "title": "授权必需标记：authority_required 持久化，禁止删文件/截账本退回 legacy；authority-set 写账本失败 fail-closed",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "新增持久必需标记 shared/AUTHORITY_POLICY.json（schema tower/authority-policy@1）：tower_id、require_authority=true、set_by、decision、set_at；它随 git 跟踪、计入 AUTHORITY_STATE_DIRS（未提交即可见），并与 ledger 事件互锚",
+    "新增 towerctl authority-require --by <name> --decision <D>：--by 必须等于 primary/CURRENT_STATE.json 的 owner.name，否则 exit 2；写 shared/AUTHORITY_POLICY.json 并追加 primary ledger 事件 AUTHORITY_REQUIRED（payload 与文件同构）；已存在且 require_authority=true 时幂等返回 already=true 且不重复追加事件；任何校验失败零写入",
+    "authority_state_check 增加 requirement 维度：required = policy 文件 require_authority=true 或 ledger 存在 AUTHORITY_REQUIRED；required 且（文件与 AUTHORITY_SET 都缺）→ 错误 authority required but not configured（legacy 不再成立）；required 时 policy 与 AUTHORITY_REQUIRED 必须互配（有策略无事件=policy unbacked，有事件无策略=policy missing），否则 exit 2；非 required 的旧塔保持 legacy 兼容",
+    "cmd_merge：authority 校验在 required-but-unconfigured / policy 不一致时 fail closed（exit 2，队列条目保持 WAITING，不写 MERGE_START/MERGING）；其余行为与 037 一致",
+    "cmd_merge_check：required 时增加一条 ok=false 的失败 check（若未配置）或 ok=true 的 requirement pinned check；非 required 的旧塔仍输出 legacy 说明",
+    "cmd_state_verify 增加 drift：authority_policy_missing（事件在、策略文件缺失或 require_authority=false）、authority_policy_unbacked（策略为 true、无 AUTHORITY_REQUIRED 事件）、authority_required_unconfigured（required 但文件与 AUTHORITY_SET 都缺）；legacy（无策略无事件）仍记 skipped",
+    "cmd_authority_set：把 append_ledger 写入包进异常处理（OSError 与 LedgerLockTimeout）→ 单 JSON、exit 2、无 traceback；失败时不得出现“看起来 configured”的状态（文件已写则保持 unbacked，merge 仍 fail closed），重跑可修复",
+    "新增 tools/tests/test_authority_required.py 覆盖：require 正反/幂等；required 塔删 state 文件 + 截掉尾部 AUTHORITY_SET（前缀合法）→ check/merge fail closed；策略被删但事件在 → 失败；策略在但事件被截 → 失败；append 失败（ledger 为目录）→ 干净 exit 2、无 traceback、不 configured；非 required 旧塔 legacy 兼容",
+    "tools/tests/test_state_verify.py 增加三种新 drift 的用例；不改 037 已建立的 configured 语义与检查名",
+    "真实塔迁移：用 worktree 的新工具对真实塔执行 authority-require（--by mac --decision D-PILOT-038）与 authority-set（revision 2），随后合并本卡；post-merge 在新代码下必须通过 authority-check（configured + required）",
+    "不改 legacy（无 baseline）信封语义、envelope-new / queue-add / post-merge 的既有行为；不手写 state/AUTHORITY.json、shared/AUTHORITY_POLICY.json 或 ledger"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-038/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-038/tower-dsh/tools/tests/test_authority_required.py",
+    "pilot/worktrees/PILOT-038/tower-dsh/tools/tests/test_state_verify.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "hand-editing state/AUTHORITY.json, shared/AUTHORITY_POLICY.json or ledger/*.jsonl",
+    "allowing merge on a required tower whose authority state is missing or unbacked",
+    "making POLICY-only (no ledger event) satisfy the requirement",
+    "changing legacy (no baseline) envelope semantics"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-038/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 328 + 新增用例数（main 基线 328）",
+    "fixture 上 authority-require --by mac --decision D-X → exit 0；shared/AUTHORITY_POLICY.json 存在且 require_authority=true；primary ledger 恰一条 AUTHORITY_REQUIRED；authority-check exit 0、status=configured、requirement=required",
+    "authority-require --by mallory → exit 2、零写入（无策略文件、事件数不变）",
+    "重复 authority-require → 幂等：exit 0、already=true、AUTHORITY_REQUIRED 仍恰一条",
+    "required 塔（已 require + 已 authority-set）上：删 state/AUTHORITY.json 并移除尾部唯一 AUTHORITY_SET（保留合法前缀链）→ verify-ledger exit 0，authority-check exit 2 且错误含 required but not configured，state-verify drift 含 authority_required_unconfigured，merge exit 2 且队列仍 WAITING、无 MERGE_START",
+    "required 塔删掉 shared/AUTHORITY_POLICY.json 但 AUTHORITY_REQUIRED 仍在 → authority-check exit 2（policy missing）、state-verify drift 含 authority_policy_missing",
+    "策略 require_authority=true 但截掉 AUTHORITY_REQUIRED 事件 → authority-check exit 2（policy unbacked）、state-verify drift 含 authority_policy_unbacked",
+    "ledger/primary.jsonl 换成目录后 authority-set → exit 2、单个 JSON、无 traceback、authority-check 不是 configured（unbacked/missing），merge fail closed；ledger 恢复后重跑 authority-set 可修复",
+    "非 required 旧塔（无策略无事件）：merge-check 仍 exit 0 且含 legacy 说明；037 既有 configured 测试全部保持绿",
+    "旧码对照：用 git show main:tower-dsh/tools/towerctl.py 落 main 版工具，对同一 required 夹具（删文件 + 截尾）跑 authority-check/merge-check/merge → 旧码按 legacy 放行（或至少不报 required），新码全部拒绝；旧码在 ledger 为目录时 authority-set/写账本 → traceback/exit 1，新码 exit 2 单 JSON。证据写进 scratch/probe-old-code.txt",
+    "真实塔：authority-require + authority-set（revision 2）后 authority-check exit 0 status=configured；建信封前 state-verify tasks=38/envelopes=37/drift []，建信封后 38/38；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-038 diff --name-only main..HEAD 恰三个 allowed_paths（tower-dsh/tools/towerctl.py、tower-dsh/tools/tests/test_authority_required.py、tower-dsh/tools/tests/test_state_verify.py）"
+  ],
+  "depends_on": [
+    "PILOT-037"
+  ],
+  "worktree": "pilot/worktrees/PILOT-038",
+  "spec_path": "pilot/PILOT-038.spec.json",
+  "spec_sha256": "cdb020d4693424a52a0d81d179d40541fdd25bd06bdb4b2c67bd06219a096ce5",
+  "spec_gate": "PASS",
+  "executor": "subagent:087f1403-4792-435d-8476-cec76c13877c",
+  "dispatch": {
+    "executor": "subagent:087f1403-4792-435d-8476-cec76c13877c",
+    "worktree": "pilot/worktrees/PILOT-038",
+    "at": "2026-10-24T20:16:29+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-038/evidence/towerctl.py",
+      "sha256": "c1bd64ddaf9381e9cb547255a8091f6c9ed1b001cd6285644b2a2a048118aa7c",
+      "bytes": 205365,
+      "at": "2026-10-24T20:38:20+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-038/evidence/test_authority_required.py",
+      "sha256": "af5df9a379e340afbd724a10912fbf0e7c523bf94d3af8545e1dba85fc868159",
+      "bytes": 27072,
+      "at": "2026-10-24T20:38:20+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-038/evidence/test_state_verify.py",
+      "sha256": "882841387815bf36aaa34969634b7b49dec62b4f6a78972fa164fb061bdaab5a",
+      "bytes": 70266,
+      "at": "2026-10-24T20:38:20+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-038/evidence/test-output.txt",
+      "sha256": "792b32eaf3ceb8269e95df39065cdd2ecaf9d220ce66ed335ebda640a3c30f3e",
+      "bytes": 98524,
+      "at": "2026-10-24T20:38:20+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-038/evidence/authority_required_probe.py",
+      "sha256": "9a15fa12c895e73c2fc4f48b48923b6c5f1c960d6921f137230925fef01400e0",
+      "bytes": 21242,
+      "at": "2026-10-24T20:38:20+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-038/evidence/probe.txt",
+      "sha256": "67ce9395b9902cc6aa59ac9646929541328c0ac3e9e790ce92d75ef8f53d5637",
+      "bytes": 3049,
+      "at": "2026-10-24T20:38:20+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-038/evidence/probe-old-code.txt",
+      "sha256": "07593fbd00ca039f8c2a0247221a4fe9a806579fdf7ac642215c27a61a9e7700",
+      "bytes": 3479,
+      "at": "2026-10-24T20:38:20+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-038/evidence/commit.txt",
+      "sha256": "b58fd13fa6384228f6b2f5ee2c54c17aea1388118103d4c2d6cfe9060394bf78",
+      "bytes": 952,
+      "at": "2026-10-24T20:38:20+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-038/evidence/diff.txt",
+      "sha256": "2baed36c759013fc537b6c9012c9adf770452d3c536fade9cc32d570cf03a5d1",
+      "bytes": 110222,
+      "at": "2026-10-24T20:38:20+08:00",
+      "id": "E-009"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:bf7571e7-8da5-4a64-bd41-c9579c9b31f3",
+    "verdict": "PASS",
+    "note": "038 PASS（代码/验收），带一个部署前置：真实塔尚未执行 authority-require，038 的要求在真实塔上还未生效（迁移由 controller 做，reviewer 禁止）。独立复核自建 %TEMP% 夹具复现：require 后 configured/required、恰一条 AUTHORITY_REQUIRED、policy 与 event 同构；非 owner 零写入；重复 require already=true；单侧缺失 repaired=true；037 攻击夹具（删 state/AUTHORITY.json + 移除尾部唯一 AUTHORITY_SET，前缀仍合法）→ verify-ledger 0、authority-check exit 2 required_unconfigured、state-verify 唯一 drift authority_required_unconfigured、merge exit 2、队列 WAITING、无 MERGE_START（main 版工具同夹具：legacy/0/MERGED，已被翻红）；删 policy（事件在）→ policy_missing；policy true 但截 REQ → policy_unbacked；ledger 为目录时 authority-set/authority-require 均 exit 2 单 JSON 无 traceback、恢复后可修；look-alike（\"true\"/1/0/null）不被当 required，且事件在时 fail closed；state 文件为目录 → fail closed。证据 9/9 SHA-256+字节数一致、evidence/towerctl.py 与 worktree 字节相同、diff.txt 与 git diff 相同；scope 恰 3 allowed_paths；test_state_verify.py 纯追加 +65/-0、test_authority_state.py 未动；亲跑 Ran 341 tests / OK(skipped=1)。真实塔只读：state-verify 38/37 drift []、verify-ledger 0 error（primary 340/supervision 193）、authority-check configured/optional（policy 不存在、无 AUTHORITY_REQUIRED）、spec-coverage 27/27、spec-lint 6/6。残余：038 不是不可删除的事实——删 policy + state + 截掉全部 SET/REQ（合法前缀）仍回 legacy 且 verify-ledger 0；配对只验 presence/极性，不验 policy 字段同构；owner 是字符串非认证；merge 不跑 verify-ledger（空账本前缀不被 merge 抓）。结论：037 的精确假 legacy 路径已关上，038 把门槛从“删一个文件+截一条尾”抬到“删四个工件+截到最早 SET/REQ 之前”。",
+    "at": "2026-10-24T20:55:08+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-038",
+    "actor": "owner",
+    "text": "owner directed 038; independent review PASS (341 tests, 9/9 hashes, old-code fake-legacy MERGED -> new exit 2)",
+    "at": "2026-10-24T20:55:09+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-038/CLOSEOUT.md",
+    "at": "2026-10-24T20:55:09+08:00"
+  },
+  "created_at": "2026-10-24T19:39:40+08:00",
+  "updated_at": "2026-10-24T20:55:09+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-038/MERGE.md",
+  "delivered_at": "2026-10-24T20:38:20+08:00",
+  "accepted_at": "2026-10-24T20:55:09+08:00"
+}

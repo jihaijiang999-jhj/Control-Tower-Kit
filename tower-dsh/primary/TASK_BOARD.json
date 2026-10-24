@@ -371,7 +371,17 @@
       "reviewer": "subagent:50413a27-baf7-4c93-876d-f183fe168d6b",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-037/MERGE.md",
       "updated_at": "2026-10-24T18:46:51+08:00"
+    },
+    {
+      "id": "PILOT-038",
+      "title": "授权必需标记：authority_required 持久化，禁止删文件/截账本退回 legacy；authority-set 写账本失败 fail-closed",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:087f1403-4792-435d-8476-cec76c13877c",
+      "reviewer": "subagent:bf7571e7-8da5-4a64-bd41-c9579c9b31f3",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-038/MERGE.md",
+      "updated_at": "2026-10-24T20:55:09+08:00"
     }
   ],
-  "updated_at": "2026-10-24T18:46:51+08:00"
+  "updated_at": "2026-10-24T20:55:09+08:00"
 }

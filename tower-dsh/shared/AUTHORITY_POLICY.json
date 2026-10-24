@@ -1,0 +1,8 @@
+{
+  "schema": "tower/authority-policy@1",
+  "tower_id": "tower-dsh",
+  "require_authority": true,
+  "set_by": "mac",
+  "decision": "D-PILOT-038",
+  "set_at": "2026-10-24T20:55:14+08:00"
+}

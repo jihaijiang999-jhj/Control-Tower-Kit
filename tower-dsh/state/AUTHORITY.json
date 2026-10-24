@@ -9,9 +9,9 @@
     "id": "sup-phase2-pilot"
   },
   "merge_authority": "sup-phase2-pilot",
-  "revision": 1,
+  "revision": 2,
   "set_by": "mac",
-  "decision": "D-PILOT-037",
-  "set_at": "2026-10-24T18:46:56+08:00",
-  "note": "PILOT-037 backfill: pin registered supervisor as merge authority"
+  "decision": "D-PILOT-038",
+  "set_at": "2026-10-24T20:55:14+08:00",
+  "note": "PILOT-038 migration: require authority + pin supervisor (revision 2)"
 }
