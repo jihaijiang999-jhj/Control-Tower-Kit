@@ -1,0 +1,56 @@
+{
+  "schema": "tower/spec@1",
+  "id": "PILOT-037",
+  "title": "授权态单写者：state/AUTHORITY.json + authority-check，把 merge 权限从字符串变成登记身份",
+  "authority": "workspace_write",
+  "anchor": "∅7 授权态单写者",
+  "why_now": "现在 merge 只校验 --role supervisor 与 supervisor != primary.id；任何会话带上任意别的字符串就能 merge（⊙S 单点）。CURRENT_STATE 里的 primary/supervisor 都是可手改的字符串，merge 权限没有登记来源。∅7 要把“谁有权 merge”变成一条可重放、可判定的状态：文件 + ledger 事件互为锚，写者不等于登记身份即拒。",
+  "scope": [
+    "新增 state/AUTHORITY.json（schema tower/authority-state@1）：tower_id、owner、primary.id、supervision.id、merge_authority、revision、set_by、decision、set_at。文件本身不是权威——权威是 primary ledger 中最后一条 AUTHORITY_SET 事件的 payload；文件与事件逐字段一致才算 configured",
+    "新增 towerctl authority-set --supervisor <id> --decision <D> --by <name> [--note]：--by 必须等于 primary/CURRENT_STATE.json 的 owner.name；--supervisor 必须等于 supervision/CURRENT_STATE.json 的 supervisor.id，且不得等于 primary.id；任一校验失败先 exit 2，不写文件、不追加事件；成功则 revision+1 写文件并追加 AUTHORITY_SET（payload 与文件同构，含 owner/primary_id/supervision_id/merge_authority/revision/set_by/decision/set_at）",
+    "新增 towerctl authority-check（只读）：输出 {ok, status, checks}，status ∈ configured|legacy；legacy = 文件与 AUTHORITY_SET 都不存在（旧塔兼容）；其余任一不一致 exit 2。校验项：文件可解析且 schema 正确；owner 与 CURRENT_STATE 一致；primary.id 与 CURRENT_STATE.primary.id 一致；supervision.id 与 supervision/CURRENT_STATE.supervisor.id 一致；merge_authority != primary.id；文件字段与最后一条 AUTHORITY_SET payload 逐字段一致；文件/事件的“有”与“无”互相匹配（有事件无文件=missing，有文件无事件=unbacked）",
+    "cmd_merge：在 --role supervisor 与 supervisor != primary.id 之后、任何队列/信封/git 动作之前运行 authority 校验。configured 时 --supervisor 必须等于 merge_authority，否则 exit 2（错误文案含 state pins <x> / request <y>），队列条目保持原状、不得写 MERGE_START/MERGING；legacy 保持旧行为；missing/unbacked/mismatch 一律 exit 2（fail closed）",
+    "cmd_merge_check：追加 authority 检查项——configured 正常时加一条 ok=true 的 merge authority pinned；legacy 时加一条 ok=true、detail 明确写 legacy（无 AUTHORITY_SET）；有任何 authority 错误时作为失败 check 让整单 exit 2",
+    "cmd_startup 与 cmd_status：新增字段 authority_state（configured|legacy），不改既有字段语义",
+    "cmd_state_verify：新增 drift 种类 authority_missing / authority_unreadable / authority_unbacked / authority_mismatch；legacy（文件与事件都无）记入 skipped（reason=no_authority_state），不影响 exit code",
+    "AUTHORITY_STATE_DIRS 增加 state，使未提交的 state/AUTHORITY.json 计入 authority_dirty（status/startup 可见）",
+    "新增 tools/tests/test_authority_state.py 覆盖上述正反路径；tools/tests/test_state_verify.py 增加 authority drift 用例；tools/tests/test_authority_drift.py 增加 state/ 计入 dirty 的用例",
+    "真实塔 backfill：用 worktree 的新工具对真实塔执行 authority-set（--supervisor sup-phase2-pilot --decision D-PILOT-037 --by mac），随后合并本卡；post-merge 在新代码下必须通过 authority-check",
+    "不改 legacy（无 baseline）信封语义；不改 envelope-new / queue-add / post-merge 的既有行为；不得手写 state/AUTHORITY.json 或 ledger"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-037/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-037/tower-dsh/tools/tests/test_authority_state.py",
+    "pilot/worktrees/PILOT-037/tower-dsh/tools/tests/test_state_verify.py",
+    "pilot/worktrees/PILOT-037/tower-dsh/tools/tests/test_authority_drift.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "hand-editing state/AUTHORITY.json or ledger/*.jsonl",
+    "allowing merge when AUTHORITY_SET exists but state/AUTHORITY.json is missing",
+    "introducing a second source of truth for the supervisor identity",
+    "changing legacy (no baseline) envelope semantics"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-037/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 305 + 新增用例数（main 基线 305）",
+    "fixture 塔上 authority-set --supervisor sup-A --decision D-X --by mac → exit 0；state/AUTHORITY.json 出现且 revision=1；primary ledger 恰一条 AUTHORITY_SET；authority-check → exit 0、status=configured",
+    "authority-set --by mallory（非 owner）→ exit 2；无 state/AUTHORITY.json；无 AUTHORITY_SET 事件",
+    "authority-set --supervisor <primary.id> → exit 2、零写入（文件不存在、事件数不变）",
+    "authority-set --supervisor <id 不等于 supervision state 的 supervisor.id> → exit 2、零写入",
+    "篡改文件 merge_authority → authority-check exit 2（mismatch）；state-verify drift 含 authority_mismatch",
+    "删除文件但 AUTHORITY_SET 仍在 → authority-check exit 2（missing）；state-verify drift 含 authority_missing；merge exit 2 且队列条目仍 WAITING、ledger 无 MERGE_START/MERGING",
+    "只有文件没有事件 → authority-check exit 2（unbacked）；state-verify drift 含 authority_unbacked",
+    "configured 塔：merge --supervisor <pin> 通过身份门（继续到后续检查）；merge --supervisor rogue → exit 2，errors 含 merge authority mismatch，队列仍 WAITING，无 MERGE_START；merge-check 在 configured 塔上含 ok=true 的 merge authority pinned",
+    "legacy 塔（无文件无事件）：merge-check 仍 exit 0 且含 legacy 说明；既有 merge/merge-check 测试全部保持绿（证明未破坏兼容）",
+    "旧码对照：用 git show main:tower-dsh/tools/towerctl.py 落 main 版工具，对同一 configured 塔跑 merge --supervisor rogue（不报身份错、继续到后续阶段）与 state-verify（篡改 AUTHORITY.json 后无 drift）；新码两处都拒。证据写进 scratch/probe-old-code.txt",
+    "真实塔：authority-set backfill 后 authority-check exit 0 status=configured；建信封前 state-verify tasks=37/envelopes=36/drift []，建信封后 37/37；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-037 diff --name-only main..HEAD 恰四个 allowed_paths（tower-dsh/tools/towerctl.py、tower-dsh/tools/tests/test_authority_state.py、tower-dsh/tools/tests/test_state_verify.py、tower-dsh/tools/tests/test_authority_drift.py）"
+  ],
+  "depends_on": ["PILOT-036"],
+  "worktree": "pilot/worktrees/PILOT-037"
+}

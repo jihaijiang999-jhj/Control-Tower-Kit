@@ -637,9 +637,11 @@ def working_tree_state(root: Path, repo: Path) -> tuple[list[str], list[str]]:
 # authority state too: leaving them out let an uncommitted task card or spec
 # look like a clean tower.  Watching the whole ``pilot`` tree is safe because
 # ``pilot/repo`` and ``pilot/worktrees`` are gitignored and ``git status``
-# never reports ignored untracked files.
+# never reports ignored untracked files.  ``state`` holds ``AUTHORITY.json``:
+# an uncommitted authority file must be visible exactly like the ledger event
+# it mirrors.
 AUTHORITY_STATE_DIRS = ("primary", "supervision", "ledger", "handoffs", "shared",
-                        "tasks", "pilot")
+                        "tasks", "pilot", "state")
 
 
 def authority_repo(root: Path) -> Path | None:
@@ -712,6 +714,370 @@ def authority_commit_hint(root: Path, drift: list[str]) -> str:
     repo_posix = repo.as_posix()
     return (f'git -C "{repo_posix}" add -- {paths} && '
             f'git -C "{repo_posix}" commit -m "{message}"')
+
+
+AUTHORITY_STATE_SCHEMA = "tower/authority-state@1"
+AUTHORITY_STATE_FILE = "state/AUTHORITY.json"
+AUTHORITY_SET_EVENT = "AUTHORITY_SET"
+# The ledger event is the authority; the file must repeat every one of these
+# values exactly.  ``primary.id``/``supervision.id`` are nested in the file and
+# flat in the payload; ``note`` is optional, and "present on one side only" is
+# itself a mismatch.
+AUTHORITY_STATE_FIELDS = ("owner", "primary_id", "supervision_id",
+                          "merge_authority", "revision", "set_by", "decision",
+                          "set_at", "note")
+AUTHORITY_TEXT_FIELDS = ("owner", "primary_id", "supervision_id",
+                         "merge_authority", "set_by", "decision", "set_at")
+# Sentinel for "key absent", distinct from ``None``: a missing optional field
+# must never compare equal to a present one (``null`` included).
+AUTHORITY_ABSENT = object()
+
+
+def _state_nested_id(state: dict, key: str, nested: str):
+    """``state[key][nested]`` or None, tolerating a non-object value."""
+    value = state.get(key)
+    return value.get(nested) if isinstance(value, dict) else None
+
+
+def _state_owner_name(state: dict):
+    """``state.owner.name`` or None, tolerating a non-object value."""
+    owner = state.get("owner")
+    return owner.get("name") if isinstance(owner, dict) else None
+
+
+def authority_state_fields(state: dict) -> dict:
+    """Flatten ``state/AUTHORITY.json`` into the ledger payload field names.
+
+    Absent keys become ``AUTHORITY_ABSENT`` so the comparison distinguishes
+    "missing" from "present with a null/invalid value".
+    """
+    primary = state.get("primary")
+    supervision = state.get("supervision")
+    return {
+        "owner": state.get("owner", AUTHORITY_ABSENT),
+        "primary_id": (primary.get("id", AUTHORITY_ABSENT)
+                       if isinstance(primary, dict) else AUTHORITY_ABSENT),
+        "supervision_id": (supervision.get("id", AUTHORITY_ABSENT)
+                           if isinstance(supervision, dict) else AUTHORITY_ABSENT),
+        "merge_authority": state.get("merge_authority", AUTHORITY_ABSENT),
+        "revision": state.get("revision", AUTHORITY_ABSENT),
+        "set_by": state.get("set_by", AUTHORITY_ABSENT),
+        "decision": state.get("decision", AUTHORITY_ABSENT),
+        "set_at": state.get("set_at", AUTHORITY_ABSENT),
+        "note": state.get("note", AUTHORITY_ABSENT),
+    }
+
+
+def authority_payload_fields(payload: dict) -> dict:
+    """Flat ``AUTHORITY_SET`` payload fields, same absent sentinel."""
+    return {field: payload.get(field, AUTHORITY_ABSENT)
+            for field in AUTHORITY_STATE_FIELDS}
+
+
+def authority_display(value):
+    """JSON-safe rendering: an absent field is ``None``."""
+    return None if value is AUTHORITY_ABSENT else value
+
+
+def _authority_field_errors(fields: dict, label: str) -> list[str]:
+    """Type rules for one side (file or ledger payload).
+
+    ``bool`` is not an ``int`` here: ``True == 1`` in Python, which is exactly
+    how ``revision: true`` used to slip through an equality-only comparison.
+    """
+    errors: list[str] = []
+    for field in AUTHORITY_TEXT_FIELDS:
+        value = fields[field]
+        if not isinstance(value, str) or not value:
+            errors.append(f"{label} {field} must be a non-empty string")
+    revision = fields["revision"]
+    if type(revision) is not int or revision < 1:
+        errors.append(f"{label} revision must be an int >= 1")
+    note = fields["note"]
+    if note is not AUTHORITY_ABSENT and (not isinstance(note, str) or not note):
+        errors.append(f"{label} note must be a non-empty string when present")
+    return errors
+
+
+def _authority_mismatch_detail(fields: dict, payload: dict,
+                               mismatched: list[str]) -> str:
+    """One line naming every mismatching field and both values."""
+    return ", ".join(
+        f"{field} {authority_display(fields[field])!r} != "
+        f"{authority_display(payload[field])!r}" for field in mismatched)
+
+
+def last_authority_event(root: Path) -> tuple[bool, dict | None]:
+    """``(event_present, payload)`` for the last ``AUTHORITY_SET`` event.
+
+    The event payload -- not the file -- is the authority.  A ledger that
+    cannot be read is reported as "no event" here: ``verify-ledger`` and
+    ``state-verify`` own that failure, and every caller of this helper is
+    read-only.  This helper never raises.
+    """
+    try:
+        events = [event for event in ledger_events_in_seq_order(root, "primary")
+                  if event.get("type") == AUTHORITY_SET_EVENT]
+    except PATH_ACCESS_ERRORS:
+        return False, None
+    if not events:
+        return False, None
+    payload = events[-1].get("payload")
+    return True, payload if isinstance(payload, dict) else None
+
+
+def next_authority_revision(root: Path) -> int:
+    """One more than the file's or the last event's revision.
+
+    Re-running ``authority-set`` on a half-written tower (one half present)
+    therefore continues the sequence instead of resetting it to 1.
+    """
+    revisions: list[int] = []
+    _, state = _read_json_object(root / AUTHORITY_STATE_FILE)
+    if isinstance(state, dict):
+        value = state.get("revision")
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            revisions.append(value)
+    _, payload = last_authority_event(root)
+    if isinstance(payload, dict):
+        value = payload.get("revision")
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            revisions.append(value)
+    return (max(revisions) if revisions else 0) + 1
+
+
+def authority_state_check(root: Path) -> dict:
+    """Read-only audit of ``state/AUTHORITY.json`` against the ledger.
+
+    ``status`` is ``"legacy"`` only when neither the file nor an
+    ``AUTHORITY_SET`` event exists, which keeps old towers working.  Every
+    other combination is ``"configured"`` and must pass every check: strict
+    field types, ``tower_id`` bound to the primary state, every field of the
+    file equal to the last event payload (optional ``note`` included), and an
+    intact primary ledger chain for the event.  A broken file or ledger becomes
+    a failed check, never an exception.  ``errors`` carries one flat line per
+    failed check so ``merge`` can fail closed with them.
+    """
+    checks: list[dict] = []
+    errors: list[str] = []
+
+    def add(name: str, ok: bool, detail: str) -> None:
+        checks.append({"name": name, "ok": bool(ok), "detail": detail})
+        if not ok:
+            errors.append(f"{name}: {detail}")
+
+    file_state, state = _read_json_object(root / AUTHORITY_STATE_FILE)
+    event_present, payload_obj = last_authority_event(root)
+    payload = payload_obj if isinstance(payload_obj, dict) else {}
+
+    # Legacy: the tower predates authority state.  Not configured, not broken,
+    # and deliberately no ledger-chain check (old towers must keep verifying).
+    if file_state == "missing" and not event_present:
+        add("authority state", True,
+            "legacy: no state/AUTHORITY.json and no AUTHORITY_SET event")
+        return {"status": "legacy", "checks": checks, "errors": errors,
+                "merge_authority": None}
+
+    _, primary_state = _read_json_object(root / "primary" / "CURRENT_STATE.json")
+    _, supervision_state = _read_json_object(
+        root / "supervision" / "CURRENT_STATE.json")
+    primary_state = primary_state if isinstance(primary_state, dict) else {}
+    supervision_state = (supervision_state
+                         if isinstance(supervision_state, dict) else {})
+    owner = _state_owner_name(primary_state)
+    primary_id = _state_nested_id(primary_state, "primary", "id")
+    supervisor_id = _state_nested_id(supervision_state, "supervisor", "id")
+    primary_tower_id = primary_state.get("tower_id", AUTHORITY_ABSENT)
+
+    # The event is the authority, so its ledger chain must be intact before its
+    # payload can be trusted.  This runs for every configured state, whatever
+    # the envelope style, so a forged AUTHORITY_SET row cannot ride a legacy
+    # envelope through the merge gate.
+    if event_present:
+        report = verify_ledger_file(root, "primary")
+        if report["errors"]:
+            add("primary ledger chain intact", False,
+                f"primary ledger chain broken: {report['errors'][0]}")
+        else:
+            add("primary ledger chain intact", True, "ok")
+
+    if file_state == "missing":
+        add("authority state file present", False,
+            "ledger/primary.jsonl has an AUTHORITY_SET event but "
+            "state/AUTHORITY.json is missing")
+    elif file_state == "unreadable":
+        add("authority state file readable", False,
+            "state/AUTHORITY.json is not a parseable JSON object")
+    else:
+        add("authority state file readable", True, AUTHORITY_STATE_FILE)
+        add("authority schema is tower/authority-state@1",
+            state.get("schema") == AUTHORITY_STATE_SCHEMA,
+            f"schema {state.get('schema')!r}")
+
+    if not event_present:
+        add("authority state backed by ledger", False,
+            "state/AUTHORITY.json exists but ledger/primary.jsonl has no "
+            "AUTHORITY_SET event")
+    elif not isinstance(payload_obj, dict):
+        add("authority state backed by ledger", False,
+            "the last AUTHORITY_SET carries no object payload")
+    else:
+        add("authority state backed by ledger", True,
+            f"AUTHORITY_SET revision {payload.get('revision')}")
+
+    if file_state == "ok":
+        fields = authority_state_fields(state)
+        type_errors = _authority_field_errors(fields, "file")
+        add("authority field types", not type_errors,
+            "; ".join(type_errors) or "ok")
+        tower_errors: list[str] = []
+        tower_id = state.get("tower_id", AUTHORITY_ABSENT)
+        if not isinstance(tower_id, str) or not tower_id:
+            tower_errors.append("file tower_id must be a non-empty string")
+        if not isinstance(primary_tower_id, str) or not primary_tower_id:
+            tower_errors.append(
+                "primary/CURRENT_STATE.json tower_id must be a non-empty string")
+        if not tower_errors and tower_id != primary_tower_id:
+            tower_errors.append(
+                f"file {tower_id!r} vs primary state {primary_tower_id!r}")
+        add("authority tower_id matches primary state", not tower_errors,
+            "; ".join(tower_errors) or "ok")
+        add("authority owner matches primary state",
+            fields["owner"] == owner,
+            f"file {authority_display(fields['owner'])!r} vs primary state "
+            f"{owner!r}")
+        add("authority primary.id matches primary state",
+            fields["primary_id"] == primary_id,
+            f"file {authority_display(fields['primary_id'])!r} vs primary "
+            f"state {primary_id!r}")
+        add("authority supervision.id matches supervision state",
+            fields["supervision_id"] == supervisor_id,
+            f"file {authority_display(fields['supervision_id'])!r} vs "
+            f"supervision state {supervisor_id!r}")
+        add("merge authority differs from primary",
+            fields["merge_authority"] != primary_id,
+            f"merge authority {authority_display(fields['merge_authority'])!r} "
+            f"vs primary {primary_id!r}")
+        if not event_present or not isinstance(payload_obj, dict):
+            add("authority file matches last AUTHORITY_SET", False,
+                "no usable AUTHORITY_SET event to compare against")
+        else:
+            payload_fields = authority_payload_fields(payload)
+            ledger_type_errors = _authority_field_errors(payload_fields,
+                                                         "ledger")
+            add("authority ledger payload types", not ledger_type_errors,
+                "; ".join(ledger_type_errors) or "ok")
+            mismatched = [field for field in AUTHORITY_STATE_FIELDS
+                          if fields[field] != payload_fields[field]]
+            add("authority file matches last AUTHORITY_SET",
+                not mismatched,
+                "ok" if not mismatched else
+                "mismatch: " + _authority_mismatch_detail(
+                    fields, payload_fields, mismatched))
+        pinned = authority_display(fields["merge_authority"])
+    else:
+        pinned = authority_display(
+            payload.get("merge_authority", AUTHORITY_ABSENT))
+
+    return {"status": "configured", "checks": checks, "errors": errors,
+            "merge_authority": pinned}
+
+
+def cmd_authority_check(root: Path, args) -> None:
+    result = authority_state_check(root)
+    ok = not result["errors"]
+    emit({"ok": ok, "status": result["status"], "checks": result["checks"]},
+         0 if ok else 2)
+
+
+def cmd_authority_set(root: Path, args) -> None:
+    """Register the merge authority: one file write plus one ledger event.
+
+    Every identity check runs before any write, so a caller that is not the
+    registered owner, or that names something other than the registered
+    supervisor, leaves the tower untouched.  Re-running is the repair path for
+    a half-write: whichever half is missing is rebuilt with a fresh revision.
+    """
+    _, primary_state = _read_json_object(root / "primary" / "CURRENT_STATE.json")
+    _, supervision_state = _read_json_object(
+        root / "supervision" / "CURRENT_STATE.json")
+    primary_state = primary_state if isinstance(primary_state, dict) else {}
+    supervision_state = (supervision_state
+                         if isinstance(supervision_state, dict) else {})
+    owner = _state_owner_name(primary_state)
+    primary_id = _state_nested_id(primary_state, "primary", "id")
+    supervisor_id = _state_nested_id(supervision_state, "supervisor", "id")
+
+    errors: list[str] = []
+    if not owner:
+        errors.append("primary/CURRENT_STATE.json has no owner.name")
+    elif args.by != owner:
+        errors.append(f"only the registered owner may set authority: "
+                      f"--by {args.by!r} != owner {owner!r}")
+    if not supervisor_id:
+        errors.append("supervision/CURRENT_STATE.json has no supervisor.id")
+    elif args.supervisor != supervisor_id:
+        errors.append(f"--supervisor {args.supervisor!r} is not the "
+                      f"registered supervisor {supervisor_id!r}")
+    if args.supervisor == primary_id:
+        errors.append(f"--supervisor {args.supervisor!r} must differ from "
+                      f"primary.id {primary_id!r}")
+    if not isinstance(args.decision, str) or not args.decision.strip():
+        errors.append("--decision must be a non-empty string")
+    if not isinstance(primary_state.get("tower_id"), str) or not \
+            primary_state.get("tower_id"):
+        errors.append("primary/CURRENT_STATE.json has no tower_id")
+    if errors:
+        fail(errors)
+
+    revision = next_authority_revision(root)
+    set_at = now()
+    note = args.note or None
+    state = {
+        "schema": AUTHORITY_STATE_SCHEMA,
+        "tower_id": primary_state.get("tower_id"),
+        "owner": owner,
+        "primary": {"id": primary_id},
+        "supervision": {"id": supervisor_id},
+        "merge_authority": args.supervisor,
+        "revision": revision,
+        "set_by": args.by,
+        "decision": args.decision,
+        "set_at": set_at,
+    }
+    payload = {
+        "owner": owner,
+        "primary_id": primary_id,
+        "supervision_id": supervisor_id,
+        "merge_authority": args.supervisor,
+        "revision": revision,
+        "set_by": args.by,
+        "decision": args.decision,
+        "set_at": set_at,
+    }
+    if note:
+        state["note"] = note
+        payload["note"] = note
+    # File first, event second: the event is the authority, so a crash between
+    # the two leaves "file without event" (unbacked), never a silent
+    # configured state.  Re-running authority-set repairs either half.  A write
+    # failure (state/AUTHORITY.json is a directory, the tree is not writable,
+    # ...) must not append the event: that would make the write failure
+    # authoritative.  It exits 2 with one JSON payload instead of a traceback.
+    target = root / AUTHORITY_STATE_FILE
+    try:
+        jdump(target, state)
+    except OSError as exc:
+        residue = target.with_name(target.name + ".tmp")
+        try:
+            if residue.is_file():
+                residue.unlink()
+        except OSError:
+            pass
+        fail([f"cannot write {AUTHORITY_STATE_FILE}: {exc}"])
+    append_ledger(root, AUTHORITY_SET_EVENT, "primary", payload)
+    emit({"ok": True, "path": AUTHORITY_STATE_FILE, "revision": revision,
+          "merge_authority": args.supervisor})
 
 
 def load_supervision(root: Path) -> dict:
@@ -972,10 +1338,12 @@ def cmd_startup(root: Path, args) -> None:
         fail(errors)
     board = load_board(root)
     drift = authority_drift(root)
+    authority = authority_state_check(root)
     emit({"ok": True, "tower_id": state.get("tower_id"), "role": state.get("role"),
           "phase": state.get("phase"), "primary": state.get("primary"),
           "tasks": len(board.get("tasks", [])), "next_action": state.get("next_action"),
-          "authority_dirty_count": None if drift is None else len(drift)})
+          "authority_dirty_count": None if drift is None else len(drift),
+          "authority_state": authority["status"]})
 
 
 SPEC_SCHEMA = "tower/spec@1"
@@ -2199,6 +2567,20 @@ def cmd_merge_check(root: Path, args) -> None:
               f"{declared if declared is not None else '(missing)'!r}, "
               f"request {envelope_id!r}"])
     checks = envelope_checks(root, env, expected_id=envelope_id)
+    # Authority state is reported on every merge-check, including the legacy
+    # case: a tower without AUTHORITY state must keep passing (old fixtures),
+    # but the absence has to be visible in the verdict, not silent.
+    authority = authority_state_check(root)
+    if authority["errors"]:
+        checks.append({"name": "merge authority", "ok": False,
+                       "detail": "; ".join(authority["errors"])})
+    elif authority["status"] == "legacy":
+        checks.append({"name": "merge authority", "ok": True,
+                       "detail": "legacy: no AUTHORITY_SET"})
+    else:
+        checks.append({"name": "merge authority pinned", "ok": True,
+                       "detail": f"merge authority pinned: "
+                                 f"{authority['merge_authority']}"})
     queue = load_queue(root)
     entry = next((e for e in queue.get("entries", [])
                   if e.get("envelope_id") == envelope_id), None)
@@ -2443,6 +2825,18 @@ def cmd_merge(root: Path, args) -> None:
     primary = jload(root / "primary" / "CURRENT_STATE.json").get("primary", {})
     if args.supervisor == primary.get("id"):
         fail(["primary cannot merge; supervisor must differ"])
+    # Authority state is decided before the envelope, queue or repository is
+    # even read.  A registered authority pins exactly one merge identity, and
+    # a missing/unbacked/mismatched chain fails closed instead of merging as
+    # if the tower were legacy.  No queue status is written here.
+    authority = authority_state_check(root)
+    if authority["errors"]:
+        fail(authority["errors"])
+    if authority["status"] == "configured":
+        pinned = authority["merge_authority"]
+        if args.supervisor != pinned:
+            fail([f"merge authority mismatch: state pins {pinned}, "
+                  f"request {args.supervisor}"])
     env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
     if not env_path.exists():
         fail([f"envelope not found: {args.envelope}"])
@@ -2923,11 +3317,13 @@ def cmd_status(root: Path, args) -> None:
     state = jload(root / "primary" / "CURRENT_STATE.json")
     board = load_board(root)
     drift = authority_drift(root)
+    authority = authority_state_check(root)
     emit({"ok": True, "tower": state.get("tower_id"), "role": state.get("role"),
           "phase": state.get("phase"), "next_action": state.get("next_action"),
           "tasks": board.get("tasks", []),
           "authority_dirty": drift,
-          "authority_dirty_count": None if drift is None else len(drift)})
+          "authority_dirty_count": None if drift is None else len(drift),
+          "authority_state": authority["status"]})
 
 
 def verify_ledger_file(root: Path, name: str) -> dict:
@@ -3480,6 +3876,66 @@ def replay_envelope_statuses(root: Path,
     return states
 
 
+def _authority_state_drift(root: Path, skip) -> list[dict]:
+    """Drift rows for ``state/AUTHORITY.json`` against the last AUTHORITY_SET.
+
+    Read-only and exception-free: ``_read_json_object`` turns every read
+    failure into ``unreadable``.  A tower with neither half is legacy and is
+    reported as one ``skipped`` observation, never drift, so an old tower
+    still verifies clean.  Every other combination is drift.
+    """
+    file_state, state = _read_json_object(root / AUTHORITY_STATE_FILE)
+    event_present, payload_obj = last_authority_event(root)
+
+    if file_state == "missing" and not event_present:
+        skip("authority_state", "AUTHORITY", "no_authority_state")
+        return []
+    if file_state == "unreadable":
+        return [{"kind": "authority_unreadable", "target": "AUTHORITY",
+                 "expected": "parseable JSON object",
+                 "actual": "unparseable"}]
+    if file_state == "missing":
+        return [{"kind": "authority_missing", "target": "AUTHORITY",
+                 "expected": "state/AUTHORITY.json matching the last "
+                             "AUTHORITY_SET event",
+                 "actual": "missing"}]
+    if not event_present:
+        return [{"kind": "authority_unbacked", "target": "AUTHORITY",
+                 "expected": "AUTHORITY_SET ledger event",
+                 "actual": "file only"}]
+    payload = payload_obj if isinstance(payload_obj, dict) else {}
+    file_fields = authority_state_fields(state)
+    payload_fields = authority_payload_fields(payload)
+    mismatched = [field for field in AUTHORITY_STATE_FIELDS
+                  if file_fields[field] != payload_fields[field]]
+    type_errors = (_authority_field_errors(file_fields, "file")
+                   + _authority_field_errors(payload_fields, "ledger"))
+    expected = {field: authority_display(payload_fields[field])
+                for field in AUTHORITY_STATE_FIELDS}
+    actual = {field: authority_display(file_fields[field])
+              for field in AUTHORITY_STATE_FIELDS}
+    expected["schema"] = AUTHORITY_STATE_SCHEMA
+    actual["schema"] = state.get("schema")
+    if actual["schema"] != AUTHORITY_STATE_SCHEMA:
+        mismatched.append("schema")
+    # ``tower_id`` is not part of the event payload, so it is bound to the
+    # primary state instead -- but only when that state is readable, so the
+    # audit stays exception-free on partial fixtures.
+    _, primary_state = _read_json_object(root / "primary" / "CURRENT_STATE.json")
+    if isinstance(primary_state, dict):
+        primary_tower_id = primary_state.get("tower_id", AUTHORITY_ABSENT)
+        if isinstance(primary_tower_id, str) and primary_tower_id:
+            expected["tower_id"] = primary_tower_id
+            actual["tower_id"] = authority_display(
+                state.get("tower_id", AUTHORITY_ABSENT))
+            if actual["tower_id"] != primary_tower_id:
+                mismatched.append("tower_id")
+    if not mismatched and not type_errors:
+        return []
+    return [{"kind": "authority_mismatch", "target": "AUTHORITY",
+             "expected": expected, "actual": actual}]
+
+
 def state_verify_drift(root: Path) -> dict:
     """Compare replayed state with records, board, queue and envelopes.
 
@@ -3642,6 +4098,8 @@ def state_verify_drift(root: Path) -> dict:
                           "expected": expected,
                           "actual": envelope.get("status")})
 
+    drift.extend(_authority_state_drift(root, skip))
+
     drift.sort(key=lambda item: (item["kind"], str(item["target"]),
                                  item.get("path") or ""))
     skipped.sort(key=lambda item: (item["kind"], str(item["target"])))
@@ -3722,6 +4180,17 @@ def build_parser() -> argparse.ArgumentParser:
                     choices=["primary", "supervision", "all"])
 
     sub.add_parser("state-verify")
+
+    sub.add_parser("authority-check")
+
+    aset = sub.add_parser("authority-set")
+    aset.add_argument("--supervisor", required=True,
+                      help="registered supervisor id that becomes merge authority")
+    aset.add_argument("--decision", required=True,
+                      help="decision id recorded in state and ledger")
+    aset.add_argument("--by", required=True,
+                      help="must equal primary/CURRENT_STATE.json owner.name")
+    aset.add_argument("--note")
 
     sl = sub.add_parser("spec-lint")
     sl.add_argument("--dir", default=None,
@@ -3876,6 +4345,8 @@ def main() -> None:
         "merge-check": cmd_merge_check, "merge": cmd_merge, "post-merge": cmd_post_merge,
         "verify-ledger": cmd_verify_ledger,
         "state-verify": cmd_state_verify,
+        "authority-check": cmd_authority_check,
+        "authority-set": cmd_authority_set,
         "spec-lint": cmd_spec_lint,
         "spec-coverage": cmd_spec_coverage,
     }
