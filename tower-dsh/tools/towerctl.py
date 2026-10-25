@@ -3079,7 +3079,7 @@ def cmd_merge_check(root: Path, args) -> None:
             "name": "pre-merge ledger chains verified",
             "ok": not breaks,
             "detail": "ok" if not breaks else "; ".join(
-                f"{name} ledger chain broken: {first}"
+                ledger_break_phrase(name, first)
                 for name, first in breaks),
         })
     queue = load_queue(root)
@@ -3348,7 +3348,7 @@ def cmd_merge(root: Path, args) -> None:
         # The trailing tag names the envelope-level check that reports the same
         # condition, so callers keyed on ``ledger chain intact`` keep working
         # even though this gate now fires before the envelope is read.
-        fail([f"merge precondition: {name} ledger chain broken: {first} "
+        fail([f"merge precondition: {ledger_break_phrase(name, first)} "
               "(ledger chain intact)"
               for name, first in breaks])
     env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
@@ -3907,24 +3907,28 @@ def verify_ledger_file(root: Path, name: str) -> dict:
 
 
 def ledger_precondition_breaks(root: Path) -> list[tuple[str, str]]:
-    """``(ledger name, first error)`` for every existing ledger that fails.
+    """``(ledger name, first error)`` for every ledger that fails verification.
 
-    PILOT-039: ``merge`` and the legacy ``merge-check`` precondition.  Only
-    files that exist are verified: a tower that never had a supervision ledger
-    keeps merging as before (the new-style envelope path already fails a
-    missing ledger through ``ledger chain intact``).  An existing ledger is
-    always verified in full -- a forged row can keep ``seq``/``prev_hash``
-    legal and still be caught by the hash.
+    PILOT-039 v2: ``merge`` and the legacy ``merge-check`` precondition verify
+    *both* ledgers unconditionally.  A missing ledger is a failure, not "no
+    chain to verify": PILOT-036 already established that absence is not
+    integrity, and skipping it let deleting ``ledger/supervision.jsonl`` turn a
+    legacy envelope into a MERGED merge whose ledger was then recreated.  An
+    existing ledger is verified in full -- a forged row can keep
+    ``seq``/``prev_hash`` legal and still be caught by the hash.
     """
     breaks: list[tuple[str, str]] = []
     for name in ("primary", "supervision"):
-        path = root / "ledger" / LEDGER_FILES[name]
-        if not path.exists():
-            continue
         report = verify_ledger_file(root, name)
         if report["errors"]:
             breaks.append((name, report["errors"][0]))
     return breaks
+
+
+def ledger_break_phrase(name: str, first: str) -> str:
+    """``<name> ledger chain missing/broken: <first error>`` for gate text."""
+    kind = "missing" if first.startswith("ledger missing:") else "broken"
+    return f"{name} ledger chain {kind}: {first}"
 
 
 def cmd_verify_ledger(root: Path, args) -> None:

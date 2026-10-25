@@ -263,6 +263,7 @@ class PrMergeTestCase(unittest.TestCase):
         })
         (self.root / "ledger" / "supervision.jsonl").write_text("",
                                                                 encoding="utf-8")
+        (self.root / "ledger" / "primary.jsonl").touch()
         # ``envelope_checks`` also gates on the task record, its PASS review
         # and the evidence hash, so the fixture has to be a real verified task.
         evidence_dir = self.root / "tasks" / TASK_ID / "evidence"

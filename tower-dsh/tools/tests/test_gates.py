@@ -148,6 +148,11 @@ class TowerGateTestCase(unittest.TestCase):
 
     def prepare_merge(self, *, base: str = "main", branch: str = "feature",
                       entry_status: str = "WAITING") -> Path:
+        # PILOT-039 v2: the merge precondition verifies both ledgers
+        # unconditionally, so a clean legacy fixture must carry both empty
+        # ledgers (a missing ledger is a failure, not "no chain").
+        (self.root / "ledger" / "primary.jsonl").touch()
+        (self.root / "ledger" / "supervision.jsonl").touch()
         repo = self.root / "pilot" / "repo"
         repo.mkdir(parents=True, exist_ok=True)
         self.assertEqual(git(repo, "init").returncode, 0)

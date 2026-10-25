@@ -218,6 +218,12 @@ class AuthorityHardeningTestCase(unittest.TestCase):
         text = path.read_text(encoding="utf-8") if path.is_file() else ""
         return [json.loads(line) for line in text.splitlines() if line.strip()]
 
+    def delete_ledger(self, name: str) -> None:
+        """Remove one ledger file (PILOT-039 v2: absence must be fatal)."""
+        path = self.ledger_path(name)
+        self.assertTrue(path.exists(), msg=f"fixture ledger missing: {name}")
+        path.unlink()
+
     def events_of(self, event_type: str) -> list[dict]:
         return [event for event in self.ledger_events()
                 if event.get("type") == event_type]
@@ -488,6 +494,46 @@ class AuthorityHardeningTestCase(unittest.TestCase):
         self.assertTrue(self.cli_json("authority-check")["ok"])
         self.assertEqual(self.cli_json("state-verify")["drift"], [])
 
+    # -- 3b. a tampered event payload with a recomputed hash -------------
+    def test_event_payload_tamper_with_recomputed_hash_is_mismatch(self) -> None:
+        # Rewrite the last AUTHORITY_REQUIRED payload *and* recompute its hash,
+        # so the ledger chain verifies end-to-end: only the policy<->event
+        # comparison can catch it.  "The event is the authority" does not mean
+        # a rewritten audit field in the event is acceptable either.
+        self.set_ok()
+        self.require_ok(decision="D-X")
+        events = self.ledger_events()
+        self.assertEqual(events[-1]["type"], "AUTHORITY_REQUIRED")
+        tampered = json.loads(json.dumps(events[-1]))
+        tampered["payload"]["decision"] = "D-OTHER"
+        tampered["hash"] = towerctl.event_hash(tampered)
+        lines = self.ledger_path().read_text(encoding="utf-8").splitlines()
+        lines[-1] = json.dumps(tampered, ensure_ascii=False)
+        self.ledger_path().write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        cp = self.run_cli("verify-ledger")
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+
+        cp = self.run_cli("authority-check")
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        check = json.loads(cp.stdout)
+        self.assertFalse(check["ok"], check)
+        blob = json.dumps(check)
+        self.assertIn(MISMATCH_PREFIX, blob)
+        self.assertIn("decision", blob)
+        self.assertIn("D-OTHER", blob)
+
+        cp = self.run_cli("state-verify")
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        state = json.loads(cp.stdout)
+        self.assertEqual([item["kind"] for item in state["drift"]],
+                         ["authority_policy_mismatch"], msg=state)
+        drift = state["drift"][0]
+        self.assertEqual(drift["expected"]["decision"], "D-OTHER")
+        self.assertEqual(drift["actual"]["decision"], "D-X")
+
+        self.assert_merge_refused(MISMATCH_PREFIX)
+
     # -- 4. concurrent authority-set -------------------------------------
     def test_concurrent_authority_set_serializes_revisions(self) -> None:
         workers = 3
@@ -592,6 +638,131 @@ class AuthorityHardeningTestCase(unittest.TestCase):
             {"checks": payload["errors"]},
             "pre-merge ledger chains verified")["detail"]
         self.assertIn("primary ledger chain broken", detail)
+
+    # -- 5b. a missing ledger is fatal, never "no chain to verify" --------
+    def test_missing_supervision_ledger_blocks_legacy_merge(self) -> None:
+        # The v1 regression: deleting the supervision ledger let a legacy
+        # envelope merge and the merge recreated the ledger.
+        self.write_envelope(baselines=False)
+        self.write_waiting_entry()
+        self.delete_ledger("supervision")
+
+        cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        payload = json.loads(cp.stdout)
+        self.assertFalse(payload["ok"], payload)
+        failed = [check["name"] for check in payload["errors"]]
+        self.assertIn("pre-merge ledger chains verified", failed)
+        detail = self.find_check(
+            {"checks": payload["errors"]},
+            "pre-merge ledger chains verified")["detail"]
+        self.assertIn("supervision ledger chain missing", detail)
+        self.assertIn("ledger missing: ledger/supervision.jsonl", detail)
+
+        queue_before = self.queue_bytes()
+        cp = self.run_cli("merge", "--role", "supervisor",
+                          "--supervisor", SUPERVISOR_ID,
+                          "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        blob = json.dumps(json.loads(cp.stdout)["errors"])
+        self.assertIn("merge precondition: supervision ledger chain missing", blob)
+        self.assertEqual(self.queue_bytes(), queue_before)
+        self.assertEqual(self.queue_entries()[0]["status"], "WAITING")
+        ledger = self.supervision_ledger()
+        self.assertNotIn("MERGE_START", ledger)
+        self.assertNotIn("MERGING", ledger)
+        self.assertFalse(self.ledger_path("supervision").exists(),
+                         msg="a refused merge must not recreate the ledger")
+
+    def test_missing_supervision_ledger_blocks_required_merge(self) -> None:
+        self.set_ok()
+        self.require_ok(decision="D-X")
+        self.write_envelope(baselines=False)
+        self.write_waiting_entry()
+        self.delete_ledger("supervision")
+
+        cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        detail = self.find_check(
+            {"checks": json.loads(cp.stdout)["errors"]},
+            "pre-merge ledger chains verified")["detail"]
+        self.assertIn("supervision ledger chain missing", detail)
+
+        cp = self.run_cli("merge", "--role", "supervisor",
+                          "--supervisor", SUPERVISOR_ID,
+                          "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        blob = json.dumps(json.loads(cp.stdout)["errors"])
+        self.assertIn("merge precondition: supervision ledger chain missing", blob)
+        self.assertEqual(self.queue_entries()[0]["status"], "WAITING")
+        self.assertNotIn("MERGE_START", self.supervision_ledger())
+        self.assertFalse(self.ledger_path("supervision").exists())
+
+    def test_missing_primary_ledger_blocks_legacy_merge(self) -> None:
+        self.write_envelope(baselines=False)
+        self.write_waiting_entry()
+        self.delete_ledger("primary")
+
+        cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        detail = self.find_check(
+            {"checks": json.loads(cp.stdout)["errors"]},
+            "pre-merge ledger chains verified")["detail"]
+        self.assertIn("primary ledger chain missing", detail)
+        self.assertIn("ledger missing: ledger/primary.jsonl", detail)
+
+        queue_before = self.queue_bytes()
+        cp = self.run_cli("merge", "--role", "supervisor",
+                          "--supervisor", SUPERVISOR_ID,
+                          "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        blob = json.dumps(json.loads(cp.stdout)["errors"])
+        self.assertIn("merge precondition: primary ledger chain missing", blob)
+        self.assertEqual(self.queue_bytes(), queue_before)
+        self.assertEqual(self.queue_entries()[0]["status"], "WAITING")
+        self.assertNotIn("MERGE_START", self.supervision_ledger())
+        self.assertFalse(self.ledger_path("primary").exists(),
+                         msg="a refused merge must not recreate the ledger")
+
+    def test_missing_primary_ledger_on_configured_tower_is_refused(self) -> None:
+        # On a configured tower the authority gate itself reads the ledger, so
+        # the primary ledger cannot disappear unnoticed: merge still refuses
+        # and never recreates it.
+        self.set_ok()
+        self.write_envelope(baselines=False)
+        self.write_waiting_entry()
+        self.delete_ledger("primary")
+
+        cp = self.run_cli("merge", "--role", "supervisor",
+                          "--supervisor", SUPERVISOR_ID,
+                          "--envelope", ENVELOPE)
+
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        payload = json.loads(cp.stdout)
+        self.assertFalse(payload["ok"], payload)
+        self.assertEqual(self.queue_entries()[0]["status"], "WAITING")
+        self.assertFalse(self.ledger_path("primary").exists())
+
+    def test_missing_supervision_ledger_new_style_fails_only_chain_intact(
+            self) -> None:
+        self.write_envelope(baselines=True)
+        self.write_waiting_entry()
+        self.delete_ledger("supervision")
+
+        cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        payload = json.loads(cp.stdout)
+        self.assertFalse(payload["ok"], payload)
+        self.assertEqual([check["name"] for check in payload["errors"]],
+                         ["ledger chain intact"])
+
+        cp = self.run_cli("merge", "--role", "supervisor",
+                          "--supervisor", SUPERVISOR_ID,
+                          "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        blob = json.dumps(json.loads(cp.stdout)["errors"])
+        self.assertIn("merge precondition: supervision ledger chain missing", blob)
+        self.assertFalse(self.ledger_path("supervision").exists())
 
     # -- 6. new-style envelope: one chain failure, no duplicate ----------
     def test_new_style_merge_check_has_no_duplicate_chain_failure(self) -> None:
