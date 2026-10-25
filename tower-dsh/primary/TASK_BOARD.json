@@ -381,7 +381,17 @@
       "reviewer": "subagent:bf7571e7-8da5-4a64-bd41-c9579c9b31f3",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-038/MERGE.md",
       "updated_at": "2026-10-24T20:55:09+08:00"
+    },
+    {
+      "id": "PILOT-039",
+      "title": "授权态收尾 v2：policy⇄event 逐字段同构、authority-require/set 跨锁、merge 前置链（缺失也算错）",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:22a3bc64-2174-4957-aeb2-a59ce6539dc8",
+      "reviewer": "subagent:baa3ec9e-499a-4a82-b5d5-41d279b1e51a",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-039/MERGE.md",
+      "updated_at": "2026-10-25T13:26:33+08:00"
     }
   ],
-  "updated_at": "2026-10-24T20:55:09+08:00"
+  "updated_at": "2026-10-25T13:26:33+08:00"
 }

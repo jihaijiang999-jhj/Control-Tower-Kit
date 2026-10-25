@@ -1,0 +1,171 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-039",
+  "title": "授权态收尾 v2：policy⇄event 逐字段同构、authority-require/set 跨锁、merge 前置链（缺失也算错）",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "authority-check 与 state-verify 增加 policy⇄event 逐字段同构校验：shared/AUTHORITY_POLICY.json 的 tower_id / require_authority / set_by / decision / set_at 必须与最后一条 AUTHORITY_REQUIRED payload 完全一致（require_authority 严格布尔 true；文本字段非空；缺失与 null 区分），不一致即 exit 2 / drift authority_policy_mismatch，detail 列出全部不一致字段",
+    "state-verify 保留 038 的 policy_missing / policy_unbacked，并新增 authority_policy_mismatch；required 且同构时无 authority drift；非 required 旧塔仍 skipped",
+    "authority-require 与 authority-set 增加跨锁：独立锁文件 state/.authority.lock（复用 _acquire_lock_file/_release_lock_file），串行化「读 revision/策略 → 校验 → 写文件 → append ledger」；锁序固定 authority → ledger；超时干净 exit 2 单 JSON、无 traceback、不留锁/tmp",
+    "并发不变量：多进程 authority-set 成功者 revision 严格递增且互不重复，事件数==成功次数，链完整；失败者干净 exit 2，无 traceback、无半写",
+    "cmd_merge 增加前置链校验：在 authority 校验之后、读信封/队列/git 之前，对 ledger/primary.jsonl 与 ledger/supervision.jsonl **无条件**各跑一次 verify_ledger_file；**文件缺失、不可读、坏行一律 fail**（文案含 merge precondition: <name> ledger chain broken/missing: <首条>），队列条目保持原状、不写 MERGE_START/MERGING",
+    "cmd_merge_check：legacy（无 baseline）信封增加独立 pre-merge 链检查项（缺失同样失败）；新式信封由 envelope_checks 的 ledger chain intact 覆盖，不加同义项，避免重复报错",
+    "为既有夹具补 fixture：tools/tests/test_coverage.py 与 tools/tests/test_gates.py 的合并夹具在 setUp 补空的 ledger/supervision.jsonl（或等价），使「干净 legacy 塔」仍能合并；只补夹具/收窄前提，不得删除或放宽任何断言",
+    "新增 tools/tests/test_authority_hardening.py：policy 五字段逐项篡改、require_authority 类型、event payload 篡改+重算 hash、并发 authority-set（≥3 进程 × 2 轮）、missing ledger（primary / supervision、legacy / 新式）merge 必须 exit 2 且无 MERGE_START、干净塔不受影响",
+    "tools/tests/test_state_verify.py 增加 authority_policy_mismatch 用例",
+    "真实塔验证：用 worktree 新工具对真实塔跑 authority-check 与 state-verify，必须 configured + required + drift []（真实塔两条 ledger 都在；若不同构用 authority-require 修复后再合并）",
+    "不改 037/038 已建立的 configured/legacy/required_unconfigured 语义与检查名；不改 envelope-new / queue-add / post-merge 的既有行为；不手写 AUTHORITY.json / AUTHORITY_POLICY.json / ledger"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-039/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-039/tower-dsh/tools/tests/test_authority_hardening.py",
+    "pilot/worktrees/PILOT-039/tower-dsh/tools/tests/test_state_verify.py",
+    "pilot/worktrees/PILOT-039/tower-dsh/tools/tests/test_coverage.py",
+    "pilot/worktrees/PILOT-039/tower-dsh/tools/tests/test_gates.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "hand-editing state/AUTHORITY.json, shared/AUTHORITY_POLICY.json or ledger/*.jsonl",
+    "skipping a missing ledger in the pre-merge chain check",
+    "allowing merge on a tower whose primary or supervision ledger is missing, unreadable or chain-broken",
+    "changing legacy (no baseline) envelope semantics beyond the pre-merge chain precondition"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-039/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 341 + 新增用例数（main 基线 341）",
+    "policy 同构正例：authority-require 后 authority-check exit 0、state-verify drift []；policy 的 tower_id / set_by / decision / set_at 任一被改 → authority-check exit 2（detail 列字段）、state-verify drift 恰含 authority_policy_mismatch、merge exit 2",
+    "require_authority 写成 \"true\" / 1 / null / 缺失 → 不得被当 required；事件在时 fail closed；event payload 被篡改并重算该行 hash → state-verify drift authority_policy_mismatch（policy⇄event 至少一侧不一致）",
+    "并发 authority-set：≥3 进程 × 2 轮同时写同一塔 → 成功者 revision 严格递增且互不重复、事件数==成功次数、verify-ledger 0、authority-check 0；失败者 exit 2 单 JSON、无 traceback、无锁/tmp 残留",
+    "missing ledger（关键）：configured/required/legacy 塔 + legacy 信封已入队 + 删除 ledger/supervision.jsonl → merge-check exit 2、merge exit 2、队列仍 WAITING、无 MERGE_START/MERGING、ledger 未被重建；删除 ledger/primary.jsonl 同样拒绝",
+    "新式信封 + 缺失或伪造 supervision 行 → merge-check exit 2，失败项恰为 ledger chain intact（不出现同义 pre-merge 项）；merge exit 2",
+    "干净 legacy / configured 塔（两条 ledger 都在且完整）：merge/merge-check 行为不变，既有测试全绿；test_coverage/test_gates 的夹具补丁不得删除或放宽任何断言",
+    "旧码对照：main 版工具对 policy 篡改、伪造 primary 行 + legacy 信封、删 supervision ledger + legacy 信封三种夹具复跑——旧码均应放行/MERGED；新码全部拒绝。证据写进 scratch/probe-old-code.txt",
+    "真实塔：worktree 新工具 authority-check exit 0（configured + required）、state-verify drift []；建信封前 tasks=39/envelopes=38，建信封后 39/39；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-039 diff --name-only main..HEAD 恰五个 allowed_paths（towerctl.py、test_authority_hardening.py、test_state_verify.py、test_coverage.py、test_gates.py）"
+  ],
+  "depends_on": [
+    "PILOT-038"
+  ],
+  "worktree": "pilot/worktrees/PILOT-039",
+  "spec_path": "pilot/PILOT-039.spec.json",
+  "spec_sha256": "c154f11d61e5103d9646f9e433df62a83ff0bb5b12ad3216aba38dc4d0e0cb71",
+  "spec_gate": "PASS",
+  "executor": "subagent:22a3bc64-2174-4957-aeb2-a59ce6539dc8",
+  "dispatch": {
+    "executor": "subagent:22a3bc64-2174-4957-aeb2-a59ce6539dc8",
+    "worktree": "pilot/worktrees/PILOT-039",
+    "at": "2026-10-25T12:59:02+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-039/evidence/towerctl.py",
+      "sha256": "31675ca89fc6d695d29d2a2314e617412067fdd8ab6b1f0a64ab818b979744b3",
+      "bytes": 222162,
+      "at": "2026-10-25T13:15:37+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/test_authority_hardening.py",
+      "sha256": "be45b5d482c52bbc002161dfc4d1b776c43421fd6d5152e25f9730f520c04b41",
+      "bytes": 39789,
+      "at": "2026-10-25T13:15:37+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/test_state_verify.py",
+      "sha256": "8423e2f6e6c0339f825fc2482f197a9f4a3086d94103aa1ee66f56030e96c16a",
+      "bytes": 72902,
+      "at": "2026-10-25T13:15:37+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/test_coverage.py",
+      "sha256": "6c4ccb44f4f50d02abd286cde4223b06d5a0da170aaa537b6ad358133ce1cb70",
+      "bytes": 46761,
+      "at": "2026-10-25T13:15:37+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/test_gates.py",
+      "sha256": "78b19d310e673045fbf215d78947fb0ddd1ae5410f5b9e750c68db933ab0a8f1",
+      "bytes": 17565,
+      "at": "2026-10-25T13:15:37+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/test_merge_pr_mode.py",
+      "sha256": "6d637cdd0ae79f1948d22039d1a65dda88548fa19dd2dec3ef1583a14ad5cb2b",
+      "bytes": 39135,
+      "at": "2026-10-25T13:15:37+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/test-output.txt",
+      "sha256": "91d35e8ce329fc737a80832dffee4179c6d6a98436a132d39db49de62d143b4c",
+      "bytes": 52133,
+      "at": "2026-10-25T13:15:37+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/authority_hardening_probe.py",
+      "sha256": "a1af72ac09c73318ac3b99a0009481a055a54b9f0a94455ec99908718a226f27",
+      "bytes": 20254,
+      "at": "2026-10-25T13:15:37+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/probe.txt",
+      "sha256": "7b1d9133fd181f8b304de97e6076f1030f09e07d319493b1fe12fb40236c1135",
+      "bytes": 3561,
+      "at": "2026-10-25T13:15:37+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/probe-old-code.txt",
+      "sha256": "efd562f2b07fc713597adbf10cc93a483c7a25f797c909c084298faae2c9387f",
+      "bytes": 3726,
+      "at": "2026-10-25T13:15:37+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/commit.txt",
+      "sha256": "9611ee82e00f4307be2ba9572482e7ce1cae76bcac7285b9b753741a78f60007",
+      "bytes": 1270,
+      "at": "2026-10-25T13:15:37+08:00",
+      "id": "E-011"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/diff.txt",
+      "sha256": "81ac12d432d96bc048890fc95c0959ac6303cedf67250b592b36a4b6f440cefb",
+      "bytes": 153624,
+      "at": "2026-10-25T13:15:37+08:00",
+      "id": "E-012"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:baa3ec9e-499a-4a82-b5d5-41d279b1e51a",
+    "verdict": "PASS",
+    "note": "039 PASS（v2，第二轮）。第一轮 FAIL 的 missing-ledger 旁路已关闭：ledger_precondition_breaks 对 primary/supervision 无条件 verify_ledger_file（缺失/不可读/坏行一律 fail），merge 在 authority 之后、读信封/队列/git 之前 exit 2，队列保持 WAITING、无 MERGE_START/MERGING、ledger 不被重建。复核实测四组全关：configured/required/legacy + legacy 信封 + 删 supervision.jsonl → merge-check 2 / merge 2 / 队列 WAITING / 无 MERGE_START / ledger rows 0；删 primary.jsonl（legacy → chain missing；configured/required → authority gate 先拦）同样 exit 2；新式信封缺 supervision 失败项恰 [\"ledger chain intact\"]（无同义 pre-merge 项）；干净 legacy/configured merge-check 0。同构：policy 四审计字段逐项篡改 → check 2 + drift authority_policy_mismatch + merge 2；event payload 篡改并重算 hash 仍 drift；并发 3 进程×2 轮 6/6 成功、revision 1..6 唯一递增、无锁/tmp；旧码 A–D 对照（policy 篡改 MERGED、伪造 primary+legacy MERGED、并发 revision 重复、删 supervision+legacy MERGED 且 ledger 重建）全部翻红。证据 12/12 SHA-256+字节数一致、spec 哈希一致、evidence/towerctl.py 与 worktree 字节相同；scope 6 文件（5 allowed + test_merge_pr_mode.py 的 +1 行 fixture，numstat 1 0），按 MAP §6.11 最小可证明补齐且 commit body/commit.txt 已写明前提错误（v2 allowed_paths 未含该文件），无断言改动；亲跑 Ran 363 tests / OK(skipped=1)。真实塔只读：state-verify 39/38 drift []（skipped 2 个 VOID 归档）、authority-check configured+required、verify-ledger 0 error（primary 356/supervision 198）、coverage 27/27、lint 6/6，policy/state/ledger 哈希前后不变。残余（非阻塞）：①v2 acceptance 文字仍写\"恰五个 allowed_paths\"与实际 6 个不一致（卡面 stale，按 §6.11 记录）；②ledger 截断为 0 字节仍是合法空链（036 已定义空账本 intact，超出\"缺失/不可读/坏行\"范围）；③authority-require 的 already=true 分支回显请求 decision 而实际不改变；④policy+event 双写并重算整链的 TOFU 残余（policy 的 git 追踪是外部锚）。注：v1 因该阻塞项已按 spec 冻结规则作废归档（tasks/PILOT-039-VOID + pilot/PILOT-039.spec.v1.json）。",
+    "at": "2026-10-25T13:26:33+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-039",
+    "actor": "owner",
+    "text": "v2 after v1 VOID; independent re-review PASS (363 tests, 12/12 hashes, missing-ledger closed)",
+    "at": "2026-10-25T13:26:33+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-039/CLOSEOUT.md",
+    "at": "2026-10-25T13:26:33+08:00"
+  },
+  "created_at": "2026-10-25T12:58:50+08:00",
+  "updated_at": "2026-10-25T13:26:33+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-039/MERGE.md",
+  "delivered_at": "2026-10-25T13:15:37+08:00",
+  "accepted_at": "2026-10-25T13:26:33+08:00"
+}

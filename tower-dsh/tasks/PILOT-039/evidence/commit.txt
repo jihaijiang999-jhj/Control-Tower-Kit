@@ -1,0 +1,32 @@
+﻿HEAD: cba7c2e479fe2347cd46a2e6d41783f2deacf638
+Title: PILOT-039: authority hardening (policy-event isomorphism, cross-lock, pre-merge chain check)
+Branch: pilot/PILOT-039
+Baseline main: ffa6668
+Status: ?? scratch/
+
+Ran 363 tests in 173.482s
+OK (skipped=1)
+
+Commits:
+cba7c2e PILOT-039: authority hardening (policy-event isomorphism, cross-lock, pre-merge chain check)
+706af92 PILOT-039: authority hardening (policy-event isomorphism, cross-lock, pre-merge chain check)
+
+Files (git diff --name-only main..HEAD):
+tower-dsh/tools/tests/test_authority_hardening.py
+tower-dsh/tools/tests/test_coverage.py
+tower-dsh/tools/tests/test_gates.py
+tower-dsh/tools/tests/test_merge_pr_mode.py
+tower-dsh/tools/tests/test_state_verify.py
+tower-dsh/tools/towerctl.py
+
+Numstat (added deleted path):
+870	0	tower-dsh/tools/tests/test_authority_hardening.py
+11	0	tower-dsh/tools/tests/test_coverage.py
+5	0	tower-dsh/tools/tests/test_gates.py
+1	0	tower-dsh/tools/tests/test_merge_pr_mode.py
+59	0	tower-dsh/tools/tests/test_state_verify.py
+351	19	tower-dsh/tools/towerctl.py
+
+Documented deviation (MAP 6.11 minimal completion):
+spec v2 allowed_paths omitted tower-dsh/tools/tests/test_merge_pr_mode.py; only +1 fixture line added:
++        (self.root / "ledger" / "primary.jsonl").touch()
