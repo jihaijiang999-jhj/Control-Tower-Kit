@@ -1,0 +1,138 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-039",
+  "title": "授权态收尾：policy⇄event 逐字段同构、authority-require/set 跨锁、merge 前置 verify-ledger",
+  "status": "rework",
+  "authority": "workspace_write",
+  "scope": [
+    "authority-check 与 state-verify 增加 policy⇄event 逐字段同构校验：shared/AUTHORITY_POLICY.json 的 tower_id / require_authority / set_by / decision / set_at 必须与最后一条 AUTHORITY_REQUIRED payload 完全一致（require_authority 必须严格为布尔 true；文本字段非空；缺失与 null 区分），不一致即 exit 2 / drift，detail 列出全部不一致字段",
+    "state-verify 新增 drift 种类 authority_policy_mismatch（与 policy_missing / policy_unbacked 并列）；required 且同构时不再产生任何 authority 类 drift；非 required 旧塔仍 skipped",
+    "authority-require 与 authority-set 增加跨锁：用独立锁文件（如 state/.authority.lock）串行化“读 revision/策略 → 写文件 → append ledger”整段临界区，使用现有 _acquire_lock_file/_release_lock_file 的 timeout/stale 语义；锁顺序固定为 authority 锁 → ledger 锁（append_ledger 内部），不得反向获取，超时干净 exit 2 单 JSON、无 traceback、不留锁与 tmp",
+    "并发不变量：多个 authority-set 并发时，成功者写入的 revision 严格递增且互不重复，AUTHORITY_SET 事件数与成功次数一致，链完整；失败者必须干净 exit 2（锁超时/竞争），不得产生 traceback、不得留下半写文件或 .tmp",
+    "cmd_merge 增加前置链校验：在 authority 校验之后、读信封/队列/git 之前，对 ledger/primary.jsonl 与 ledger/supervision.jsonl 各跑一次 verify_ledger_file；任一有错即 fail（文案含 ledger chain broken: <首条>），队列条目保持原状、不写 MERGE_START/MERGING",
+    "cmd_merge_check 增加一条独立的 merge 前置链校检查项（新旧信封都跑；干净时 ok=true，坏链时失败），与 envelope_checks 里新式信封的 ledger chain intact 并存但不重复报错",
+    "新增 tools/tests/test_authority_hardening.py：policy 五个字段逐项篡改、require_authority 类型（true 严格）、policy 与 event 同构正例、并发 authority-set（≥3 进程 × 2 轮，revision 唯一递增、事件数一致、链完整、无 traceback）、merge 前置链校验（legacy 信封 + 伪造 primary 行；新式信封 + 伪造 supervision 行）、干净 legacy 塔不受影响",
+    "tools/tests/test_state_verify.py 增加 authority_policy_mismatch 的 drift 用例（policy 字段被改 / require_authority 类型错）",
+    "真实塔迁移/验证：用 worktree 的新工具对真实塔跑 authority-check 与 state-verify，必须 configured + required + drift []（真实塔策略由 038 写入，字段应已同构）；若发现不同构，必须用 authority-require 修复后再合并本卡",
+    "不改 037/038 已建立的 configured/legacy/required_unconfigured 语义与检查名；不改 envelope-new / queue-add / post-merge 的既有行为；不手写 AUTHORITY.json / AUTHORITY_POLICY.json / ledger"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-039/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-039/tower-dsh/tools/tests/test_authority_hardening.py",
+    "pilot/worktrees/PILOT-039/tower-dsh/tools/tests/test_state_verify.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "hand-editing state/AUTHORITY.json, shared/AUTHORITY_POLICY.json or ledger/*.jsonl",
+    "acquiring the ledger lock before the authority lock",
+    "allowing merge on a tower whose primary or supervision chain fails verification",
+    "changing legacy (no baseline) envelope semantics beyond the merge precondition"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-039/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 341 + 新增用例数（main 基线 341）",
+    "policy 同构正例：authority-require 后 authority-check exit 0、state-verify drift []；policy 的 tower_id / set_by / decision / set_at / require_authority 任一被改 → authority-check exit 2（detail 列出该字段）、state-verify drift 恰含 authority_policy_mismatch、merge exit 2",
+    "require_authority 写成 \"true\" / 1 / null / 缺失 → 不得被当 required；若事件在则 fail closed（policy_mismatch 或 policy_missing），若事件不在则 check 不通过",
+    "并发 authority-set：≥3 个进程同时写同一塔，成功者的 revision 严格递增且互不重复，AUTHORITY_SET 事件数 == 成功次数，verify-ledger 0 error，authority-check exit 0；失败者 exit 2 单 JSON、无 traceback、无 .tmp / 锁残留",
+    "merge 前置链：legacy 信封 + 已入队 + 伪造 primary 行（seq/prev 合法、hash 错）→ merge exit 2 且 errors 含 ledger chain broken，队列仍 WAITING、无 MERGE_START/MERGING（旧码同夹具应能走到 MERGED 或至少不报链错）",
+    "新式信封 + 伪造 supervision 行 → merge-check exit 2，失败项包含独立的 pre-merge 链检查（与 ledger chain intact 不重复成两条同义错误）；merge exit 2",
+    "干净塔（legacy 或 configured）在链完整时 merge/merge-check 行为不变；037/038 既有测试全部保持绿",
+    "旧码对照：用 git show main:tower-dsh/tools/towerctl.py 落 main 版工具，对 policy 篡改夹具与伪造链夹具复跑——旧码 policy 篡改后 check/state-verify 不报、伪造 primary 行 + legacy 信封 merge 可 MERGED；新码全部拒绝。证据写进 scratch/probe-old-code.txt",
+    "真实塔：worktree 新工具对真实塔 authority-check exit 0（configured + required）、state-verify drift []；建信封前 tasks=39/envelopes=38，建信封后 39/39；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-039 diff --name-only main..HEAD 恰三个 allowed_paths（tower-dsh/tools/towerctl.py、tower-dsh/tools/tests/test_authority_hardening.py、tower-dsh/tools/tests/test_state_verify.py）"
+  ],
+  "depends_on": [
+    "PILOT-038"
+  ],
+  "worktree": "pilot/worktrees/PILOT-039",
+  "spec_path": "pilot/PILOT-039.spec.json",
+  "spec_sha256": "5014bc4aabb7dce2a471360dd971a1a0db4478626740a33ce9ed6460388251d4",
+  "spec_gate": "PASS",
+  "executor": "subagent:22a3bc64-2174-4957-aeb2-a59ce6539dc8",
+  "dispatch": {
+    "executor": "subagent:22a3bc64-2174-4957-aeb2-a59ce6539dc8",
+    "worktree": "pilot/worktrees/PILOT-039",
+    "at": "2026-10-25T12:22:51+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-039/evidence/towerctl.py",
+      "sha256": "a029aa383c68141c0bf7ce32bace015c40f430ce3323a8fded5566b8c05007e8",
+      "bytes": 221916,
+      "at": "2026-10-25T12:47:26+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/test_authority_hardening.py",
+      "sha256": "e1ebd820583033a17a4aa8a3320803e2e76a941fbca7e2d3ba6c9fc7ce46eaf4",
+      "bytes": 31224,
+      "at": "2026-10-25T12:47:26+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/test_state_verify.py",
+      "sha256": "8423e2f6e6c0339f825fc2482f197a9f4a3086d94103aa1ee66f56030e96c16a",
+      "bytes": 72902,
+      "at": "2026-10-25T12:47:26+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/test-output.txt",
+      "sha256": "5f3ee69ee7106af668c2f070cb2ade9e719db80d9c72b06141b1b3e8b79c523b",
+      "bytes": 51085,
+      "at": "2026-10-25T12:47:26+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/authority_hardening_probe.py",
+      "sha256": "3fa3227977fd9ab0894d5094ea43eef459c1f3063d40e4dd326b4d35fc8c02ce",
+      "bytes": 18676,
+      "at": "2026-10-25T12:47:26+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/probe.txt",
+      "sha256": "e2e366def53cb9e64ddccee9339c69735e5f5f225b06c4743508c6be0fcf63b8",
+      "bytes": 2954,
+      "at": "2026-10-25T12:47:26+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/probe-old-code.txt",
+      "sha256": "6aed33aee4026ccc9fe76bfb24a9991328f1476b4bc333c8561183376f24c825",
+      "bytes": 2529,
+      "at": "2026-10-25T12:47:26+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/commit.txt",
+      "sha256": "e7f3ab51de4cb57e6f0a02cb37d011262e297fc8120d88486b289fa39179069e",
+      "bytes": 717,
+      "at": "2026-10-25T12:47:26+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-039/evidence/diff.txt",
+      "sha256": "6a73e99880692d3e6ae3ea8149297c295572604c226b5488ebb64b9d729230e9",
+      "bytes": 127466,
+      "at": "2026-10-25T12:47:26+08:00",
+      "id": "E-009"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:baa3ec9e-499a-4a82-b5d5-41d279b1e51a",
+    "verdict": "FAIL",
+    "note": "039 FAIL（阻塞：missing ledger 的 legacy 合并口）。复核自建塔复现：configured/required/legacy 塔 + legacy 信封已入队 + 删 ledger/supervision.jsonl → merge-check exit 0、merge exit 0/MERGED、写 MERGE_START、ledger 重建后 verify-ledger 全绿；legacy 塔删 ledger/primary.jsonl 同样 MERGED。根因：ledger_precondition_breaks 对缺失文件 continue，违反 spec「两条链各跑一次 verify_ledger_file，任一有错即 fail」与 forbidden「chain fails verification 不得 merge」，也违背 036 缺失=错原则。其余通过：9/9 证据哈希与字节数、scope 恰 3 文件、Ran 357 OK(skipped=1)、policy 四审计字段逐项篡改 check 2+drift authority_policy_mismatch+merge 2（event payload 篡改并重算 hash 也会 drift）、require_authority 类型错 fail closed、并发 6/6 revision 1..6 唯一递增且无锁/tmp 残留、锁超时干净 exit 2、旧码 policy 篡改全绿且 MERGED、旧码并发 revision 重复、真实塔只读 39/38 drift [] 且 350/198 0 error、coverage 27/27、lint 6/6。偏离①（merge-check 前置链只对 legacy）行为等价可接受；偏离②（缺失跳过）不可接受。返工方向：missing 必须算错（无条件 verify_ledger_file），并为缺少空 supervision.jsonl 的既有夹具补 touch（test_coverage/test_gates 等），不得放宽断言。因 allowed_paths 需扩到夹具文件，按 spec 冻结规则重建卡：v1 归档为 tasks/PILOT-039-VOID + pilot/PILOT-039.spec.v1.json，v2 重建后重新 dispatch。",
+    "at": "2026-10-25T12:58:22+08:00"
+  },
+  "decision": null,
+  "closeout": null,
+  "created_at": "2026-10-25T11:52:57+08:00",
+  "updated_at": "2026-10-25T12:58:22+08:00",
+  "next": "返工",
+  "delivered_at": "2026-10-25T12:47:26+08:00"
+}

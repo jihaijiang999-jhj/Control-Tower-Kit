@@ -1568,6 +1568,65 @@ class StateVerifyTestCase(unittest.TestCase):
         self.assertEqual(drift["target"], "AUTHORITY_POLICY")
         self.assertEqual(drift["actual"], "policy file only")
 
+    # -- 40. policy <-> event isomorphism (PILOT-039) ---------------------
+    # The two halves of the marker must repeat the same five fields.  A
+    # rewritten audit field (or a wrong value type) is drift of its own kind;
+    # the expected/actual pair names every key, like every other authority row.
+    def test_authority_policy_field_mismatch_is_drift(self) -> None:
+        self.build_base_tower()
+        self.put_authority_event()
+        self.put_authority_file()
+        self.put_policy()
+        self.put_required_event()
+        # Tamper with the policy half only: the ledger event stays authoritative.
+        self.put_policy(set_by="mallory")
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["authority_policy_mismatch"])
+        drift = out["drift"][0]
+        self.assertEqual(drift["target"], "AUTHORITY_POLICY")
+        self.assertEqual(drift["expected"]["set_by"], "mac")
+        self.assertEqual(drift["actual"]["set_by"], "mallory")
+        self.assertIs(drift["expected"]["require_authority"], True)
+        self.assertIs(drift["actual"]["require_authority"], True)
+
+    def test_authority_policy_field_type_error_is_drift(self) -> None:
+        self.build_base_tower()
+        self.put_authority_event()
+        self.put_authority_file()
+        self.put_policy()
+        self.put_required_event()
+        # A null where a non-empty string belongs is not "equal enough": the
+        # field is a type error on the policy side, never silent.
+        self.put_policy(set_at=None)
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["authority_policy_mismatch"])
+        drift = out["drift"][0]
+        self.assertIsNone(drift["actual"]["set_at"])
+        self.assertEqual(drift["expected"]["set_at"],
+                         self.AUTHORITY_POLICY["set_at"])
+
+    def test_required_authority_type_error_is_still_policy_missing(self) -> None:
+        # "true" is not the boolean true: 038's policy_missing semantics are
+        # preserved (the event exists, the policy is not a valid requirement).
+        self.build_base_tower()
+        self.put_authority_event()
+        self.put_authority_file()
+        self.put_policy(require_authority="true")
+        self.put_required_event()
+
+        out, code = self.state_verify()
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.drift_kinds(out), ["authority_policy_missing"])
+        self.assertEqual(out["drift"][0]["actual"],
+                         "require_authority is not true")
+
 
 if __name__ == "__main__":
     unittest.main()

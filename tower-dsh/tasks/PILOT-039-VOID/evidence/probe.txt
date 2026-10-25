@@ -1,0 +1,48 @@
+﻿PROBE label=NEW
+towerctl=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-039\tower-dsh\tools\towerctl.py
+worktree=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-039
+
+=== [NEW] A. policy <-> event isomorphism ===
+  authority-set                 rc=0 revision=1 
+  authority-require             rc=0 repaired=True 
+  policy == last event payload  True
+  authority-check [intact]        rc=0 ok=True status=configured 
+  state-verify [intact]           rc=0 drift=[] 
+  policy rewritten:            set_by 'mac' -> 'mallory'
+  authority-check [tampered]        rc=2 ok=False status=configured 
+    check errors:              [{"detail": "authority policy does not match last AUTHORITY_REQUIRED: set_by 'mallory' != 'mac'", "name": "authority requirement", "ok": false}, {"detail": "ok", "name": "primary ledger chain intact", "ok": true}, {"detail": "state/AUTHORITY.json", "name": "authority state file readable", "ok": true}, {"detail": "schem...
+  state-verify [tampered]           rc=2 drift=['authority_policy_mismatch'] 
+  merge-check (tampered)        rc=2 ok=False failed=['merge authority']
+  merge (tampered)              rc=2 ok=False errors=["authority requirement: authority policy does not match last AUTHORITY_REQUIRED: set_by 'mallory' != 'mac'"]
+  queue / envelope after merge  WAITING / DRAFT
+  policy restored               authority-check rc=0 ok=True
+
+=== [NEW] B. merge precondition: forged primary row, legacy envelope ===
+  forged primary row             seq=1 prev_hash=GENESIS... hash=000...000 (wrong)
+  verify-ledger                 rc=2 first_error=primary: row 1: hash mismatch (event tampered)
+  merge                         rc=2 ok=False status=None errors=["merge precondition: primary ledger chain broken: row 1: hash mismatch (event tampered) (ledger chain intact)"]
+  queue status after attempt    WAITING
+  envelope status after attempt DRAFT
+  queue bytes unchanged         True
+  envelope bytes unchanged      True
+  MERGE_START written           False
+  MERGING written               False
+
+=== [NEW] C. cross-lock: 3 concurrent authority-set writers x 2 rounds ===
+  round 1 writer rc=0 ok=True revision=2 errors=null
+  round 1 writer rc=0 ok=True revision=1 errors=null
+  round 1 writer rc=0 ok=True revision=3 errors=null
+  round 2 writer rc=0 ok=True revision=4 errors=null
+  round 2 writer rc=0 ok=True revision=6 errors=null
+  round 2 writer rc=0 ok=True revision=5 errors=null
+  exit codes                    [0, 0, 0, 0, 0, 0]
+  tracebacks                    0
+  successes / events            6 / 6
+  revisions in ledger order     [1, 2, 3, 4, 5, 6]
+  unique and increasing         True
+  verify-ledger                 rc=0 ok=True errors=[]
+  authority-check               rc=0 ok=True
+  .authority.lock residue       False
+  .tmp residue                  []
+
+PROBE DONE

@@ -421,6 +421,11 @@ class MergeInvariantTestCase(unittest.TestCase):
         self.root = Path(self._tmp.name)
         self.repo = self.root / "pilot" / "repo"
         self.repo.mkdir(parents=True)
+        # PILOT-039 v2: ``merge-check`` verifies both ledgers unconditionally,
+        # so this clean legacy fixture needs both empty ledgers.
+        (self.root / "ledger").mkdir(parents=True, exist_ok=True)
+        (self.root / "ledger" / "primary.jsonl").touch()
+        (self.root / "ledger" / "supervision.jsonl").touch()
         (self.root / "tasks" / MERGE_TASK / "evidence").mkdir(parents=True)
         self.assertEqual(run_git(self.repo, "init").returncode, 0)
         self.assertEqual(
@@ -617,6 +622,9 @@ class CompletionGateTestCase(unittest.TestCase):
                           f"tasks/{self.TASK}/evidence", "specs"):
             (self.root / directory).mkdir(parents=True, exist_ok=True)
         (self.root / "ledger" / "primary.jsonl").touch()
+        # PILOT-039 v2: the merge precondition verifies both ledgers
+        # unconditionally; a clean legacy fixture needs both empty ledgers.
+        (self.root / "ledger" / "supervision.jsonl").touch()
         proof = self.root / "tasks" / self.TASK / "evidence" / "proof.txt"
         proof.write_text("proof\n", encoding="utf-8")
         write_json(self.root / "tasks" / self.TASK / "record.json", {
@@ -922,6 +930,9 @@ class PolicyInvariantTestCase(unittest.TestCase):
                           f"tasks/{POLICY_TASK}/evidence"):
             (self.root / directory).mkdir(parents=True, exist_ok=True)
         (self.root / "ledger" / "primary.jsonl").touch()
+        # PILOT-039 v2: merge now refuses a missing ledger, so the clean
+        # legacy fixture carries the empty supervision ledger too.
+        (self.root / "ledger" / "supervision.jsonl").touch()
         write_json(self.root / "primary" / "CURRENT_STATE.json", {
             "schema": "tower/current-state@1",
             "tower_id": "tower-dsh",
