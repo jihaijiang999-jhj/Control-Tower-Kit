@@ -330,6 +330,35 @@ def ledger_lock(root: Path, timeout: float | None = None,
         _release_lock_file(path, identity)
 
 
+@contextmanager
+def authority_lock(root: Path, timeout: float | None = None,
+                   stale_after: float | None = None):
+    """Single-writer lock around the whole authority read/write/append section.
+
+    PILOT-039: ``authority-set``/``authority-require`` read the current
+    revision (or the policy half), validate, write the file and append the
+    ledger event.  Without one lock around that whole section two writers can
+    read the same revision, or race the same ``.tmp`` file.  This lock is
+    always taken *before* ``append_ledger`` takes the ledger lock; the reverse
+    order is forbidden (and no code does it).  Timeouts raise
+    :class:`LedgerLockTimeout`, which ``main`` turns into one JSON payload with
+    exit 2; the acquire path creates no file, so a timeout leaves no residue.
+    """
+    path = root / AUTHORITY_LOCK_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    limit = LEDGER_LOCK_TIMEOUT if timeout is None else timeout
+    stale = LEDGER_LOCK_STALE_AFTER if stale_after is None else stale_after
+    _acquire_lock_file(path, limit, stale)
+    try:
+        identity = path.stat()
+    except OSError:
+        identity = None
+    try:
+        yield path
+    finally:
+        _release_lock_file(path, identity)
+
+
 def _append_ledger_event(root: Path, filename: str, event_type: str,
                          actor: str, payload: dict) -> dict:
     ledger = root / "ledger" / filename
@@ -740,6 +769,17 @@ AUTHORITY_TEXT_FIELDS = ("owner", "primary_id", "supervision_id",
 # Sentinel for "key absent", distinct from ``None``: a missing optional field
 # must never compare equal to a present one (``null`` included).
 AUTHORITY_ABSENT = object()
+# PILOT-039: the policy file and the last ``AUTHORITY_REQUIRED`` payload must be
+# field-for-field isomorphic, so a rewritten audit field (set_by/decision/
+# set_at/tower_id) cannot silently disagree with the ledger event.  The field
+# list is deliberately explicit: the safety of the gate must not depend on which
+# keys a caller happened to write.
+AUTHORITY_POLICY_FIELDS = ("tower_id", "require_authority", "set_by",
+                           "decision", "set_at")
+# Independent single-writer lock for the authority writers.  The lock order is
+# fixed: this lock is taken first and ``append_ledger`` takes the ledger lock
+# inside it.  Nothing may acquire the ledger lock and then wait for this one.
+AUTHORITY_LOCK_FILE = "state/.authority.lock"
 
 
 def _state_nested_id(state: dict, key: str, nested: str):
@@ -835,6 +875,121 @@ def last_authority_event(root: Path) -> tuple[bool, dict | None]:
     return True, payload if isinstance(payload, dict) else None
 
 
+def last_authority_required_event(root: Path) -> tuple[bool, dict | None]:
+    """``(event_present, payload)`` for the last ``AUTHORITY_REQUIRED`` event.
+
+    The policy file must mirror this payload exactly (PILOT-039).  Like
+    :func:`last_authority_event` this is read-only and never raises: an
+    unreadable ledger is "no event" here, and ``verify-ledger``/``state-verify``
+    own ledger corruption.
+    """
+    try:
+        events = [event for event in ledger_events_in_seq_order(root, "primary")
+                  if event.get("type") == AUTHORITY_REQUIRED_EVENT]
+    except PATH_ACCESS_ERRORS:
+        return False, None
+    if not events:
+        return False, None
+    payload = events[-1].get("payload")
+    return True, payload if isinstance(payload, dict) else None
+
+
+def authority_policy_fields(policy) -> dict:
+    """The five compared policy fields, with the absent-vs-null sentinel.
+
+    A non-object (or ``None``) contributes every field as absent, so a policy
+    or event payload that is not an object can never compare equal to one that
+    is.  ``authority_display`` renders the sentinel as ``null`` for JSON.
+    """
+    source = policy if isinstance(policy, dict) else {}
+    return {field: source.get(field, AUTHORITY_ABSENT)
+            for field in AUTHORITY_POLICY_FIELDS}
+
+
+def _authority_policy_value_ok(field: str, value) -> bool:
+    """Per-field type rule for the policy/event comparison.
+
+    ``require_authority`` must be the boolean ``True``: ``"true"``, ``1`` and
+    ``null`` are truthy look-alikes and are rejected here, not coerced.  Every
+    other field must be a non-empty string.
+    """
+    if field == "require_authority":
+        return value is True
+    return isinstance(value, str) and bool(value)
+
+
+def authority_policy_mismatch(root: Path, requirement: dict) -> dict | None:
+    """Field-level comparison of the policy file with the last event payload.
+
+    Returns ``None`` when there is no pair to compare (event absent or policy
+    not required: those are ``policy_unbacked``/``policy_missing``) or when the
+    halves agree.  Otherwise returns ``fields`` (every differing field, in the
+    canonical order), plus ``expected`` (event payload side) and ``actual``
+    (policy file side) dictionaries, so callers can emit one row or one error
+    line naming all of them.  ``tower_id`` additionally binds to the primary
+    state, because the policy's tower identity is what the requirement is
+    anchored to.
+    """
+    if not (requirement["policy_required"] and requirement["event_present"]):
+        return None
+    policy_fields = authority_policy_fields(requirement.get("policy"))
+    event_fields = authority_policy_fields(requirement.get("event_payload"))
+    mismatched: list[str] = []
+    for field in AUTHORITY_POLICY_FIELDS:
+        if not _authority_policy_value_ok(field, policy_fields[field]) or \
+                not _authority_policy_value_ok(field, event_fields[field]):
+            mismatched.append(field)
+        elif policy_fields[field] != event_fields[field]:
+            mismatched.append(field)
+    # ``tower_id`` is also bound to the primary state.  When both halves agree
+    # with each other but not with the primary state, the primary state is the
+    # expectation; the row/line still names exactly one field.
+    primary_tower_id = AUTHORITY_ABSENT
+    _, primary_state = _read_json_object(root / "primary" / "CURRENT_STATE.json")
+    if isinstance(primary_state, dict):
+        primary_tower_id = primary_state.get("tower_id", AUTHORITY_ABSENT)
+    if (isinstance(primary_tower_id, str) and primary_tower_id
+            and policy_fields["tower_id"] != primary_tower_id
+            and "tower_id" not in mismatched):
+        mismatched.append("tower_id")
+    if not mismatched:
+        return None
+    expected = {field: authority_display(event_fields[field])
+                for field in AUTHORITY_POLICY_FIELDS}
+    actual = {field: authority_display(policy_fields[field])
+              for field in AUTHORITY_POLICY_FIELDS}
+    if ("tower_id" in mismatched
+            and isinstance(primary_tower_id, str) and primary_tower_id
+            and expected["tower_id"] == actual["tower_id"]):
+        expected["tower_id"] = primary_tower_id
+    return {"fields": mismatched, "expected": expected, "actual": actual}
+
+
+def authority_policy_mismatch_detail(result: dict) -> str:
+    """One line naming every differing field with its policy/event values."""
+    parts: list[str] = []
+    for field in result["fields"]:
+        actual = result["actual"][field]
+        expected = result["expected"][field]
+        if field == "require_authority":
+            parts.append(f"require_authority {actual!r} != {expected!r} "
+                         "(both sides must be boolean true)")
+        else:
+            parts.append(f"{field} {actual!r} != {expected!r}")
+    return "; ".join(parts)
+
+
+def authority_policy_invalid(requirement: dict) -> bool:
+    """True when a policy file exists but is not a valid requirement marker.
+
+    A malformed policy is fail-closed: it must never degrade the tower to
+    "optional"/legacy just because ``require_authority`` failed a type check.
+    The only way to not require authority is to have no policy file at all.
+    """
+    return (requirement["policy_state"] != "missing"
+            and not requirement["policy_required"])
+
+
 def next_authority_revision(root: Path) -> int:
     """One more than the file's or the last event's revision.
 
@@ -892,11 +1047,13 @@ def authority_requirement(root: Path) -> dict:
     policy_state, policy = _read_json_object(root / AUTHORITY_POLICY_FILE)
     policy_required = authority_policy_required(policy)
     event_present = authority_required_event(root)
+    _, event_payload = last_authority_required_event(root)
     return {
         "policy_state": policy_state,
         "policy": policy,
         "policy_required": policy_required,
         "event_present": event_present,
+        "event_payload": event_payload,
         "required": policy_required or event_present,
     }
 
@@ -919,12 +1076,20 @@ def _authority_policy_payload(primary_state: dict, by: str, decision: str,
     }
 
 
-def authority_requirement_errors(requirement: dict) -> list[str]:
+def authority_requirement_errors(root: Path, requirement: dict) -> list[str]:
     """Pairing errors for a required tower; empty when the halves agree.
 
     ``authority policy unbacked`` (policy true, no event) and ``authority
-    policy missing`` (event, no policy) are flat strings so ``merge`` can fail
-    closed with them and ``state-verify`` can name the matching drift kind.
+    policy missing`` (event, no policy/false policy) are flat strings so
+    ``merge`` can fail closed with them and ``state-verify`` can name the
+    matching drift kind.
+
+    PILOT-039 adds two fail-closed cases: a policy file that exists but is not
+    a valid marker (wrong/absent ``require_authority``, unparseable JSON) can
+    never degrade the tower to optional, and when both halves exist every
+    shared field must be identical -- a rewritten ``set_by``/``decision``/
+    ``set_at``/``tower_id`` is named in one line, exactly like a changed
+    ``require_authority`` type.
     """
     errors: list[str] = []
     if requirement["policy_required"] and not requirement["event_present"]:
@@ -938,6 +1103,19 @@ def authority_requirement_errors(requirement: dict) -> list[str]:
             f"ledger/primary.jsonl has an {AUTHORITY_REQUIRED_EVENT} event "
             f"but {AUTHORITY_POLICY_FILE} is missing or does not set "
             "require_authority=true")
+    elif authority_policy_invalid(requirement):
+        detail = ("is not a parseable JSON object"
+                  if requirement["policy_state"] == "unreadable"
+                  else "does not set require_authority=true (boolean)")
+        errors.append(f"authority policy invalid: {AUTHORITY_POLICY_FILE} "
+                      f"{detail}")
+    if requirement["policy_required"] and requirement["event_present"]:
+        mismatch = authority_policy_mismatch(root, requirement)
+        if mismatch is not None:
+            errors.append(
+                "authority policy does not match last "
+                f"{AUTHORITY_REQUIRED_EVENT}: "
+                + authority_policy_mismatch_detail(mismatch))
     return errors
 
 
@@ -978,13 +1156,17 @@ def authority_state_check(root: Path) -> dict:
 
     # The marker is checked first: a required tower can never fall through to
     # the legacy branch below, so deleting both halves cannot downgrade it.
+    # PILOT-039: a *present* policy file is checked too, even when it does not
+    # parse into a requirement -- a malformed marker is fail-closed, never a
+    # silent downgrade to optional/legacy.
     requirement_ok = True
-    if required:
-        pairing = authority_requirement_errors(requirement)
+    policy_present = requirement["policy_state"] != "missing"
+    if required or policy_present:
+        pairing = authority_requirement_errors(root, requirement)
         for error in pairing:
             requirement_ok = False
             add("authority requirement", False, error)
-        if file_state == "missing" or not event_present:
+        if required and (file_state == "missing" or not event_present):
             missing = ("state/AUTHORITY.json" if file_state == "missing"
                        else "the AUTHORITY_SET ledger event")
             add("authority required", False,
@@ -993,11 +1175,21 @@ def authority_state_check(root: Path) -> dict:
             return {"status": "required_unconfigured", "checks": checks,
                     "errors": errors, "merge_authority": None,
                     "required": True}
+        if (not required and policy_present and file_state == "missing"
+                and not event_present):
+            # A malformed policy with nothing configured behind it: the
+            # requirement error above is the whole story, so the 037
+            # "state file present"/"backed by ledger" pair would only duplicate
+            # it under a misleading name.
+            return {"status": "configured", "checks": checks,
+                    "errors": errors, "merge_authority": None,
+                    "required": False}
 
     # Legacy: the tower predates authority state and never required it.  Not
     # configured, not broken, and deliberately no ledger-chain check (old
     # towers must keep verifying).
-    if not required and file_state == "missing" and not event_present:
+    if (not required and not policy_present and file_state == "missing"
+            and not event_present):
         add("authority state", True,
             "legacy: no state/AUTHORITY.json and no AUTHORITY_SET event")
         return {"status": "legacy", "checks": checks, "errors": errors,
@@ -1132,7 +1324,17 @@ def cmd_authority_set(root: Path, args) -> None:
     registered owner, or that names something other than the registered
     supervisor, leaves the tower untouched.  Re-running is the repair path for
     a half-write: whichever half is missing is rebuilt with a fresh revision.
+
+    PILOT-039: the entire read-revision/validate/write-file/append-event
+    section runs under ``state/.authority.lock``, so concurrent writers cannot
+    reuse a revision or race the atomic ``.tmp`` replacement.  The authority
+    lock is always taken before the ledger lock (inside ``append_ledger``).
     """
+    with authority_lock(root):
+        authority_set_locked(root, args)
+
+
+def authority_set_locked(root: Path, args) -> None:
     _, primary_state = _read_json_object(root / "primary" / "CURRENT_STATE.json")
     _, supervision_state = _read_json_object(
         root / "supervision" / "CURRENT_STATE.json")
@@ -1236,13 +1438,27 @@ def cmd_authority_require(root: Path, args) -> None:
     before any write, so a caller that is not the registered owner leaves the
     tower untouched.  A tower that already has both halves is idempotent:
     exit 0, ``already=true``, and no new event.  A tower with exactly one half
-    is repaired (``repaired=true``) by writing only the missing side.
+    is repaired (``repaired=true``) by writing only the missing side; a tower
+    whose halves disagree is repaired from the authoritative event payload
+    (``repaired=true``, ``already=false``), so a rewritten audit field cannot
+    leave the requirement permanently broken.  The requested ``--decision`` is
+    only used when neither half exists yet: an existing half is replayed
+    verbatim, because the ledger event is the authority.
 
     A ledger append failure exits 2 with a single JSON payload and no
     traceback.  The policy file may already be written, which surfaces as
     "policy unbacked" -- exactly the fail-closed state we want: the requirement
     is visible but cannot be satisfied until the event exists.
+
+    PILOT-039: the whole read-policy/validate/write-file/append-event section
+    runs under ``state/.authority.lock`` (taken before the ledger lock), so a
+    concurrent require cannot interleave the policy half with the event half.
     """
+    with authority_lock(root):
+        authority_require_locked(root, args)
+
+
+def authority_require_locked(root: Path, args) -> None:
     _, primary_state = _read_json_object(root / "primary" / "CURRENT_STATE.json")
     primary_state = primary_state if isinstance(primary_state, dict) else {}
     owner = _state_owner_name(primary_state)
@@ -1264,19 +1480,42 @@ def cmd_authority_require(root: Path, args) -> None:
     requirement = authority_requirement(root)
     policy_required = requirement["policy_required"]
     event_present = requirement["event_present"]
-    if policy_required and event_present:
+    # PILOT-039: both halves present but not isomorphic is repairable, and must
+    # be: the event is the authority, so re-running require rewrites the policy
+    # file from the last event payload instead of leaving the tower permanently
+    # mismatched (this is also the migration path for the real tower).
+    mismatch = (authority_policy_mismatch(root, requirement)
+                if policy_required and event_present else None)
+    if policy_required and event_present and mismatch is None:
         emit({"ok": True, "path": AUTHORITY_POLICY_FILE, "by": args.by,
               "decision": args.decision, "required": True, "already": True,
               "repaired": False})
 
     set_at = now()
-    if policy_required:
+    if policy_required and mismatch is None:
         # The policy half already mirrors what we want pinned: replay it
         # verbatim so the appended event stays isomorphic to the file.
         policy = dict(requirement["policy"])
     else:
-        policy = _authority_policy_payload(primary_state, args.by,
-                                           args.decision, set_at)
+        if policy_required or event_present:
+            # Repair from the authoritative half: the last event payload when
+            # one exists, otherwise the existing policy file (event missing).
+            source = (requirement.get("event_payload") if event_present
+                      else requirement.get("policy"))
+            if not isinstance(source, dict):
+                fail(["authority policy cannot be repaired: the existing "
+                      "marker half is not a JSON object; rewrite it with "
+                      "authority-require after fixing the ledger"])
+            policy = dict(source)
+            bad = [field for field in AUTHORITY_POLICY_FIELDS
+                   if not _authority_policy_value_ok(
+                       field, authority_policy_fields(policy)[field])]
+            if bad:
+                fail(["authority policy cannot be repaired from the existing "
+                      f"half: invalid field(s) {', '.join(bad)}"])
+        else:
+            policy = _authority_policy_payload(primary_state, args.by,
+                                               args.decision, set_at)
         target = root / AUTHORITY_POLICY_FILE
         try:
             jdump(target, policy)
@@ -1335,6 +1574,23 @@ def add_merge_ledger(root: Path, entry: dict) -> None:
     jdump(path, ledger)
 
 
+def envelope_has_baselines(env: dict) -> bool:
+    """True for a new-style envelope that declares both test-count baselines.
+
+    Both counts must be real integers >= 1 (``bool`` excluded).  The same
+    predicate gates the new-style ledger checks in :func:`envelope_checks` and
+    the legacy-only pre-merge chain check in ``merge-check`` (PILOT-039), so
+    the two decisions cannot drift apart.
+    """
+    tests_baseline = env.get("tests_baseline")
+    tower_tests_baseline = env.get("tower_tests_baseline")
+    return (isinstance(tests_baseline, int) and not isinstance(tests_baseline, bool)
+            and tests_baseline >= 1
+            and isinstance(tower_tests_baseline, int)
+            and not isinstance(tower_tests_baseline, bool)
+            and tower_tests_baseline >= 1)
+
+
 def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
     checks: list[dict] = []
 
@@ -1358,13 +1614,7 @@ def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
     # ``MERGE_QUEUE.json`` leaves no ``QUEUE_ADD`` event, so the queue entry
     # would otherwise be accepted purely on the strength of the file.
     # Envelopes predating the baseline requirement keep the old behaviour.
-    tests_baseline = env.get("tests_baseline")
-    tower_tests_baseline = env.get("tower_tests_baseline")
-    if (isinstance(tests_baseline, int) and not isinstance(tests_baseline, bool)
-            and tests_baseline >= 1
-            and isinstance(tower_tests_baseline, int)
-            and not isinstance(tower_tests_baseline, bool)
-            and tower_tests_baseline >= 1):
+    if envelope_has_baselines(env):
         # Both ledger files must verify end-to-end: a forged row can name the
         # envelope and still be detected here as a broken hash chain.
         chain_errors: list[str] = []
@@ -2817,6 +3067,21 @@ def cmd_merge_check(root: Path, args) -> None:
         checks.append({"name": "merge authority pinned", "ok": True,
                        "detail": f"merge authority pinned: "
                                  f"{authority['merge_authority']}"})
+    # PILOT-039: a legacy envelope has no lifecycle events, so
+    # ``envelope_checks`` never verifies the ledgers for it.  Without this
+    # independent check a forged ledger row would only be caught by ``merge``.
+    # New-style envelopes already carry ``ledger chain intact``; adding the
+    # same verification twice would report one broken chain as two synonymous
+    # failures, so the check is deliberately legacy-only.
+    if not envelope_has_baselines(env):
+        breaks = ledger_precondition_breaks(root)
+        checks.append({
+            "name": "pre-merge ledger chains verified",
+            "ok": not breaks,
+            "detail": "ok" if not breaks else "; ".join(
+                f"{name} ledger chain broken: {first}"
+                for name, first in breaks),
+        })
     queue = load_queue(root)
     entry = next((e for e in queue.get("entries", [])
                   if e.get("envelope_id") == envelope_id), None)
@@ -3073,6 +3338,19 @@ def cmd_merge(root: Path, args) -> None:
         if args.supervisor != pinned:
             fail([f"merge authority mismatch: state pins {pinned}, "
                   f"request {args.supervisor}"])
+    # PILOT-039: the audit-chain precondition runs before the envelope, the
+    # queue or any git state is read.  A forged row that keeps seq/prev_hash
+    # legal (only the hash is wrong) used to ride a legacy envelope all the way
+    # to MERGED; now it fails here, with the queue untouched and no
+    # MERGE_START/MERGING written.
+    breaks = ledger_precondition_breaks(root)
+    if breaks:
+        # The trailing tag names the envelope-level check that reports the same
+        # condition, so callers keyed on ``ledger chain intact`` keep working
+        # even though this gate now fires before the envelope is read.
+        fail([f"merge precondition: {name} ledger chain broken: {first} "
+              "(ledger chain intact)"
+              for name, first in breaks])
     env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
     if not env_path.exists():
         fail([f"envelope not found: {args.envelope}"])
@@ -3628,6 +3906,27 @@ def verify_ledger_file(root: Path, name: str) -> dict:
     return result
 
 
+def ledger_precondition_breaks(root: Path) -> list[tuple[str, str]]:
+    """``(ledger name, first error)`` for every existing ledger that fails.
+
+    PILOT-039: ``merge`` and the legacy ``merge-check`` precondition.  Only
+    files that exist are verified: a tower that never had a supervision ledger
+    keeps merging as before (the new-style envelope path already fails a
+    missing ledger through ``ledger chain intact``).  An existing ledger is
+    always verified in full -- a forged row can keep ``seq``/``prev_hash``
+    legal and still be caught by the hash.
+    """
+    breaks: list[tuple[str, str]] = []
+    for name in ("primary", "supervision"):
+        path = root / "ledger" / LEDGER_FILES[name]
+        if not path.exists():
+            continue
+        report = verify_ledger_file(root, name)
+        if report["errors"]:
+            breaks.append((name, report["errors"][0]))
+    return breaks
+
+
 def cmd_verify_ledger(root: Path, args) -> None:
     names = ["primary", "supervision"] if args.ledger == "all" else [args.ledger]
     files = {}
@@ -4127,6 +4426,11 @@ def _authority_state_drift(root: Path, skip) -> list[dict]:
     still have a configured authority state
     (``authority_required_unconfigured``).  The drift row shape is unchanged
     (``kind`` / ``target`` / ``expected`` / ``actual``).
+
+    PILOT-039 adds ``authority_policy_mismatch``: when both halves exist they
+    must agree on every shared field, so a rewritten audit field is drift.
+    A policy file that exists but is not a valid marker is fail-closed drift
+    too (same row kind, the shape rather than the event is the expectation).
     """
     file_state, state = _read_json_object(root / AUTHORITY_STATE_FILE)
     event_present, payload_obj = last_authority_event(root)
@@ -4160,6 +4464,30 @@ def _authority_state_drift(root: Path, skip) -> list[dict]:
             # The requirement rows are the whole story here: adding 037's
             # authority_missing/unbacked rows would only duplicate the same
             # missing half under a legacy-compatible name.
+            return rows
+        # PILOT-039: both halves exist, so the policy file must repeat the last
+        # AUTHORITY_REQUIRED payload field for field (audit fields included).
+        mismatch = authority_policy_mismatch(root, requirement)
+        if mismatch is not None:
+            rows.append({
+                "kind": "authority_policy_mismatch",
+                "target": "AUTHORITY_POLICY",
+                "expected": mismatch["expected"],
+                "actual": mismatch["actual"]})
+
+    if not required and authority_policy_invalid(requirement):
+        # A present-but-invalid policy is fail-closed drift: it can never turn
+        # into the legacy skip below just because require_authority is not
+        # literally true.
+        fields = authority_policy_fields(requirement["policy"])
+        rows.append({
+            "kind": "authority_policy_mismatch",
+            "target": "AUTHORITY_POLICY",
+            "expected": {"require_authority": True},
+            "actual": {field: authority_display(fields[field])
+                       for field in AUTHORITY_POLICY_FIELDS},
+        })
+        if file_state == "missing" and not event_present:
             return rows
 
     if file_state == "missing" and not event_present:
