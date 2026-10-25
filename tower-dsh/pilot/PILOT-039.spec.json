@@ -1,26 +1,29 @@
 {
   "schema": "tower/spec@1",
   "id": "PILOT-039",
-  "title": "授权态收尾：policy⇄event 逐字段同构、authority-require/set 跨锁、merge 前置 verify-ledger",
+  "title": "授权态收尾 v2：policy⇄event 逐字段同构、authority-require/set 跨锁、merge 前置链（缺失也算错）",
   "authority": "workspace_write",
-  "anchor": "§6.18 残余 / ∅7 收尾",
-  "why_now": "038 的 required 标记只验 presence 与极性：把 shared/AUTHORITY_POLICY.json 的 decision/set_at/set_by/tower_id 改掉不会报 drift（审计字段可被静默改写）；authority-require/authority-set 的 revision 读取、文件写、事件追加没有跨锁（并发可产生重复 revision 或 tmp 冲突）；merge 自身不跑 verify-ledger，空账本或合法前缀不被它抓住（合法前缀 + 删文件仍可被构造）。039 把这三条收掉，让“必需标记”从“存在”升级为“同构”，让并发写入串行化，让审计链在合并前被强制验一次。",
+  "anchor": "§6.18 残余 / ∅7 收尾（v2，v1 因 missing-ledger 旁路作废）",
+  "why_now": "v1 已实现同构与跨锁并通过复核，但 merge 前置链对缺失 ledger 直接 continue：configured/required/legacy 塔删掉 ledger/supervision.jsonl 后，legacy 信封仍可 merge（MERGE_START+MERGED，ledger 被重建、verify-ledger 全绿），违反 spec 与 036「缺失=错」。v2 把缺失改为无条件失败，并扩大 allowed_paths 以便给缺少空 supervision.jsonl 的既有夹具补 fixture（不得放宽断言）。",
   "scope": [
-    "authority-check 与 state-verify 增加 policy⇄event 逐字段同构校验：shared/AUTHORITY_POLICY.json 的 tower_id / require_authority / set_by / decision / set_at 必须与最后一条 AUTHORITY_REQUIRED payload 完全一致（require_authority 必须严格为布尔 true；文本字段非空；缺失与 null 区分），不一致即 exit 2 / drift，detail 列出全部不一致字段",
-    "state-verify 新增 drift 种类 authority_policy_mismatch（与 policy_missing / policy_unbacked 并列）；required 且同构时不再产生任何 authority 类 drift；非 required 旧塔仍 skipped",
-    "authority-require 与 authority-set 增加跨锁：用独立锁文件（如 state/.authority.lock）串行化“读 revision/策略 → 写文件 → append ledger”整段临界区，使用现有 _acquire_lock_file/_release_lock_file 的 timeout/stale 语义；锁顺序固定为 authority 锁 → ledger 锁（append_ledger 内部），不得反向获取，超时干净 exit 2 单 JSON、无 traceback、不留锁与 tmp",
-    "并发不变量：多个 authority-set 并发时，成功者写入的 revision 严格递增且互不重复，AUTHORITY_SET 事件数与成功次数一致，链完整；失败者必须干净 exit 2（锁超时/竞争），不得产生 traceback、不得留下半写文件或 .tmp",
-    "cmd_merge 增加前置链校验：在 authority 校验之后、读信封/队列/git 之前，对 ledger/primary.jsonl 与 ledger/supervision.jsonl 各跑一次 verify_ledger_file；任一有错即 fail（文案含 ledger chain broken: <首条>），队列条目保持原状、不写 MERGE_START/MERGING",
-    "cmd_merge_check 增加一条独立的 merge 前置链校检查项（新旧信封都跑；干净时 ok=true，坏链时失败），与 envelope_checks 里新式信封的 ledger chain intact 并存但不重复报错",
-    "新增 tools/tests/test_authority_hardening.py：policy 五个字段逐项篡改、require_authority 类型（true 严格）、policy 与 event 同构正例、并发 authority-set（≥3 进程 × 2 轮，revision 唯一递增、事件数一致、链完整、无 traceback）、merge 前置链校验（legacy 信封 + 伪造 primary 行；新式信封 + 伪造 supervision 行）、干净 legacy 塔不受影响",
-    "tools/tests/test_state_verify.py 增加 authority_policy_mismatch 的 drift 用例（policy 字段被改 / require_authority 类型错）",
-    "真实塔迁移/验证：用 worktree 的新工具对真实塔跑 authority-check 与 state-verify，必须 configured + required + drift []（真实塔策略由 038 写入，字段应已同构）；若发现不同构，必须用 authority-require 修复后再合并本卡",
+    "authority-check 与 state-verify 增加 policy⇄event 逐字段同构校验：shared/AUTHORITY_POLICY.json 的 tower_id / require_authority / set_by / decision / set_at 必须与最后一条 AUTHORITY_REQUIRED payload 完全一致（require_authority 严格布尔 true；文本字段非空；缺失与 null 区分），不一致即 exit 2 / drift authority_policy_mismatch，detail 列出全部不一致字段",
+    "state-verify 保留 038 的 policy_missing / policy_unbacked，并新增 authority_policy_mismatch；required 且同构时无 authority drift；非 required 旧塔仍 skipped",
+    "authority-require 与 authority-set 增加跨锁：独立锁文件 state/.authority.lock（复用 _acquire_lock_file/_release_lock_file），串行化「读 revision/策略 → 校验 → 写文件 → append ledger」；锁序固定 authority → ledger；超时干净 exit 2 单 JSON、无 traceback、不留锁/tmp",
+    "并发不变量：多进程 authority-set 成功者 revision 严格递增且互不重复，事件数==成功次数，链完整；失败者干净 exit 2，无 traceback、无半写",
+    "cmd_merge 增加前置链校验：在 authority 校验之后、读信封/队列/git 之前，对 ledger/primary.jsonl 与 ledger/supervision.jsonl **无条件**各跑一次 verify_ledger_file；**文件缺失、不可读、坏行一律 fail**（文案含 merge precondition: <name> ledger chain broken/missing: <首条>），队列条目保持原状、不写 MERGE_START/MERGING",
+    "cmd_merge_check：legacy（无 baseline）信封增加独立 pre-merge 链检查项（缺失同样失败）；新式信封由 envelope_checks 的 ledger chain intact 覆盖，不加同义项，避免重复报错",
+    "为既有夹具补 fixture：tools/tests/test_coverage.py 与 tools/tests/test_gates.py 的合并夹具在 setUp 补空的 ledger/supervision.jsonl（或等价），使「干净 legacy 塔」仍能合并；只补夹具/收窄前提，不得删除或放宽任何断言",
+    "新增 tools/tests/test_authority_hardening.py：policy 五字段逐项篡改、require_authority 类型、event payload 篡改+重算 hash、并发 authority-set（≥3 进程 × 2 轮）、missing ledger（primary / supervision、legacy / 新式）merge 必须 exit 2 且无 MERGE_START、干净塔不受影响",
+    "tools/tests/test_state_verify.py 增加 authority_policy_mismatch 用例",
+    "真实塔验证：用 worktree 新工具对真实塔跑 authority-check 与 state-verify，必须 configured + required + drift []（真实塔两条 ledger 都在；若不同构用 authority-require 修复后再合并）",
     "不改 037/038 已建立的 configured/legacy/required_unconfigured 语义与检查名；不改 envelope-new / queue-add / post-merge 的既有行为；不手写 AUTHORITY.json / AUTHORITY_POLICY.json / ledger"
   ],
   "allowed_paths": [
     "pilot/worktrees/PILOT-039/tower-dsh/tools/towerctl.py",
     "pilot/worktrees/PILOT-039/tower-dsh/tools/tests/test_authority_hardening.py",
-    "pilot/worktrees/PILOT-039/tower-dsh/tools/tests/test_state_verify.py"
+    "pilot/worktrees/PILOT-039/tower-dsh/tools/tests/test_state_verify.py",
+    "pilot/worktrees/PILOT-039/tower-dsh/tools/tests/test_coverage.py",
+    "pilot/worktrees/PILOT-039/tower-dsh/tools/tests/test_gates.py"
   ],
   "forbidden": [
     "network",
@@ -30,21 +33,21 @@
     "production access",
     "weakening or deleting existing test coverage",
     "hand-editing state/AUTHORITY.json, shared/AUTHORITY_POLICY.json or ledger/*.jsonl",
-    "acquiring the ledger lock before the authority lock",
-    "allowing merge on a tower whose primary or supervision chain fails verification",
-    "changing legacy (no baseline) envelope semantics beyond the merge precondition"
+    "skipping a missing ledger in the pre-merge chain check",
+    "allowing merge on a tower whose primary or supervision ledger is missing, unreadable or chain-broken",
+    "changing legacy (no baseline) envelope semantics beyond the pre-merge chain precondition"
   ],
   "acceptance": [
     "cd pilot/worktrees/PILOT-039/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 341 + 新增用例数（main 基线 341）",
-    "policy 同构正例：authority-require 后 authority-check exit 0、state-verify drift []；policy 的 tower_id / set_by / decision / set_at / require_authority 任一被改 → authority-check exit 2（detail 列出该字段）、state-verify drift 恰含 authority_policy_mismatch、merge exit 2",
-    "require_authority 写成 \"true\" / 1 / null / 缺失 → 不得被当 required；若事件在则 fail closed（policy_mismatch 或 policy_missing），若事件不在则 check 不通过",
-    "并发 authority-set：≥3 个进程同时写同一塔，成功者的 revision 严格递增且互不重复，AUTHORITY_SET 事件数 == 成功次数，verify-ledger 0 error，authority-check exit 0；失败者 exit 2 单 JSON、无 traceback、无 .tmp / 锁残留",
-    "merge 前置链：legacy 信封 + 已入队 + 伪造 primary 行（seq/prev 合法、hash 错）→ merge exit 2 且 errors 含 ledger chain broken，队列仍 WAITING、无 MERGE_START/MERGING（旧码同夹具应能走到 MERGED 或至少不报链错）",
-    "新式信封 + 伪造 supervision 行 → merge-check exit 2，失败项包含独立的 pre-merge 链检查（与 ledger chain intact 不重复成两条同义错误）；merge exit 2",
-    "干净塔（legacy 或 configured）在链完整时 merge/merge-check 行为不变；037/038 既有测试全部保持绿",
-    "旧码对照：用 git show main:tower-dsh/tools/towerctl.py 落 main 版工具，对 policy 篡改夹具与伪造链夹具复跑——旧码 policy 篡改后 check/state-verify 不报、伪造 primary 行 + legacy 信封 merge 可 MERGED；新码全部拒绝。证据写进 scratch/probe-old-code.txt",
-    "真实塔：worktree 新工具对真实塔 authority-check exit 0（configured + required）、state-verify drift []；建信封前 tasks=39/envelopes=38，建信封后 39/39；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
-    "git -C pilot/worktrees/PILOT-039 diff --name-only main..HEAD 恰三个 allowed_paths（tower-dsh/tools/towerctl.py、tower-dsh/tools/tests/test_authority_hardening.py、tower-dsh/tools/tests/test_state_verify.py）"
+    "policy 同构正例：authority-require 后 authority-check exit 0、state-verify drift []；policy 的 tower_id / set_by / decision / set_at 任一被改 → authority-check exit 2（detail 列字段）、state-verify drift 恰含 authority_policy_mismatch、merge exit 2",
+    "require_authority 写成 \"true\" / 1 / null / 缺失 → 不得被当 required；事件在时 fail closed；event payload 被篡改并重算该行 hash → state-verify drift authority_policy_mismatch（policy⇄event 至少一侧不一致）",
+    "并发 authority-set：≥3 进程 × 2 轮同时写同一塔 → 成功者 revision 严格递增且互不重复、事件数==成功次数、verify-ledger 0、authority-check 0；失败者 exit 2 单 JSON、无 traceback、无锁/tmp 残留",
+    "missing ledger（关键）：configured/required/legacy 塔 + legacy 信封已入队 + 删除 ledger/supervision.jsonl → merge-check exit 2、merge exit 2、队列仍 WAITING、无 MERGE_START/MERGING、ledger 未被重建；删除 ledger/primary.jsonl 同样拒绝",
+    "新式信封 + 缺失或伪造 supervision 行 → merge-check exit 2，失败项恰为 ledger chain intact（不出现同义 pre-merge 项）；merge exit 2",
+    "干净 legacy / configured 塔（两条 ledger 都在且完整）：merge/merge-check 行为不变，既有测试全绿；test_coverage/test_gates 的夹具补丁不得删除或放宽任何断言",
+    "旧码对照：main 版工具对 policy 篡改、伪造 primary 行 + legacy 信封、删 supervision ledger + legacy 信封三种夹具复跑——旧码均应放行/MERGED；新码全部拒绝。证据写进 scratch/probe-old-code.txt",
+    "真实塔：worktree 新工具 authority-check exit 0（configured + required）、state-verify drift []；建信封前 tasks=39/envelopes=38，建信封后 39/39；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-039 diff --name-only main..HEAD 恰五个 allowed_paths（towerctl.py、test_authority_hardening.py、test_state_verify.py、test_coverage.py、test_gates.py）"
   ],
   "depends_on": ["PILOT-038"],
   "worktree": "pilot/worktrees/PILOT-039"

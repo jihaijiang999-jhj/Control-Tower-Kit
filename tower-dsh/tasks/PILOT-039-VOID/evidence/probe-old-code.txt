@@ -1,0 +1,47 @@
+﻿PROBE label=OLD
+towerctl=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-039\scratch\old\towerctl.py
+worktree=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-039
+
+=== [OLD] A. policy <-> event isomorphism ===
+  authority-set                 rc=0 revision=1 
+  authority-require             rc=0 repaired=True 
+  policy == last event payload  True
+  authority-check [intact]        rc=0 ok=True status=configured 
+  state-verify [intact]           rc=0 drift=[] 
+  policy rewritten:            set_by 'mac' -> 'mallory'
+  authority-check [tampered]        rc=0 ok=True status=configured 
+  state-verify [tampered]           rc=0 drift=[] 
+  merge-check (tampered)        rc=0 ok=True failed=[]
+  merge (tampered)              rc=0 ok=True errors=
+  queue / envelope after merge  MERGED / MERGED
+  policy restored               authority-check rc=0 ok=True
+
+=== [OLD] B. merge precondition: forged primary row, legacy envelope ===
+  forged primary row             seq=1 prev_hash=GENESIS... hash=000...000 (wrong)
+  verify-ledger                 rc=2 first_error=primary: row 1: hash mismatch (event tampered)
+  merge                         rc=0 ok=True status=MERGED errors=
+  queue status after attempt    MERGED
+  envelope status after attempt MERGED
+  queue bytes unchanged         False
+  envelope bytes unchanged      False
+  MERGE_START written           True
+  MERGING written               False
+
+=== [OLD] C. cross-lock: 3 concurrent authority-set writers x 2 rounds ===
+  round 1 writer rc=0 ok=True revision=1 errors=null
+  round 1 writer rc=2 ok=False revision=None errors=["cannot write state/AUTHORITY.json: [Errno 13] Permission denied: 'C:\\\\Users\\\\mac\\\\Documents\\\\deepseek-harness\\\\default-workspace\\\\tower-dsh\\\\pilot\\\\worktrees\\\\PILOT-039\\\\scratch\...
+  round 1 writer rc=0 ok=True revision=1 errors=null
+  round 2 writer rc=0 ok=True revision=2 errors=null
+  round 2 writer rc=0 ok=True revision=2 errors=null
+  round 2 writer rc=0 ok=True revision=2 errors=null
+  exit codes                    [0, 2, 0, 0, 0, 0]
+  tracebacks                    0
+  successes / events            5 / 5
+  revisions in ledger order     [1, 1, 2, 2, 2]
+  unique and increasing         False
+  verify-ledger                 rc=0 ok=True errors=[]
+  authority-check               rc=0 ok=True
+  .authority.lock residue       False
+  .tmp residue                  []
+
+PROBE DONE

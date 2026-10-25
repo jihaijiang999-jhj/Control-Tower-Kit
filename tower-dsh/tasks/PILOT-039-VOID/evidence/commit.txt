@@ -1,0 +1,17 @@
+﻿HEAD: dd688a437cac3b379cbb6a7ca3b658cebb83c198
+Title: PILOT-039: authority hardening (policy-event isomorphism, cross-lock, pre-merge chain check)
+Branch: pilot/PILOT-039
+Baseline main: 321f991
+Status: ?? scratch/
+
+Ran 357 tests in 166.660s
+OK (skipped=1)
+
+Files in commit:
+ tower-dsh/tools/tests/test_authority_hardening.py | 699 ++++++++++++++++++++++
+ tower-dsh/tools/tests/test_state_verify.py        |  59 ++
+ tower-dsh/tools/towerctl.py                       | 366 ++++++++++-
+ 3 files changed, 1105 insertions(+), 19 deletions(-)
+
+Allowed-path check (git diff --name-only main..HEAD):
+tower-dsh/tools/tests/test_authority_hardening.py tower-dsh/tools/tests/test_state_verify.py tower-dsh/tools/towerctl.py
