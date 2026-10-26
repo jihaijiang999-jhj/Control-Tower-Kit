@@ -366,10 +366,10 @@
       "task": "PILOT-041",
       "branch": "pilot/PILOT-041",
       "base": "main",
-      "status": "MERGED",
+      "status": "POST_MERGE_VERIFIED",
       "added_at": "2026-10-26T18:52:34+08:00",
       "merge_commit": "cc7c55a9e141fc740d3ee5a962c8ab93870fdc16"
     }
   ],
-  "updated_at": "2026-10-26T18:58:02+08:00"
+  "updated_at": "2026-10-26T19:04:51+08:00"
 }
