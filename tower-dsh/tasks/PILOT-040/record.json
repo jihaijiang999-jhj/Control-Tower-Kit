@@ -1,0 +1,168 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-040",
+  "title": "空账本语义：0 字节截断不得掩护 legacy merge；authority-require 的 already 分支回显真实 decision",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "新增 merge 前置守卫 ledger_empty_guard(root)：仅当 authority 状态为 configured 或 required 时生效（legacy 塔保持旧行为）；当 supervision ledger 为空（0 事件）且存在任一 supervision 工件（supervision/envelopes/*.json、MERGE_QUEUE 条目、registries/merge-ledger 条目）→ 判为失败，文案含 'supervision ledger is empty but envelope/queue history exists'；primary ledger 为空时由 authority 校验先行拦截（required_unconfigured/unbacked），守卫只需覆盖 supervision 侧",
+    "cmd_merge：把 ledger_empty_guard 放在 039 的前置链校验之后、读信封/队列/git 之前；触发时 fail，队列条目保持原状、不写 MERGE_START/MERGING、不重建 ledger",
+    "cmd_merge_check：对 configured/required 塔追加一条独立检查项（如 'ledger history present'）；空账本+工件时 ok=false、整单 exit 2；无工件或 legacy 塔不触发",
+    "守卫不改变 036 的『空文件=合法空链』语义：空的但没有工件的塔（fresh）仍通过；只把『空账本 + 有历史工件』判为不一致，与 state-verify 的 envelope_unbacked/queue_unbacked 判定对齐",
+    "authority-require 输出修正：already=true（两侧都在）或 repaired=true（补齐一侧）时，输出必须回显**策略/事件里的真实 decision**（不是请求的 --decision）；若请求与真实不同，附加 requested_decision 字段并保持 decision 为真实值；policy/event 内容与事件数不得因回显而改变",
+    "新增 tools/tests/test_empty_ledger_guard.py：configured/required 塔 + 手写 envelope/queue + 0 字节 supervision.jsonl → merge-check 2 / merge 2 / 队列 WAITING / 无 MERGE_START / ledger 仍 0 字节；legacy 塔同夹具保持旧行为（放行）；fresh 空塔（无工件）不触发；state-verify 在同夹具上已报 envelope_unbacked/queue_unbacked（审计先行证据）；authority-require 的 already/repaired 回显真实 decision（请求 D-NEW、实际 D-ORIG）",
+    "tools/tests/test_authority_hardening.py 仅在既有断言与新回显冲突时做最小调整（不得放宽断言）；不改其他测试文件",
+    "真实塔验证：用 worktree 新工具对真实塔跑 authority-check 与 state-verify（configured+required、drift []）；合并后 post-merge 必须通过新守卫（真实塔两条 ledger 非空、工件一致）",
+    "不改 037/038/039 已建立的 configured/legacy/required_unconfigured、policy 同构、跨锁、前置链语义与检查名；不改 envelope-new / queue-add / post-merge 的既有行为；不手写 ledger 或策略文件"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-040/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-040/tower-dsh/tools/tests/test_empty_ledger_guard.py",
+    "pilot/worktrees/PILOT-040/tower-dsh/tools/tests/test_authority_hardening.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "hand-editing state/AUTHORITY.json, shared/AUTHORITY_POLICY.json or ledger/*.jsonl",
+    "treating a fresh empty ledger (no artifacts) as a failure",
+    "changing legacy (no baseline) envelope semantics on legacy towers",
+    "changing the persisted decision in authority-require when already configured"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-040/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 363 + 新增用例数（main 基线 363）",
+    "configured 塔 + 手写 envelope 记录 + 队列条目 + 0 字节 supervision.jsonl → merge-check exit 2（失败项含 ledger 空/工件不一致语义）、merge exit 2、队列仍 WAITING、无 MERGE_START/MERGING、supervision.jsonl 仍是 0 字节（未被重建）",
+    "required 塔同夹具同样 exit 2；legacy 塔（无 authority 状态）同夹具保持旧行为（merge 可成功），以固定兼容边界",
+    "fresh 塔（configured 但 supervision 无任何信封/队列/合并账本工件、ledger 为空）不触发守卫（merge-check 不因空账本失败）",
+    "state-verify 在同一『空账本 + 工件』夹具上 exit 2 且 drift 含 envelope_unbacked/queue_unbacked（证明审计器先行、门店后补）",
+    "authority-require 在两侧都已存在时：exit 0、already=true、输出 decision 等于事件/策略里的真实值；请求不同 decision 时输出 requested_decision 且 decision 仍为真实值；policy/event 内容与事件数不变",
+    "authority-require 修复单侧时：repaired=true、输出 decision 为事件真实值（请求值不覆盖事件）",
+    "037/038/039 既有测试全部保持绿（configured/legacy/required_unconfigured、policy 同构、跨锁、前置链缺失=致命）",
+    "旧码对照：main 版工具在『configured + 0 字节 supervision + legacy 信封』夹具上 merge 可 MERGED（或至少不报空账本错）；新码 exit 2。证据写进 scratch/probe-old-code.txt",
+    "真实塔：worktree 新工具 authority-check exit 0（configured + required）、state-verify drift []；建信封前 tasks=40/envelopes=39，建信封后 40/40；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-040 diff --name-only main..HEAD 恰三个 allowed_paths（除非 test_authority_hardening.py 无需改动，则两文件）"
+  ],
+  "depends_on": [
+    "PILOT-039"
+  ],
+  "worktree": "pilot/worktrees/PILOT-040",
+  "spec_path": "pilot/PILOT-040.spec.json",
+  "spec_sha256": "624c1ec6382dbd19a438d132558fa097548ebe22654c591a9dbd85cf141c2dad",
+  "spec_gate": "PASS",
+  "executor": "subagent:cf06e1f9-f8e9-444d-b8df-8be1c25372bb",
+  "dispatch": {
+    "executor": "subagent:cf06e1f9-f8e9-444d-b8df-8be1c25372bb",
+    "worktree": "pilot/worktrees/PILOT-040",
+    "at": "2026-10-26T11:29:02+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-040/evidence/towerctl.py",
+      "sha256": "59846ab1c07c7403d4bb1cf509e62e2b32cecafc4d489fc8337f50d7233b4d5e",
+      "bytes": 228560,
+      "at": "2026-10-26T11:54:04+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/test_empty_ledger_guard.py",
+      "sha256": "2a5274db5010796fb2ddac83026f73dfe49c75f0fb498437d4c3a64f6aa457eb",
+      "bytes": 23279,
+      "at": "2026-10-26T11:54:04+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/test_authority_hardening.py",
+      "sha256": "ecf0020a0fcc68b4ca73591a3f500aa016db0c13d87eacba3d6bc245392db0ea",
+      "bytes": 40125,
+      "at": "2026-10-26T11:54:04+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/test_authority_required.py",
+      "sha256": "4f2b3d5780485e0fc1187e27cbc2e4f439ac7b5c993d53d9a40067824d0e3530",
+      "bytes": 27505,
+      "at": "2026-10-26T11:54:04+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/test_authority_state.py",
+      "sha256": "e505468bff086d595c127231b41fcc8b556e6760da0317e6991c3c4494afec6d",
+      "bytes": 29238,
+      "at": "2026-10-26T11:54:04+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/test-output.txt",
+      "sha256": "ba28b6f775aaec6a1b2eb9e48cb327d0445f07accc07377725adb04fa339ed07",
+      "bytes": 108616,
+      "at": "2026-10-26T11:54:04+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/empty_ledger_probe.py",
+      "sha256": "1ab1bf3f700ec1ac2b681a94bebb64e7c156849d8a9077997ae5a7f3900e13b0",
+      "bytes": 9883,
+      "at": "2026-10-26T11:54:04+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/probe.txt",
+      "sha256": "1259f88fd91bef218a3c73451aeca8cf15776f176b9ede2a7726ca0ab4acebe5",
+      "bytes": 3286,
+      "at": "2026-10-26T11:54:04+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/probe-old-code.txt",
+      "sha256": "e25051e34bcc97f2e7c8ad7e2dd925dfb1f4e49834482726169a31a90c01e15c",
+      "bytes": 4966,
+      "at": "2026-10-26T11:54:04+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/commit.txt",
+      "sha256": "92585b04670b04ed280452420c7e39bb1c114f547a3eccd7765d61528c7da356",
+      "bytes": 1025,
+      "at": "2026-10-26T11:54:04+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/diff.txt",
+      "sha256": "a6544db6c8a6937192d61815c3fd856e0ce445d91189f472e9678301d6b3ec27",
+      "bytes": 39280,
+      "at": "2026-10-26T11:54:04+08:00",
+      "id": "E-011"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/fixture-seeding.diff",
+      "sha256": "cbc85a32ad893ecc273571a8576dfa26c8ba24ebc8a7413d73756e869d9f9272",
+      "bytes": 5125,
+      "at": "2026-10-26T11:54:04+08:00",
+      "id": "E-012"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:3ecc3001-a65f-462b-a63d-3d8ee3e1cdd4",
+    "verdict": "PASS",
+    "note": "040 PASS（无阻塞）。空账本守卫已关掉 0 字节截断对 legacy merge 的掩护：configured/required + 手写 envelope + 队列 + 0 字节 supervision.jsonl → merge-check exit 2（失败项 ledger history present，文案含 empty 与工件清单）、merge exit 2、队列 WAITING、无 MERGE_START/MERGING、ledger 仍 0 字节、envelope DRAFT；legacy 塔同夹具保持旧行为（merge 成功，兼容边界已 pin）；fresh configured（无工件）不触发；非空 ledger + 工件不触发；同夹具 state-verify exit 2 且 drift envelope_unbacked/queue_unbacked（审计先行）。authority-require 回显已修：already 请求 D-NEW 实际 D-ORIG → decision=D-ORIG、requested_decision=D-NEW、事件 1 条、policy/ledger 字节不变；repaired 两方向同样以事件为准；首写行为不变。独立复核 12/12 证据 SHA-256+字节数一致、spec 哈希一致、evidence/towerctl.py 与 worktree 字节相同；scope 5 文件（towerctl + 新测试 + 三个既有测试的 §6.11 授权播种：8/0、11/0、10/0，零删除零断言改动，commit body 已写明 allowed_paths 未含这两个文件）；亲跑 Ran 371 tests / OK(skipped=1)。旧码同夹具 merge-check 0、merge MERGED 且重建 ledger（604B，含 MERGE_START），新码 exit 2；旧码 authority-require 回显请求值（bug 已复现）。真实塔只读：state-verify 40/39 drift []（skipped 2 VOID，evidence 317）、authority-check configured+required（13 checks，rev 2）、verify-ledger 0 error（primary 364/supervision 203）、coverage 27/27、lint 6/6、ledger_empty_guard(real)=[]、8 个关键文件哈希前后不变。残余（非阻塞）：①守卫按“可解析 JSON 对象”计事件，截成 {\"seq\": 1}（11B）可过 039 并绕过守卫（需写 ledger；本质仍是 036 无密钥链残余，建议 041 把计数限定为含非空 type + dict payload 的行）；②仅 merge-ledger 工件时守卫失败但 state-verify ok，文案与审计不一致；③§6.11 播种导致卡面与 allowed_paths/验收文字 stale（5 文件 vs 3），closeout 记录；④evidence 的 probe/test-output 为 UTF-16LE（哈希字节一致，卫生问题）；⑤legacy 塔 primary 清 0 字节仍按 036 放行（卡面明确保持）。",
+    "at": "2026-10-26T12:11:44+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-040",
+    "actor": "owner",
+    "text": "independent review PASS (371 tests, 12/12 hashes, 0-byte truncation closed)",
+    "at": "2026-10-26T12:11:44+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-040/CLOSEOUT.md",
+    "at": "2026-10-26T12:11:44+08:00"
+  },
+  "created_at": "2026-10-25T15:15:30+08:00",
+  "updated_at": "2026-10-26T12:11:44+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-040/MERGE.md",
+  "delivered_at": "2026-10-26T11:54:04+08:00",
+  "accepted_at": "2026-10-26T12:11:44+08:00"
+}

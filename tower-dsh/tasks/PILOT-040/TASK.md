@@ -1,0 +1,50 @@
+# PILOT-040 — 空账本语义：0 字节截断不得掩护 legacy merge；authority-require 的 already 分支回显真实 decision
+
+- Status: `ready`
+- Authority: `workspace_write`
+- Worktree: `pilot/worktrees/PILOT-040`
+
+## Scope
+
+- 新增 merge 前置守卫 ledger_empty_guard(root)：仅当 authority 状态为 configured 或 required 时生效（legacy 塔保持旧行为）；当 supervision ledger 为空（0 事件）且存在任一 supervision 工件（supervision/envelopes/*.json、MERGE_QUEUE 条目、registries/merge-ledger 条目）→ 判为失败，文案含 'supervision ledger is empty but envelope/queue history exists'；primary ledger 为空时由 authority 校验先行拦截（required_unconfigured/unbacked），守卫只需覆盖 supervision 侧
+- cmd_merge：把 ledger_empty_guard 放在 039 的前置链校验之后、读信封/队列/git 之前；触发时 fail，队列条目保持原状、不写 MERGE_START/MERGING、不重建 ledger
+- cmd_merge_check：对 configured/required 塔追加一条独立检查项（如 'ledger history present'）；空账本+工件时 ok=false、整单 exit 2；无工件或 legacy 塔不触发
+- 守卫不改变 036 的『空文件=合法空链』语义：空的但没有工件的塔（fresh）仍通过；只把『空账本 + 有历史工件』判为不一致，与 state-verify 的 envelope_unbacked/queue_unbacked 判定对齐
+- authority-require 输出修正：already=true（两侧都在）或 repaired=true（补齐一侧）时，输出必须回显**策略/事件里的真实 decision**（不是请求的 --decision）；若请求与真实不同，附加 requested_decision 字段并保持 decision 为真实值；policy/event 内容与事件数不得因回显而改变
+- 新增 tools/tests/test_empty_ledger_guard.py：configured/required 塔 + 手写 envelope/queue + 0 字节 supervision.jsonl → merge-check 2 / merge 2 / 队列 WAITING / 无 MERGE_START / ledger 仍 0 字节；legacy 塔同夹具保持旧行为（放行）；fresh 空塔（无工件）不触发；state-verify 在同夹具上已报 envelope_unbacked/queue_unbacked（审计先行证据）；authority-require 的 already/repaired 回显真实 decision（请求 D-NEW、实际 D-ORIG）
+- tools/tests/test_authority_hardening.py 仅在既有断言与新回显冲突时做最小调整（不得放宽断言）；不改其他测试文件
+- 真实塔验证：用 worktree 新工具对真实塔跑 authority-check 与 state-verify（configured+required、drift []）；合并后 post-merge 必须通过新守卫（真实塔两条 ledger 非空、工件一致）
+- 不改 037/038/039 已建立的 configured/legacy/required_unconfigured、policy 同构、跨锁、前置链语义与检查名；不改 envelope-new / queue-add / post-merge 的既有行为；不手写 ledger 或策略文件
+
+## Allowed paths
+
+- `pilot/worktrees/PILOT-040/tower-dsh/tools/towerctl.py`
+- `pilot/worktrees/PILOT-040/tower-dsh/tools/tests/test_empty_ledger_guard.py`
+- `pilot/worktrees/PILOT-040/tower-dsh/tools/tests/test_authority_hardening.py`
+
+## Forbidden
+
+- network
+- external dependencies
+- changes outside the task worktree
+- merge
+- production access
+- weakening or deleting existing test coverage
+- hand-editing state/AUTHORITY.json, shared/AUTHORITY_POLICY.json or ledger/*.jsonl
+- treating a fresh empty ledger (no artifacts) as a failure
+- changing legacy (no baseline) envelope semantics on legacy towers
+- changing the persisted decision in authority-require when already configured
+
+## Acceptance
+
+- cd pilot/worktrees/PILOT-040/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 363 + 新增用例数（main 基线 363）
+- configured 塔 + 手写 envelope 记录 + 队列条目 + 0 字节 supervision.jsonl → merge-check exit 2（失败项含 ledger 空/工件不一致语义）、merge exit 2、队列仍 WAITING、无 MERGE_START/MERGING、supervision.jsonl 仍是 0 字节（未被重建）
+- required 塔同夹具同样 exit 2；legacy 塔（无 authority 状态）同夹具保持旧行为（merge 可成功），以固定兼容边界
+- fresh 塔（configured 但 supervision 无任何信封/队列/合并账本工件、ledger 为空）不触发守卫（merge-check 不因空账本失败）
+- state-verify 在同一『空账本 + 工件』夹具上 exit 2 且 drift 含 envelope_unbacked/queue_unbacked（证明审计器先行、门店后补）
+- authority-require 在两侧都已存在时：exit 0、already=true、输出 decision 等于事件/策略里的真实值；请求不同 decision 时输出 requested_decision 且 decision 仍为真实值；policy/event 内容与事件数不变
+- authority-require 修复单侧时：repaired=true、输出 decision 为事件真实值（请求值不覆盖事件）
+- 037/038/039 既有测试全部保持绿（configured/legacy/required_unconfigured、policy 同构、跨锁、前置链缺失=致命）
+- 旧码对照：main 版工具在『configured + 0 字节 supervision + legacy 信封』夹具上 merge 可 MERGED（或至少不报空账本错）；新码 exit 2。证据写进 scratch/probe-old-code.txt
+- 真实塔：worktree 新工具 authority-check exit 0（configured + required）、state-verify drift []；建信封前 tasks=40/envelopes=39，建信封后 40/40；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6
+- git -C pilot/worktrees/PILOT-040 diff --name-only main..HEAD 恰三个 allowed_paths（除非 test_authority_hardening.py 无需改动，则两文件）

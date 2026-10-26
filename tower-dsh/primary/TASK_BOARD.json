@@ -391,7 +391,17 @@
       "reviewer": "subagent:baa3ec9e-499a-4a82-b5d5-41d279b1e51a",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-039/MERGE.md",
       "updated_at": "2026-10-25T13:26:33+08:00"
+    },
+    {
+      "id": "PILOT-040",
+      "title": "空账本语义：0 字节截断不得掩护 legacy merge；authority-require 的 already 分支回显真实 decision",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:cf06e1f9-f8e9-444d-b8df-8be1c25372bb",
+      "reviewer": "subagent:3ecc3001-a65f-462b-a63d-3d8ee3e1cdd4",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-040/MERGE.md",
+      "updated_at": "2026-10-26T12:11:44+08:00"
     }
   ],
-  "updated_at": "2026-10-25T13:26:33+08:00"
+  "updated_at": "2026-10-26T12:11:44+08:00"
 }

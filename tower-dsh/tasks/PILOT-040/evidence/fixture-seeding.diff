@@ -1,0 +1,111 @@
+﻿diff --git a/tower-dsh/tools/tests/test_authority_hardening.py b/tower-dsh/tools/tests/test_authority_hardening.py
+index b961b08..919b60b 100644
+--- a/tower-dsh/tools/tests/test_authority_hardening.py
++++ b/tower-dsh/tools/tests/test_authority_hardening.py
+@@ -261,6 +261,12 @@ class AuthorityHardeningTestCase(unittest.TestCase):
+                            "branch": BRANCH, "base": "main",
+                            "status": "WAITING", "added_at": FIXED_TIME}])
+ 
++    def seed_queue_history(self) -> None:
++        """PILOT-040: append the QUEUE_ADD row the hand-written fixture skipped."""
++        towerctl.append_supervision_ledger(
++            self.root, "QUEUE_ADD", "primary",
++            {"envelope": ENVELOPE, "task": TASK})
++
+     def queue_bytes(self) -> bytes:
+         return (self.root / "supervision" / "MERGE_QUEUE.json").read_bytes()
+ 
+@@ -359,6 +365,7 @@ class AuthorityHardeningTestCase(unittest.TestCase):
+ 
+         self.write_envelope()
+         self.write_waiting_entry()
++        self.seed_queue_history()
+         cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
+         self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+         merged_check = json.loads(cp.stdout)
+@@ -810,6 +817,7 @@ class AuthorityHardeningTestCase(unittest.TestCase):
+         self.set_ok()
+         self.write_envelope(baselines=False)
+         self.write_waiting_entry()
++        self.seed_queue_history()
+ 
+         cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
+ 
+diff --git a/tower-dsh/tools/tests/test_authority_required.py b/tower-dsh/tools/tests/test_authority_required.py
+index c2472ff..b3a1648 100644
+--- a/tower-dsh/tools/tests/test_authority_required.py
++++ b/tower-dsh/tools/tests/test_authority_required.py
+@@ -53,6 +53,9 @@ GIT_IDENTITY = {
+     "GIT_COMMITTER_EMAIL": "tower@example.invalid",
+ }
+ 
++sys.path.insert(0, str(TOOLS_DIR))
++import towerctl  # noqa: E402  (import after sys.path setup)
++
+ 
+ def write_json(path: Path, data) -> None:
+     path.parent.mkdir(parents=True, exist_ok=True)
+@@ -224,6 +227,12 @@ class AuthorityRequiredTestCase(unittest.TestCase):
+                            "branch": BRANCH, "base": "main",
+                            "status": "WAITING", "added_at": FIXED_TIME}])
+ 
++    def seed_queue_history(self) -> None:
++        """PILOT-040: append the QUEUE_ADD row the hand-written fixture skipped."""
++        towerctl.append_supervision_ledger(
++            self.root, "QUEUE_ADD", "primary",
++            {"envelope": ENVELOPE, "task": TASK})
++
+     def queue_bytes(self) -> bytes:
+         return (self.root / "supervision" / "MERGE_QUEUE.json").read_bytes()
+ 
+@@ -313,6 +322,7 @@ class AuthorityRequiredTestCase(unittest.TestCase):
+         # merge-check reports the requirement as its own ok=true check.
+         self.write_legacy_envelope()
+         self.write_waiting_entry()
++        self.seed_queue_history()
+         cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
+         self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+         check = json.loads(cp.stdout)
+@@ -582,6 +592,7 @@ class AuthorityRequiredTestCase(unittest.TestCase):
+ 
+         # Configured but not required: 037's configured pin, no requirement.
+         self.set_ok()
++        self.seed_queue_history()
+         check = self.cli_json("authority-check")
+         self.assertEqual(check["status"], "configured")
+         self.assertEqual(check["requirement"], "optional")
+diff --git a/tower-dsh/tools/tests/test_authority_state.py b/tower-dsh/tools/tests/test_authority_state.py
+index adc6ba3..ffa784b 100644
+--- a/tower-dsh/tools/tests/test_authority_state.py
++++ b/tower-dsh/tools/tests/test_authority_state.py
+@@ -45,6 +45,9 @@ GIT_IDENTITY = {
+     "GIT_COMMITTER_EMAIL": "tower@example.invalid",
+ }
+ 
++sys.path.insert(0, str(TOOLS_DIR))
++import towerctl  # noqa: E402  (import after sys.path setup)
++
+ 
+ def write_json(path: Path, data) -> None:
+     path.parent.mkdir(parents=True, exist_ok=True)
+@@ -191,6 +194,12 @@ class AuthorityStateTestCase(unittest.TestCase):
+     def queue_entry(self) -> dict:
+         return self.queue_entries()[0]
+ 
++    def seed_queue_history(self) -> None:
++        """PILOT-040: append the QUEUE_ADD row the hand-written fixture skipped."""
++        towerctl.append_supervision_ledger(
++            self.root, "QUEUE_ADD", "primary",
++            {"envelope": ENVELOPE, "task": TASK})
++
+     def write_authority_file(self, **overrides) -> None:
+         """Hand-write a file that claims authority without a ledger event."""
+         data = {
+@@ -399,6 +408,7 @@ class AuthorityStateTestCase(unittest.TestCase):
+         self.write_queue([{"envelope_id": ENVELOPE, "task": TASK,
+                            "branch": BRANCH, "base": "main",
+                            "status": "WAITING", "added_at": FIXED_TIME}])
++        self.seed_queue_history()
+ 
+         cp = self.run_cli("merge", "--role", "supervisor",
+                           "--supervisor", "rogue", "--envelope", ENVELOPE)

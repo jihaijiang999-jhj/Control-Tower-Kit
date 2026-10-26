@@ -1,0 +1,20 @@
+﻿=== HEAD ===
+ecb570062469bf53abfde46a864d2dd72ddd2213
+PILOT-040: empty-ledger guard (0-byte truncation cannot shield legacy merge) + authority-require echo fix
+fixture: seed supervision ledger in 037/038 authority fixtures (documented minimal completion per MAP 6.11; spec v2 allowed_paths omitted these files)
+
+=== show --stat ===
+ tower-dsh/tools/tests/test_authority_hardening.py |   8 +
+ tower-dsh/tools/tests/test_authority_required.py  |  11 +
+ tower-dsh/tools/tests/test_authority_state.py     |  10 +
+ tower-dsh/tools/tests/test_empty_ledger_guard.py  | 512 ++++++++++++++++++++++
+ tower-dsh/tools/towerctl.py                       | 141 +++++-
+ 5 files changed, 675 insertions(+), 7 deletions(-)
+=== diff --name-only main..HEAD ===
+tower-dsh/tools/tests/test_authority_hardening.py
+tower-dsh/tools/tests/test_authority_required.py
+tower-dsh/tools/tests/test_authority_state.py
+tower-dsh/tools/tests/test_empty_ledger_guard.py
+tower-dsh/tools/towerctl.py
+=== git status --short ===
+?? scratch/
