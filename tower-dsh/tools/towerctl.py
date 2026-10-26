@@ -359,34 +359,47 @@ def authority_lock(root: Path, timeout: float | None = None,
         _release_lock_file(path, identity)
 
 
-def _append_ledger_event(root: Path, filename: str, event_type: str,
-                         actor: str, payload: dict) -> dict:
+def _append_ledger_event_locked(root: Path, filename: str, event_type: str,
+                                actor: str, payload: dict) -> dict:
+    """Append one event assuming the caller already holds ``ledger_lock``.
+
+    ``ledger_lock`` is deliberately not re-entrant.  ``completion-add`` has to
+    read the ledger, decide whether the ``COMPLETION_ADDED`` half is missing
+    (idempotency / half-write repair) and append inside one critical section,
+    so the locked append is factored out instead of taking the lock twice.
+    """
     ledger = root / "ledger" / filename
     ledger.parent.mkdir(parents=True, exist_ok=True)
-    with ledger_lock(root):
-        rows = ledger_rows(ledger)
-        seq = 0
-        for raw in rows:
-            parsed = parse_ledger_row(raw)
-            if parsed is None:
-                continue
-            try:
-                seq = max(seq, int(parsed.get("seq", 0)))
-            except (TypeError, ValueError):
-                continue
-        event = {
-            "seq": seq + 1,
-            "at": now(),
-            "type": event_type,
-            "actor": actor,
-            "payload": payload,
-            "prev_hash": prev_hash_for_rows(rows),
-        }
-        event["hash"] = event_hash(event)
-        # Binary append keeps the line terminator LF on every platform.
-        with ledger.open("ab") as fh:
-            fh.write((json.dumps(event, ensure_ascii=False) + "\n").encode("utf-8"))
+    rows = ledger_rows(ledger)
+    seq = 0
+    for raw in rows:
+        parsed = parse_ledger_row(raw)
+        if parsed is None:
+            continue
+        try:
+            seq = max(seq, int(parsed.get("seq", 0)))
+        except (TypeError, ValueError):
+            continue
+    event = {
+        "seq": seq + 1,
+        "at": now(),
+        "type": event_type,
+        "actor": actor,
+        "payload": payload,
+        "prev_hash": prev_hash_for_rows(rows),
+    }
+    event["hash"] = event_hash(event)
+    # Binary append keeps the line terminator LF on every platform.
+    with ledger.open("ab") as fh:
+        fh.write((json.dumps(event, ensure_ascii=False) + "\n").encode("utf-8"))
     return event
+
+
+def _append_ledger_event(root: Path, filename: str, event_type: str,
+                         actor: str, payload: dict) -> dict:
+    with ledger_lock(root):
+        return _append_ledger_event_locked(
+            root, filename, event_type, actor, payload)
 
 
 def append_ledger(root: Path, event_type: str, actor: str, payload: dict) -> dict:
@@ -2051,6 +2064,63 @@ def dispatch_provenance_field(value, label: str) -> str | None:
     return text
 
 
+# PILOT-042: owner-signed "authorized completions".  A completion is the
+# recorded repair for a path a delivered branch legitimately needed but the
+# frozen spec's ``allowed_paths`` did not list (the §6.11 recurrence).  It is
+# deliberately narrow: it only joins the deliver scope allow-list and never the
+# merge / authority / chain / empty-ledger gates.
+COMPLETION_ADDED = "COMPLETION_ADDED"
+COMPLETION_TASK_STATUSES = ("ready", "dispatched", "delivered", "rework")
+COMPLETION_ENTRY_FIELDS = ("path", "by", "reason", "decision")
+
+
+def _norm_tower_rel(root: Path, raw) -> tuple[str | None, str | None]:
+    """Normalise one tower-root-relative path; return ``(posix, error)``.
+
+    Lexical only: the file does not have to exist yet -- a completion is
+    recorded before the work lands and may name a brand-new file.  Absolute
+    paths and any ``..`` are rejected before a filesystem call, and the
+    normalised path is checked to stay inside ``root``.
+    """
+    if not isinstance(raw, str) or not raw.strip():
+        return None, "path must be a non-empty string"
+    text = raw.strip().replace("\\", "/")
+    if "\x00" in text:
+        return None, "path must not contain NUL"
+    if os.path.isabs(text) or text.startswith("/") or re.match(r"^[A-Za-z]:", text):
+        return None, f"path must be tower-root-relative, not absolute: {raw}"
+    if ".." in text:
+        return None, f"path must not contain '..': {raw}"
+    root_abs = os.path.abspath(root)
+    try:
+        lexical = os.path.normpath(os.path.join(root_abs, text))
+    except (OSError, ValueError, RuntimeError):
+        return None, f"path cannot be normalised: {raw}"
+    if lexical != root_abs and not lexical.startswith(root_abs + os.sep):
+        return None, f"path outside tower root: {raw}"
+    display = os.path.relpath(lexical, root_abs).replace(os.sep, "/")
+    if display in ("", "."):
+        return None, "path must name something inside the tower root"
+    return display, None
+
+
+def completion_events(root: Path, task_id: str) -> list[dict]:
+    """Payloads of the ``COMPLETION_ADDED`` events naming ``task_id``.
+
+    Read-only.  Rows that are not JSON objects are ignored by
+    :func:`ledger_events_in_seq_order`; a broken ledger is reported by
+    ``state-verify`` / ``verify-ledger`` instead.
+    """
+    payloads: list[dict] = []
+    for event in ledger_events_in_seq_order(root, "primary"):
+        if event.get("type") != COMPLETION_ADDED:
+            continue
+        payload = event.get("payload")
+        if isinstance(payload, dict) and payload.get("task") == task_id:
+            payloads.append(payload)
+    return payloads
+
+
 def allowed_repo_path(allowed: str, worktree_rel: str, tower_rel: str) -> str | None:
     """Map one tower-relative ``allowed_paths`` entry to a worktree-relative path.
 
@@ -2085,10 +2155,34 @@ def allowed_repo_path(allowed: str, worktree_rel: str, tower_rel: str) -> str | 
     return f"{tower_rel}/{text}" if tower_rel else text
 
 
-def deliver_scope(root: Path, rec: dict) -> tuple[list[str], list[str], str | None]:
-    """Check the task worktree diff against ``rec["allowed_paths"]``.
+def _dispatch_base_sha(rec: dict) -> str | None:
+    """The recorded immutable deliver baseline, or None for a legacy record."""
+    dispatch = rec.get("dispatch")
+    if not isinstance(dispatch, dict):
+        return None
+    value = dispatch.get("base_sha")
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
 
-    Returns ``(errors, scope_files, skipped_reason)``:
+
+def completion_paths(rec: dict) -> list[str]:
+    """Well-formed ``record.completions`` paths, in recorded order."""
+    values: list[str] = []
+    completions = rec.get("completions")
+    for entry in completions if isinstance(completions, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        path = entry.get("path")
+        if isinstance(path, str) and path.strip():
+            values.append(path)
+    return values
+
+
+def deliver_scope(root: Path, rec: dict) -> tuple[list[str], list[str], str | None, list[str]]:
+    """Check the task worktree diff against the deliver allow-list.
+
+    Returns ``(errors, scope_files, skipped_reason, completions_used)``:
 
     * ``skipped_reason`` is set only when the tower root is outside any git
       repository (fixtures / legacy towers), where a diff cannot be computed.
@@ -2096,6 +2190,8 @@ def deliver_scope(root: Path, rec: dict) -> tuple[list[str], list[str], str | No
       cannot be inspected must not be delivered silently.
     * ``scope_files`` holds the changed paths as reported by the worktree
       repository (already relative to its root) when the check ran.
+    * ``completions_used`` is the subset of the mapped ``record.completions``
+      paths that the diff actually touched.
 
     The worktree must be the root of a linked worktree of the authority
     repository: a ``rev-parse`` success alone is not enough, because a nested
@@ -2105,47 +2201,69 @@ def deliver_scope(root: Path, rec: dict) -> tuple[list[str], list[str], str | No
     an out-of-scope file into an allowed path must show both the deleted and
     the added path, otherwise only the allowed target would be inspected.
 
+    PILOT-042 extends the gate in two ways:
+
+    * ``record.completions`` (owner-signed entries recorded by
+      ``completion-add``) joins the allow-list through the same
+      :func:`allowed_repo_path` mapping as ``allowed_paths``.  It never widens
+      any other gate.
+    * When ``record.dispatch.base_sha`` is recorded, the diff is taken from
+      that anchored commit after proving it is an ancestor of HEAD.  Rewriting
+      the local ``main`` ref therefore cannot empty the diff.  A legacy record
+      without ``base_sha`` keeps the PILOT-041 ``merge-base main HEAD``
+      baseline.
+
     The check runs before any evidence is copied, so a rejected delivery
     writes nothing.
     """
     repo = authority_repo(root)
     if repo is None:
-        return [], [], DELIVER_SCOPE_SKIPPED
+        return [], [], DELIVER_SCOPE_SKIPPED, []
     worktree_rel = str(rec.get("worktree") or "").strip()
     if not worktree_rel:
-        return ["worktree missing: (empty); scope check cannot run"], [], None
+        return ["worktree missing: (empty); scope check cannot run"], [], None, []
     worktree = ensure_within(root, root / worktree_rel, label="worktree")
     try:
         toplevel = git_ok(worktree, "rev-parse", "--show-toplevel")
     except RuntimeError as exc:
-        return [f"worktree is not a git repository: {worktree_rel} ({exc})"], [], None
+        return [f"worktree is not a git repository: {worktree_rel} ({exc})"], [], None, []
     if Path(toplevel).resolve() != worktree.resolve():
         return [f"worktree is not the repository root: {worktree_rel} "
-                f"(toplevel: {toplevel})"], [], None
+                f"(toplevel: {toplevel})"], [], None, []
     try:
         repo_git_dir = Path(git_ok(repo, "rev-parse", "--absolute-git-dir")).resolve()
         worktree_git_dir = Path(
             git_ok(worktree, "rev-parse", "--absolute-git-dir")).resolve()
     except RuntimeError as exc:
-        return [f"scope repository identity unavailable: {exc}"], [], None
+        return [f"scope repository identity unavailable: {exc}"], [], None, []
     if (worktree_git_dir == repo_git_dir
             or repo_git_dir not in worktree_git_dir.parents):
         return [f"worktree is not a worktree of the tower repository: "
-                f"{worktree_rel} (git dir: {worktree_git_dir.as_posix()})"], [], None
-    try:
-        merge_base = git_ok(worktree, "merge-base", "main", "HEAD")
-    except RuntimeError as exc:
-        return [f"scope baseline unavailable: merge-base main HEAD failed in "
-                f"{worktree_rel} ({exc})"], [], None
-    diff = git(worktree, "diff", "--name-only", "--no-renames",
-               f"{merge_base}..HEAD")
+                f"{worktree_rel} (git dir: {worktree_git_dir.as_posix()})"], [], None, []
+    base_sha = _dispatch_base_sha(rec)
+    if base_sha is not None:
+        # Fail closed on ANY non-zero status: a bad/unreadable object is as
+        # untrustworthy as a commit that is not an ancestor of HEAD.
+        ancestor = git(worktree, "merge-base", "--is-ancestor", base_sha, "HEAD")
+        if ancestor.returncode != 0:
+            return [f"scope baseline is not an ancestor of HEAD: {base_sha} "
+                    f"({command_failure(ancestor)})"], [], None, []
+        diff_range = f"{base_sha}..HEAD"
+    else:
+        try:
+            merge_base = git_ok(worktree, "merge-base", "main", "HEAD")
+        except RuntimeError as exc:
+            return [f"scope baseline unavailable: merge-base main HEAD failed in "
+                    f"{worktree_rel} ({exc})"], [], None, []
+        diff_range = f"{merge_base}..HEAD"
+    diff = git(worktree, "diff", "--name-only", "--no-renames", diff_range)
     if diff.returncode != 0:
-        return [f"scope diff failed: git diff --no-renames {merge_base}..HEAD "
-                f"({command_failure(diff)})"], [], None
+        return [f"scope diff failed: git diff --no-renames {diff_range} "
+                f"({command_failure(diff)})"], [], None, []
     changed = [line.strip() for line in diff.stdout.splitlines() if line.strip()]
     status = git(worktree, "status", "--porcelain", "--untracked-files=no")
     if status.returncode != 0:
-        return [f"scope status failed: git status ({command_failure(status)})"], [], None
+        return [f"scope status failed: git status ({command_failure(status)})"], [], None, []
     # Untracked files are deliberately not inspected (``scratch/`` is allowed);
     # tracked-but-uncommitted changes are, because they would ship outside the
     # reviewed diff.
@@ -2158,10 +2276,43 @@ def deliver_scope(root: Path, rec: dict) -> tuple[list[str], list[str], str | No
          for entry in (rec.get("allowed_paths") or []))
         if mapped
     }
+    # PILOT-042: owner-signed completions join the allow-list, mapped exactly
+    # like allowed_paths so worktree paths and elsewhere-in-tower paths both
+    # resolve to the worktree-relative spelling the diff uses.
+    completion_allowed = {
+        mapped for mapped in
+        (allowed_repo_path(entry, worktree_rel, tower_rel)
+         for entry in completion_paths(rec))
+        if mapped
+    }
+    completions_used = sorted(path for path in changed
+                              if path in completion_allowed)
     for path in changed:
-        if path not in allowed:
+        if path not in allowed and path not in completion_allowed:
             errors.append(f"out of scope change: {path} (not in allowed_paths)")
-    return errors, changed, None
+    return errors, changed, None, completions_used
+
+
+def dispatch_base_sha(root: Path, worktree: Path) -> str | None:
+    """``git rev-parse main`` of the tower repository, or None.
+
+    PILOT-042 anchors every dispatch to the base commit the branch was cut
+    from, so ``deliver`` does not depend on a mutable local ``main`` ref.  A
+    tower outside git (fixtures / legacy) simply records ``None``: that must
+    not block a dispatch, it only selects the 041 fallback at deliver time.
+    """
+    candidates: list[Path] = []
+    repo = authority_repo(root)
+    if repo is not None:
+        candidates.append(repo)
+    candidates.append(worktree)
+    for candidate in candidates:
+        cp = git(candidate, "rev-parse", "--verify", "main^{commit}")
+        if cp.returncode == 0:
+            sha = cp.stdout.strip()
+            if sha:
+                return sha
+    return None
 
 
 def cmd_dispatch(root: Path, args) -> None:
@@ -2186,7 +2337,8 @@ def cmd_dispatch(root: Path, args) -> None:
     model = dispatch_provenance_field(args.model, "model")
     parent = dispatch_provenance_field(args.parent, "parent")
     dispatch = {"executor": args.executor, "worktree": worktree, "at": now(),
-                "kind": kind, "model": model, "parent": parent}
+                "kind": kind, "model": model, "parent": parent,
+                "base_sha": dispatch_base_sha(root, worktree_path)}
     rec["executor"] = args.executor
     rec["dispatch"] = dispatch
     rec["status"] = "dispatched"
@@ -2204,8 +2356,9 @@ def cmd_deliver(root: Path, args) -> None:
         fail([f"task status {rec.get('status')} cannot deliver"])
     # PILOT-041: gate the worktree diff against allowed_paths *before* any
     # evidence is copied, so a rejected delivery leaves the record and the
-    # evidence directory untouched.
-    scope_errors, scope_files, scope_skipped = deliver_scope(root, rec)
+    # evidence directory untouched.  PILOT-042 lets recorded completions join
+    # that allow-list and reports the ones the diff actually used.
+    scope_errors, scope_files, scope_skipped, scope_completions = deliver_scope(root, rec)
     if scope_errors:
         fail(scope_errors)
     tdir = task_dir(root, args.task)
@@ -2252,11 +2405,129 @@ def cmd_deliver(root: Path, args) -> None:
         result["scope_check"] = "checked"
         result["scope_checked"] = True
         result["scope_files"] = scope_files
+        result["scope_completions"] = scope_completions
     else:
         result["scope_check"] = scope_skipped
         result["scope_checked"] = False
         result["scope_files"] = []
+        result["scope_completions"] = []
     emit(result)
+
+
+def cmd_completion_add(root: Path, args) -> None:
+    """Record one owner-signed completion (record half + ledger half).
+
+    A completion authorises one tower-root-relative path for a task whose
+    frozen spec did not list it.  It is written twice, like every other
+    control-plane fact: ``record.completions`` (the working copy) and one
+    ``COMPLETION_ADDED`` event in ``ledger/primary.jsonl`` (the authority).
+    Delivery folds the completions into its allow-list; no other gate reads
+    them.
+
+    Every validation runs before the first write, so a non-owner caller, an
+    empty reason/decision or a rejected path leaves the tower byte-identical.
+    The read-decide-write section then runs under the ledger lock, which makes
+    the pair idempotent: both halves present is ``already=true`` with no
+    duplicate event, and re-running repairs exactly the missing half with
+    ``repaired=true`` (the event half is authoritative, so "event only" must
+    not append a second event).
+    """
+    tid = check_task_id(args.task)
+    rec = load_record(root, tid)
+    _, primary_state = _read_json_object(root / "primary" / "CURRENT_STATE.json")
+    primary_state = primary_state if isinstance(primary_state, dict) else {}
+    owner = _state_owner_name(primary_state)
+    errors: list[str] = []
+    if not owner:
+        errors.append("primary/CURRENT_STATE.json has no owner.name")
+    elif args.by != owner:
+        errors.append(f"only the registered owner may record a completion: "
+                      f"--by {args.by!r} != owner {owner!r}")
+    reason = args.reason.strip() if isinstance(args.reason, str) else ""
+    if not reason:
+        errors.append("--reason must be a non-empty string")
+    decision = args.decision.strip() if isinstance(args.decision, str) else ""
+    if not decision:
+        errors.append("--decision must be a non-empty string")
+    path, path_error = _norm_tower_rel(root, args.path)
+    if path_error:
+        errors.append(path_error)
+    if rec.get("status") not in COMPLETION_TASK_STATUSES:
+        errors.append(f"task status {rec.get('status')} cannot record a "
+                      f"completion (allowed: "
+                      f"{', '.join(COMPLETION_TASK_STATUSES)})")
+    if errors:
+        fail(errors)
+    assert path is not None
+    at = now()
+    entry = {"task": tid, "path": path, "by": owner, "reason": reason,
+             "decision": decision, "at": at}
+    with ledger_lock(root):
+        # Re-read inside the critical section: the status may have changed and
+        # the other half may exist already.
+        current = load_record(root, tid)
+        if current.get("status") not in COMPLETION_TASK_STATUSES:
+            fail([f"task status {current.get('status')} cannot record a "
+                  f"completion (allowed: "
+                  f"{', '.join(COMPLETION_TASK_STATUSES)})"])
+        completions = current.get("completions")
+        completions = completions if isinstance(completions, list) else []
+        record_entries = [item for item in completions if isinstance(item, dict)]
+        existing_entry = next(
+            (item for item in record_entries if item.get("path") == path), None)
+        events = completion_events(root, tid)
+        existing_event = next(
+            (payload for payload in events if payload.get("path") == path), None)
+        if existing_event is not None and existing_entry is not None:
+            emit({"ok": True, "task": tid, "path": path, "already": True,
+                  "repaired": False, "event": COMPLETION_ADDED,
+                  "events": len(events), "completions": len(completions),
+                  "entry": existing_entry}, 0)
+        if existing_event is not None:
+            # Event without record: rebuild the record half from the event so
+            # the two stay isomorphic; the event count must not change.
+            payload = existing_event
+            repaired = {
+                "task": tid, "path": path, "by": payload.get("by"),
+                "reason": payload.get("reason"),
+                "decision": payload.get("decision"), "at": payload.get("at"),
+            }
+            completions.append(repaired)
+            current["completions"] = completions
+            save_record(root, current)
+            emit({"ok": True, "task": tid, "path": path, "already": False,
+                  "repaired": True, "event": COMPLETION_ADDED,
+                  "events": len(events), "completions": len(completions),
+                  "entry": repaired}, 0)
+        if existing_entry is not None:
+            # Record without event: the record is not the authority, so append
+            # the backing event from the recorded entry (record unchanged).
+            def _text(key: str, fallback: str) -> str:
+                value = existing_entry.get(key)
+                return value.strip() if isinstance(value, str) and value.strip() \
+                    else fallback
+            payload = {
+                "task": tid, "path": path,
+                "by": _text("by", owner),
+                "reason": _text("reason", reason),
+                "decision": _text("decision", decision),
+                "at": _text("at", at),
+            }
+            _append_ledger_event_locked(
+                root, LEDGER_FILES["primary"], COMPLETION_ADDED, "primary", payload)
+            emit({"ok": True, "task": tid, "path": path, "already": False,
+                  "repaired": True, "event": COMPLETION_ADDED,
+                  "events": len(events) + 1, "completions": len(completions),
+                  "entry": existing_entry}, 0)
+        _append_ledger_event_locked(
+            root, LEDGER_FILES["primary"], COMPLETION_ADDED, "primary", entry)
+        completions.append(entry)
+        current["completions"] = completions
+        save_record(root, current)
+        emit({"ok": True, "task": tid, "path": path, "already": False,
+              "repaired": False, "event": COMPLETION_ADDED,
+              "events": len(events) + 1, "completions": len(completions),
+              "entry": entry}, 0)
 
 
 def cmd_checkback(root: Path, args) -> None:
@@ -4825,6 +5096,87 @@ def _authority_state_drift(root: Path, skip) -> list[dict]:
     return rows
 
 
+def _completion_drift(root: Path, task_id: str, record: dict,
+                      events: list[dict]) -> list[dict]:
+    """PILOT-042: audit ``record.completions`` against COMPLETION_ADDED events.
+
+    A completion is only trustworthy when both halves exist and name the same
+    path:
+
+    * record path without an event -> ``completion_unbacked`` (``target`` is
+      the task, ``expected`` is the path);
+    * event path without a record entry -> ``completion_missing``;
+    * an entry or event whose ``path``/``by``/``reason``/``decision`` is not a
+      non-empty string, or whose path is absolute / contains ``..`` / escapes
+      the tower root -> ``completion_invalid``.
+
+    A task without completions (legacy record) yields no row at all, so old
+    towers verify exactly as before.  Read-only: only string normalisation and
+    the already-parsed ledger payloads are used.
+    """
+    drift: list[dict] = []
+    completions = record.get("completions")
+    if completions is None:
+        completions = []
+    if not isinstance(completions, list):
+        drift.append({"kind": "completion_invalid", "target": task_id,
+                      "path": None, "expected": "list of completion entries",
+                      "actual": "not a list"})
+        completions = []
+
+    event_paths: set[str] = set()
+    for payload in events:
+        raw_path = payload.get("path")
+        normalized, error = _norm_tower_rel(root, raw_path)
+        if error:
+            drift.append({"kind": "completion_invalid", "target": task_id,
+                          "path": raw_path if isinstance(raw_path, str) else None,
+                          "expected": "well-formed COMPLETION_ADDED path",
+                          "actual": error})
+            continue
+        event_paths.add(normalized)
+
+    record_paths: set[str] = set()
+    for entry in completions:
+        if not isinstance(entry, dict):
+            drift.append({"kind": "completion_invalid", "target": task_id,
+                          "path": None,
+                          "expected": "well-formed completion entry",
+                          "actual": "invalid entry"})
+            continue
+        raw_path = entry.get("path")
+        normalized, error = _norm_tower_rel(root, raw_path)
+        display = normalized if normalized is not None else (
+            raw_path if isinstance(raw_path, str) else None)
+        path_field_ok = isinstance(raw_path, str) and bool(raw_path.strip())
+        invalid = False
+        for field in COMPLETION_ENTRY_FIELDS:
+            value = entry.get(field)
+            if not isinstance(value, str) or not value.strip():
+                drift.append({"kind": "completion_invalid", "target": task_id,
+                              "path": display,
+                              "expected": f"non-empty string {field}",
+                              "actual": None if value is None else value})
+                invalid = True
+        if path_field_ok and error:
+            drift.append({"kind": "completion_invalid", "target": task_id,
+                          "path": display,
+                          "expected": "tower-root-relative path inside the tower",
+                          "actual": error})
+            invalid = True
+        if not invalid:
+            record_paths.add(normalized)
+    for path in sorted(record_paths - event_paths):
+        drift.append({"kind": "completion_unbacked", "target": task_id,
+                      "path": path, "expected": path,
+                      "actual": "no COMPLETION_ADDED event"})
+    for path in sorted(event_paths - record_paths):
+        drift.append({"kind": "completion_missing", "target": task_id,
+                      "path": path, "expected": "record.completions entry",
+                      "actual": "missing"})
+    return drift
+
+
 def state_verify_drift(root: Path) -> dict:
     """Compare replayed state with records, board, queue and envelopes.
 
@@ -4855,6 +5207,11 @@ def state_verify_drift(root: Path) -> dict:
     ``evidence`` entries and frozen ``spec_path``/``spec_sha256`` verified
     against the bytes on disk.  ``evidence_checked`` counts only the evidence
     entries whose bytes were actually hashed.
+
+    PILOT-042 adds the completion audit: a record's ``completions`` must be
+    backed path-for-path by ``COMPLETION_ADDED`` events and every event must
+    have its record entry (``completion_unbacked`` / ``completion_missing`` /
+    ``completion_invalid``).  A task without completions produces no row.
     """
     transitions: list[dict] = []
     task_states = replay_task_statuses(root, transitions)
@@ -4862,6 +5219,16 @@ def state_verify_drift(root: Path) -> dict:
     drift: list[dict] = list(transitions)
     skipped: list[dict] = []
     evidence_checked = 0
+    completion_events_by_task: dict[str, list[dict]] = {}
+    for event in ledger_events_in_seq_order(root, "primary"):
+        if event.get("type") != COMPLETION_ADDED:
+            continue
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        owner_task = payload.get("task")
+        if isinstance(owner_task, str) and owner_task:
+            completion_events_by_task.setdefault(owner_task, []).append(payload)
 
     def skip(kind: str, target: str, reason: str) -> None:
         skipped.append({"kind": kind, "target": target, "reason": reason})
@@ -4949,6 +5316,9 @@ def state_verify_drift(root: Path) -> dict:
                 drift.extend(entry_drift)
                 evidence_checked += checked
             drift.extend(_spec_drift(root, task_id, record))
+            drift.extend(_completion_drift(
+                root, task_id, record,
+                completion_events_by_task.get(task_id, [])))
         if board is None:
             continue
         board_entry = board_tasks.get(task_id)
@@ -5198,6 +5568,15 @@ def build_parser() -> argparse.ArgumentParser:
     de.add_argument("--task", required=True)
     de.add_argument("--evidence", action="append", required=True)
 
+    ca = sub.add_parser("completion-add")
+    ca.add_argument("--task", required=True)
+    ca.add_argument("--path", required=True,
+                    help="tower-root-relative path the branch legitimately needs")
+    ca.add_argument("--by", required=True,
+                    help="must equal primary/CURRENT_STATE.json owner.name")
+    ca.add_argument("--reason", required=True)
+    ca.add_argument("--decision", required=True)
+
     cb = sub.add_parser("checkback")
     cb.add_argument("--task", required=True)
     cb.add_argument("--reviewer", required=True)
@@ -5235,6 +5614,7 @@ def main() -> None:
         "spec-approve": cmd_spec_approve,
         "task-next": cmd_task_next,
         "hash": cmd_hash, "dispatch": cmd_dispatch, "deliver": cmd_deliver,
+        "completion-add": cmd_completion_add,
         "checkback": cmd_checkback, "accept": cmd_accept, "close": cmd_close,
         "supervision-init": cmd_supervision_init, "supervision-status": cmd_supervision_status,
         "supervision-phase": cmd_supervision_phase,
