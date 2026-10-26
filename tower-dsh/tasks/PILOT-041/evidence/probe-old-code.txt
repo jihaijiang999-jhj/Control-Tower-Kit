@@ -1,0 +1,36 @@
+PILOT-041 old-code comparison (main towerctl has no scope gate)
+===============================================================
+old source: git show main:tower-dsh/tools/towerctl.py
+main commit: f63258fcfa97de1aad91721afc29e1727b46b181
+old file: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-041\scratch\old\towerctl.py
+old bytes: 228560
+old sha256: 59846ab1c07c7403d4bb1cf509e62e2b32cecafc4d489fc8337f50d7233b4d5e
+old contains 'deliver_scope': False
+old contains 'scope_checked': False
+old executed with PYTHONPATH=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-041\tower-dsh\tools (spec_coverage.py/spec_lint.py are unchanged from main; only towerctl.py differs)
+
+case: additive
+  allowed_paths: ['pilot/worktrees/TEST-041/tower-dsh/tools/x.py']
+  rename-aware diff: ['tower-dsh/tools/x.py', 'tower-dsh/tools/y.py']
+  --no-renames diff: ['tower-dsh/tools/x.py', 'tower-dsh/tools/y.py']
+  NEW tool:
+    exit=2
+    stdout={"ok": false, "errors": ["out of scope change: tower-dsh/tools/y.py (not in allowed_paths)"]}
+      error: out of scope change: tower-dsh/tools/y.py (not in allowed_paths)
+  OLD tool:
+    exit=0
+    stdout={"ok": true, "task": "TEST-041", "status": "delivered", "evidence": 1}
+
+case: rename
+  allowed_paths: ['pilot/worktrees/TEST-041/tower-dsh/tools/new.py']
+  rename-aware diff: ['tower-dsh/tools/new.py']
+  --no-renames diff: ['tower-dsh/pilot/other.json', 'tower-dsh/tools/new.py']
+  NEW tool:
+    exit=2
+    stdout={"ok": false, "errors": ["out of scope change: tower-dsh/pilot/other.json (not in allowed_paths)"]}
+      error: out of scope change: tower-dsh/pilot/other.json (not in allowed_paths)
+  OLD tool:
+    exit=0
+    stdout={"ok": true, "task": "TEST-041", "status": "delivered", "evidence": 1}
+
+conclusion: the old tool delivers both the additive and the renamed out-of-scope worktree with exit 0 (no scope check); the new tool fails closed with exit 2 and writes no evidence.  The rename case additionally shows why the diff must be collected with --no-renames: rename detection reports only the new (allowed) path.

@@ -1,0 +1,29 @@
+PILOT-041 residual-risk check (read-only, no tower write command run)
+=====================================================================
+Why: §6.11 minimal completion added tower-dsh/tools/tests/test_deliver_ids.py
+to the branch, but spec v2 allowed_paths lists only towerctl.py and
+test_deliver_scope.py.  Because the scope gate compares the *whole* worktree
+diff with allowed_paths, delivering this branch with the current PILOT-041
+record will be rejected.
+
+Method: imported the worktree tools/towerctl.py (read-only), loaded the real
+record tasks/PILOT-041/record.json, and called deliver_scope(root, rec) with
+root = <tower root>.  No state file, ledger, evidence or record was written;
+only read-only git queries ran.  Re-run after the review hardening
+(--no-renames diff, toplevel == worktree, linked worktree of the tower repo):
+the real linked worktree passes both new identity checks.
+
+Observed (HEAD fa84fbe):
+  skipped = None
+  changed = ['tower-dsh/tools/tests/test_deliver_ids.py',
+             'tower-dsh/tools/tests/test_deliver_scope.py',
+             'tower-dsh/tools/towerctl.py']
+  allowed = ['tower-dsh/tools/tests/test_deliver_scope.py',
+             'tower-dsh/tools/towerctl.py']
+  errors  = ['out of scope change: tower-dsh/tools/tests/test_deliver_ids.py '
+             '(not in allowed_paths)']
+
+Consequence: `towerctl deliver --task PILOT-041 ...` on this branch exits 2
+until the card's allowed_paths is amended through the proper spec/§6.11
+process (hand-editing allowed_paths is forbidden by the task card).  This is
+the open decision left for the controller; the executor did not run deliver.

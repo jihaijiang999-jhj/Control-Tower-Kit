@@ -1,0 +1,29 @@
+=== HEAD ===
+fa84fbe92aa4ce872c26da6f74be769e26942675
+
+=== TITLE ===
+PILOT-041 review fix: reject renamed out-of-scope paths and rewired worktrees
+
+=== LOG main..HEAD ===
+fa84fbe PILOT-041 review fix: reject renamed out-of-scope paths and rewired worktrees
+039bae6 PILOT-041: deliver scope gate (diff subset of allowed_paths) + dispatch provenance
+
+=== SHOW HEAD ===
+commit fa84fbe92aa4ce872c26da6f74be769e26942675
+Author:     mac <mac@local>
+AuthorDate: Mon Oct 26 18:37:09 2026 +0800
+Commit:     mac <mac@local>
+CommitDate: Mon Oct 26 18:37:09 2026 +0800
+
+    PILOT-041 review fix: reject renamed out-of-scope paths and rewired worktrees
+    
+    - collect the worktree diff with --no-renames so a rename shows both the deleted and the added side
+    
+    - require the worktree to be the repository root and a linked worktree of the tower repository; rev-parse success alone let a nested checkout or a rewired .git deliver an empty diff
+
+ tower-dsh/tools/tests/test_deliver_scope.py | 81 +++++++++++++++++++++++++++++
+ tower-dsh/tools/towerctl.py                 | 28 ++++++++--
+ 2 files changed, 106 insertions(+), 3 deletions(-)
+
+=== STATUS ===
+?? scratch/

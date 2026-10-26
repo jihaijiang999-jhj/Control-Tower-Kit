@@ -1,0 +1,153 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-041",
+  "title": "执行契约 L1 v2：deliver 校验 worktree diff ⊆ allowed_paths；dispatch 记录 kind/model/parent",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "cmd_deliver 增加范围校验（在复制证据之前执行，失败则零写入）：若塔根不在 git 仓库内（authority_repo(root) is None，夹具/旧塔）→ 跳过并输出 scope_check=\"skipped (no git repo)\"；若塔根在 git 仓库内 → 对 rec.worktree 执行 git rev-parse --show-toplevel，失败即 exit 2（fail closed）",
+    "基线与 diff：在 worktree 内用 git merge-base main HEAD 取分支点，git diff --name-only <merge-base>..HEAD 得到 repo 相对改动集；main 缺失或 merge-base 失败即 exit 2",
+    "allowed_paths 映射（v2 修正）：allowed 路径是塔根相对（形如 pilot/worktrees/<ID>/tower-dsh/tools/x.py）。若 A 以 <worktree_rel>/ 开头（worktree_rel = rec.worktree，如 pilot/worktrees/PILOT-041），则 repo_path = A 去掉 <worktree_rel>/ 后的剩余部分——**该剩余部分已经是 repo 相对（worktree 根就是 repo 根），不得再叠加 <tower_rel>**；若 A 不以 <worktree_rel>/ 开头（例如 pilot/PILOT-041.spec.json），则 repo_path = <tower_rel>/<A>，<tower_rel> 由 repo_relative(repo, root) 动态计算（tower 根即 repo 根时为空串）",
+    "越界判定：改动集必须是映射后 allowed 集的子集；否则 exit 2，errors 列出每个越界文件；同时要求 git status --porcelain --untracked-files=no 为空（已跟踪文件不得未提交），未跟踪的 scratch/ 允许；deliver 输出增加 scope_check / scope_files / scope_checked 字段（成功时可见）",
+    "cmd_dispatch 增加 --kind（默认 subagent）、--model、--parent 三个可选参数；写入 record.dispatch 与 DISPATCH ledger payload（{executor, worktree, at, kind, model, parent}）；kind 非空字符串校验；缺省保持向后兼容",
+    "新增 tools/tests/test_deliver_scope.py：git 仓库 + 塔根 + 真实 worktree 的夹具——只改 allowed 文件 → deliver exit 0 且输出 scope_checked=true；多改一个 allowed 外文件 → exit 2、record 仍 dispatched、证据零写入；已跟踪文件未提交 → exit 2；未跟踪 scratch/ → 放行；非 git 夹具塔 → 输出 skipped 且 deliver 照常；dispatch 三个新字段写入 record 与 ledger；另测一条“allowed 同时含 worktree 内路径与塔根其他路径（如 pilot/xxx.spec.json）”、两种映射都正确",
+    "旧码对照：main 版 towerctl 在同一越界夹具上 deliver exit 0（无范围检查），新码 exit 2；证据写进 scratch/probe-old-code.txt",
+    "真实塔验证：用 worktree 新工具跑 authority-check/state-verify（configured+required、drift []）；建信封前 tasks=41/envelopes=40，建信封后 41/41",
+    "不改 036–040 已建立的信任边界/授权/前置链/空账本语义；不改 envelope-new / queue-add / merge / post-merge；不手写 ledger 或允许手改 allowed_paths"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-041/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-041/tower-dsh/tools/tests/test_deliver_scope.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "hand-editing state/AUTHORITY.json, shared/AUTHORITY_POLICY.json or ledger/*.jsonl",
+    "silently skipping the scope check when the worktree is a git repository",
+    "treating an uncommitted tracked change as in-scope",
+    "changing legacy (no baseline) envelope semantics"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-041/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 371 + 新增用例数（main 基线 371）",
+    "git 夹具：只改 allowed 内文件并 commit → deliver exit 0，输出 scope_checked=true、scope_files 含该文件；record 变 delivered",
+    "同夹具多改一个 allowed 外文件并 commit → deliver exit 2，errors 列出越界文件，record 仍 dispatched、evidence 为空（零写入），无 DELIVER 事件",
+    "已跟踪文件有未提交改动 → deliver exit 2（tracked dirt），未跟踪 scratch/ 存在不影响",
+    "非 git 夹具塔（authority_repo 为 None）→ deliver 照常 exit 0，输出 scope_check=skipped (no git repo)",
+    "worktree 是 git 仓库但取不到 merge-base/main → deliver exit 2（fail closed），不静默跳过",
+    "映射正确性：allowed 同时含 worktree 内路径（pilot/worktrees/<ID>/tower-dsh/tools/x.py）与塔根其他路径（pilot/<ID>.spec.json）时，前者映射为 tower-dsh/tools/x.py、后者映射为 tower-dsh/pilot/<ID>.spec.json；两种都被正确接受/拒绝",
+    "dispatch --kind external --model m1 --parent p1 → record.dispatch 与 DISPATCH ledger payload 均含四个字段；不带新参数时行为与旧版一致（只多默认 kind=subagent 或完全兼容）",
+    "旧码对照：main 版工具在越界夹具 deliver exit 0，新码 exit 2；证据写进 scratch/probe-old-code.txt",
+    "真实塔：worktree 新工具 authority-check exit 0（configured+required）、state-verify drift []；建信封前 tasks=41/envelopes=40，建信封后 41/41；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-041 diff --name-only main..HEAD 恰两个 allowed_paths（towerctl.py、test_deliver_scope.py）"
+  ],
+  "depends_on": [
+    "PILOT-040"
+  ],
+  "worktree": "pilot/worktrees/PILOT-041",
+  "spec_path": "pilot/PILOT-041.spec.json",
+  "spec_sha256": "d47003f37eaa0ef369476a067ea12055dac13cd537ee8e0e140761ed1b8b9730",
+  "spec_gate": "PASS",
+  "executor": "subagent:eea7c311-4511-404e-96a6-c27f4079742e",
+  "dispatch": {
+    "executor": "subagent:eea7c311-4511-404e-96a6-c27f4079742e",
+    "worktree": "pilot/worktrees/PILOT-041",
+    "at": "2026-10-26T17:53:18+08:00"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-041/evidence/towerctl.py",
+      "sha256": "47527ca27d275bacb31e627b7c85d3d7d7c9e46dc0fb9d9b8380e3b6644a7cc3",
+      "bytes": 236102,
+      "at": "2026-10-26T18:41:39+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-041/evidence/test_deliver_scope.py",
+      "sha256": "4875ed6deaf2b8eba6412363edebe86dfdf631428a3a2fbb19bb8b3759ef3bb9",
+      "bytes": 27749,
+      "at": "2026-10-26T18:41:39+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-041/evidence/test_deliver_ids.py",
+      "sha256": "d162f988576fa7a0d40185bc82f33c97c4c657f3bcbc115cea65d70a8ea32e3e",
+      "bytes": 9824,
+      "at": "2026-10-26T18:41:39+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-041/evidence/test-output.txt",
+      "sha256": "baa14097ab4e0c28ec01d31dedace354a5cce56c0f80300f125b53a7a52e0d79",
+      "bytes": 55791,
+      "at": "2026-10-26T18:41:39+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-041/evidence/deliver_scope_probe.py",
+      "sha256": "053f144c1c056cf901799824e4f9307158b3cea75b7a50e9b667f665d0719078",
+      "bytes": 12361,
+      "at": "2026-10-26T18:41:39+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-041/evidence/probe.txt",
+      "sha256": "08833cce013fdd7ab8bd5118726c3997dd9ddd9fd04e92835b20f6fb1e89fee6",
+      "bytes": 1806,
+      "at": "2026-10-26T18:41:39+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-041/evidence/probe-old-code.txt",
+      "sha256": "23ba8ad9abe978cea6ebc3edebb5c02c488e54f79898b8f7901f5b565c12efd2",
+      "bytes": 2177,
+      "at": "2026-10-26T18:41:39+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-041/evidence/commit.txt",
+      "sha256": "b89d5bf3c540a796993e3384393f8e5d0891802d66f175fa6861bf41a5e6b345",
+      "bytes": 1191,
+      "at": "2026-10-26T18:41:39+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-041/evidence/diff.txt",
+      "sha256": "655881d04709a5d32376de375addd6c8e8dc40ab2b4e62dd1ab4c08b0acb414c",
+      "bytes": 39753,
+      "at": "2026-10-26T18:41:39+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-041/evidence/real-tower-scope-simulation.txt",
+      "sha256": "27364db4a88ccc3ea96ebcd7e82cc0dc0274e8063860bcd96f25b2895c50a14b",
+      "bytes": 1630,
+      "at": "2026-10-26T18:41:39+08:00",
+      "id": "E-010"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:7d878b41-c0f6-4ddb-9a04-c1ca69ffb904",
+    "verdict": "PASS",
+    "note": "041 PASS（第二轮）。上轮唯一阻塞（rename 漏检）已修：`git diff --name-only --no-renames` 让 `git mv 外部 tracked 文件 → allowed 路径` 同时列出旧/新路径，deliver exit 2、errors 点名旧路径、record 仍 dispatched、证据零写入；反向 rename 仍拒；两侧都在 allowed 的 rename 放行（无过度误伤）；旧码同夹具 exit 0。同轮加固 toplevel/git-dir 身份检查：纯子目录、嵌套 git 仓库、foreign .git、同仓库 main gitdir、独立 clone 均 exit 2 且零写入，真实 linked worktree（含 --relative-paths）不被误伤。回归全绿：上轮 6 场景、dispatch 四字段/默认/空值拒绝、§6.11 断言；独立复核夹具 95 PASS/0 FAIL；亲跑 Ran 387 tests / OK(skipped=1)。证据 10/10 SHA-256+字节数一致、evidence/diff.txt 与 live diff 字节相同、spec 哈希一致；scope 3 文件（2 allowed + test_deliver_ids.py 的 §6.11 3/2 单点，本轮未再动）。真实塔只读：state-verify 41/40 drift []（skipped 3 VOID）、authority-check configured+required（13/13）、verify-ledger 0 error（primary 377/supervision 208）、coverage 27/27、lint 6/6、9 个关键文件哈希前后不变。bootstrap 判定：本卡交付仍用 main 版 pre-gate 工具（分支 3 文件 vs spec allowed 2；新门无法验证引入它自己的 commit），复核判为**一次性、有条件的例外**——closeout 记录、不追认不回填、后续卡必须走新门、尽快开 completion-list 机制卡；副作用：本卡 dispatch 仍旧三字段、DISPATCH seq 374 无 kind/model/parent、DELIVERY.md 无 scope 字段，均如实记录。残余（非阻塞）：①本地 main ref 可 update-ref 改写使 diff 为空仍能过门（已延期另卡，建议 dispatch 锚定 base_sha）；②独立 clone 被身份检查拒绝（兼容注记）；③塔仓本身是 linked worktree 时会被误拒（当前主 checkout 无影响，替代方向=common-dir/已注册 worktree 判定）；④identity 是路径前缀不是密码学边界；⑤rename 需两侧都在 allowed（保守）；⑥--absolute-git-dir 需 git>=2.13；⑦§6.11 subset 断言可再收紧为精确 7 键；⑧卡面 acceptance 仍写\"恰两个 allowed_paths\"（§6.11 stale，commit body 已记）。",
+    "at": "2026-10-26T18:52:15+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-041",
+    "actor": "owner",
+    "text": "second-round review PASS (387 tests, 10/10 hashes, rename + rewired worktree closed); bootstrap exception recorded",
+    "at": "2026-10-26T18:52:16+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-041/CLOSEOUT.md",
+    "at": "2026-10-26T18:52:16+08:00"
+  },
+  "created_at": "2026-10-26T17:52:56+08:00",
+  "updated_at": "2026-10-26T18:52:16+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-041/MERGE.md",
+  "delivered_at": "2026-10-26T18:41:39+08:00",
+  "accepted_at": "2026-10-26T18:52:16+08:00"
+}

@@ -401,7 +401,17 @@
       "reviewer": "subagent:3ecc3001-a65f-462b-a63d-3d8ee3e1cdd4",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-040/MERGE.md",
       "updated_at": "2026-10-26T12:11:44+08:00"
+    },
+    {
+      "id": "PILOT-041",
+      "title": "执行契约 L1 v2：deliver 校验 worktree diff ⊆ allowed_paths；dispatch 记录 kind/model/parent",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:eea7c311-4511-404e-96a6-c27f4079742e",
+      "reviewer": "subagent:7d878b41-c0f6-4ddb-9a04-c1ca69ffb904",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-041/MERGE.md",
+      "updated_at": "2026-10-26T18:52:16+08:00"
     }
   ],
-  "updated_at": "2026-10-26T12:11:44+08:00"
+  "updated_at": "2026-10-26T18:52:16+08:00"
 }

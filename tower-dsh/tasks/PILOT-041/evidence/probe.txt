@@ -1,0 +1,36 @@
+PILOT-041 deliver scope probe (rename fix included)
+===================================================
+
+case: additive
+  fixture: C:\Users\mac\AppData\Local\Temp\pilot041-probe-zv011eum\additive\kit\tower-dsh
+  allowed_paths: ['pilot/worktrees/TEST-041/tower-dsh/tools/x.py']
+  git diff --name-only main..HEAD: ['tower-dsh/tools/x.py', 'tower-dsh/tools/y.py']
+  git diff --name-only --no-renames main..HEAD: ['tower-dsh/tools/x.py', 'tower-dsh/tools/y.py']
+  NEW tool:
+    exit=2
+    stdout={"ok": false, "errors": ["out of scope change: tower-dsh/tools/y.py (not in allowed_paths)"]}
+      error: out of scope change: tower-dsh/tools/y.py (not in allowed_paths)
+    record.status after new = dispatched
+    evidence dir exists after new = False
+  OLD tool:
+    exit=0
+    stdout={"ok": true, "task": "TEST-041", "status": "delivered", "evidence": 1}
+    record.status after old = delivered
+
+case: rename
+  fixture: C:\Users\mac\AppData\Local\Temp\pilot041-probe-zv011eum\rename\kit\tower-dsh
+  allowed_paths: ['pilot/worktrees/TEST-041/tower-dsh/tools/new.py']
+  git diff --name-only main..HEAD: ['tower-dsh/tools/new.py']
+  git diff --name-only --no-renames main..HEAD: ['tower-dsh/pilot/other.json', 'tower-dsh/tools/new.py']
+  NEW tool:
+    exit=2
+    stdout={"ok": false, "errors": ["out of scope change: tower-dsh/pilot/other.json (not in allowed_paths)"]}
+      error: out of scope change: tower-dsh/pilot/other.json (not in allowed_paths)
+    record.status after new = dispatched
+    evidence dir exists after new = False
+  OLD tool:
+    exit=0
+    stdout={"ok": true, "task": "TEST-041", "status": "delivered", "evidence": 1}
+    record.status after old = delivered
+
+verdict: new rejects both fixtures with exit 2 and zero writes; old accepts both with exit 0
