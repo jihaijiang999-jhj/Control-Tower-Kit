@@ -411,7 +411,17 @@
       "reviewer": "subagent:7d878b41-c0f6-4ddb-9a04-c1ca69ffb904",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-041/MERGE.md",
       "updated_at": "2026-10-26T18:52:16+08:00"
+    },
+    {
+      "id": "PILOT-042",
+      "title": "授权完成清单（completion list）+ dispatch 锚定 base_sha 作为 deliver 基线",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:0abf19e6-b6d2-4807-b368-59b2f5d4ca5f",
+      "reviewer": "subagent:457986b8-942e-4c38-a696-aa6649938d3b",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-042/MERGE.md",
+      "updated_at": "2026-10-26T22:41:55+08:00"
     }
   ],
-  "updated_at": "2026-10-26T18:52:16+08:00"
+  "updated_at": "2026-10-26T22:41:55+08:00"
 }

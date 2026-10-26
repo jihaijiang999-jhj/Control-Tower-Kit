@@ -1,0 +1,21 @@
+PILOT-042 — executor commit
+HEAD: b1c6ffdca01986ae03a83f0ac52fe06916b8cfd8
+Title: PILOT-042: authorized completion list + dispatch base_sha anchoring
+Branch: pilot/PILOT-042
+Base: 3aab3791d822c123b010f0381dc61d7683eb3ae7 (main)
+
+test suite:
+  Ran 419 tests in 219.594s
+  OK (skipped=1)
+
+git diff --name-only main..HEAD:
+tower-dsh/tools/tests/test_completion_and_base.py
+tower-dsh/tools/towerctl.py
+
+git diff --stat main..HEAD:
+ tower-dsh/tools/tests/test_completion_and_base.py | 919 ++++++++++++++++++++++
+ tower-dsh/tools/towerctl.py                       | 478 +++++++++--
+ 2 files changed, 1348 insertions(+), 49 deletions(-)
+
+git status --short:
+?? scratch/

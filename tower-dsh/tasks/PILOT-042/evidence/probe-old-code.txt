@@ -1,0 +1,54 @@
+{
+  "probe": "PILOT-042 completion scope + base_sha anchor",
+  "tool": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-042\\scratch\\old\\towerctl.py",
+  "scenario_completion_path": {
+    "completion_add_supported": false,
+    "completion_add_exit": 2,
+    "changed_file": "tower-dsh/tools/helper.py",
+    "in_allowed_paths": false,
+    "deliver_exit": 2,
+    "deliver_ok": false,
+    "deliver_errors": [
+      "out of scope change: tower-dsh/tools/helper.py (not in allowed_paths)"
+    ],
+    "scope_completions": "<absent (pre-PILOT-042 tool)>"
+  },
+  "scenario_rewritten_main": {
+    "recorded_base_sha": "f20eac218dae85e28771ba70e8cfe2c908b0e950",
+    "head": "0d3edea11827b8af014ac0228ec11989bb601efc",
+    "rewritten_main": "0d3edea11827b8af014ac0228ec11989bb601efc",
+    "changed_file": "tower-dsh/pilot/other.json",
+    "in_allowed_paths": false,
+    "deliver_exit": 0,
+    "deliver_ok": true,
+    "deliver_errors": [],
+    "scope_completions": "<absent (pre-PILOT-042 tool)>"
+  },
+  "ok": true
+}
+
+
+== PILOT-042 old-vs-new comparison (same probe, same fixtures) ==
+
+fixture A -- branch changes tower-dsh/tools/helper.py, which is in neither
+allowed_paths nor (old tool) any completion list:
+  main-branch tool  (scratch/old/towerctl.py): deliver exit 2
+                    "out of scope change: tower-dsh/tools/helper.py (not in allowed_paths)"
+                    (there is no completion concept: the gate rejects the
+                    legitimate §6.11 authorization repair)
+  PILOT-042 tool    (tower-dsh/tools/towerctl.py): deliver exit 0,
+                    scope_completions = ["tower-dsh/tools/helper.py"]
+                    (completion-add recorded the path first)
+
+fixture B -- branch changes out-of-scope tower-dsh/pilot/other.json, then the
+worktree runs `git update-ref refs/heads/main HEAD`:
+  main-branch tool  (scratch/old/towerctl.py): deliver exit 0
+                    (merge-base main HEAD == HEAD -> empty diff; the rewrite
+                    hid the out-of-scope change)
+  PILOT-042 tool    (tower-dsh/tools/towerctl.py): deliver exit 2
+                    "out of scope change: tower-dsh/pilot/other.json (not in allowed_paths)"
+                    (diff anchored at the recorded dispatch.base_sha)
+
+reproduce:
+  python -B scratch/completion_base_probe.py > scratch/probe.txt
+  python -B scratch/completion_base_probe.py --tool scratch/old/towerctl.py > scratch/probe-old-code.txt

@@ -1,0 +1,31 @@
+{
+  "probe": "PILOT-042 completion scope + base_sha anchor",
+  "tool": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\tower-dsh\\pilot\\worktrees\\PILOT-042\\tower-dsh\\tools\\towerctl.py",
+  "scenario_completion_path": {
+    "completion_add_supported": true,
+    "completion_add_exit": 0,
+    "changed_file": "tower-dsh/tools/helper.py",
+    "in_allowed_paths": false,
+    "completion_add_already": false,
+    "deliver_exit": 0,
+    "deliver_ok": true,
+    "deliver_errors": [],
+    "scope_completions": [
+      "tower-dsh/tools/helper.py"
+    ]
+  },
+  "scenario_rewritten_main": {
+    "recorded_base_sha": "25434cfe222845eb8671771c4ce9c770d7f39ca7",
+    "head": "44df02a0833074846872ab85005b6903a791604c",
+    "rewritten_main": "44df02a0833074846872ab85005b6903a791604c",
+    "changed_file": "tower-dsh/pilot/other.json",
+    "in_allowed_paths": false,
+    "deliver_exit": 2,
+    "deliver_ok": false,
+    "deliver_errors": [
+      "out of scope change: tower-dsh/pilot/other.json (not in allowed_paths)"
+    ],
+    "scope_completions": "<absent (pre-PILOT-042 tool)>"
+  },
+  "ok": true
+}
