@@ -2033,6 +2033,115 @@ def cmd_hash(root: Path, args) -> None:
           "bytes": path.stat().st_size})
 
 
+DELIVER_SCOPE_SKIPPED = "skipped (no git repo)"
+
+
+def dispatch_provenance_field(value, label: str) -> str | None:
+    """Normalise an optional provenance flag: absent -> None, empty -> exit 2.
+
+    ``--model`` and ``--parent`` are optional, but passing them with an empty
+    (or whitespace-only) value is a caller mistake: silently recording nothing
+    would erase the provenance the flag exists to capture.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        fail([f"{label} must be a non-empty string when given"])
+    return text
+
+
+def allowed_repo_path(allowed: str, worktree_rel: str, tower_rel: str) -> str | None:
+    """Map one tower-relative ``allowed_paths`` entry to a worktree-relative path.
+
+    The diff collected by :func:`deliver_scope` is relative to the *worktree*
+    repository root (a ``git worktree`` checkout whose root is that repository
+    root).  ``allowed_paths`` entries, on the other hand, are relative to the
+    tower root.  Two shapes exist:
+
+    * ``pilot/worktrees/<ID>/tower-dsh/tools/x.py`` — inside the task worktree.
+      The worktree root *is* the repository root, so dropping the
+      ``<worktree_rel>/`` prefix already yields the worktree-relative path.
+      ``<tower_rel>`` must not be prepended again (the v1 mapping bug fixed in
+      PILOT-041 v2: it produced ``tower-dsh/tower-dsh/tools/x.py``).
+    * ``pilot/<ID>.spec.json`` — elsewhere in the tower.  Its worktree-relative
+      path is ``<tower_rel>/pilot/<ID>.spec.json``; ``<tower_rel>`` is empty
+      when the tower root is the repository root.
+    """
+    worktree_rel = str(worktree_rel or "").replace("\\", "/").strip().strip("/")
+    tower_rel = str(tower_rel or "").replace("\\", "/").strip().strip("/")
+    text = str(allowed or "").replace("\\", "/").strip()
+    while text.startswith("./"):
+        text = text[2:]
+    text = text.strip("/")
+    if not text:
+        return None
+    if worktree_rel:
+        prefix = worktree_rel + "/"
+        if text == worktree_rel:
+            return None
+        if text.startswith(prefix):
+            return text[len(prefix):] or None
+    return f"{tower_rel}/{text}" if tower_rel else text
+
+
+def deliver_scope(root: Path, rec: dict) -> tuple[list[str], list[str], str | None]:
+    """Check the task worktree diff against ``rec["allowed_paths"]``.
+
+    Returns ``(errors, scope_files, skipped_reason)``:
+
+    * ``skipped_reason`` is set only when the tower root is outside any git
+      repository (fixtures / legacy towers), where a diff cannot be computed.
+    * Every git failure is an *error* instead (fail closed): a worktree that
+      cannot be inspected must not be delivered silently.
+    * ``scope_files`` holds the changed paths as reported by the worktree
+      repository (already relative to its root) when the check ran.
+
+    The check runs before any evidence is copied, so a rejected delivery
+    writes nothing.
+    """
+    repo = authority_repo(root)
+    if repo is None:
+        return [], [], DELIVER_SCOPE_SKIPPED
+    worktree_rel = str(rec.get("worktree") or "").strip()
+    if not worktree_rel:
+        return ["worktree missing: (empty); scope check cannot run"], [], None
+    worktree = ensure_within(root, root / worktree_rel, label="worktree")
+    try:
+        git_ok(worktree, "rev-parse", "--show-toplevel")
+    except RuntimeError as exc:
+        return [f"worktree is not a git repository: {worktree_rel} ({exc})"], [], None
+    try:
+        merge_base = git_ok(worktree, "merge-base", "main", "HEAD")
+    except RuntimeError as exc:
+        return [f"scope baseline unavailable: merge-base main HEAD failed in "
+                f"{worktree_rel} ({exc})"], [], None
+    diff = git(worktree, "diff", "--name-only", f"{merge_base}..HEAD")
+    if diff.returncode != 0:
+        return [f"scope diff failed: git diff {merge_base}..HEAD "
+                f"({command_failure(diff)})"], [], None
+    changed = [line.strip() for line in diff.stdout.splitlines() if line.strip()]
+    status = git(worktree, "status", "--porcelain", "--untracked-files=no")
+    if status.returncode != 0:
+        return [f"scope status failed: git status ({command_failure(status)})"], [], None
+    # Untracked files are deliberately not inspected (``scratch/`` is allowed);
+    # tracked-but-uncommitted changes are, because they would ship outside the
+    # reviewed diff.
+    errors = [f"uncommitted tracked change: {status_path(line)}"
+              for line in status.stdout.splitlines() if line.strip()]
+    tower_rel = repo_relative(repo, root) or ""
+    allowed = {
+        mapped for mapped in
+        (allowed_repo_path(entry, worktree_rel, tower_rel)
+         for entry in (rec.get("allowed_paths") or []))
+        if mapped
+    }
+    for path in changed:
+        if path not in allowed:
+            errors.append(f"out of scope change: {path} (not in allowed_paths)")
+    return errors, changed, None
+
+
 def cmd_dispatch(root: Path, args) -> None:
     rec = load_record(root, args.task)
     if rec.get("status") not in ("ready", "rework"):
@@ -2049,14 +2158,20 @@ def cmd_dispatch(root: Path, args) -> None:
     gate_errors = spec_gate_errors(root, rec)
     if gate_errors:
         fail(gate_errors)
+    kind = dispatch_provenance_field(args.kind, "kind")
+    if kind is None:
+        fail(["kind must be a non-empty string"])
+    model = dispatch_provenance_field(args.model, "model")
+    parent = dispatch_provenance_field(args.parent, "parent")
+    dispatch = {"executor": args.executor, "worktree": worktree, "at": now(),
+                "kind": kind, "model": model, "parent": parent}
     rec["executor"] = args.executor
-    rec["dispatch"] = {"executor": args.executor, "worktree": worktree, "at": now()}
+    rec["dispatch"] = dispatch
     rec["status"] = "dispatched"
     rec["next"] = "等待 executor 交付"
     save_record(root, rec)
     update_board(root, rec)
-    append_ledger(root, "DISPATCH", "primary",
-                  {"task": args.task, "executor": args.executor, "worktree": worktree})
+    append_ledger(root, "DISPATCH", "primary", {"task": args.task, **dispatch})
     emit({"ok": True, "task": args.task, "status": rec["status"], "executor": args.executor,
           "worktree": worktree})
 
@@ -2065,6 +2180,12 @@ def cmd_deliver(root: Path, args) -> None:
     rec = load_record(root, args.task)
     if rec.get("status") not in ("dispatched", "delivered", "rework"):
         fail([f"task status {rec.get('status')} cannot deliver"])
+    # PILOT-041: gate the worktree diff against allowed_paths *before* any
+    # evidence is copied, so a rejected delivery leaves the record and the
+    # evidence directory untouched.
+    scope_errors, scope_files, scope_skipped = deliver_scope(root, rec)
+    if scope_errors:
+        fail(scope_errors)
     tdir = task_dir(root, args.task)
     evdir = tdir / "evidence"
     evdir.mkdir(parents=True, exist_ok=True)
@@ -2103,8 +2224,17 @@ def cmd_deliver(root: Path, args) -> None:
     (tdir / "DELIVERY.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     append_ledger(root, "DELIVER", "executor" if rec.get("executor") else "primary",
                   {"task": args.task, "evidence": len(rec["evidence"])})
-    emit({"ok": True, "task": args.task, "status": rec["status"],
-          "evidence": len(rec["evidence"])})
+    result = {"ok": True, "task": args.task, "status": rec["status"],
+              "evidence": len(rec["evidence"])}
+    if scope_skipped is None:
+        result["scope_check"] = "checked"
+        result["scope_checked"] = True
+        result["scope_files"] = scope_files
+    else:
+        result["scope_check"] = scope_skipped
+        result["scope_checked"] = False
+        result["scope_files"] = []
+    emit(result)
 
 
 def cmd_checkback(root: Path, args) -> None:
@@ -5035,6 +5165,12 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--task", required=True)
     d.add_argument("--executor", required=True)
     d.add_argument("--worktree")
+    d.add_argument("--kind", default="subagent",
+                   help="executor kind recorded as provenance (default: subagent)")
+    d.add_argument("--model", default=None,
+                   help="model id recorded as provenance (optional)")
+    d.add_argument("--parent", default=None,
+                   help="parent session/agent id recorded as provenance (optional)")
 
     de = sub.add_parser("deliver")
     de.add_argument("--task", required=True)

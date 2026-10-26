@@ -130,8 +130,9 @@ class DeliverIdsTestCase(unittest.TestCase):
     def test_same_path_delivered_twice_keeps_one_id(self) -> None:
         self.write_source("proof.txt", "first version\n")
         first = self.deliver("proof.txt")
-        self.assertEqual(set(json.loads(first.stdout)),
-                         {"ok", "task", "status", "evidence"})
+        payload = json.loads(first.stdout)
+        self.assertTrue({"ok", "task", "status", "evidence"} <= set(payload))
+        self.assertEqual(payload.get("scope_check"), "skipped (no git repo)")
         record = self.load_record()
         self.assertEqual([e["id"] for e in record["evidence"]], ["E-001"])
 
