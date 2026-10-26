@@ -45,6 +45,9 @@ GIT_IDENTITY = {
     "GIT_COMMITTER_EMAIL": "tower@example.invalid",
 }
 
+sys.path.insert(0, str(TOOLS_DIR))
+import towerctl  # noqa: E402  (import after sys.path setup)
+
 
 def write_json(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -190,6 +193,12 @@ class AuthorityStateTestCase(unittest.TestCase):
 
     def queue_entry(self) -> dict:
         return self.queue_entries()[0]
+
+    def seed_queue_history(self) -> None:
+        """PILOT-040: append the QUEUE_ADD row the hand-written fixture skipped."""
+        towerctl.append_supervision_ledger(
+            self.root, "QUEUE_ADD", "primary",
+            {"envelope": ENVELOPE, "task": TASK})
 
     def write_authority_file(self, **overrides) -> None:
         """Hand-write a file that claims authority without a ledger event."""
@@ -399,6 +408,7 @@ class AuthorityStateTestCase(unittest.TestCase):
         self.write_queue([{"envelope_id": ENVELOPE, "task": TASK,
                            "branch": BRANCH, "base": "main",
                            "status": "WAITING", "added_at": FIXED_TIME}])
+        self.seed_queue_history()
 
         cp = self.run_cli("merge", "--role", "supervisor",
                           "--supervisor", "rogue", "--envelope", ENVELOPE)

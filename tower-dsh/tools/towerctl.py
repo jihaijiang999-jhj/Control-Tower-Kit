@@ -1487,9 +1487,18 @@ def authority_require_locked(root: Path, args) -> None:
     mismatch = (authority_policy_mismatch(root, requirement)
                 if policy_required and event_present else None)
     if policy_required and event_present and mismatch is None:
-        emit({"ok": True, "path": AUTHORITY_POLICY_FILE, "by": args.by,
-              "decision": args.decision, "required": True, "already": True,
-              "repaired": False})
+        # PILOT-040: the persisted decision is the authority here, so echo it
+        # instead of the requested --decision.  A caller that asked for a
+        # different value must see both, or the output would claim the tower
+        # pinned a decision it never stored.  Nothing is written: the policy,
+        # the event payload and the event count stay exactly as they were.
+        persisted = requirement["policy"].get("decision")
+        out = {"ok": True, "path": AUTHORITY_POLICY_FILE, "by": args.by,
+               "decision": persisted, "required": True, "already": True,
+               "repaired": False}
+        if persisted != args.decision:
+            out["requested_decision"] = args.decision
+        emit(out)
 
     set_at = now()
     if policy_required and mismatch is None:
@@ -1539,10 +1548,18 @@ def authority_require_locked(root: Path, args) -> None:
                   "is missing; re-run authority-require once the ledger is "
                   "writable"])
 
-    emit({"ok": True, "path": AUTHORITY_POLICY_FILE,
-          "by": policy.get("set_by"), "decision": policy.get("decision"),
-          "set_at": policy.get("set_at"), "required": True,
-          "already": False, "repaired": True})
+    # PILOT-040: this branch either repaired a half from the authoritative side
+    # or performed the first write.  In both cases ``policy`` is what was
+    # actually stored, so its decision is echoed; only a repair can differ from
+    # the requested value, and then the request is reported alongside it.
+    persisted = policy.get("decision")
+    out = {"ok": True, "path": AUTHORITY_POLICY_FILE,
+           "by": policy.get("set_by"), "decision": persisted,
+           "set_at": policy.get("set_at"), "required": True,
+           "already": False, "repaired": True}
+    if persisted != args.decision:
+        out["requested_decision"] = args.decision
+    emit(out)
 
 
 def load_supervision(root: Path) -> dict:
@@ -3082,6 +3099,15 @@ def cmd_merge_check(root: Path, args) -> None:
                 ledger_break_phrase(name, first)
                 for name, first in breaks),
         })
+    # PILOT-040: the empty-ledger guard is reported only when it fires.  An
+    # always-present ok=True item here would change the check list of every
+    # existing configured/required fixture (036/037/038/039 assert exact
+    # lists), while a fresh empty tower has nothing to report.  When it fires
+    # the item names the same condition ``merge`` fails closed on.
+    empty_ledger = ledger_empty_guard(root)
+    if empty_ledger:
+        checks.append({"name": "ledger history present", "ok": False,
+                       "detail": "; ".join(empty_ledger)})
     queue = load_queue(root)
     entry = next((e for e in queue.get("entries", [])
                   if e.get("envelope_id") == envelope_id), None)
@@ -3351,6 +3377,14 @@ def cmd_merge(root: Path, args) -> None:
         fail([f"merge precondition: {ledger_break_phrase(name, first)} "
               "(ledger chain intact)"
               for name, first in breaks])
+    # PILOT-040: 039 catches a *missing* ledger; a truncation to 0 bytes keeps
+    # the file and slipped through.  Still before the envelope, queue,
+    # repository or git state is read: a refusal leaves the queue entry, both
+    # ledgers and the envelope byte-for-byte untouched and records no
+    # MERGE_START/MERGING.
+    empty_ledger = ledger_empty_guard(root)
+    if empty_ledger:
+        fail(empty_ledger)
     env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
     if not env_path.exists():
         fail([f"envelope not found: {args.envelope}"])
@@ -3929,6 +3963,99 @@ def ledger_break_phrase(name: str, first: str) -> str:
     """``<name> ledger chain missing/broken: <first error>`` for gate text."""
     kind = "missing" if first.startswith("ledger missing:") else "broken"
     return f"{name} ledger chain {kind}: {first}"
+
+
+# The 040 gate's stable phrase: callers (and the task card) key on it, so it is
+# defined once and reused verbatim in every error line.
+EMPTY_SUPERVISION_LEDGER = ("supervision ledger is empty but envelope/queue "
+                            "history exists")
+
+
+def supervision_artifacts(root: Path) -> list[str]:
+    """Supervision artifacts that imply history the ledger should back.
+
+    PILOT-040: envelope files, merge-queue entries and merge-ledger entries are
+    the three files a tower writes as it merges.  They are only legitimate when
+    ``ledger/supervision.jsonl`` records how they got there.  Read-only, and
+    unreadable artifacts are skipped here: ``state-verify`` already reports
+    them (`queue_unreadable` / `merge-ledger` drift) and this guard must not
+    pretend an unparseable file is history.
+    """
+    artifacts: list[str] = []
+    envelope_dir = root / "supervision" / "envelopes"
+    if envelope_dir.is_dir():
+        for child in sorted(envelope_dir.iterdir()):
+            if child.is_file() and child.suffix == ".json":
+                artifacts.append(rel(root, child))
+    queue_path = root / "supervision" / "MERGE_QUEUE.json"
+    _, queue = _read_json_object(queue_path)
+    if isinstance(queue, dict):
+        entries = queue.get("entries")
+        if isinstance(entries, list) and entries:
+            artifacts.append(f"{rel(root, queue_path)} entries={len(entries)}")
+    merge_ledger_path = (root / "supervision" / "registries"
+                         / "merge-ledger.json")
+    _, merge_ledger = _read_json_object(merge_ledger_path)
+    if isinstance(merge_ledger, dict):
+        entries = merge_ledger.get("entries")
+        if isinstance(entries, list) and entries:
+            artifacts.append(f"{rel(root, merge_ledger_path)} "
+                             f"entries={len(entries)}")
+    return artifacts
+
+
+def supervision_ledger_event_count(root: Path) -> int | None:
+    """Parseable events in ``ledger/supervision.jsonl``; ``None`` if unreadable.
+
+    A whitespace-only file counts as zero events (it is an empty chain), while
+    a row that is not a JSON object is not an event either.  ``None`` means the
+    file itself cannot be read; that is a chain failure handled by 039, not an
+    empty ledger, so the 040 guard must decline to judge it.
+    """
+    path = root / "ledger" / LEDGER_FILES["supervision"]
+    if not path.is_file():
+        return None
+    try:
+        rows = ledger_rows(path)
+    except OSError:
+        return None
+    return sum(1 for raw in rows if parse_ledger_row(raw) is not None)
+
+
+def ledger_empty_guard(root: Path) -> list[str]:
+    """PILOT-040: a 0-event supervision ledger may not shield history.
+
+    036 established that an *existing* empty ledger is a valid empty chain, so
+    a fresh tower still merges.  039 made a **missing** ledger fatal.  The
+    remaining seam was truncation: ``truncate -s0 ledger/supervision.jsonl``
+    keeps the file (039's presence check passes) and a legacy envelope plus its
+    hand-written queue row then merged without one supervision event.  That is
+    exactly the inconsistency ``state-verify`` already reports as
+    ``envelope_unbacked`` / ``queue_unbacked``; the audit saw it, the merge
+    gate did not.
+
+    Only non-legacy towers are guarded: a tower with no authority state keeps
+    its old (036/039) behaviour.  The guard also needs at least one supervision
+    artifact (envelope file, queue entry, merge-ledger entry).  A configured or
+    required tower with an empty ledger and *no* such artifact is fresh, has no
+    history to be inconsistent with, and passes.  Returns flat error lines;
+    callers fail closed on any non-empty list.
+    """
+    authority = authority_state_check(root)
+    if authority["status"] == "legacy":
+        return []
+    if supervision_ledger_event_count(root) != 0:
+        # ``None`` (missing/unreadable) is not this guard's business: 039 makes
+        # absence fatal and verify-ledger owns unreadability.
+        return []
+    artifacts = supervision_artifacts(root)
+    if not artifacts:
+        return []
+    ledger = root / "ledger" / LEDGER_FILES["supervision"]
+    return [f"{EMPTY_SUPERVISION_LEDGER}: {rel(root, ledger)} has 0 events "
+            f"while {', '.join(artifacts)} exist(s); a truncated supervision "
+            "ledger cannot shield envelope/queue history "
+            "(state-verify reports envelope_unbacked/queue_unbacked)"]
 
 
 def cmd_verify_ledger(root: Path, args) -> None:

@@ -1,0 +1,69 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-040",
+  "task": "PILOT-040",
+  "repository": "..",
+  "branch": "pilot/PILOT-040",
+  "base": "main",
+  "implementation_head_sha": "ecb570062469bf53abfde46a864d2dd72ddd2213",
+  "envelope_path": "merge-envelopes/ENV-PILOT-040.json",
+  "created_at": "2026-10-26T12:10:00+08:00",
+  "scope": "PILOT-040: empty-ledger guard (0-byte truncation cannot shield legacy merge) + authority-require echo fix",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 363,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-040/evidence/towerctl.py",
+      "sha256": "59846ab1c07c7403d4bb1cf509e62e2b32cecafc4d489fc8337f50d7233b4d5e"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/test_empty_ledger_guard.py",
+      "sha256": "2a5274db5010796fb2ddac83026f73dfe49c75f0fb498437d4c3a64f6aa457eb"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/test_authority_hardening.py",
+      "sha256": "ecf0020a0fcc68b4ca73591a3f500aa016db0c13d87eacba3d6bc245392db0ea"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/test_authority_required.py",
+      "sha256": "4f2b3d5780485e0fc1187e27cbc2e4f439ac7b5c993d53d9a40067824d0e3530"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/test_authority_state.py",
+      "sha256": "e505468bff086d595c127231b41fcc8b556e6760da0317e6991c3c4494afec6d"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/test-output.txt",
+      "sha256": "ba28b6f775aaec6a1b2eb9e48cb327d0445f07accc07377725adb04fa339ed07"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/empty_ledger_probe.py",
+      "sha256": "1ab1bf3f700ec1ac2b681a94bebb64e7c156849d8a9077997ae5a7f3900e13b0"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/probe.txt",
+      "sha256": "1259f88fd91bef218a3c73451aeca8cf15776f176b9ede2a7726ca0ab4acebe5"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/probe-old-code.txt",
+      "sha256": "e25051e34bcc97f2e7c8ad7e2dd925dfb1f4e49834482726169a31a90c01e15c"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/commit.txt",
+      "sha256": "92585b04670b04ed280452420c7e39bb1c114f547a3eccd7765d61528c7da356"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/diff.txt",
+      "sha256": "a6544db6c8a6937192d61815c3fd856e0ce445d91189f472e9678301d6b3ec27"
+    },
+    {
+      "path": "tasks/PILOT-040/evidence/fixture-seeding.diff",
+      "sha256": "cbc85a32ad893ecc273571a8576dfa26c8ba24ebc8a7413d73756e869d9f9272"
+    }
+  ]
+}
