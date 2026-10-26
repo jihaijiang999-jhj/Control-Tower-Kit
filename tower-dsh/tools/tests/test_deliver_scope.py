@@ -284,6 +284,87 @@ class DeliverScopeGateTestCase(unittest.TestCase):
         self.assertEqual(record["status"], "dispatched")
         self.assertEqual(record["evidence"], [])
 
+    # -- 4b. a rename of an out-of-scope file into an allowed path is caught -
+    def test_rename_from_out_of_scope_into_allowed_is_rejected(self) -> None:
+        # Only the rename target is allowed.  Rename detection must be off, so
+        # the diff also lists the deleted (out-of-scope) source path.
+        self.write_record(allowed_paths=[
+            f"{WORKTREE_REL}/tower-dsh/tools/new.py",
+        ])
+        cp = run_git(self.worktree, "mv", "tower-dsh/pilot/other.json",
+                     "tower-dsh/tools/new.py")
+        self.assertEqual(cp.returncode, 0, msg=cp.stderr + cp.stdout)
+        self.commit_worktree("rename out-of-scope file into an allowed path")
+
+        deliver = self.deliver()
+        self.assert_failed_with(deliver, "tower-dsh/pilot/other.json")
+        errors = json.loads(deliver.stdout)["errors"]
+        self.assertIn(
+            "out of scope change: tower-dsh/pilot/other.json (not in allowed_paths)",
+            "\n".join(errors))
+        record = self.load_record()
+        self.assertEqual(record["status"], "dispatched")
+        self.assertEqual(record["evidence"], [])
+        self.assertFalse(self.evidence_dir().exists())
+
+    def test_rename_from_allowed_to_out_of_scope_is_rejected(self) -> None:
+        # Default allowed_paths is tower-dsh/tools/x.py; moving it away leaves
+        # the (allowed) deletion plus an out-of-scope addition.
+        cp = run_git(self.worktree, "mv", "tower-dsh/tools/x.py",
+                     "tower-dsh/pilot/moved.json")
+        self.assertEqual(cp.returncode, 0, msg=cp.stderr + cp.stdout)
+        self.commit_worktree("rename allowed file out of scope")
+
+        deliver = self.deliver()
+        self.assert_failed_with(deliver, "tower-dsh/pilot/moved.json")
+        record = self.load_record()
+        self.assertEqual(record["status"], "dispatched")
+        self.assertEqual(record["evidence"], [])
+        self.assertFalse(self.evidence_dir().exists())
+
+    # -- 4c. a nested checkout is not the repository root -----------------
+    def test_nested_checkout_is_not_the_repository_root(self) -> None:
+        nested_rel = "pilot/worktrees/NESTED"
+        nested = self.tower / nested_rel
+        nested.mkdir(parents=True, exist_ok=True)
+        (nested / "file.txt").write_text("nested\n", encoding="utf-8")
+        self.write_record(worktree=nested_rel)
+
+        cp = self.deliver()
+        self.assert_failed_with(cp, "not the repository root")
+        record = self.load_record()
+        self.assertEqual(record["status"], "dispatched")
+        self.assertEqual(record["evidence"], [])
+        self.assertFalse(self.evidence_dir().exists())
+
+    # -- 4d. a rewired .git (foreign repository) is not the tower repo ----
+    def test_worktree_git_dir_pointing_at_another_repository_fails_closed(
+            self) -> None:
+        foreign = Path(self._tmp.name) / "foreign"
+        foreign.mkdir(parents=True, exist_ok=True)
+        self.assertEqual(run_git(foreign, "init").returncode, 0)
+        self.assertEqual(
+            run_git(foreign, "symbolic-ref", "HEAD", "refs/heads/main").returncode, 0)
+        (foreign / "a.txt").write_text("a\n", encoding="utf-8")
+        self.assertEqual(run_git(foreign, "add", "-A").returncode, 0)
+        commit = run_git(foreign, "commit", "-m", "foreign base")
+        self.assertEqual(commit.returncode, 0, msg=commit.stderr + commit.stdout)
+
+        # Point the worktree's .git file at a repository that is not the
+        # tower's repository; rev-parse still succeeds and the diff is empty,
+        # so only the repository-identity check can catch it.
+        gitfile = self.worktree / ".git"
+        gitfile.unlink()
+        gitfile.write_text(
+            f"gitdir: {(foreign / '.git').as_posix()}\n", encoding="utf-8")
+
+        cp = self.deliver()
+        self.assert_failed_with(cp, "not a worktree of the tower repository")
+        record = self.load_record()
+        self.assertEqual(record["status"], "dispatched")
+        self.assertEqual(record["evidence"], [])
+        self.assertFalse(self.evidence_dir().exists())
+
     # -- 5. a git worktree without main is fail-closed -------------------
     def test_missing_main_baseline_fails_closed(self) -> None:
         self._tmp.cleanup()

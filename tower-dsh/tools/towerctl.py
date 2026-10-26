@@ -2097,6 +2097,14 @@ def deliver_scope(root: Path, rec: dict) -> tuple[list[str], list[str], str | No
     * ``scope_files`` holds the changed paths as reported by the worktree
       repository (already relative to its root) when the check ran.
 
+    The worktree must be the root of a linked worktree of the authority
+    repository: a ``rev-parse`` success alone is not enough, because a nested
+    checkout (a plain subdirectory of another repository) or a rewired
+    ``.git`` still answers with *some* repository and can produce an empty
+    diff.  Rename detection is disabled when collecting the diff: a rename of
+    an out-of-scope file into an allowed path must show both the deleted and
+    the added path, otherwise only the allowed target would be inspected.
+
     The check runs before any evidence is copied, so a rejected delivery
     writes nothing.
     """
@@ -2108,17 +2116,31 @@ def deliver_scope(root: Path, rec: dict) -> tuple[list[str], list[str], str | No
         return ["worktree missing: (empty); scope check cannot run"], [], None
     worktree = ensure_within(root, root / worktree_rel, label="worktree")
     try:
-        git_ok(worktree, "rev-parse", "--show-toplevel")
+        toplevel = git_ok(worktree, "rev-parse", "--show-toplevel")
     except RuntimeError as exc:
         return [f"worktree is not a git repository: {worktree_rel} ({exc})"], [], None
+    if Path(toplevel).resolve() != worktree.resolve():
+        return [f"worktree is not the repository root: {worktree_rel} "
+                f"(toplevel: {toplevel})"], [], None
+    try:
+        repo_git_dir = Path(git_ok(repo, "rev-parse", "--absolute-git-dir")).resolve()
+        worktree_git_dir = Path(
+            git_ok(worktree, "rev-parse", "--absolute-git-dir")).resolve()
+    except RuntimeError as exc:
+        return [f"scope repository identity unavailable: {exc}"], [], None
+    if (worktree_git_dir == repo_git_dir
+            or repo_git_dir not in worktree_git_dir.parents):
+        return [f"worktree is not a worktree of the tower repository: "
+                f"{worktree_rel} (git dir: {worktree_git_dir.as_posix()})"], [], None
     try:
         merge_base = git_ok(worktree, "merge-base", "main", "HEAD")
     except RuntimeError as exc:
         return [f"scope baseline unavailable: merge-base main HEAD failed in "
                 f"{worktree_rel} ({exc})"], [], None
-    diff = git(worktree, "diff", "--name-only", f"{merge_base}..HEAD")
+    diff = git(worktree, "diff", "--name-only", "--no-renames",
+               f"{merge_base}..HEAD")
     if diff.returncode != 0:
-        return [f"scope diff failed: git diff {merge_base}..HEAD "
+        return [f"scope diff failed: git diff --no-renames {merge_base}..HEAD "
                 f"({command_failure(diff)})"], [], None
     changed = [line.strip() for line in diff.stdout.splitlines() if line.strip()]
     status = git(worktree, "status", "--porcelain", "--untracked-files=no")
