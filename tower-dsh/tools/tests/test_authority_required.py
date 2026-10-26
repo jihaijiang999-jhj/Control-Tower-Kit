@@ -53,6 +53,9 @@ GIT_IDENTITY = {
     "GIT_COMMITTER_EMAIL": "tower@example.invalid",
 }
 
+sys.path.insert(0, str(TOOLS_DIR))
+import towerctl  # noqa: E402  (import after sys.path setup)
+
 
 def write_json(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -224,6 +227,12 @@ class AuthorityRequiredTestCase(unittest.TestCase):
                            "branch": BRANCH, "base": "main",
                            "status": "WAITING", "added_at": FIXED_TIME}])
 
+    def seed_queue_history(self) -> None:
+        """PILOT-040: append the QUEUE_ADD row the hand-written fixture skipped."""
+        towerctl.append_supervision_ledger(
+            self.root, "QUEUE_ADD", "primary",
+            {"envelope": ENVELOPE, "task": TASK})
+
     def queue_bytes(self) -> bytes:
         return (self.root / "supervision" / "MERGE_QUEUE.json").read_bytes()
 
@@ -313,6 +322,7 @@ class AuthorityRequiredTestCase(unittest.TestCase):
         # merge-check reports the requirement as its own ok=true check.
         self.write_legacy_envelope()
         self.write_waiting_entry()
+        self.seed_queue_history()
         cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
         self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
         check = json.loads(cp.stdout)
@@ -582,6 +592,7 @@ class AuthorityRequiredTestCase(unittest.TestCase):
 
         # Configured but not required: 037's configured pin, no requirement.
         self.set_ok()
+        self.seed_queue_history()
         check = self.cli_json("authority-check")
         self.assertEqual(check["status"], "configured")
         self.assertEqual(check["requirement"], "optional")

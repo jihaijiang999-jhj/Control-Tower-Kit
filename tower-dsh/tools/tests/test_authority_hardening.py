@@ -261,6 +261,12 @@ class AuthorityHardeningTestCase(unittest.TestCase):
                            "branch": BRANCH, "base": "main",
                            "status": "WAITING", "added_at": FIXED_TIME}])
 
+    def seed_queue_history(self) -> None:
+        """PILOT-040: append the QUEUE_ADD row the hand-written fixture skipped."""
+        towerctl.append_supervision_ledger(
+            self.root, "QUEUE_ADD", "primary",
+            {"envelope": ENVELOPE, "task": TASK})
+
     def queue_bytes(self) -> bytes:
         return (self.root / "supervision" / "MERGE_QUEUE.json").read_bytes()
 
@@ -359,6 +365,7 @@ class AuthorityHardeningTestCase(unittest.TestCase):
 
         self.write_envelope()
         self.write_waiting_entry()
+        self.seed_queue_history()
         cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
         self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
         merged_check = json.loads(cp.stdout)
@@ -810,6 +817,7 @@ class AuthorityHardeningTestCase(unittest.TestCase):
         self.set_ok()
         self.write_envelope(baselines=False)
         self.write_waiting_entry()
+        self.seed_queue_history()
 
         cp = self.run_cli("merge-check", "--envelope", ENVELOPE)
 
