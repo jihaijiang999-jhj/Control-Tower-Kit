@@ -8,6 +8,7 @@ to the GitHub CLI (``gh``); every other command stays offline.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import os
@@ -2046,6 +2047,269 @@ def cmd_hash(root: Path, args) -> None:
           "bytes": path.stat().st_size})
 
 
+# ---------------------------------------------------------------------------
+# PILOT-044: shape budget ratchet
+# ---------------------------------------------------------------------------
+# ``shape-check`` freezes the shape of ``tools/*.py`` and ``tools/tests/*.py``
+# in ``state/SHAPE-BASELINE.json`` and then judges only *new* debt: new long
+# functions, existing functions growing, new long files, new duplicated blocks
+# and new unused imports.  The limits live here (not in the baseline), so a
+# baseline can never be used to widen them.
+SHAPE_BASELINE_SCHEMA = "tower/shape-baseline@1"
+SHAPE_BASELINE_REL = "state/SHAPE-BASELINE.json"
+SHAPE_MAX_FUNCTION_LINES = 80
+SHAPE_MAX_FUNCTION_BRANCHES = 12
+SHAPE_MAX_FILE_LINES = 600
+SHAPE_DUP_WINDOW = 15
+SHAPE_BRANCH_NODES = (ast.If, ast.For, ast.While, ast.Try,
+                      ast.BoolOp, ast.IfExp, ast.ExceptHandler)
+DELIVER_SHAPE_SKIPPED = "skipped"
+
+
+def shape_py_files(root: Path) -> list[Path]:
+    """Every scanned file: ``tools/*.py`` plus ``tools/tests/*.py``."""
+    found: list[Path] = []
+    for pattern in ("tools/*.py", "tools/tests/*.py"):
+        for path in root.glob(pattern):
+            if path.is_file() and "__pycache__" not in path.parts:
+                found.append(path)
+    return sorted(found)
+
+
+def shape_branch_count(node: ast.AST) -> int:
+    """Decision points under ``node``: the seven node kinds PILOT-044 counts."""
+    return sum(1 for child in ast.walk(node) if isinstance(child, SHAPE_BRANCH_NODES))
+
+
+def shape_function_stats(tree: ast.Module) -> dict[str, dict]:
+    """Every function in the file: ``{"Class.method": {lines, branches}}``.
+
+    Methods and nested functions are in scope: a 91-line class method or a long
+    nested helper is exactly the debt the ratchet exists to catch.  Keys are
+    qualified names so the baseline stays unambiguous.
+    """
+    stats: dict[str, dict] = {}
+    shape_collect_functions(list(tree.body), "", stats)
+    return stats
+
+
+def shape_collect_functions(nodes: list[ast.AST], prefix: str,
+                            stats: dict[str, dict]) -> None:
+    """Record each def under ``nodes`` and recurse into its own scope."""
+    for node in nodes:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            key = shape_unique_name(prefix + node.name, stats)
+            stats[key] = {"lines": node.end_lineno - node.lineno + 1,
+                          "branches": shape_branch_count(node)}
+            shape_collect_functions(list(node.body), key + ".", stats)
+        elif isinstance(node, ast.ClassDef):
+            shape_collect_functions(list(node.body), prefix + node.name + ".", stats)
+        else:
+            shape_collect_functions(list(ast.iter_child_nodes(node)), prefix, stats)
+
+
+def shape_unique_name(name: str, stats: dict[str, dict]) -> str:
+    """A file-unique key, suffixing redefinitions (``m#1``)."""
+    key = name
+    suffix = 1
+    while key in stats:
+        key = f"{name}#{suffix}"
+        suffix += 1
+    return key
+
+
+def shape_import_bindings(tree: ast.AST) -> list[tuple[str, int]]:
+    """``(bound_name, lineno)`` for every import that binds a name."""
+    bindings: list[tuple[str, int]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                bindings.append((alias.asname or alias.name.split(".")[0], node.lineno))
+        elif isinstance(node, ast.ImportFrom):
+            if node.module == "__future__":
+                continue
+            for alias in node.names:
+                if alias.name == "*":
+                    continue
+                bindings.append((alias.asname or alias.name, node.lineno))
+    return bindings
+
+
+def shape_used_names(tree: ast.AST) -> set[str]:
+    """Names referenced anywhere, plus the strings exported through ``__all__``."""
+    used = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id == "__all__":
+                used |= {elt.value for elt in getattr(node.value, "elts", [])
+                         if isinstance(elt, ast.Constant) and isinstance(elt.value, str)}
+    return used
+
+
+def shape_unused_imports(tree: ast.AST, text: str) -> list[str]:
+    """Imported names the file never uses; a trailing ``# noqa`` opts out."""
+    lines = text.splitlines()
+    used = shape_used_names(tree)
+    missing: set[str] = set()
+    for name, lineno in shape_import_bindings(tree):
+        if name in used or name in missing:
+            continue
+        line = lines[lineno - 1] if 0 < lineno <= len(lines) else ""
+        if "# noqa" in line:
+            continue
+        missing.add(name)
+    return sorted(missing)
+
+
+def shape_duplicate_windows(text: str) -> list[str]:
+    """SHA-256 of every ``SHAPE_DUP_WINDOW``-line window after normalisation.
+
+    Normalisation drops indentation, blank lines and whole-line comments, so a
+    copy/pasted block stays visible after re-indenting or re-commenting.
+    """
+    kept = [line.strip() for line in text.splitlines()]
+    kept = [line for line in kept if line and not line.startswith("#")]
+    digests: list[str] = []
+    for start in range(len(kept) - SHAPE_DUP_WINDOW + 1):
+        window = "\n".join(kept[start:start + SHAPE_DUP_WINDOW])
+        digests.append(hashlib.sha256(window.encode("utf-8")).hexdigest())
+    return digests
+
+
+def shape_scan(root: Path) -> dict:
+    """Scan one tower root into the ``tower/shape-baseline@1`` payload shape."""
+    files: dict[str, dict] = {}
+    unused: dict[str, list[str]] = {}
+    counts: dict[str, int] = {}
+    for path in shape_py_files(root):
+        key = path.relative_to(root).as_posix()
+        # ``utf-8-sig``: PILOT-042's test module starts with a BOM, which
+        # ``ast.parse`` rejects but the interpreter tolerates.
+        text = path.read_text(encoding="utf-8-sig")
+        try:
+            tree = ast.parse(text, filename=key)
+        except SyntaxError as exc:
+            fail([f"cannot parse {key}: {exc.msg}"])
+        files[key] = {"lines": len(text.splitlines()),
+                      "functions": shape_function_stats(tree)}
+        missing = shape_unused_imports(tree, text)
+        if missing:
+            unused[key] = missing
+        for digest in shape_duplicate_windows(text):
+            counts[digest] = counts.get(digest, 0) + 1
+    duplicates = sorted(digest for digest, count in counts.items() if count >= 2)
+    return {"schema": SHAPE_BASELINE_SCHEMA, "files": files,
+            "unused_imports": unused, "duplicate_blocks": duplicates}
+
+
+def load_shape_baseline(path: Path) -> dict:
+    """Load a baseline document, rejecting an unknown schema or file map."""
+    try:
+        data = jload(path)
+    except (OSError, ValueError) as exc:
+        fail([f"shape baseline unreadable: {SHAPE_BASELINE_REL} ({exc})"])
+    if not isinstance(data, dict) or data.get("schema") != SHAPE_BASELINE_SCHEMA:
+        fail([f"shape baseline schema must be {SHAPE_BASELINE_SCHEMA}"])
+    if not isinstance(data.get("files"), dict):
+        fail(["shape baseline files must be an object"])
+    return data
+
+
+def write_shape_baseline(path: Path, data: dict) -> None:
+    """Write the baseline deterministically: sorted keys, LF endings, no timestamp."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    # ``.gitattributes`` forces ``eol=lf`` for this artifact: writing LF here
+    # keeps a regenerated baseline byte-identical to the committed one.
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+
+
+def shape_file_errors(key: str, current: dict, frozen: dict | None) -> list[str]:
+    """New/growing functions in one file, plus the new-file line budget."""
+    errors: list[str] = []
+    if frozen is None:
+        if current["lines"] > SHAPE_MAX_FILE_LINES:
+            errors.append(f"shape: new file {key} has {current['lines']} lines "
+                          f"(> {SHAPE_MAX_FILE_LINES})")
+        frozen_functions: dict = {}
+    else:
+        frozen_functions = frozen.get("functions") or {}
+    for name, stats in sorted((current.get("functions") or {}).items()):
+        base = frozen_functions.get(name)
+        if base is None:
+            if (stats["lines"] > SHAPE_MAX_FUNCTION_LINES
+                    or stats["branches"] > SHAPE_MAX_FUNCTION_BRANCHES):
+                errors.append(
+                    f"shape: new function {name} in {key} has {stats['lines']} "
+                    f"lines / {stats['branches']} branches (limits "
+                    f"{SHAPE_MAX_FUNCTION_LINES}/{SHAPE_MAX_FUNCTION_BRANCHES})")
+            continue
+        if stats["lines"] > base.get("lines", 0):
+            errors.append(f"shape: function {name} in {key} grew to "
+                          f"{stats['lines']} lines (baseline {base.get('lines')})")
+        if stats["branches"] > base.get("branches", 0):
+            errors.append(f"shape: function {name} in {key} grew to "
+                          f"{stats['branches']} branches (baseline {base.get('branches')})")
+    return errors
+
+
+def shape_duplicate_errors(current: dict, baseline: dict) -> list[str]:
+    """Duplicated blocks the baseline did not already contain."""
+    frozen = set(baseline.get("duplicate_blocks") or [])
+    return [f"shape: new duplicated block (>={SHAPE_DUP_WINDOW} lines): {digest}"
+            for digest in current.get("duplicate_blocks") or [] if digest not in frozen]
+
+
+def shape_unused_import_errors(current: dict, baseline: dict) -> list[str]:
+    """Unused imports the baseline did not already contain, per file."""
+    frozen = baseline.get("unused_imports") or {}
+    errors: list[str] = []
+    for key, names in sorted((current.get("unused_imports") or {}).items()):
+        allowed = set(frozen.get(key) or [])
+        errors += [f"shape: unused import {name} in {key}" for name in names
+                   if name not in allowed]
+    return errors
+
+
+def shape_debt_errors(current: dict, baseline: dict) -> list[str]:
+    """Every new shape debt, or ``[]`` when the ratchet passes."""
+    frozen_files = baseline.get("files") or {}
+    errors: list[str] = []
+    for key, entry in sorted((current.get("files") or {}).items()):
+        errors += shape_file_errors(key, entry, frozen_files.get(key))
+    errors += shape_duplicate_errors(current, baseline)
+    errors += shape_unused_import_errors(current, baseline)
+    return errors
+
+
+def cmd_shape_check(root: Path, args) -> None:
+    """Judge new shape debt against ``state/SHAPE-BASELINE.json``.
+
+    ``--write-baseline`` rewrites the baseline and stops there (exit 0); it is
+    never mixed with the gate, so a failing tower cannot be "fixed" by the same
+    invocation that reports it.
+    """
+    baseline_path = root / SHAPE_BASELINE_REL
+    if args.write_baseline:
+        write_shape_baseline(baseline_path, shape_scan(root))
+        emit({"ok": True, "shape_check": "baseline", "written": SHAPE_BASELINE_REL})
+    if not baseline_path.is_file():
+        fail([f"shape baseline missing: {SHAPE_BASELINE_REL}; "
+              "run `towerctl shape-check --write-baseline` first"])
+    current = shape_scan(root)
+    errors = shape_debt_errors(current, load_shape_baseline(baseline_path))
+    if errors:
+        fail(errors, shape_check="failed", shape_checked=True)
+    functions = sum(len(entry["functions"]) for entry in current["files"].values())
+    emit({"ok": True, "shape_check": "checked", "shape_checked": True,
+          "files": len(current["files"]), "functions": functions,
+          "duplicate_blocks": len(current["duplicate_blocks"]),
+          "unused_imports": sum(len(v) for v in current["unused_imports"].values())})
+
+
 DELIVER_SCOPE_SKIPPED = "skipped (no git repo)"
 
 
@@ -2293,6 +2557,57 @@ def deliver_scope(root: Path, rec: dict) -> tuple[list[str], list[str], str | No
     return errors, changed, None, completions_used
 
 
+def deliver_shape_gate(root: Path, rec: dict) -> tuple[list[str], str | None]:
+    """Run the tower root's shape baseline over the worktree's tower copy.
+
+    Returns ``(errors, skipped)``.  ``skipped`` is :data:`DELIVER_SHAPE_SKIPPED`
+    only when the worktree has no ``tools/*.py`` (nothing to scan) or when it is
+    a pre-shape tower (no ``state/`` directory on either side).  Otherwise the
+    baseline is the **tower root's** copy and the worktree must carry it
+    byte-for-byte, so a task cannot silence the gate by editing or deleting its
+    own baseline.  Every error is returned before evidence is copied.
+    """
+    repo = authority_repo(root)
+    worktree_rel = str(rec.get("worktree") or "").strip()
+    if repo is None or not worktree_rel:
+        return [], DELIVER_SHAPE_SKIPPED
+    tower_rel = repo_relative(repo, root) or ""
+    shape_root = root / worktree_rel
+    if tower_rel:
+        shape_root = shape_root / tower_rel
+    if not shape_py_files(shape_root):
+        return [], DELIVER_SHAPE_SKIPPED
+    tower_baseline = root / SHAPE_BASELINE_REL
+    worktree_baseline = shape_root / SHAPE_BASELINE_REL
+    if not (root / "state").is_dir() and not (shape_root / "state").is_dir():
+        return [], DELIVER_SHAPE_SKIPPED
+    errors = shape_baseline_guard(tower_baseline, worktree_baseline)
+    if errors:
+        return errors, None
+    current = shape_scan(shape_root)
+    return shape_debt_errors(current, load_shape_baseline(tower_baseline)), None
+
+
+def shape_baseline_guard(tower_baseline: Path, worktree_baseline: Path) -> list[str]:
+    """The deliver baseline is the tower root's copy, byte-for-byte.
+
+    A task may not silence the ratchet by editing or deleting its own baseline:
+    the baseline is frozen on main, and changing it needs its own
+    baseline-refresh card.
+    """
+    if not tower_baseline.is_file():
+        return [f"shape baseline missing: {SHAPE_BASELINE_REL} in the tower root; "
+                "a baseline refresh needs its own card"]
+    if not worktree_baseline.is_file():
+        return [f"shape baseline missing in worktree: {SHAPE_BASELINE_REL}; "
+                "it must match the tower root (baseline refresh needs its own card)"]
+    if worktree_baseline.read_bytes() != tower_baseline.read_bytes():
+        return [f"shape baseline modified in worktree: {SHAPE_BASELINE_REL}; "
+                "it must match the tower root byte-for-byte (baseline refresh "
+                "needs its own card)"]
+    return []
+
+
 def dispatch_base_sha(root: Path, worktree: Path) -> str | None:
     """``git rev-parse main`` of the tower repository, or None.
 
@@ -2350,22 +2665,13 @@ def cmd_dispatch(root: Path, args) -> None:
           "worktree": worktree})
 
 
-def cmd_deliver(root: Path, args) -> None:
-    rec = load_record(root, args.task)
-    if rec.get("status") not in ("dispatched", "delivered", "rework"):
-        fail([f"task status {rec.get('status')} cannot deliver"])
-    # PILOT-041: gate the worktree diff against allowed_paths *before* any
-    # evidence is copied, so a rejected delivery leaves the record and the
-    # evidence directory untouched.  PILOT-042 lets recorded completions join
-    # that allow-list and reports the ones the diff actually used.
-    scope_errors, scope_files, scope_skipped, scope_completions = deliver_scope(root, rec)
-    if scope_errors:
-        fail(scope_errors)
-    tdir = task_dir(root, args.task)
-    evdir = tdir / "evidence"
+def collect_delivery_evidence(root: Path, task_id: str, rec: dict,
+                              values: list[str]) -> None:
+    """Copy each evidence file into ``tasks/<id>/evidence`` and renumber ids."""
+    evdir = task_dir(root, task_id) / "evidence"
     evdir.mkdir(parents=True, exist_ok=True)
     existing = {e.get("path") for e in rec.get("evidence", [])}
-    for value in args.evidence:
+    for value in values:
         src = resolve_input_within(root, value, "evidence")
         if not src.exists() or not src.is_file():
             fail([f"evidence not found: {value}"])
@@ -2386,31 +2692,64 @@ def cmd_deliver(root: Path, args) -> None:
     # and in list order; it also repairs records written by the old scheme.
     for index, entry in enumerate(rec.get("evidence", []), start=1):
         entry["id"] = f"E-{index:03d}"
+
+
+def write_delivery_md(root: Path, task_id: str, rec: dict) -> None:
+    """Render ``DELIVERY.md`` from the record's evidence list."""
+    lines = [f"# {rec['id']} — Delivery", "", f"- Status: `delivered`",
+             f"- Executor: `{rec.get('executor')}`",
+             f"- Worktree: `{rec.get('worktree')}`", "",
+             "## Evidence", "", "| ID | Path | SHA-256 | Bytes |", "|---|---|---|---|"]
+    for e in rec["evidence"]:
+        lines.append(f"| {e['id']} | `{e['path']}` | `{e['sha256']}` | {e['bytes']} |")
+    (task_dir(root, task_id) / "DELIVERY.md").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8")
+
+
+def delivery_gate_fields(scope_skipped, scope_files, scope_completions,
+                         shape_skipped) -> dict:
+    """Scope/shape gate status block appended to a delivery result."""
+    scope_checked = scope_skipped is None
+    shape_checked = shape_skipped is None
+    return {
+        "scope_check": "checked" if scope_checked else scope_skipped,
+        "scope_checked": scope_checked,
+        "scope_files": scope_files if scope_checked else [],
+        "scope_completions": scope_completions if scope_checked else [],
+        "shape_check": "checked" if shape_checked else shape_skipped,
+        "shape_checked": shape_checked,
+    }
+
+
+def cmd_deliver(root: Path, args) -> None:
+    rec = load_record(root, args.task)
+    if rec.get("status") not in ("dispatched", "delivered", "rework"):
+        fail([f"task status {rec.get('status')} cannot deliver"])
+    # PILOT-041: gate the worktree diff against allowed_paths *before* any
+    # evidence is copied, so a rejected delivery leaves the record and the
+    # evidence directory untouched.  PILOT-042 lets recorded completions join
+    # that allow-list and reports the ones the diff actually used.
+    scope_errors, scope_files, scope_skipped, scope_completions = deliver_scope(root, rec)
+    if scope_errors:
+        fail(scope_errors)
+    # PILOT-044: the same no-writes-before-the-gate rule now covers shape -- the
+    # worktree's own ratchet runs before the first evidence copy.
+    shape_errors, shape_skipped = deliver_shape_gate(root, rec)
+    if shape_errors:
+        fail(shape_errors, shape_check="failed", shape_checked=True)
+    collect_delivery_evidence(root, args.task, rec, args.evidence)
     rec["status"] = "delivered"
     rec["delivered_at"] = now()
     rec["next"] = "等待独立 reviewer"
     save_record(root, rec)
     update_board(root, rec)
-    lines = [f"# {rec['id']} — Delivery", "", f"- Status: `delivered`",
-             f"- Executor: `{rec.get('executor')}`", f"- Worktree: `{rec.get('worktree')}`", "",
-             "## Evidence", "", "| ID | Path | SHA-256 | Bytes |", "|---|---|---|---|"]
-    for e in rec["evidence"]:
-        lines.append(f"| {e['id']} | `{e['path']}` | `{e['sha256']}` | {e['bytes']} |")
-    (tdir / "DELIVERY.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    write_delivery_md(root, args.task, rec)
     append_ledger(root, "DELIVER", "executor" if rec.get("executor") else "primary",
                   {"task": args.task, "evidence": len(rec["evidence"])})
     result = {"ok": True, "task": args.task, "status": rec["status"],
               "evidence": len(rec["evidence"])}
-    if scope_skipped is None:
-        result["scope_check"] = "checked"
-        result["scope_checked"] = True
-        result["scope_files"] = scope_files
-        result["scope_completions"] = scope_completions
-    else:
-        result["scope_check"] = scope_skipped
-        result["scope_checked"] = False
-        result["scope_files"] = []
-        result["scope_completions"] = []
+    result.update(delivery_gate_fields(scope_skipped, scope_files,
+                                       scope_completions, shape_skipped))
     emit(result)
 
 
@@ -2530,31 +2869,66 @@ def cmd_completion_add(root: Path, args) -> None:
               "entry": entry}, 0)
 
 
-def cmd_checkback(root: Path, args) -> None:
-    rec = load_record(root, args.task)
-    if rec.get("status") not in ("delivered", "reviewed", "rework"):
-        fail([f"task status {rec.get('status')} cannot checkback"])
-    reviewer = (args.reviewer or "").strip()
+STRUCTURE_QUESTIONS = (
+    "新抽象是否有 ≥2 个使用点？",
+    "有无死代码/永久开关？",
+    "有无 ≥15 行重复？",
+    "测试是否只镜像实现？",
+    "新增 TODO 是否有卡号？",
+)
+STRUCTURE_PENDING = "未提供（044 起建议填写，暂不阻塞）"
+
+
+def structure_review_lines(structure: str) -> list[str]:
+    """The fixed ``## Structure review（五问）`` block (PILOT-044)."""
+    lines = ["", "## Structure review（五问）", ""]
+    lines += [f"{index}. {question}"
+              for index, question in enumerate(STRUCTURE_QUESTIONS, start=1)]
+    lines += ["", f"reviewer 回答：{structure or STRUCTURE_PENDING}"]
+    return lines
+
+
+def write_review_md(root: Path, task_id: str, rec: dict, reviewer: str,
+                    verdict: str, note: str, structure: str) -> None:
+    """Render ``REVIEW.md``: verdict, note, evidence and the structure block."""
+    lines = [f"# {rec['id']} — Independent Checkback", "",
+             f"- Reviewer: `{reviewer}`", f"- Verdict: **{verdict}**",
+             f"- At: {rec['review']['at']}", "", "## Note", "", note or "(none)", "",
+             "## Evidence checked", ""]
+    lines += [f"- `{e['path']}` `{e['sha256']}`" for e in rec.get("evidence", [])]
+    lines += structure_review_lines(structure)
+    (task_dir(root, task_id) / "REVIEW.md").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8")
+
+
+def checkback_reviewer(rec: dict, raw) -> str:
+    """Validate and normalise the reviewer identity (non-empty, not executor)."""
+    reviewer = (raw or "").strip()
     if not reviewer:
         fail(["reviewer must be non-empty (whitespace-only is not a reviewer)"])
     if reviewer == (rec.get("executor") or "").strip():
         fail(["reviewer must differ from executor"])
+    return reviewer
+
+
+def cmd_checkback(root: Path, args) -> None:
+    rec = load_record(root, args.task)
+    if rec.get("status") not in ("delivered", "reviewed", "rework"):
+        fail([f"task status {rec.get('status')} cannot checkback"])
+    reviewer = checkback_reviewer(rec, args.reviewer)
+    structure = args.structure or ""
     rec["review"] = {"reviewer": reviewer, "verdict": args.verdict,
-                     "note": args.note or "", "at": now()}
+                     "note": args.note or "", "structure": structure, "at": now()}
     rec["status"] = "reviewed" if args.verdict == "PASS" else "rework"
     rec["next"] = "等待 accept" if args.verdict == "PASS" else "返工"
     save_record(root, rec)
     update_board(root, rec)
-    tdir = task_dir(root, args.task)
-    lines = [f"# {rec['id']} — Independent Checkback", "",
-             f"- Reviewer: `{reviewer}`", f"- Verdict: **{args.verdict}**",
-             f"- At: {rec['review']['at']}", "", "## Note", "", args.note or "(none)", "",
-             "## Evidence checked", ""]
-    lines += [f"- `{e['path']}` `{e['sha256']}`" for e in rec.get("evidence", [])]
-    (tdir / "REVIEW.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    write_review_md(root, args.task, rec, reviewer, args.verdict,
+                    args.note or "", structure)
     append_ledger(root, "CHECKBACK", "reviewer",
                   {"task": args.task, "reviewer": reviewer, "verdict": args.verdict})
-    emit({"ok": True, "task": args.task, "status": rec["status"], "verdict": args.verdict})
+    emit({"ok": True, "task": args.task, "status": rec["status"],
+          "verdict": args.verdict, "structure": bool(structure)})
 
 
 def cmd_accept(root: Path, args) -> None:
@@ -5439,9 +5813,9 @@ def build_parser() -> argparse.ArgumentParser:
                     choices=["primary", "supervision", "all"])
 
     sub.add_parser("state-verify")
-
+    shp = sub.add_parser("shape-check")
+    shp.add_argument("--write-baseline", action="store_true")
     sub.add_parser("authority-check")
-
     aset = sub.add_parser("authority-set")
     aset.add_argument("--supervisor", required=True,
                       help="registered supervisor id that becomes merge authority")
@@ -5456,7 +5830,6 @@ def build_parser() -> argparse.ArgumentParser:
                       help="decision id recorded in the policy and ledger")
     areq.add_argument("--by", required=True,
                       help="must equal primary/CURRENT_STATE.json owner.name")
-
     sl = sub.add_parser("spec-lint")
     sl.add_argument("--dir", default=None,
                     help="lint one directory (default: root specs/ plus root policy docs)")
@@ -5582,6 +5955,7 @@ def build_parser() -> argparse.ArgumentParser:
     cb.add_argument("--reviewer", required=True)
     cb.add_argument("--verdict", required=True, choices=["PASS", "FAIL"])
     cb.add_argument("--note")
+    cb.add_argument("--structure", help="reviewer answers to the five structure questions")
 
     ac = sub.add_parser("accept")
     ac.add_argument("--task", required=True)
@@ -5630,7 +6004,7 @@ def main() -> None:
         "authority-set": cmd_authority_set,
         "authority-require": cmd_authority_require,
         "spec-lint": cmd_spec_lint,
-        "spec-coverage": cmd_spec_coverage,
+        "spec-coverage": cmd_spec_coverage, "shape-check": cmd_shape_check,
     }
     try:
         handlers[args.cmd](root, args)
