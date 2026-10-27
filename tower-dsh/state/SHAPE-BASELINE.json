@@ -1,0 +1,1469 @@
+{
+  "duplicate_blocks": [
+    "03c628b1de10af89c77ac5c610b82c4f16ab7a2c65ec9d44fe02120017d14663",
+    "049df44c76ce14b873cd202b1e56e507b548d91d5adc10c569d2154118b5af13",
+    "055944fcead816288c14cfb7ef2318fb175e2250e820f20898de23286cf808a9",
+    "0615e7ca78c11833d8d068ce21df9d4284c1f90b2aa53c5f985823ce4bc8df40",
+    "0675edc82eba953bbfd5b0d5b16474949f129ad05a0fb3dfe36c9fefc9ca16af",
+    "097b9da294a70b1e361a439dd0ff1c743ebb5d486a9c9a252bb54c02acd08329",
+    "09e542c264eac69750f8f7f1db1b37fc18bef2ec48bf7726df38ea404f40e441",
+    "0a0f3f96612988fef08cf8d338b5dd9d36ee2a33e0f263d02c2637ec6c218aa0",
+    "0e4b3ac255bf9c04c36422a0fa48488b4fc749687fd1823ab0091a88b685282b",
+    "0f6ed93d9f581582f29f1e1c483077c094c668224bd16627eb7feb40aeec9685",
+    "10f2549aade7cfa486d2f6517501e67f1c4e924add3872335f1e49f0ac583349",
+    "134d09262eac44f270801fac542c6bf68d78eec76a2e876fc527f657e43e135d",
+    "17c6ee5ffe55f7f71c7b6f5a0ba9207848bcd2194ebddc20c6e2b39f0434deb6",
+    "17e250534d11b8ef50ac5e1e41ee3033736530b987acc499e0d2b5f4f2762e40",
+    "1a615d84862c1f51e6c7f3a387859379165c7528e28d24204cf12c3f46bf3a33",
+    "1ae4c656895f45e0fb3d5360bf1db78ca62525e3d1fd6446ce069149c7863dba",
+    "1e6e0f37d7a03889b188e37683a2c316048d6538ea5a5b5d51440e60df7666a5",
+    "1e969e80fc913027e6eff94b1dec699a7deb375c616617c8b72292672966db4e",
+    "1f805656f2516c5fb9605452f000ba6d9e596c2d8eefce15e3301552807648b8",
+    "213e556eeab765f1ac74f7eb6053c6f51cc3110f0b0ffe97ada4104062fcefaa",
+    "260c57cc5104366a828599421428b97d2d3ac6a2bf46cacfe5e13e63ca371278",
+    "283fad12cf0995359b0be45a0a333e0448fb53ac256d54f955d50ec7ebe34965",
+    "28e41232eb6180d46fd5c60f8c7fdccdc1072d1fdfff9ee079d8bdfcac7b3152",
+    "293cc747b00229a08a7f6881b17176fa17762eb14140623a5a0fba2b574acd35",
+    "29f70653c8169752daadfd16dd9974c8219f84588c6e07c6e5e8539b0fbfdba0",
+    "2d8c3599f26990f7a99c81e67952c1493e465329ea41d0de96b37b3da731c815",
+    "2f75c187420f5fd12c2576e8080933fb4fc68438fb6ccfbb17a59102324fefdb",
+    "30b280a27c87c324f8195f40d2546d09506dfc8398346f88b3a850f070f86584",
+    "3150edb1843eaae7bf0ca50c53902a88c97466b5038b02ae50a2abe966368523",
+    "31b1c71a6bb120dcd6acb82fc9067e53d6959bb208e1e90e4ce3db4a3f3f5dc1",
+    "3c5c97e312fe362e81ac4a8ff2113393ac381c7d3dba92dfae8e128881dcee6b",
+    "3d0f838f8d668724ed40915d4c47e09579fce6255c50001e450a9a9184fb84fc",
+    "3d85113b7e46747b9e87356dc0f7dca70a86ceae026c8a375805c4c89e102f52",
+    "44c578cb089d4e3af08d4c1f2b1aa3cd8432503bd5e6174cfda8ed98e459b75d",
+    "48a22be275aecfb00ecdd7bea0dc9e5e62d3c8566350534e375c98d5e80d9045",
+    "4b917eb5cda1991b3a3b0b06668bdba4da1f1361f048fb8a2cf919f35cdfe488",
+    "4c4659e678b80e3ab9090119d1e5170bfc91ab8dab5df904dde070caf55f40a4",
+    "4debed20bd6752cb199b4f9a918ee235a7c27ec16f38493e6238bad9a49bc035",
+    "4f1516b5b7502ee9f83c7c265a6df35bc7bdc811d442fab76f2c7182d0e4fec2",
+    "4fd09ff5abf54487874ec6a9e0e548518c73b9541367bd85745cff153bf07bc8",
+    "5578b34e467434a82f6050546234f68e205f609707641c68005201e45bf1dcfb",
+    "55aabd54f9b438ecb0b81bfbc506889fa31474ef8fb1ccbfcd8b3d5bcabbcd46",
+    "566ac755f1c9f0099a6337385e3f87e7ca1f684aad467cbaf7d7ac6660fcda73",
+    "585320a5b85e355986f6064b4221997d7d36a6a82a97d617fce0c853408522e6",
+    "5a11e2d656fc04ebed9a2210088aabea3981d6b2a7664aad0e25b9b8dc65e2fb",
+    "5be0036ba415e1d699224d2c81a83c43e01a84229f5dd7ec784871cc386bd8bf",
+    "5fa157ed3845c8ff3383b02a77bc5b518cbec232ef656b82539c449b16a55fe4",
+    "6059be504beafabd9edd359b9db248785f989f2a40c03afa777a1d6d6fa504d3",
+    "61b2b1dc01493f0de3802bfc51ba65d4510c8de3c70a24da1b6d56817d3fe5af",
+    "61e2e8cfd940d81b41ff9c4bc3872162c44caa65b28823222a00f718119f5972",
+    "61eaee6c13335ec9cc773cadc5cf0e71ff2331de532763b81797cf50387907bd",
+    "64e0619101627eaf8ca2996b12731f988b42fa22d9094c75ffbf0a23d5a04938",
+    "66d1ec01b5a1a714c1947b64c633639e282b8eb7de9e9fdbe3acf1af0ab472a2",
+    "66e5f44df98d93893923343b7fe11d9f823ca40fdf7e970cc4ab612425bb2c2b",
+    "67f2d000d8b67e677bfda962b10a111dc8deb08438f5ea6cb9169c63ca606886",
+    "685530eb0d34d05a3f12f9d4fcd787aca2f8a2687097631a730f557240e16661",
+    "692c4ff10cc3f58ee80d4b9c216a5e04dabcd4d849df3b3f1662255b6c46a55a",
+    "692f577061140f6698b6ce3f526fee1fc4d0aae575a25a7228c9c1dfb83cb97e",
+    "6b7b927bd8e2f12552995709d37b09abd34d0e6ce09ae544812f628047ae0cda",
+    "6bb7c767cbee94274b4243b1c4dd3c53c248678a954eca88aab81d15ce51ac6f",
+    "6c778a2efdf209f980520fdba10b8c4982b483cba0a5f7e9dd4d654dc3956564",
+    "6cda5933f0e39df2c0d2b917c9383e85c43b898f91210304abb3363933ad69b3",
+    "6d7fa4647d1a0711172ce67be2c729c226511578b5538892eab3fcc33b07285d",
+    "6dbd73d7aa00d4aeb3ab3132c193d807afb7f55d99c591ea9d24d342425a027f",
+    "6f45c065a309c90b8c394d4c663a307e536024c575c82ed28a4e757d225d2e6d",
+    "7195590faa5084d6945e83c3b32098675b876e93230abd61525c7da3ad7f0673",
+    "71d905f3bfaeb45bebe28b0a056f79b8c70c52e3b66323ea4182ccb3ed6866a3",
+    "73debd68c67c36842622a42921b141f7015bf86711f570f222e176ec2e41a4ba",
+    "77c951a924acd9b8188c130306c1ba6ec2b5ba58a2cf1ba9e2206087f32a2b2c",
+    "793c0795ef9bc2a61ce1114270a5bece7decce4832c0de2601ecc02d7eb6a0d8",
+    "7945e7432bf6aef5c2f4691199260b0394683ff31cbbddadc9f6ecf21cf68737",
+    "79ec68cb93481d05ddfae194ba078248d3540fc7fb2fd83b4f8ac198b0411449",
+    "7e2c20b2160c1a62273e7c6c49c2b350ff2d7446a86a3725a4675b12a7694b8b",
+    "7f82dfd76762e50d3a9f840ce601bbe4e4cc7290afc7d025cd259b2aeba51533",
+    "800ba38a64f459b865d15b7009e85a917b8b86cc926407033ddb89ffda123ab8",
+    "82119477dcd54b9111b2ce6cd469f168e1085ff063e53140bf83c03bbe7e4200",
+    "854621dc783329e27e32b92a364340d7a62d9db0f39236221281a4ff0604b60e",
+    "862627829128ac590ed33d6a65ffa60f95ba985402697c68cb3382b1cb5695ad",
+    "86824f98932550bccea408ae30a6c7245068cd9664eb135e4f847f00dfb7737c",
+    "88d0fbf2ce890858fee590ae3651d16ba369876aea0332b8042348d005c3be84",
+    "8b862f565950c2fe4a4277d99ab5e9a9276c5a48fd6bd3fce5be5d5df6cb3af0",
+    "8c243f3c3aa6bc41fb40d9e49190285cfa24d8881b249d0fc4897def1b1145e7",
+    "8f9e8e4ce0193976433f257351abb7650f444782a4fdfe3ac2b4685c78696cb1",
+    "9039d3fbb4117575a53c075c4b023ee815679bf9a478d456b629317ab4a84759",
+    "919c7026840b64fc4e4b46d858570797d68149ffc8f3ee76ca7dbf694cd7114e",
+    "92566faacedc4654ad77073bf90d7c5312a51ae75511373a91c185812a2878b1",
+    "93b361c2275c35b3485065947dd7688e4359433301d72815a47b85139e174421",
+    "9469a675c38ab628d49b228845873bbe3a61a01f4fb9317ad22195998c42b21b",
+    "95cf19aaed803f6edeac6f42faf923b8a947824714f9cb35849e3c01e5688b39",
+    "97383839ecb0bfaf2d54c3ba48ac8af5a344ca8bb6dd3b1a41977be95a3a81d3",
+    "97c3681cdb46e66db07bf0cffda058788d0ae00295c93187018fe0873b076498",
+    "991a7160210bca9386898ea8827e1088a77ec042550e1805b05cfe38e2f471b6",
+    "9ae5f9f46346cbc6df94e6a9c52c1f4fd3c64bf68b13a0e88feb98bdfea9ccad",
+    "9b05d6053fbc3cad036054416df0159ba32c65ac4f385aa247e089223c888fb9",
+    "9c6ba9c6cfb20f0790b8a1a1aad7270d738d140130280e7f67213f992d99cb93",
+    "9e55b2343581cebe4e39fb9118a8e3046035f18bcece9606cb8771bfd38bd4d4",
+    "9ef84c02d0699e5c680d675b519a5d016557fbe1661d3a235cb7b19f2ccf58bc",
+    "9f10c788c183fb61fac2edf6c5d7ea6fb9a76bc68a5de4a18a11c642bf5e23ca",
+    "9faaca63360e051d1a352e95ed24fe9f3625ba2f5ca73d7a5bccefce059d8059",
+    "a0c89d73892fec4831daa04baaf438a671e7b83c24d5d39b317cd4437964f0df",
+    "a1c466c8d77e04737662d39953a81f5a26b8bf812a821dc42708cb3b98f75255",
+    "a2d4ad6668c96be2b01df2edf7ac6c2a14dff359639fffacc7bc31aa6d44d054",
+    "a308d83fa9c6f0a2ec9b5213d62c717429fcea13d0285e5ba3fc1767b04df737",
+    "a5456106fdc47568b695f75affd1e099219743a072c3f6c4707292ea0f363797",
+    "a5b1df734845546ae059799a8374ff2970d359eacac53fd11ddcecd2d75789e1",
+    "a71a58ef32353adb1179cf6df2d123456f37344f2c703fa165c3c3f487e003ed",
+    "a851e2270af75487e83a2a8379f8337c2b8ce17fb00b8cfc64282e7d074afb13",
+    "a9346a2b863294cc1210e73c6c87f8438b6ae4f8ca803b28c45547c42298ec2e",
+    "a9db8b26c10d0a9a404980f9066fc733582f03b370f67e747a34147d7ae3dbdf",
+    "aaa99f6ffeb78b0cc25a97df89eb848d2e345a8f8745b146dee69d8206543115",
+    "aabb6354d26a5d0976c555e851404294ce9b136cf223284e4383005d3e9b4561",
+    "aba68b1576837f1ed4e5def0706d02c39e4a5e747b62706f688216853b4aa04f",
+    "ae19b269a33a5afa3129a25693d858eab4eafc1f73368cb664d98352299d9338",
+    "b0bd93cc094848969bbe41ed8382ee759bfd2bf668ea1fa74993137df0a29f57",
+    "b28b1c4cac7031933e6f5fba24b0eef851e4773fd7470487830d5a234293cd55",
+    "b2964aeff345cb5a4371ca9f5741a7b38ebd29c98f0a20248aafc29ca0c08599",
+    "b6bbb312a60fd7c1e2235657a3c2386079b307121cc0b564d9fdb4999aa86269",
+    "b7c92be46c8c17fbbfe0af442e2bdb353ec4751373437841880a9ee3b0772949",
+    "b93f6ba8d3256607ceddbbe1145871102a7ad3934eb09470ee03b8f64173be4c",
+    "bade9539ad2fe9d9fa2aeb40e022a081b07b3421574d013a665e4fa702513b0e",
+    "bc36642f67b9ec1c89b5c363b7babe0dc23f94688bd356740586d037cb3bf42f",
+    "bd05738e8b17e7f760a69d611880fa8c2082d08233c30a770d70a0317fdf7d0e",
+    "be5a030386c889ac46840d2b5472cc172716d94daa017731fab213f7d361f10b",
+    "c095ed78c0d9f67fea4dd285a00db03a44ed76277a3c79cbaabee61c348c6165",
+    "c0e97f9ababd5982141717e11d4231266171a1a6c8a9f45b3cebe3e1dd294384",
+    "c4781ef7dcd216ce43a8989604ccbc2495802afff138593a8e20e6d80e69e242",
+    "c4f960af66e956d22be971cc51eeb7bb10525566d6e4d4ebbfe949f859b0eede",
+    "c54218b01116e230e63646f754c5215ad9d98005d1389dc5291c707dd17c6c22",
+    "c61b24005e7e5825427f4dbe297793a887089ea460a331ad223ce03d05c21410",
+    "c6b0929ad578082fc123f0d088b80e796d3c7216f923758b91547da2cc0f834d",
+    "c742ce424c2358731bc7df5977e868a9fc17aef8c8c548749c962feab39a3857",
+    "c7db82de996f965dc6fd11a1def7ad147c97b6cd901cfe3dbeeb89b4ba3c9bc4",
+    "cb5b6037ad3a969d847e9dc4568c17faf6d7cd531a523a5625e83f742ae4d060",
+    "ceec48624373ec101029c8da06f47ad562b1acec72a10be72c937aad981882ec",
+    "d16c6d7fe7a022008749219ff6771ec795460d54e9b77b305daea8cbb5cf68c3",
+    "d2b283730cd04ade8b26c9458d3b2eaa33c575a8b773926075a7401e16e0ce6f",
+    "d35a2e232110908fd79427ac458870bef78257180f58a44fb7475fc1167ed2d4",
+    "d463c86b7ac54ac7f57dd3ba0e27cc7fb518357dbd2e1471f2ce62db32c4133d",
+    "d726e8b20f0da9636d9b9ea1f1f00e23495490686fef0ffee78540c3f1938b11",
+    "d75ea70645645c3605bedbf80404d2b3725de8e57c5b47e370b99b78db25dfc5",
+    "d9d15ea6bb07ad409f51a66b7f5a67eb9fab595a521241571993fc317b7dcec3",
+    "dadcf899a4c83c02a3d051ce564a222229de1313e77c1d3ffe0421be41a51dd1",
+    "dc0321cee86e32c58e3c82c80c0073cb34f55e62231caf73a769c3ecfcd092c5",
+    "dcfe3508820dd77e45abb86a0b069d5d28709a8e83492aa0194cee320a0ceaca",
+    "de9b4052271563986c35fe253d86206a590cfd7c5c9d287bc5d7e474ddd5839a",
+    "e0b96b114292336045234dc5a9b8022d65e8f5621e6af831d2ad54de0a1e2c8c",
+    "e320c45436b3f2b949e4167075c7bad2480fb6602491a9d8208eeef529f12f98",
+    "e39327ada32d9358631c4d253a8c2a96b263ab922eec95ce1c339ffbfb99df0c",
+    "e5838683eb999ae922173f93a17e4dd3630cc491cbe2e6d90cc51467e950542c",
+    "e66fc12084f71bd2ccc281210294cfd476c5b6c2885453937fe7b09d644ef866",
+    "e7c3a3500eda1a304560b54af47829a541ade7b67ba0bf3c77d4a4b000643787",
+    "e7dde0aab08e8cbc2185795055929e9108495bd6754c872dbf40ae2a7daaf0ad",
+    "e9242a9dcfa71cf0c32152a806c80eefdc2af06a593e6a6446cc2d9bcb6b895e",
+    "eacfbab8a63c5340f711d915e49a6ac2c7f90d7b7e8994dca12f5682731cde76",
+    "ec17b1d29f0647d12266e6a438c0b5fd885873554f520a430fdaf5c814ca5481",
+    "ee48628035e4430438322e426fd3242f67e3cbd189f3db5f7f8ad4ea6eb83939",
+    "f067919be0bcde640308a82932dc22868156503d205ba8aac96761504a6b91db",
+    "f1a9d16880d38671ebac40a903fd01d44151cd414c609b1fd5d2998999806cfd",
+    "f3b4a27c8aab7b79949da7006f5877e8534954e45bdedc510d6777f7c0085d4f",
+    "f42847ab8ce46360f479005049ac1c4e01984022a809a90d29f3140badf79512",
+    "f496b1d08c5fdcda6af3f0d6954948b4da4ff352140017c0d5d50733f716c148",
+    "f4b4218c2d96c8c73b83101add5de98da388ee7414e59b93b8fb2ef0160dc256",
+    "f656b40425c705b9b51debd99450cbd3dd446353905f94fb638f8c5a093495eb",
+    "fb1c324e3cd1fb32edac159a511fb3dc5ed13113f1cf5e7a759a5fa9a78c507e",
+    "fb73ac5f0cf58f327d68947fb6890cb556c64bbcb2370c396e46a0c8cffb7705",
+    "fc400f99cf634d39f1a7f99382041a6d1da0ce66734c2744d14c800fe54ce0fb",
+    "fd7c567a112a8bfc092ef2d19a19c9ecb499c2f6466bc406ff4a42f7764241a5",
+    "fe71eec822e601907800df3fb34baa045b4b67bf499da7c06146d97011564a00",
+    "fee5322cf0b1fcdd39aaddc0d6b5e6b00b45179e991cec7d9f10a1ec1d1f33c3"
+  ],
+  "files": {
+    "tools/run_tests.py": {
+      "functions": {
+        "_append_git_config": {
+          "branches": 3,
+          "lines": 9
+        },
+        "build_parser": {
+          "branches": 0,
+          "lines": 15
+        },
+        "child_env": {
+          "branches": 2,
+          "lines": 16
+        },
+        "main": {
+          "branches": 1,
+          "lines": 17
+        },
+        "new_run_dir": {
+          "branches": 0,
+          "lines": 11
+        },
+        "quarantine_run_dir": {
+          "branches": 1,
+          "lines": 14
+        }
+      },
+      "lines": 135
+    },
+    "tools/spec_coverage.py": {
+      "functions": {
+        "_clause_section": {
+          "branches": 1,
+          "lines": 4
+        },
+        "_display": {
+          "branches": 2,
+          "lines": 5
+        },
+        "_front_matter": {
+          "branches": 2,
+          "lines": 7
+        },
+        "_resolve": {
+          "branches": 2,
+          "lines": 6
+        },
+        "collect_clauses": {
+          "branches": 14,
+          "lines": 54
+        },
+        "collect_test_ids": {
+          "branches": 9,
+          "lines": 21
+        },
+        "evaluate": {
+          "branches": 14,
+          "lines": 67
+        },
+        "load_bindings": {
+          "branches": 6,
+          "lines": 19
+        },
+        "main": {
+          "branches": 2,
+          "lines": 21
+        },
+        "spec_files": {
+          "branches": 4,
+          "lines": 16
+        }
+      },
+      "lines": 279
+    },
+    "tools/spec_lint.py": {
+      "functions": {
+        "_display_path": {
+          "branches": 2,
+          "lines": 5
+        },
+        "_front_matter_fields": {
+          "branches": 2,
+          "lines": 7
+        },
+        "_is_separator": {
+          "branches": 1,
+          "lines": 3
+        },
+        "_is_table_row": {
+          "branches": 0,
+          "lines": 2
+        },
+        "_legend_values": {
+          "branches": 0,
+          "lines": 2
+        },
+        "_split_states": {
+          "branches": 0,
+          "lines": 2
+        },
+        "_strict_duplicate_section_errors": {
+          "branches": 3,
+          "lines": 14
+        },
+        "_strict_table_errors": {
+          "branches": 13,
+          "lines": 38
+        },
+        "bare_command_tokens": {
+          "branches": 0,
+          "lines": 10
+        },
+        "lint_dir": {
+          "branches": 3,
+          "lines": 21
+        },
+        "lint_file": {
+          "branches": 61,
+          "lines": 190
+        },
+        "lint_path": {
+          "branches": 1,
+          "lines": 11
+        },
+        "lint_policy_file": {
+          "branches": 43,
+          "lines": 125
+        },
+        "lint_root": {
+          "branches": 4,
+          "lines": 28
+        },
+        "parse_front_matter": {
+          "branches": 8,
+          "lines": 26
+        },
+        "parse_section_blocks": {
+          "branches": 4,
+          "lines": 17
+        },
+        "parse_sections": {
+          "branches": 4,
+          "lines": 17
+        },
+        "parse_tables": {
+          "branches": 6,
+          "lines": 20
+        },
+        "split_cells": {
+          "branches": 7,
+          "lines": 28
+        },
+        "strict_structure_errors": {
+          "branches": 0,
+          "lines": 3
+        },
+        "unbacktick": {
+          "branches": 0,
+          "lines": 3
+        }
+      },
+      "lines": 712
+    },
+    "tools/tests/clause_bindings.py": {
+      "functions": {},
+      "lines": 166
+    },
+    "tools/tests/test_authority_drift.py": {
+      "functions": {
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 428
+    },
+    "tools/tests/test_authority_hardening.py": {
+      "functions": {
+        "read_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_git": {
+          "branches": 0,
+          "lines": 6
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 878
+    },
+    "tools/tests/test_authority_required.py": {
+      "functions": {
+        "read_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_git": {
+          "branches": 0,
+          "lines": 6
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 611
+    },
+    "tools/tests/test_authority_state.py": {
+      "functions": {
+        "read_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_git": {
+          "branches": 0,
+          "lines": 6
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 645
+    },
+    "tools/tests/test_ci_gate.py": {
+      "functions": {
+        "read_text": {
+          "branches": 1,
+          "lines": 5
+        },
+        "step_blocks": {
+          "branches": 1,
+          "lines": 5
+        }
+      },
+      "lines": 189
+    },
+    "tools/tests/test_completion_and_base.py": {
+      "functions": {
+        "completion_entry": {
+          "branches": 0,
+          "lines": 5
+        },
+        "read_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_cli": {
+          "branches": 0,
+          "lines": 5
+        },
+        "run_git": {
+          "branches": 0,
+          "lines": 7
+        },
+        "sha256_file": {
+          "branches": 0,
+          "lines": 2
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 3
+        }
+      },
+      "lines": 919
+    },
+    "tools/tests/test_coverage.py": {
+      "functions": {
+        "bindings_text": {
+          "branches": 1,
+          "lines": 8
+        },
+        "read_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_cli": {
+          "branches": 0,
+          "lines": 11
+        },
+        "run_git": {
+          "branches": 0,
+          "lines": 5
+        },
+        "sha256_file": {
+          "branches": 0,
+          "lines": 2
+        },
+        "spec_text": {
+          "branches": 0,
+          "lines": 4
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 1045
+    },
+    "tools/tests/test_deliver_ids.py": {
+      "functions": {
+        "sha256_file": {
+          "branches": 0,
+          "lines": 2
+        }
+      },
+      "lines": 230
+    },
+    "tools/tests/test_deliver_scope.py": {
+      "functions": {
+        "read_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_cli": {
+          "branches": 0,
+          "lines": 5
+        },
+        "run_git": {
+          "branches": 0,
+          "lines": 7
+        },
+        "sha256_file": {
+          "branches": 0,
+          "lines": 2
+        },
+        "task_record": {
+          "branches": 1,
+          "lines": 26
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 3
+        }
+      },
+      "lines": 622
+    },
+    "tools/tests/test_empty_ledger_guard.py": {
+      "functions": {
+        "read_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_git": {
+          "branches": 0,
+          "lines": 6
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 512
+    },
+    "tools/tests/test_envelope_baseline.py": {
+      "functions": {
+        "read_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_cli": {
+          "branches": 0,
+          "lines": 9
+        },
+        "run_git": {
+          "branches": 0,
+          "lines": 6
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 677
+    },
+    "tools/tests/test_gates.py": {
+      "functions": {
+        "git": {
+          "branches": 0,
+          "lines": 7
+        },
+        "sha256": {
+          "branches": 0,
+          "lines": 2
+        }
+      },
+      "lines": 381
+    },
+    "tools/tests/test_git_config_isolation.py": {
+      "functions": {
+        "capture_run_cli_env": {
+          "branches": 1,
+          "lines": 15
+        }
+      },
+      "lines": 96
+    },
+    "tools/tests/test_handoff_generic.py": {
+      "functions": {
+        "section": {
+          "branches": 2,
+          "lines": 10
+        },
+        "sha256": {
+          "branches": 0,
+          "lines": 2
+        }
+      },
+      "lines": 400
+    },
+    "tools/tests/test_hardening2.py": {
+      "functions": {
+        "read_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_cli": {
+          "branches": 0,
+          "lines": 11
+        },
+        "run_git": {
+          "branches": 0,
+          "lines": 6
+        },
+        "sha256_file": {
+          "branches": 0,
+          "lines": 2
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 572
+    },
+    "tools/tests/test_ledger_chain.py": {
+      "functions": {
+        "canonical_hash": {
+          "branches": 0,
+          "lines": 6
+        }
+      },
+      "lines": 289
+    },
+    "tools/tests/test_ledger_lock_windows.py": {
+      "functions": {
+        "append_many": {
+          "branches": 6,
+          "lines": 24
+        },
+        "read_events": {
+          "branches": 1,
+          "lines": 6
+        }
+      },
+      "lines": 296
+    },
+    "tools/tests/test_merge_pr_mode.py": {
+      "functions": {
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 825
+    },
+    "tools/tests/test_output_encoding.py": {
+      "functions": {
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 197
+    },
+    "tools/tests/test_policy_lint.py": {
+      "functions": {
+        "remove_section": {
+          "branches": 0,
+          "lines": 3
+        }
+      },
+      "lines": 343
+    },
+    "tools/tests/test_post_merge.py": {
+      "functions": {},
+      "lines": 624
+    },
+    "tools/tests/test_run_tests.py": {
+      "functions": {
+        "run_process": {
+          "branches": 2,
+          "lines": 27
+        }
+      },
+      "lines": 234
+    },
+    "tools/tests/test_spec_lint.py": {
+      "functions": {
+        "remove_section": {
+          "branches": 0,
+          "lines": 3
+        },
+        "strip_front_matter": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 240
+    },
+    "tools/tests/test_state_verify.py": {
+      "functions": {
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 1632
+    },
+    "tools/tests/test_trust_boundary.py": {
+      "functions": {
+        "canonical_hash": {
+          "branches": 0,
+          "lines": 6
+        },
+        "read_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_git": {
+          "branches": 0,
+          "lines": 6
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 525
+    },
+    "tools/towerctl.py": {
+      "functions": {
+        "_acquire_lock_file": {
+          "branches": 10,
+          "lines": 34
+        },
+        "_append_ledger_event": {
+          "branches": 0,
+          "lines": 5
+        },
+        "_append_ledger_event_locked": {
+          "branches": 4,
+          "lines": 34
+        },
+        "_authority_field_errors": {
+          "branches": 8,
+          "lines": 18
+        },
+        "_authority_mismatch_detail": {
+          "branches": 0,
+          "lines": 6
+        },
+        "_authority_policy_payload": {
+          "branches": 0,
+          "lines": 16
+        },
+        "_authority_policy_value_ok": {
+          "branches": 2,
+          "lines": 10
+        },
+        "_authority_state_drift": {
+          "branches": 27,
+          "lines": 129
+        },
+        "_clear_stale_lock": {
+          "branches": 10,
+          "lines": 29
+        },
+        "_completion_drift": {
+          "branches": 19,
+          "lines": 79
+        },
+        "_contained_tower_path": {
+          "branches": 6,
+          "lines": 36
+        },
+        "_dispatch_base_sha": {
+          "branches": 3,
+          "lines": 9
+        },
+        "_evidence_entry_drift": {
+          "branches": 21,
+          "lines": 94
+        },
+        "_force_utf8_stdio": {
+          "branches": 3,
+          "lines": 7
+        },
+        "_illegal_transition": {
+          "branches": 0,
+          "lines": 6
+        },
+        "_is_executable_path": {
+          "branches": 3,
+          "lines": 13
+        },
+        "_latest_by": {
+          "branches": 4,
+          "lines": 13
+        },
+        "_lexical_tower_path": {
+          "branches": 9,
+          "lines": 29
+        },
+        "_load_optional_record": {
+          "branches": 1,
+          "lines": 2
+        },
+        "_looks_like_path": {
+          "branches": 3,
+          "lines": 4
+        },
+        "_norm_tower_rel": {
+          "branches": 11,
+          "lines": 28
+        },
+        "_optional_git": {
+          "branches": 4,
+          "lines": 10
+        },
+        "_optional_git_status": {
+          "branches": 6,
+          "lines": 11
+        },
+        "_optional_task_record": {
+          "branches": 5,
+          "lines": 16
+        },
+        "_path_has_symlink": {
+          "branches": 6,
+          "lines": 20
+        },
+        "_profile_base": {
+          "branches": 4,
+          "lines": 16
+        },
+        "_profile_worktree_matches_task": {
+          "branches": 4,
+          "lines": 10
+        },
+        "_read_json_object": {
+          "branches": 4,
+          "lines": 19
+        },
+        "_release_lock_file": {
+          "branches": 7,
+          "lines": 18
+        },
+        "_sorted_states": {
+          "branches": 1,
+          "lines": 3
+        },
+        "_spec_drift": {
+          "branches": 17,
+          "lines": 45
+        },
+        "_split_argv": {
+          "branches": 4,
+          "lines": 17
+        },
+        "_state_nested_id": {
+          "branches": 1,
+          "lines": 4
+        },
+        "_state_owner_name": {
+          "branches": 1,
+          "lines": 4
+        },
+        "add_merge_ledger": {
+          "branches": 1,
+          "lines": 8
+        },
+        "allowed_repo_path": {
+          "branches": 10,
+          "lines": 32
+        },
+        "append_ledger": {
+          "branches": 0,
+          "lines": 2
+        },
+        "append_supervision_ledger": {
+          "branches": 0,
+          "lines": 3
+        },
+        "authority_commit_hint": {
+          "branches": 3,
+          "lines": 10
+        },
+        "authority_display": {
+          "branches": 1,
+          "lines": 3
+        },
+        "authority_drift": {
+          "branches": 9,
+          "lines": 39
+        },
+        "authority_lock": {
+          "branches": 5,
+          "lines": 26
+        },
+        "authority_payload_fields": {
+          "branches": 0,
+          "lines": 4
+        },
+        "authority_policy_fields": {
+          "branches": 1,
+          "lines": 10
+        },
+        "authority_policy_invalid": {
+          "branches": 1,
+          "lines": 9
+        },
+        "authority_policy_mismatch": {
+          "branches": 12,
+          "lines": 45
+        },
+        "authority_policy_mismatch_detail": {
+          "branches": 2,
+          "lines": 12
+        },
+        "authority_policy_required": {
+          "branches": 1,
+          "lines": 8
+        },
+        "authority_repo": {
+          "branches": 3,
+          "lines": 17
+        },
+        "authority_require_locked": {
+          "branches": 29,
+          "lines": 102
+        },
+        "authority_required_event": {
+          "branches": 2,
+          "lines": 13
+        },
+        "authority_requirement": {
+          "branches": 1,
+          "lines": 21
+        },
+        "authority_requirement_errors": {
+          "branches": 9,
+          "lines": 41
+        },
+        "authority_set_locked": {
+          "branches": 21,
+          "lines": 93
+        },
+        "authority_state_check": {
+          "branches": 36,
+          "lines": 186
+        },
+        "authority_state_fields": {
+          "branches": 2,
+          "lines": 21
+        },
+        "block_pr_merge": {
+          "branches": 0,
+          "lines": 17
+        },
+        "build_parser": {
+          "branches": 0,
+          "lines": 169
+        },
+        "canonical_event_bytes": {
+          "branches": 0,
+          "lines": 10
+        },
+        "check_evidence": {
+          "branches": 7,
+          "lines": 21
+        },
+        "check_package_id": {
+          "branches": 1,
+          "lines": 6
+        },
+        "check_task_id": {
+          "branches": 1,
+          "lines": 6
+        },
+        "checks_timeout_detail": {
+          "branches": 1,
+          "lines": 4
+        },
+        "cli_commands": {
+          "branches": 2,
+          "lines": 7
+        },
+        "cmd_accept": {
+          "branches": 5,
+          "lines": 21
+        },
+        "cmd_authority_check": {
+          "branches": 2,
+          "lines": 8
+        },
+        "cmd_authority_require": {
+          "branches": 0,
+          "lines": 27
+        },
+        "cmd_authority_set": {
+          "branches": 0,
+          "lines": 15
+        },
+        "cmd_check": {
+          "branches": 35,
+          "lines": 73
+        },
+        "cmd_checkback": {
+          "branches": 9,
+          "lines": 25
+        },
+        "cmd_close": {
+          "branches": 4,
+          "lines": 34
+        },
+        "cmd_completion_add": {
+          "branches": 18,
+          "lines": 114
+        },
+        "cmd_deliver": {
+          "branches": 11,
+          "lines": 62
+        },
+        "cmd_dispatch": {
+          "branches": 7,
+          "lines": 33
+        },
+        "cmd_envelope_new": {
+          "branches": 15,
+          "lines": 66
+        },
+        "cmd_handoff_accept": {
+          "branches": 4,
+          "lines": 35
+        },
+        "cmd_handoff_activate": {
+          "branches": 5,
+          "lines": 35
+        },
+        "cmd_handoff_check": {
+          "branches": 2,
+          "lines": 12
+        },
+        "cmd_handoff_claim": {
+          "branches": 3,
+          "lines": 28
+        },
+        "cmd_handoff_new": {
+          "branches": 30,
+          "lines": 189
+        },
+        "cmd_handoff_receipt": {
+          "branches": 7,
+          "lines": 45
+        },
+        "cmd_handoff_status": {
+          "branches": 3,
+          "lines": 12
+        },
+        "cmd_hash": {
+          "branches": 1,
+          "lines": 6
+        },
+        "cmd_init": {
+          "branches": 4,
+          "lines": 35
+        },
+        "cmd_merge": {
+          "branches": 35,
+          "lines": 197
+        },
+        "cmd_merge_check": {
+          "branches": 11,
+          "lines": 72
+        },
+        "cmd_phase": {
+          "branches": 1,
+          "lines": 13
+        },
+        "cmd_post_merge": {
+          "branches": 30,
+          "lines": 171
+        },
+        "cmd_queue_add": {
+          "branches": 5,
+          "lines": 54
+        },
+        "cmd_spec_approve": {
+          "branches": 3,
+          "lines": 10
+        },
+        "cmd_spec_coverage": {
+          "branches": 1,
+          "lines": 7
+        },
+        "cmd_spec_lint": {
+          "branches": 4,
+          "lines": 19
+        },
+        "cmd_startup": {
+          "branches": 8,
+          "lines": 27
+        },
+        "cmd_state_verify": {
+          "branches": 3,
+          "lines": 22
+        },
+        "cmd_status": {
+          "branches": 1,
+          "lines": 11
+        },
+        "cmd_supervision_init": {
+          "branches": 4,
+          "lines": 24
+        },
+        "cmd_supervision_phase": {
+          "branches": 1,
+          "lines": 13
+        },
+        "cmd_supervision_status": {
+          "branches": 2,
+          "lines": 14
+        },
+        "cmd_task_new": {
+          "branches": 9,
+          "lines": 56
+        },
+        "cmd_task_next": {
+          "branches": 0,
+          "lines": 7
+        },
+        "cmd_verify_ledger": {
+          "branches": 3,
+          "lines": 10
+        },
+        "cmd_wiring": {
+          "branches": 10,
+          "lines": 40
+        },
+        "command_failure": {
+          "branches": 3,
+          "lines": 4
+        },
+        "completion_events": {
+          "branches": 4,
+          "lines": 15
+        },
+        "completion_paths": {
+          "branches": 5,
+          "lines": 11
+        },
+        "current_snapshot": {
+          "branches": 23,
+          "lines": 63
+        },
+        "deliver_scope": {
+          "branches": 21,
+          "lines": 112
+        },
+        "dispatch_base_sha": {
+          "branches": 4,
+          "lines": 20
+        },
+        "dispatch_provenance_field": {
+          "branches": 2,
+          "lines": 13
+        },
+        "emit": {
+          "branches": 0,
+          "lines": 3
+        },
+        "ensure_within": {
+          "branches": 4,
+          "lines": 16
+        },
+        "envelope_checks": {
+          "branches": 20,
+          "lines": 121
+        },
+        "envelope_for_task": {
+          "branches": 5,
+          "lines": 10
+        },
+        "envelope_has_baselines": {
+          "branches": 1,
+          "lines": 15
+        },
+        "event_hash": {
+          "branches": 0,
+          "lines": 2
+        },
+        "fail": {
+          "branches": 0,
+          "lines": 4
+        },
+        "gh_command": {
+          "branches": 4,
+          "lines": 20
+        },
+        "git": {
+          "branches": 0,
+          "lines": 5
+        },
+        "git_ok": {
+          "branches": 2,
+          "lines": 5
+        },
+        "handoff_checks": {
+          "branches": 16,
+          "lines": 46
+        },
+        "is_safe_id": {
+          "branches": 2,
+          "lines": 9
+        },
+        "jdump": {
+          "branches": 0,
+          "lines": 5
+        },
+        "jload": {
+          "branches": 0,
+          "lines": 2
+        },
+        "last_authority_event": {
+          "branches": 4,
+          "lines": 17
+        },
+        "last_authority_required_event": {
+          "branches": 4,
+          "lines": 17
+        },
+        "ledger_break_phrase": {
+          "branches": 1,
+          "lines": 4
+        },
+        "ledger_empty_guard": {
+          "branches": 3,
+          "lines": 34
+        },
+        "ledger_events_in_seq_order": {
+          "branches": 4,
+          "lines": 17
+        },
+        "ledger_events_naming": {
+          "branches": 4,
+          "lines": 17
+        },
+        "ledger_has_event": {
+          "branches": 0,
+          "lines": 9
+        },
+        "ledger_has_queue_add": {
+          "branches": 0,
+          "lines": 8
+        },
+        "ledger_has_task_event": {
+          "branches": 8,
+          "lines": 14
+        },
+        "ledger_lock": {
+          "branches": 5,
+          "lines": 17
+        },
+        "ledger_lock_path": {
+          "branches": 0,
+          "lines": 2
+        },
+        "ledger_precondition_breaks": {
+          "branches": 2,
+          "lines": 17
+        },
+        "ledger_rows": {
+          "branches": 7,
+          "lines": 22
+        },
+        "legacy_anchor": {
+          "branches": 0,
+          "lines": 3
+        },
+        "load_board": {
+          "branches": 1,
+          "lines": 5
+        },
+        "load_profile": {
+          "branches": 3,
+          "lines": 8
+        },
+        "load_queue": {
+          "branches": 1,
+          "lines": 5
+        },
+        "load_record": {
+          "branches": 1,
+          "lines": 5
+        },
+        "load_supervision": {
+          "branches": 1,
+          "lines": 5
+        },
+        "main": {
+          "branches": 3,
+          "lines": 34
+        },
+        "match_task_by_evidence": {
+          "branches": 9,
+          "lines": 27
+        },
+        "max_verified_tower_tests": {
+          "branches": 8,
+          "lines": 26
+        },
+        "next_authority_revision": {
+          "branches": 7,
+          "lines": 18
+        },
+        "now": {
+          "branches": 0,
+          "lines": 2
+        },
+        "parse_created_pr": {
+          "branches": 3,
+          "lines": 15
+        },
+        "parse_ledger_row": {
+          "branches": 3,
+          "lines": 7
+        },
+        "parse_test_count": {
+          "branches": 3,
+          "lines": 7
+        },
+        "pr_fast_forward": {
+          "branches": 1,
+          "lines": 7
+        },
+        "pr_remote_merge": {
+          "branches": 17,
+          "lines": 69
+        },
+        "prev_hash_for_rows": {
+          "branches": 4,
+          "lines": 10
+        },
+        "rel": {
+          "branches": 2,
+          "lines": 5
+        },
+        "replay_envelope_statuses": {
+          "branches": 11,
+          "lines": 40
+        },
+        "replay_task_statuses": {
+          "branches": 10,
+          "lines": 37
+        },
+        "repo_relative": {
+          "branches": 2,
+          "lines": 6
+        },
+        "require_gh_auth": {
+          "branches": 7,
+          "lines": 20
+        },
+        "require_git": {
+          "branches": 1,
+          "lines": 6
+        },
+        "resolve_input": {
+          "branches": 2,
+          "lines": 6
+        },
+        "resolve_input_within": {
+          "branches": 1,
+          "lines": 5
+        },
+        "resolve_pilot_paths": {
+          "branches": 13,
+          "lines": 42
+        },
+        "resolve_repository": {
+          "branches": 2,
+          "lines": 5
+        },
+        "run_gh": {
+          "branches": 4,
+          "lines": 19
+        },
+        "run_test_suite": {
+          "branches": 0,
+          "lines": 13
+        },
+        "save_board": {
+          "branches": 0,
+          "lines": 3
+        },
+        "save_queue": {
+          "branches": 0,
+          "lines": 3
+        },
+        "save_record": {
+          "branches": 0,
+          "lines": 3
+        },
+        "select_envelope": {
+          "branches": 3,
+          "lines": 12
+        },
+        "select_task": {
+          "branches": 4,
+          "lines": 16
+        },
+        "sha256_file": {
+          "branches": 1,
+          "lines": 6
+        },
+        "spec_gate_errors": {
+          "branches": 4,
+          "lines": 29
+        },
+        "state_verify_drift": {
+          "branches": 49,
+          "lines": 189
+        },
+        "status_path": {
+          "branches": 2,
+          "lines": 6
+        },
+        "supervision_artifacts": {
+          "branches": 10,
+          "lines": 31
+        },
+        "supervision_ledger_event_count": {
+          "branches": 3,
+          "lines": 16
+        },
+        "task_dir": {
+          "branches": 0,
+          "lines": 2
+        },
+        "task_record_path": {
+          "branches": 0,
+          "lines": 2
+        },
+        "tool_owned_paths": {
+          "branches": 2,
+          "lines": 8
+        },
+        "update_board": {
+          "branches": 1,
+          "lines": 16
+        },
+        "validate_spec": {
+          "branches": 10,
+          "lines": 20
+        },
+        "verify_ledger_file": {
+          "branches": 14,
+          "lines": 64
+        },
+        "wait_for_checks": {
+          "branches": 9,
+          "lines": 34
+        },
+        "working_tree_state": {
+          "branches": 6,
+          "lines": 23
+        },
+        "write_task_merge_record": {
+          "branches": 7,
+          "lines": 33
+        }
+      },
+      "lines": 5642
+    }
+  },
+  "schema": "tower/shape-baseline@1",
+  "unused_imports": {
+    "tools/spec_coverage.py": [
+      "sys"
+    ]
+  }
+}
