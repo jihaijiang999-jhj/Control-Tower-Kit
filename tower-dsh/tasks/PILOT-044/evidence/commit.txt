@@ -1,0 +1,17 @@
+﻿HEAD: 5cc933eb894f781b28cd1a16f9be348afc942753
+Title: PILOT-044: gate methods/nested functions and freeze deliver baseline to the tower root
+Date: 2026-10-28 01:22:43 +0800
+
+HEAD: b816f4104371b843dbc82f85fd08e040f83551ab
+Title: PILOT-044: shape-check ratchet (new debt only) + REVIEW structure five questions
+Date: 2026-10-28 00:24:08 +0800
+
+--- files changed (git diff --name-only main..HEAD) ---
+tower-dsh/state/SHAPE-BASELINE.json
+tower-dsh/tools/tests/test_shape_check.py
+tower-dsh/tools/towerctl.py
+--- commits ---
+5cc933e PILOT-044: gate methods/nested functions and freeze deliver baseline to the tower root
+b816f41 PILOT-044: shape-check ratchet (new debt only) + REVIEW structure five questions
+--- git status --short ---
+?? scratch/

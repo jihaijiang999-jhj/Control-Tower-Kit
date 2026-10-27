@@ -421,7 +421,27 @@
       "reviewer": "subagent:457986b8-942e-4c38-a696-aa6649938d3b",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-042/MERGE.md",
       "updated_at": "2026-10-26T22:41:55+08:00"
+    },
+    {
+      "id": "PILOT-043",
+      "title": "记录层纵深：deliver 反查 completion 事件、state-verify 审计 base_sha 与孤悬 completion",
+      "status": "ready",
+      "authority": "workspace_write",
+      "executor": null,
+      "reviewer": null,
+      "next": "spec 审批：owner 或独立 reviewer 运行 spec-approve，然后 check --phase spec",
+      "updated_at": "2026-10-27T11:27:24+08:00"
+    },
+    {
+      "id": "PILOT-044",
+      "title": "形状预算 ratchet：shape-check（只判新增债务）+ REVIEW Structure 五问",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:d87cf646-a7cc-4217-a573-5613f961985d",
+      "reviewer": "subagent:862dbc9b-d3a8-4a2a-93ce-3d4a7a8ad9a6",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-044/MERGE.md",
+      "updated_at": "2026-10-28T01:49:02+08:00"
     }
   ],
-  "updated_at": "2026-10-26T22:41:55+08:00"
+  "updated_at": "2026-10-28T01:49:02+08:00"
 }

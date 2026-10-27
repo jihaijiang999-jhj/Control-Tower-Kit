@@ -1,0 +1,169 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-044",
+  "title": "形状预算 ratchet：shape-check（只判新增债务）+ REVIEW Structure 五问",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "新增 towerctl shape-check：扫描塔根 tools/*.py 与 tools/tests/*.py（跳过 __pycache__），按基线做 ratchet——新函数 >80 行或 >12 分支 → error；基线内函数超过基线值（变长/分支增加）→ error；基线内函数未超过 → 放行；新文件 >600 行 → error；新出现 ≥15 行重复块（去空白/注释后按 15 行窗口哈希）→ error；新出现未使用 import → error；全部通过 exit 0",
+    "shape-check --write-baseline：把当前扫描结果写入 state/SHAPE-BASELINE.json（schema tower/shape-baseline@1；files→{lines,functions:{name:{lines,branches}}}；unused_imports；duplicate_blocks 的 sha256 列表；键排序、无时间戳，两次运行字节相同）；--write-baseline 不与其他检查混用（写入即 exit 0）",
+    "shape-check 默认读 state/SHAPE-BASELINE.json；基线缺失时 exit 2 并提示先 --write-baseline（不静默跳过）",
+    "deliver 接入：范围门通过后、复制证据前，对 worktree 的 tools/ 跑同一 ratchet（基线取 worktree 的 state/SHAPE-BASELINE.json；worktree 无 tools/*.py 或基线缺失 → 跳过并在输出注明 shape_check=\"skipped\"；有基线且发现新增债务 → exit 2、零写入）；成功输出增加 shape_checked=true|false",
+    "checkback 增加可选 --structure <text>：REVIEW.md 固定包含 “## Structure review（五问）” 区块，逐条列出——(1) 新抽象是否有 ≥2 个使用点？(2) 有无死代码/永久开关？(3) 有无 ≥15 行重复？(4) 测试是否只镜像实现？(5) 新增 TODO 是否有卡号？——并把 --structure 文本作为“reviewer 回答”；未提供则写“未提供（044 起建议填写，暂不阻塞）”；record.review.structure 记录该文本",
+    "新增 tools/tests/test_shape_check.py：新 90 行函数 → exit 2；基线内 120 行函数不报；基线内函数变 130 行 → exit 2；新 700 行文件 → exit 2；新未使用 import → exit 2；新 15 行重复块 → exit 2；--write-baseline 两次字节相同；基线缺失 → exit 2；deliver 对有新增债务的 worktree → exit 2 且零写入，无债务 → 0 且 shape_checked=true；checkback --structure → REVIEW.md 含五问与回答",
+    "生成并提交 state/SHAPE-BASELINE.json（基于 042 合并后的 main，不包含 044 自己的改动），使 044 自身新增函数全部 ≤80 行/≤12 分支（dogfooding）",
+    "真实塔验证：worktree 新工具 shape-check exit 0、authority-check exit 0、state-verify drift []；建信封前 tasks=43/envelopes=42，建信封后 43/43；merge 前置链与空账本守卫仍通过",
+    "不改 036–043 的信任边界/授权/前置链/空账本/范围门/completion/base_sha 语义；不引入第三方依赖；不手写 ledger；CI workflow 的接线留给 045（workflow 在仓库根，allowed_paths 映射暂不支持，属已知边界）"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-044/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-044/tower-dsh/tools/tests/test_shape_check.py",
+    "pilot/worktrees/PILOT-044/tower-dsh/state/SHAPE-BASELINE.json"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "hand-editing state/AUTHORITY.json, shared/AUTHORITY_POLICY.json or ledger/*.jsonl",
+    "silently skipping shape-check when the baseline exists",
+    "weakening thresholds or baselining 044's own new functions to make them pass",
+    "adding a third-party linter/coverage dependency"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-044/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 419 + 新增用例数（main 基线 419）",
+    "shape-check 在真实塔 exit 0；--write-baseline 两次输出字节相同；删除基线后 shape-check exit 2 并提示写入",
+    "夹具：新 90 行函数 → exit 2；基线内 120 行函数 → 0；基线内函数 120→130 → exit 2；新 700 行文件 → 2；新未使用 import → 2；新 15 行重复块 → 2",
+    "deliver：worktree 有新增长函数 → exit 2、零写入；无新增债务 → 0 且输出 shape_checked=true；无 tools/ 或无基线的夹具 → shape_check=skipped（既有 deliver 测试全绿）",
+    "checkback --structure '…' → REVIEW.md 含 “Structure review” 五问与回答，record.review.structure 为该文本；不传 --structure 时 REVIEW.md 仍含五问、回答为“未提供”",
+    "旧码对照：main 版工具对新长函数夹具 deliver exit 0（无 shape 门）、新码 exit 2；main 版无 shape-check 命令。证据写进 scratch/probe-old-code.txt",
+    "真实塔：worktree 新工具 shape-check exit 0、authority-check exit 0（configured+required）、state-verify drift []；建信封前 tasks=43/envelopes=42，建信封后 43/43；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-044 diff --name-only main..HEAD 恰三个 allowed_paths（towerctl.py、test_shape_check.py、state/SHAPE-BASELINE.json）"
+  ],
+  "depends_on": [
+    "PILOT-042"
+  ],
+  "worktree": "pilot/worktrees/PILOT-044",
+  "spec_path": "pilot/PILOT-044.spec.json",
+  "spec_sha256": "964fe3b56f396d5fa92461be43095cb6a7c865ed8afd9dfa2289ba7cb59c5902",
+  "spec_gate": "PASS",
+  "executor": "subagent:d87cf646-a7cc-4217-a573-5613f961985d",
+  "dispatch": {
+    "executor": "subagent:d87cf646-a7cc-4217-a573-5613f961985d",
+    "worktree": "pilot/worktrees/PILOT-044",
+    "at": "2026-10-28T00:04:40+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "b671c7c08944e42b5a42ddcce32d06a276d949d7"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-044/evidence/shape_probe.py",
+      "sha256": "b83334124533e88a78eefdc2063e6de4e779ca95383f930ec4c7cd2282667a82",
+      "bytes": 4237,
+      "at": "2026-10-28T00:33:14+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-044/evidence/towerctl.py",
+      "sha256": "e68eca96cacf9911120b48e623eb9351a566589c9bb7cf7959f8508951dfcedd",
+      "bytes": 271499,
+      "at": "2026-10-28T01:30:27+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-044/evidence/test_shape_check.py",
+      "sha256": "27d9bbc9c9ce34db2d97d051e3249d9f0e65071abef6d49ee76760071d2247fe",
+      "bytes": 22217,
+      "at": "2026-10-28T01:30:27+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-044/evidence/SHAPE-BASELINE.json",
+      "sha256": "88f0fa0e444a96cc602e1603ffcef726d6024d6c78b8e08cf2975629d1ab4ad9",
+      "bytes": 140520,
+      "at": "2026-10-28T01:30:27+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-044/evidence/test-output.txt",
+      "sha256": "0ee0d5954f542ce63f8b78c2a2d205e9a7e9fc2d4d77dddebf1b7cf3140f7e63",
+      "bytes": 63438,
+      "at": "2026-10-28T01:30:27+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-044/evidence/probe.txt",
+      "sha256": "c370d7d085f95d0a73f0c26258262e2ef39c75faf7df6b3eb2b24cc0835e516d",
+      "bytes": 2294,
+      "at": "2026-10-28T01:30:27+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-044/evidence/deliver-baseline-probe.txt",
+      "sha256": "a003d7478c9e20498de12f35a5fb0615e4bece34437ea45478427f6e5b9a1c83",
+      "bytes": 1252,
+      "at": "2026-10-28T01:30:27+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-044/evidence/probe-old-code.txt",
+      "sha256": "b88462a5281a275189a4ae44ad90f0dcb331983fe52f0d25c69e9d7c4dd5b926",
+      "bytes": 2378,
+      "at": "2026-10-28T01:30:27+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-044/evidence/baseline-summary.txt",
+      "sha256": "58a21bca24ea2c0aead82a909540c302bd4296c5b19dcad036c0e378729727e6",
+      "bytes": 4434,
+      "at": "2026-10-28T01:30:27+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-044/evidence/commit.txt",
+      "sha256": "38be7de4662fddd99dca8f77e73d08a947f16e92a52a89b48a01ea402c741270",
+      "bytes": 763,
+      "at": "2026-10-28T01:30:27+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-044/evidence/diff.txt",
+      "sha256": "be7934722759a5265c358dce20de5ddd42f1614ca76aacc7f6aac1f737106b33",
+      "bytes": 195155,
+      "at": "2026-10-28T01:30:27+08:00",
+      "id": "E-011"
+    },
+    {
+      "path": "tasks/PILOT-044/evidence/baseline-from-main.json",
+      "sha256": "88f0fa0e444a96cc602e1603ffcef726d6024d6c78b8e08cf2975629d1ab4ad9",
+      "bytes": 140520,
+      "at": "2026-10-28T01:30:27+08:00",
+      "id": "E-012"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:862dbc9b-d3a8-4a2a-93ce-3d4a7a8ad9a6",
+    "verdict": "PASS",
+    "note": "044 第二轮复核：代码与夹具全部 PASS（方法/嵌套盲区已关上：新 91 行 Big.huge → 2、outer.inner → 2、基线 120→130 → 2、键为限定名；baseline 自关已关上：worktree 篡改/删除 → 2、塔根缺失 → 2、有债塔根干净 → 2 零写入、干净 → 0 checked、parse error → 2 无 traceback；Ran 441 OK；证据 12/12；基线 1114 条、可字节复现、不含 044）。复核唯一 FAIL 点是“044 自身交付是否经过新门”的记录缺失：真实塔根 pre-merge 没有 state/SHAPE-BASELINE.json，而新门要求塔根基线，故 044 在 01:30 的交付只能用 main 版工具（043 代码，无 shape 门）完成——这是**引入新门时的一次性 bootstrap**（与 041 同类：新门会拒绝“引入它自己的那个 commit”，因为基线由该 commit 引入），不是绕过既有门。按复核给出的修法 1 记录该例外：一次性、不追认、不回填；staging/夹具已独立证明新门在忠实塔上生效（塔根缺基线 → 2；塔根有基线、worktree 干净 → 0；worktree 篡改/删除基线 → 2；worktree 有债 → 2 零写入）；044 merge 后 main 即拥有 state/SHAPE-BASELINE.json，之后所有 deliver 必须走新门（本卡不提供 --force/环境变量绕过）。非阻塞残余：①skip 条件“塔根与 worktree 都无 state/ 目录”在宽 allowed_paths 下可被利用（先删两侧 state/ 再 deliver；真实塔 authority-check 会 2，但 deliver 不调用它）——045 收紧为显式 fixture 标记或要求 tower state 存在；②baseline-summary 的 functions total 1067 标签错误，实际 1114 条（285 module 条目 + 829 dotted）；③spec 的 43/42 是 VOID 假设下的 stale 文字，实际 44/42（dispatch 已入账）；④test-output 含 cp936 字节、baseline-summary 为 UTF-16LE（哈希有效，卫生问题）；⑤嵌套长函数会同时报父与子（noisy 但安全）。",
+    "at": "2026-10-28T01:49:02+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-044",
+    "actor": "owner",
+    "text": "second-round review PASS on code/fixtures; gate-introduction bootstrap recorded as one-time (no backfill); 441 tests, 12/12 hashes",
+    "at": "2026-10-28T01:49:02+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-044/CLOSEOUT.md",
+    "at": "2026-10-28T01:49:02+08:00"
+  },
+  "created_at": "2026-10-27T23:55:56+08:00",
+  "updated_at": "2026-10-28T01:49:02+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-044/MERGE.md",
+  "delivered_at": "2026-10-28T01:30:27+08:00",
+  "accepted_at": "2026-10-28T01:49:02+08:00"
+}
