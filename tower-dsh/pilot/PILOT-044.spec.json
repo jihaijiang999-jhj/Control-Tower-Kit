@@ -3,7 +3,7 @@
   "id": "PILOT-044",
   "title": "形状预算 ratchet：shape-check（只判新增债务）+ REVIEW Structure 五问",
   "authority": "workspace_write",
-  "anchor": "MAP P1-2 / 代码形状无机器门（043 暂缓未派，先做本卡）",
+  "anchor": "MAP P1-2 / 代码形状无机器门（043 暂缓未派 ready，先做本卡）",
   "why_now": "towerctl.py 已 5,643 行、194 函数，其中 13 个 >80 行、6 个 >150 行；041/042 两张卡 +538 行并新增两个 >80 行函数，419 个测试全绿——没有任何门看见“形状”。044 用零依赖的 AST 扫描做 ratchet：现有债务进基线不报，新增债务（新长函数、函数变长、新长文件、新重复块、新未使用 import）一律 fail；并把复核的 Structure 五问写进 REVIEW.md。diff 覆盖率需要 coverage 依赖，留下一张卡。",
   "scope": [
     "新增 towerctl shape-check：扫描塔根 tools/*.py 与 tools/tests/*.py（跳过 __pycache__），按基线做 ratchet——新函数 >80 行或 >12 分支 → error；基线内函数超过基线值（变长/分支增加）→ error；基线内函数未超过 → 放行；新文件 >600 行 → error；新出现 ≥15 行重复块（去空白/注释后按 15 行窗口哈希）→ error；新出现未使用 import → error；全部通过 exit 0",
