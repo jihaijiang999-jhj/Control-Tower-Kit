@@ -2082,25 +2082,40 @@ def shape_branch_count(node: ast.AST) -> int:
 
 
 def shape_function_stats(tree: ast.Module) -> dict[str, dict]:
-    """Module-level function shapes: ``{name: {lines, branches}}``.
+    """Every function in the file: ``{"Class.method": {lines, branches}}``.
 
-    Methods and nested functions stay out of scope: the frozen baseline covers
-    the module-level shape of each file (PILOT-044 measured the 13 >80-line
-    functions that way).  Duplicate names are suffixed so no function can hide
-    another one in the baseline.
+    Methods and nested functions are in scope: a 91-line class method or a long
+    nested helper is exactly the debt the ratchet exists to catch.  Keys are
+    qualified names so the baseline stays unambiguous.
     """
     stats: dict[str, dict] = {}
-    for node in tree.body:
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        key = node.name
-        suffix = 1
-        while key in stats:
-            key = f"{node.name}#{suffix}"
-            suffix += 1
-        stats[key] = {"lines": node.end_lineno - node.lineno + 1,
-                      "branches": shape_branch_count(node)}
+    shape_collect_functions(list(tree.body), "", stats)
     return stats
+
+
+def shape_collect_functions(nodes: list[ast.AST], prefix: str,
+                            stats: dict[str, dict]) -> None:
+    """Record each def under ``nodes`` and recurse into its own scope."""
+    for node in nodes:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            key = shape_unique_name(prefix + node.name, stats)
+            stats[key] = {"lines": node.end_lineno - node.lineno + 1,
+                          "branches": shape_branch_count(node)}
+            shape_collect_functions(list(node.body), key + ".", stats)
+        elif isinstance(node, ast.ClassDef):
+            shape_collect_functions(list(node.body), prefix + node.name + ".", stats)
+        else:
+            shape_collect_functions(list(ast.iter_child_nodes(node)), prefix, stats)
+
+
+def shape_unique_name(name: str, stats: dict[str, dict]) -> str:
+    """A file-unique key, suffixing redefinitions (``m#1``)."""
+    key = name
+    suffix = 1
+    while key in stats:
+        key = f"{name}#{suffix}"
+        suffix += 1
+    return key
 
 
 def shape_import_bindings(tree: ast.AST) -> list[tuple[str, int]]:
@@ -2173,7 +2188,10 @@ def shape_scan(root: Path) -> dict:
         # ``utf-8-sig``: PILOT-042's test module starts with a BOM, which
         # ``ast.parse`` rejects but the interpreter tolerates.
         text = path.read_text(encoding="utf-8-sig")
-        tree = ast.parse(text, filename=key)
+        try:
+            tree = ast.parse(text, filename=key)
+        except SyntaxError as exc:
+            fail([f"cannot parse {key}: {exc.msg}"])
         files[key] = {"lines": len(text.splitlines()),
                       "functions": shape_function_stats(tree)}
         missing = shape_unused_imports(tree, text)
@@ -2540,13 +2558,14 @@ def deliver_scope(root: Path, rec: dict) -> tuple[list[str], list[str], str | No
 
 
 def deliver_shape_gate(root: Path, rec: dict) -> tuple[list[str], str | None]:
-    """Run the PILOT-044 shape ratchet over the tower copy inside the worktree.
+    """Run the tower root's shape baseline over the worktree's tower copy.
 
     Returns ``(errors, skipped)``.  ``skipped`` is :data:`DELIVER_SHAPE_SKIPPED`
-    when the worktree has no ``tools/*.py`` or no baseline (fixtures / legacy
-    towers); ``None`` means the ratchet ran and passed.  New debt is an error,
-    and :func:`cmd_deliver` fails before copying evidence, so a rejected
-    delivery writes nothing at all.
+    only when the worktree has no ``tools/*.py`` (nothing to scan) or when it is
+    a pre-shape tower (no ``state/`` directory on either side).  Otherwise the
+    baseline is the **tower root's** copy and the worktree must carry it
+    byte-for-byte, so a task cannot silence the gate by editing or deleting its
+    own baseline.  Every error is returned before evidence is copied.
     """
     repo = authority_repo(root)
     worktree_rel = str(rec.get("worktree") or "").strip()
@@ -2558,11 +2577,35 @@ def deliver_shape_gate(root: Path, rec: dict) -> tuple[list[str], str | None]:
         shape_root = shape_root / tower_rel
     if not shape_py_files(shape_root):
         return [], DELIVER_SHAPE_SKIPPED
-    baseline_path = shape_root / SHAPE_BASELINE_REL
-    if not baseline_path.is_file():
+    tower_baseline = root / SHAPE_BASELINE_REL
+    worktree_baseline = shape_root / SHAPE_BASELINE_REL
+    if not (root / "state").is_dir() and not (shape_root / "state").is_dir():
         return [], DELIVER_SHAPE_SKIPPED
+    errors = shape_baseline_guard(tower_baseline, worktree_baseline)
+    if errors:
+        return errors, None
     current = shape_scan(shape_root)
-    return shape_debt_errors(current, load_shape_baseline(baseline_path)), None
+    return shape_debt_errors(current, load_shape_baseline(tower_baseline)), None
+
+
+def shape_baseline_guard(tower_baseline: Path, worktree_baseline: Path) -> list[str]:
+    """The deliver baseline is the tower root's copy, byte-for-byte.
+
+    A task may not silence the ratchet by editing or deleting its own baseline:
+    the baseline is frozen on main, and changing it needs its own
+    baseline-refresh card.
+    """
+    if not tower_baseline.is_file():
+        return [f"shape baseline missing: {SHAPE_BASELINE_REL} in the tower root; "
+                "a baseline refresh needs its own card"]
+    if not worktree_baseline.is_file():
+        return [f"shape baseline missing in worktree: {SHAPE_BASELINE_REL}; "
+                "it must match the tower root (baseline refresh needs its own card)"]
+    if worktree_baseline.read_bytes() != tower_baseline.read_bytes():
+        return [f"shape baseline modified in worktree: {SHAPE_BASELINE_REL}; "
+                "it must match the tower root byte-for-byte (baseline refresh "
+                "needs its own card)"]
+    return []
 
 
 def dispatch_base_sha(root: Path, worktree: Path) -> str | None:

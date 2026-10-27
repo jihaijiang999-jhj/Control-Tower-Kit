@@ -69,6 +69,26 @@ def long_function(name: str, lines: int) -> str:
     return "\n".join([f"def {name}():", *body]) + "\n"
 
 
+def long_method(class_name: str, method: str, lines: int) -> str:
+    """A class holding one method with exactly ``lines`` physical lines."""
+    body = [f"        v{index} = {index}" for index in range(lines - 1)]
+    return f"class {class_name}:\n    def {method}(self):\n" + "\n".join(body) + "\n"
+
+
+def nested_long_function(outer: str, inner: str, lines: int) -> str:
+    """``outer`` nests ``inner`` with exactly ``lines`` physical lines."""
+    body = [f"        v{index} = {index}" for index in range(lines - 1)]
+    return f"def {outer}():\n    def {inner}():\n" + "\n".join(body) + "\n"
+
+
+def write_baseline(path: Path, data) -> None:
+    """Write a baseline with LF endings, matching ``.gitattributes``."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+
+
 class ShapeCheckCase(unittest.TestCase):
     """Standalone ``shape-check`` against a minimal, non-git tower root."""
 
@@ -164,12 +184,58 @@ class ShapeCheckCase(unittest.TestCase):
         self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
         self.assertIn("--write-baseline", cp.stdout)
 
+    # -- 9. methods and nested functions are in scope ---------------------
+    def test_new_long_method_fails(self) -> None:
+        self.freeze()
+        self.write_tool("tools/a.py", long_method("Big", "huge", 91))
+        cp = self.check()
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        self.assertIn("new function Big.huge", cp.stdout)
+
+    def test_baselined_long_method_passes(self) -> None:
+        self.write_tool("tools/a.py", long_method("Big", "huge", 120))
+        self.freeze()
+        cp = self.check()
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+
+    def test_growing_a_baselined_method_fails(self) -> None:
+        self.write_tool("tools/a.py", long_method("Big", "huge", 120))
+        self.freeze()
+        self.write_tool("tools/a.py", long_method("Big", "huge", 130))
+        cp = self.check()
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        self.assertIn("Big.huge", cp.stdout)
+        self.assertIn("grew to 130 lines", cp.stdout)
+
+    def test_new_nested_long_function_fails(self) -> None:
+        self.freeze()
+        self.write_tool("tools/a.py", nested_long_function("outer", "inner", 90))
+        cp = self.check()
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        self.assertIn("new function outer.inner", cp.stdout)
+
+    def test_baseline_uses_qualified_names(self) -> None:
+        self.write_tool("tools/a.py", long_method("Big", "huge", 120))
+        self.freeze()
+        functions = read_json(
+            self.tower / "state" / "SHAPE-BASELINE.json")["files"]["tools/a.py"]["functions"]
+        self.assertEqual(functions["Big.huge"]["lines"], 120)
+        self.assertNotIn("huge", functions)
+
+    # -- 10. a syntax error is a clean exit 2, not a traceback -------------
+    def test_syntax_error_fails_cleanly(self) -> None:
+        self.freeze()
+        self.write_tool("tools/a.py", "def broken(:\n")
+        cp = self.check()
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        self.assertIn("cannot parse tools/a.py", cp.stdout)
+        self.assertNotIn("Traceback", cp.stdout + cp.stderr)
+
 
 class DeliverShapeFixture(unittest.TestCase):
     """Real git kit + task worktree shared by the deliver shape cases."""
 
     include_tools = True
-    include_baseline = True
 
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory(
@@ -190,19 +256,21 @@ class DeliverShapeFixture(unittest.TestCase):
         self.tower.mkdir(parents=True, exist_ok=True)
         (self.kit / ".gitignore").write_text(
             "tower-dsh/pilot/worktrees/\n", encoding="utf-8")
+        # Mirror the tower repo: LF checkouts keep the baseline byte-identical.
+        (self.kit / ".gitattributes").write_text(
+            "* text=auto eol=lf\n", encoding="utf-8")
         (self.tower / "README.md").write_text("base\n", encoding="utf-8")
         (self.tower / "pilot").mkdir(parents=True, exist_ok=True)
         (self.tower / "pilot" / f"{TASK_ID}.spec.json").write_text("{}\n", encoding="utf-8")
         if self.include_tools:
             (self.tower / "tools").mkdir(parents=True, exist_ok=True)
             (self.tower / "tools" / "a.py").write_text(SMALL_TOOL, encoding="utf-8")
-        if self.include_baseline:
-            files = {"tools/a.py": {"lines": 2, "functions": {
-                "small": {"lines": 2, "branches": 0}}}} if self.include_tools else {}
-            write_json(self.tower / "state" / "SHAPE-BASELINE.json", {
-                "schema": "tower/shape-baseline@1", "files": files,
-                "unused_imports": {}, "duplicate_blocks": [],
-            })
+        files = {"tools/a.py": {"lines": 2, "functions": {
+            "small": {"lines": 2, "branches": 0}}}} if self.include_tools else {}
+        write_baseline(self.tower / "state" / "SHAPE-BASELINE.json", {
+            "schema": "tower/shape-baseline@1", "files": files,
+            "unused_imports": {}, "duplicate_blocks": [],
+        })
 
     def init_kit(self) -> None:
         self.assertEqual(run_git(self.kit, "init").returncode, 0)
@@ -219,7 +287,8 @@ class DeliverShapeFixture(unittest.TestCase):
         self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
 
     def allowed_paths(self) -> list[str]:
-        paths = [f"{WORKTREE_REL}/tower-dsh/README.md"]
+        paths = [f"{WORKTREE_REL}/tower-dsh/README.md",
+                 f"{WORKTREE_REL}/tower-dsh/state/SHAPE-BASELINE.json"]
         if self.include_tools:
             paths.append(f"{WORKTREE_REL}/tower-dsh/tools/a.py")
         return paths
@@ -306,19 +375,45 @@ class DeliverShapeGateCase(DeliverShapeFixture):
         self.assertEqual(self.ledger_types(), ["DELIVER"])
 
 
-class DeliverShapeNoBaselineCase(DeliverShapeFixture):
-    """No baseline in the worktree: the shape gate is skipped, not failed."""
+class DeliverShapeTamperedBaselineCase(DeliverShapeFixture):
+    """A task cannot widen the gate by editing its own baseline copy."""
 
-    include_baseline = False
-
-    def test_missing_baseline_skips_shape_check(self) -> None:
+    def test_modified_baseline_blocks_delivery(self) -> None:
         self.put_worktree("tower-dsh/tools/a.py",
                           SMALL_TOOL + "\n\n" + long_function("long_one", 90))
+        data = read_json(self.tower / "state" / "SHAPE-BASELINE.json")
+        data["files"]["tools/a.py"]["functions"]["long_one"] = {
+            "lines": 90, "branches": 0}
+        write_baseline(self.worktree / "tower-dsh/state/SHAPE-BASELINE.json", data)
         self.commit_worktree()
         cp, payload = self.deliver()
-        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
-        self.assertEqual(payload.get("shape_check"), "skipped")
-        self.assertFalse(payload.get("shape_checked"))
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        self.assertIn("shape baseline modified in worktree", cp.stdout)
+        self.assertFalse(payload.get("ok"))
+
+
+class DeliverShapeDeletedBaselineCase(DeliverShapeFixture):
+    """Deleting the worktree baseline is not a way to disable the ratchet."""
+
+    def test_deleted_baseline_blocks_delivery(self) -> None:
+        (self.worktree / "tower-dsh/state/SHAPE-BASELINE.json").unlink()
+        self.commit_worktree()
+        cp, payload = self.deliver()
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        self.assertIn("shape baseline missing in worktree", cp.stdout)
+        self.assertFalse(payload.get("ok"))
+
+
+class DeliverShapeNoTowerBaselineCase(DeliverShapeFixture):
+    """A tower without its baseline fails closed instead of skipping."""
+
+    def test_missing_tower_baseline_blocks_delivery(self) -> None:
+        (self.tower / "state" / "SHAPE-BASELINE.json").unlink()
+        cp, payload = self.deliver()
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        self.assertIn("shape baseline missing: state/SHAPE-BASELINE.json in the tower root",
+                      cp.stdout)
+        self.assertFalse(payload.get("ok"))
 
 
 class DeliverShapeNoToolsCase(DeliverShapeFixture):
