@@ -1,0 +1,85 @@
+== old code ==
+source: git show main:tower-dsh/tools/towerctl.py -> C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-046\scratch\old\towerctl.py
+sha256: 0ed22b2f58a508934ebef47b5554fd2788a1d222611a5bd17bfd197dc25510b4
+
+$ main: status-snapshot --task PILOT-046 --event note
+exit: 2
+stderr:
+usage: towerctl.py [-h] [--root ROOT]
+                   {init,wiring,startup,status,supervision-init,supervision-status,handoff-status,verify-ledger,state-verify,shape-check,authority-check,authority-set,authority-require,spec-lint,spec-coverage,handoff-new,handoff-check,handoff-claim,handoff-accept,handoff-receipt,handoff-activate,supervision-phase,envelope-new,queue-add,merge-check,merge,post-merge,phase,task-new,task-next,check,spec-approve,hash,dispatch,deliver,completion-add,checkback,accept,close,campaign-check,brief}
+                   ...
+towerctl.py: error: argument cmd: invalid choice: 'status-snapshot' (choose from init, wiring, startup, status, supervision-init, supervision-status, handoff-status, verify-ledger, state-verify, shape-check, authority-check, authority-set, authority-require, spec-lint, spec-coverage, handoff-new, handoff-check, handoff-claim, handoff-accept, handoff-receipt, handoff-activate, supervision-phase, envelope-new, queue-add, merge-check, merge, post-merge, phase, task-new, task-next, check, spec-approve, hash, dispatch, deliver, completion-add, checkback, accept, close, campaign-check, brief)
+$ main: status-index
+exit: 2
+stderr:
+usage: towerctl.py [-h] [--root ROOT]
+                   {init,wiring,startup,status,supervision-init,supervision-status,handoff-status,verify-ledger,state-verify,shape-check,authority-check,authority-set,authority-require,spec-lint,spec-coverage,handoff-new,handoff-check,handoff-claim,handoff-accept,handoff-receipt,handoff-activate,supervision-phase,envelope-new,queue-add,merge-check,merge,post-merge,phase,task-new,task-next,check,spec-approve,hash,dispatch,deliver,completion-add,checkback,accept,close,campaign-check,brief}
+                   ...
+towerctl.py: error: argument cmd: invalid choice: 'status-index' (choose from init, wiring, startup, status, supervision-init, supervision-status, handoff-status, verify-ledger, state-verify, shape-check, authority-check, authority-set, authority-require, spec-lint, spec-coverage, handoff-new, handoff-check, handoff-claim, handoff-accept, handoff-receipt, handoff-activate, supervision-phase, envelope-new, queue-add, merge-check, merge, post-merge, phase, task-new, task-next, check, spec-approve, hash, dispatch, deliver, completion-add, checkback, accept, close, campaign-check, brief)
+$ main: status-rollup --week 2026-W44
+exit: 2
+stderr:
+usage: towerctl.py [-h] [--root ROOT]
+                   {init,wiring,startup,status,supervision-init,supervision-status,handoff-status,verify-ledger,state-verify,shape-check,authority-check,authority-set,authority-require,spec-lint,spec-coverage,handoff-new,handoff-check,handoff-claim,handoff-accept,handoff-receipt,handoff-activate,supervision-phase,envelope-new,queue-add,merge-check,merge,post-merge,phase,task-new,task-next,check,spec-approve,hash,dispatch,deliver,completion-add,checkback,accept,close,campaign-check,brief}
+                   ...
+towerctl.py: error: argument cmd: invalid choice: 'status-rollup' (choose from init, wiring, startup, status, supervision-init, supervision-status, handoff-status, verify-ledger, state-verify, shape-check, authority-check, authority-set, authority-require, spec-lint, spec-coverage, handoff-new, handoff-check, handoff-claim, handoff-accept, handoff-receipt, handoff-activate, supervision-phase, envelope-new, queue-add, merge-check, merge, post-merge, phase, task-new, task-next, check, spec-approve, hash, dispatch, deliver, completion-add, checkback, accept, close, campaign-check, brief)
+$ main: status-archive --before 2026-10-29
+exit: 2
+stderr:
+usage: towerctl.py [-h] [--root ROOT]
+                   {init,wiring,startup,status,supervision-init,supervision-status,handoff-status,verify-ledger,state-verify,shape-check,authority-check,authority-set,authority-require,spec-lint,spec-coverage,handoff-new,handoff-check,handoff-claim,handoff-accept,handoff-receipt,handoff-activate,supervision-phase,envelope-new,queue-add,merge-check,merge,post-merge,phase,task-new,task-next,check,spec-approve,hash,dispatch,deliver,completion-add,checkback,accept,close,campaign-check,brief}
+                   ...
+towerctl.py: error: argument cmd: invalid choice: 'status-archive' (choose from init, wiring, startup, status, supervision-init, supervision-status, handoff-status, verify-ledger, state-verify, shape-check, authority-check, authority-set, authority-require, spec-lint, spec-coverage, handoff-new, handoff-check, handoff-claim, handoff-accept, handoff-receipt, handoff-activate, supervision-phase, envelope-new, queue-add, merge-check, merge, post-merge, phase, task-new, task-next, check, spec-approve, hash, dispatch, deliver, completion-add, checkback, accept, close, campaign-check, brief)
+
+== board [] ==
+$ main: campaign-check (board [])
+exit: 1
+stderr:
+Traceback (most recent call last):
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-046\scratch\old\towerctl.py", line 6631, in <module>
+    main()
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-046\scratch\old\towerctl.py", line 6625, in main
+    handlers[args.cmd](root, args)
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-046\scratch\old\towerctl.py", line 6215, in cmd_campaign_check
+    payload = campaign_check_report(root, args.strict)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-046\scratch\old\towerctl.py", line 6201, in campaign_check_report
+    warnings = board_orphan_warnings(root, campaigns) if strategy else []
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-046\scratch\old\towerctl.py", line 6157, in board_orphan_warnings
+    tasks = load_board(root).get("tasks") or []
+            ^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'list' object has no attribute 'get'
+$ now: campaign-check (board [])
+exit: 2
+stdout:
+{
+  "ok": false,
+  "strict": false,
+  "strategy": "S-2026-Q4",
+  "goals": [
+    "G1"
+  ],
+  "campaigns": 1,
+  "campaign_ids": [
+    "C-2026-Q4-01"
+  ],
+  "wip": {
+    "in_flight": 0,
+    "limit": 1,
+    "campaigns": {
+      "C-2026-Q4-01": 0
+    }
+  },
+  "errors": [
+    {
+      "code": "E7",
+      "target": "primary/TASK_BOARD.json",
+      "detail": "board must be a JSON object, got list"
+    }
+  ],
+  "warnings": []
+}
+
+old traceback: True
+new exit 2 with E7: True

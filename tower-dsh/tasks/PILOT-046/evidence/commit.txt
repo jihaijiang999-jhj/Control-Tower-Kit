@@ -1,0 +1,32 @@
+HEAD: 06c322fc257001658644cf640b97d19e68de0603
+branch: pilot/PILOT-046
+title: PILOT-046: status history (snapshot/index/rollup/archive) + command layer hardening
+base(main): 2b1a0303945f37e2ae2c270db1560de268a0631e
+
+diff --name-only main..HEAD:
+tower-dsh/status/2026-10-28.md
+tower-dsh/status/README.md
+tower-dsh/status/index.json
+tower-dsh/status/weekly/2026-W44.md
+tower-dsh/tools/tests/test_status_history.py
+tower-dsh/tools/towerctl.py
+
+diff --name-status main..HEAD:
+A	tower-dsh/status/2026-10-28.md
+A	tower-dsh/status/README.md
+A	tower-dsh/status/index.json
+A	tower-dsh/status/weekly/2026-W44.md
+A	tower-dsh/tools/tests/test_status_history.py
+M	tower-dsh/tools/towerctl.py
+
+diff --stat main..HEAD:
+tower-dsh/status/2026-10-28.md               |  13 +
+ tower-dsh/status/README.md                   |  27 ++
+ tower-dsh/status/index.json                  |  22 ++
+ tower-dsh/status/weekly/2026-W44.md          |  13 +
+ tower-dsh/tools/tests/test_status_history.py | 420 +++++++++++++++++++++++
+ tower-dsh/tools/towerctl.py                  | 490 ++++++++++++++++++++++++++-
+ 6 files changed, 969 insertions(+), 16 deletions(-)
+
+git status --short:
+?? scratch/

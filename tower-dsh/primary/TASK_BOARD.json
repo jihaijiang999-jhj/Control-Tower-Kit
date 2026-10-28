@@ -451,7 +451,17 @@
       "reviewer": "subagent:10266429-6ccc-4ea3-a735-136c5f58bd5d",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-045/MERGE.md",
       "updated_at": "2026-10-28T18:12:35+08:00"
+    },
+    {
+      "id": "PILOT-046",
+      "title": "状态历史 + 命令层硬化：status 快照/rollup/index + R2–R5 + W3",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:6bea1d8d-3f30-4fdc-8090-b0ef7dd7cd92",
+      "reviewer": "subagent:60f3d8a7-46aa-4f30-ba4d-54f07fad7e43",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-046/MERGE.md",
+      "updated_at": "2026-10-28T23:03:06+08:00"
     }
   ],
-  "updated_at": "2026-10-28T18:12:35+08:00"
+  "updated_at": "2026-10-28T23:03:06+08:00"
 }

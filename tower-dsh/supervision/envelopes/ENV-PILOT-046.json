@@ -1,0 +1,84 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-046",
+  "task": "PILOT-046",
+  "repository": "..",
+  "branch": "pilot/PILOT-046",
+  "base": "main",
+  "implementation_head_sha": "06c322fc257001658644cf640b97d19e68de0603",
+  "envelope_path": "merge-envelopes/ENV-PILOT-046.json",
+  "created_at": "2026-10-28T23:03:22+08:00",
+  "scope": "PILOT-046: status history (snapshot/index/rollup/archive) + command layer hardening (E7, R3-R5, W3)",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 467,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-046/evidence/towerctl.py",
+      "sha256": "f758af40ff2610f3d53641c02343a1a109bcd282558cffcd740b7d3e2456cc86"
+    },
+    {
+      "path": "tasks/PILOT-046/evidence/test_status_history.py",
+      "sha256": "d68d19848f4d464d4bea67cef59371f8becaf7f2c082fda66a19e7395887affe"
+    },
+    {
+      "path": "tasks/PILOT-046/evidence/README.md",
+      "sha256": "696a24a078f458318d95e34f54ee39f9d0a1d6bf6426cf33960129eb90c9b310"
+    },
+    {
+      "path": "tasks/PILOT-046/evidence/2026-10-28.md",
+      "sha256": "5e3f576a74b56c856296a66a984ea2797796d7e825e8cefe0a7630eda895a741"
+    },
+    {
+      "path": "tasks/PILOT-046/evidence/index.json",
+      "sha256": "a61bb2fb89ff2660a8d426b397f778b6d01c4b9e096e9b45e4a5da42efc33137"
+    },
+    {
+      "path": "tasks/PILOT-046/evidence/2026-W44.md",
+      "sha256": "f98a17dfea17efdb715e7341bfdab088333bdfd38a75fc3318c518c19abfdd19"
+    },
+    {
+      "path": "tasks/PILOT-046/evidence/test-output.txt",
+      "sha256": "de4f6a0222e5e0bb6bfae5dd605317e0c8c65b7dc94f63c51465e9e1b26cac17"
+    },
+    {
+      "path": "tasks/PILOT-046/evidence/status_probe.py",
+      "sha256": "c01a458a6f8bcbe184bb033f96a55c98547aef570219d9973335ccd3fdaa25bf"
+    },
+    {
+      "path": "tasks/PILOT-046/evidence/probe.txt",
+      "sha256": "cabff43f03a9d1db5335efef3e93bf4d999bcbb950f0fc5afff9345d65e198bf"
+    },
+    {
+      "path": "tasks/PILOT-046/evidence/probe-old-code.txt",
+      "sha256": "c1fe59bca9ee68e1c7e4e092c10ae846065228d4f4aacf977120543a603f03a6"
+    },
+    {
+      "path": "tasks/PILOT-046/evidence/commit.txt",
+      "sha256": "3b0de8963551d34c2c46e8ca35114c2d1251a22304ef0323aa02cb18a16663e3"
+    },
+    {
+      "path": "tasks/PILOT-046/evidence/diff.txt",
+      "sha256": "fa3d1421169fdb126232f536d2e461dab2d617490967a72fda78cf1323b44e5e"
+    },
+    {
+      "path": "tasks/PILOT-046/evidence/index-sample.json",
+      "sha256": "e61cd753745410ecfa944b2d88d8d838791786cc6cf991f6e79a1d97eac03b72"
+    }
+  ],
+  "envelope_head_sha": "7174bf8ffeea5e4607a4079a731c7acaa18a4db1",
+  "status": "MERGED",
+  "pr_number": 30,
+  "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/30",
+  "remote_merged": true,
+  "remote_merged_at": "2026-10-28T23:10:47+08:00",
+  "merge_commit": "63d7b47dce5549e9029a5965990d29b1dba5ea8b",
+  "merged_at": "2026-10-28T23:10:49+08:00",
+  "supervisor": "sup-phase2-pilot",
+  "merge_mode": "pr",
+  "check_conclusion": "success"
+}

@@ -1,0 +1,126 @@
+== fixture ==
+throw-away tower: C:\Users\mac\AppData\Local\Temp\pilot046-probe-hv5gvgy6\tower
+
+== new commands ==
+$ status-snapshot --task PILOT-046 --event dispatched --note initial status history --tests 486 --at 2026-10-28T10:00:00
+exit: 0
+stdout:
+{
+  "ok": true,
+  "command": "status-snapshot",
+  "file": "status/2026-10-28.md",
+  "task": "PILOT-046",
+  "event": "dispatched",
+  "at": "2026-10-28T10:00"
+}
+$ status-snapshot --task PILOT-046 --event note --note index/rollup generated --at 2026-10-28T11:30:00
+exit: 0
+stdout:
+{
+  "ok": true,
+  "command": "status-snapshot",
+  "file": "status/2026-10-28.md",
+  "task": "PILOT-046",
+  "event": "note",
+  "at": "2026-10-28T11:30"
+}
+$ status-index
+exit: 0
+stdout:
+{
+  "ok": true,
+  "command": "status-index",
+  "file": "status/index.json",
+  "days": 1,
+  "cards": 1,
+  "campaigns": 1
+}
+$ status-rollup --week 2026-W44
+exit: 0
+stdout:
+{
+  "ok": true,
+  "command": "status-rollup",
+  "file": "status/weekly/2026-W44.md",
+  "week": "2026-W44",
+  "window": [
+    "2026-10-26",
+    "2026-11-01"
+  ]
+}
+$ status-archive --before 2026-10-29
+exit: 0
+stdout:
+{
+  "command": "status-archive",
+  "ok": true,
+  "before": "2026-10-29",
+  "files": [
+    "status/archive/2026-Q4.md"
+  ],
+  "days": 1
+}
+
+== status/2026-10-28.md (two appended entries) ==
+# STATUS — 2026-10-28
+
+## 10:00 · PILOT-046 · dispatched
+- campaign: C-2026-Q4-01 (1/1)
+- wip: 1/1
+- blocked: 0
+- tests: 486
+- note: initial status history
+
+## 11:30 · PILOT-046 · note
+- campaign: C-2026-Q4-01 (1/1)
+- wip: 1/1
+- blocked: 0
+- note: index/rollup generated
+
+== status/index.json ==
+{
+  "campaigns": {
+    "C-2026-Q4-01": {
+      "progress": "1/1"
+    }
+  },
+  "cards": {
+    "PILOT-046": {
+      "last_date": "2026-10-28",
+      "last_event": "note"
+    }
+  },
+  "days": [
+    {
+      "date": "2026-10-28",
+      "entries": 2,
+      "file": "status/2026-10-28.md",
+      "sha256": "2601ac50edf516f701c872637aa3e89145241243ed3effb3d2d7853c87f56214"
+    }
+  ],
+  "schema": "tower/status-index@1"
+}
+
+== byte stability ==
+index rerun identical: True
+index rebuilt after delete identical: True
+rollup rerun identical: True
+archive rerun identical: True
+snapshots kept by archive: True
+
+== status/weekly/2026-W44.md ==
+# WEEKLY — 2026-W44
+
+- 窗口：2026-10-26 → 2026-11-01
+- 事件数：2
+- closed 卡：-
+- blocked 计数：0
+- wip 变化：1/1
+- campaign 进度：
+  - C-2026-Q4-01 1/1
+
+## 事件
+- 2026-10-28 10:00 · PILOT-046 · dispatched
+- 2026-10-28 11:30 · PILOT-046 · note
+
+index-sample.json sha256: e61cd753745410ecfa944b2d88d8d838791786cc6cf991f6e79a1d97eac03b72

@@ -1,0 +1,1107 @@
+tower-dsh/status/2026-10-28.md               |  13 +
+ tower-dsh/status/README.md                   |  27 ++
+ tower-dsh/status/index.json                  |  22 ++
+ tower-dsh/status/weekly/2026-W44.md          |  13 +
+ tower-dsh/tools/tests/test_status_history.py | 420 +++++++++++++++++++++++
+ tower-dsh/tools/towerctl.py                  | 490 ++++++++++++++++++++++++++-
+ 6 files changed, 969 insertions(+), 16 deletions(-)
+
+diff --git a/tower-dsh/status/2026-10-28.md b/tower-dsh/status/2026-10-28.md
+new file mode 100644
+index 0000000..7fc4139
+--- /dev/null
++++ b/tower-dsh/status/2026-10-28.md
+@@ -0,0 +1,13 @@
++# STATUS — 2026-10-28
++
++## 22:32 · PILOT-046 · dispatched
++- campaign: C-2026-Q4-01 (1/1)
++- wip: 0/1
++- blocked: 0
++- note: initial status history
++
++## 22:32 · PILOT-046 · note
++- campaign: C-2026-Q4-01 (1/1)
++- wip: 0/1
++- blocked: 0
++- note: status index and 2026-W44 rollup generated in worktree
+diff --git a/tower-dsh/status/README.md b/tower-dsh/status/README.md
+new file mode 100644
+index 0000000..c7420cc
+--- /dev/null
++++ b/tower-dsh/status/README.md
+@@ -0,0 +1,27 @@
++# STATUS — 状态历史
++
++塔的 NOW 账本：**只追加、不重写、生成物不手改**。
++
++## 文件
++
++- `YYYY-MM-DD.md` — 当天快照，一条事件一个 `## HH:MM · <卡> · <event>` 段；同日多次追加，不覆盖。
++- `index.json` — `status-index` 生成：每天的日期/文件/条目数/sha256，每张卡的 `last_event`/`last_date`，以及 campaign 进度；键排序、无时间戳，可删除后重算。
++- `weekly/YYYY-Www.md` — `status-rollup --week` 生成：本周事件数、closed 卡、blocked 计数、wip 变化、campaign 进度。
++- `archive/YYYY-Qn.md` — `status-archive --before` 生成：旧快照每天一行摘要；**不删除原快照**。
++
++## 命令
++
++    python tools/towerctl.py status-snapshot --task PILOT-046 --event dispatched --note "..."
++    python tools/towerctl.py status-snapshot --task PILOT-046 --event note --tests 486
++    python tools/towerctl.py status-index
++    python tools/towerctl.py status-rollup --week 2026-W44
++    python tools/towerctl.py status-archive --before 2026-10-01
++
++事件：`dispatched` / `delivered` / `reviewed` / `accepted` / `closed` / `note`；`--tests` 记录测试数，`--at` 仅供测试冻结时间。
++
++## 口径
++
++- `campaign`：active campaign 的 `closed/total`（按 `task_forces`），无 active campaign 写 `-`。
++- `wip`：全塔在飞卡数 / active campaign 的 `wip_limit`；在飞 = `dispatched|delivered|reviewed|accepted`。
++- `blocked`：`rework` 或 `review.verdict=FAIL` 的卡数。
++- 四个命令只写本目录，不动 `primary/`、`supervision/`、`ledger/`、`tasks/`。
+diff --git a/tower-dsh/status/index.json b/tower-dsh/status/index.json
+new file mode 100644
+index 0000000..7c59099
+--- /dev/null
++++ b/tower-dsh/status/index.json
+@@ -0,0 +1,22 @@
++{
++  "campaigns": {
++    "C-2026-Q4-01": {
++      "progress": "1/1"
++    }
++  },
++  "cards": {
++    "PILOT-046": {
++      "last_date": "2026-10-28",
++      "last_event": "note"
++    }
++  },
++  "days": [
++    {
++      "date": "2026-10-28",
++      "entries": 2,
++      "file": "status/2026-10-28.md",
++      "sha256": "5e3f576a74b56c856296a66a984ea2797796d7e825e8cefe0a7630eda895a741"
++    }
++  ],
++  "schema": "tower/status-index@1"
++}
+diff --git a/tower-dsh/status/weekly/2026-W44.md b/tower-dsh/status/weekly/2026-W44.md
+new file mode 100644
+index 0000000..070f7ee
+--- /dev/null
++++ b/tower-dsh/status/weekly/2026-W44.md
+@@ -0,0 +1,13 @@
++# WEEKLY — 2026-W44
++
++- 窗口：2026-10-26 → 2026-11-01
++- 事件数：2
++- closed 卡：-
++- blocked 计数：0
++- wip 变化：0/1
++- campaign 进度：
++  - C-2026-Q4-01 1/1
++
++## 事件
++- 2026-10-28 22:32 · PILOT-046 · dispatched
++- 2026-10-28 22:32 · PILOT-046 · note
+diff --git a/tower-dsh/tools/tests/test_status_history.py b/tower-dsh/tools/tests/test_status_history.py
+new file mode 100644
+index 0000000..beda40f
+--- /dev/null
++++ b/tower-dsh/tools/tests/test_status_history.py
+@@ -0,0 +1,420 @@
++"""Tests for PILOT-046: append-only status history and the R2-R5/W3 hardening.
++
++Every case builds its own throw-away tower under the runner's ``TMP`` sandbox
++and drives the real CLI through ``subprocess``, so exit codes and bytes are
++asserted exactly as a caller observes them::
++
++    python -B tools/run_tests.py
++
++The status commands must write only ``status/``; the control-plane hash case
++pins that.  The hardening cases (E7/R3/R4/R5/W3) go through
++``towerctl campaign-check`` so the wiring is covered too.
++"""
++from __future__ import annotations
++
++import hashlib
++import json
++import subprocess
++import sys
++import tempfile
++import unittest
++from datetime import date, timedelta
++from pathlib import Path
++
++TOOLS_DIR = Path(__file__).resolve().parents[1]
++TCLI = TOOLS_DIR / "towerctl.py"
++sys.path.insert(0, str(TOOLS_DIR))
++import towerctl  # noqa: E402  (TOOLS_DIR must be on sys.path first)
++
++CARD = "PILOT-046"
++CLOSED = "PILOT-045"
++STRATEGY = "command/STRATEGY.md"
++CAMPAIGN = "command/campaigns/C-2026-Q4-01.md"
++DAY = "2026-10-28"
++WEEK = "2026-W44"
++
++
++def day(offset: int) -> str:
++    """An ISO date ``offset`` days from today, for relative fixtures."""
++    return (date.today() + timedelta(days=offset)).isoformat()
++
++
++def strategy_text() -> str:
++    """A minimal valid strategy document."""
++    return ("---\n"
++            "schema: tower/strategy@1\n"
++            "id: S-2026-Q4\n"
++            "horizon: 2026-Q4\n"
++            "owner: mac\n"
++            "status: active\n"
++            f"review_by: {day(30)}\n"
++            "goals:\n"
++            "  - id: G1\n"
++            "    text: 可信交付\n"
++            "non_goals:\n"
++            "  - 多写者并行\n"
++            "---\n"
++            "# 战略正文\n")
++
++
++def campaign_text(task_forces: tuple[str, ...] = (CLOSED,), goal: str = "G1",
++                  budget: str = "2 张卡 / 2 周", wip_limit: int = 1,
++                  forces_block: str | None = None,
++                  started: str | None = None) -> str:
++    """A minimal campaign document; ``forces_block`` replaces ``task_forces``."""
++    block = forces_block if forces_block is not None else (
++        "task_forces:\n" + "".join(f"  - {task}\n" for task in task_forces))
++    started_line = f"started: {started}\n" if started else ""
++    return ("---\n"
++            "schema: tower/campaign@1\n"
++            "id: C-2026-Q4-01\n"
++            f"goal: {goal}\n"
++            "status: active\n"
++            "owner: mac\n"
++            'objective: "状态历史"\n'
++            f"{block}"
++            f"{started_line}"
++            'sequence: "046"\n'
++            f'budget: "{budget}"\n'
++            f"wip_limit: {wip_limit}\n"
++            f"review_by: {day(30)}\n"
++            "---\n"
++            "# 战役正文\n")
++
++
++def run_cli(root: Path, *args: str) -> subprocess.CompletedProcess:
++    return subprocess.run(
++        [sys.executable, "-B", str(TCLI), "--root", str(root), *args],
++        capture_output=True, text=True, encoding="utf-8")
++
++
++def sha(path: Path) -> str:
++    return hashlib.sha256(path.read_bytes()).hexdigest()
++
++
++def plane_hashes(root: Path) -> dict[str, str]:
++    """Content hashes of the control-plane trees these commands must not write."""
++    return {path.relative_to(root).as_posix(): sha(path)
++            for name in ("primary", "supervision", "ledger", "tasks")
++            for path in sorted((root / name).rglob("*")) if path.is_file()}
++
++
++class StatusTowerCase(unittest.TestCase):
++    """A throw-away tower: strategy, campaign, board, records."""
++
++    def setUp(self) -> None:
++        self._tmp = tempfile.TemporaryDirectory(
++            prefix="towerctl-status-", ignore_cleanup_errors=True)
++        self.tower = Path(self._tmp.name) / "tower"
++        self.write_doc(STRATEGY, strategy_text())
++        self.write_doc(CAMPAIGN, campaign_text())
++        self.write_json("primary/TASK_BOARD.json", {
++            "schema": "tower/task-board@1", "tasks": [{"id": CLOSED}]})
++        self.write_json("primary/CURRENT_STATE.json", {
++            "schema": "tower/current-state@1", "owner": {"name": "mac"}})
++        self.write_record(CLOSED, "closed", "PASS")
++        self.write_record(CARD, "dispatched")
++
++    def tearDown(self) -> None:
++        self._tmp.cleanup()
++
++    def write_doc(self, relpath: str, text: str) -> Path:
++        path = self.tower / relpath
++        path.parent.mkdir(parents=True, exist_ok=True)
++        path.write_text(text, encoding="utf-8")
++        return path
++
++    def write_json(self, relpath: str, data) -> Path:
++        return self.write_doc(relpath, json.dumps(data, ensure_ascii=False, indent=2))
++
++    def write_record(self, task_id: str, status: str,
++                     verdict: str | None = None) -> None:
++        self.write_json(f"tasks/{task_id}/record.json", {
++            "schema": "tower/task@1", "id": task_id, "title": "夹具卡",
++            "status": status, "next": "等待处理",
++            "review": {"verdict": verdict} if verdict else None})
++
++    def snapshot(self, event: str, at: str, note: str | None = None,
++                 task: str = CARD, tests: int | None = None) -> subprocess.CompletedProcess:
++        args = ["status-snapshot", "--task", task, "--event", event, "--at", at]
++        if note is not None:
++            args += ["--note", note]
++        if tests is not None:
++            args += ["--tests", str(tests)]
++        return run_cli(self.tower, *args)
++
++    def check(self, *args: str) -> subprocess.CompletedProcess:
++        return run_cli(self.tower, "campaign-check", *args)
++
++    def payload(self, *args: str) -> dict:
++        cp = self.check(*args)
++        return json.loads(cp.stdout) if cp.stdout.strip() else {}
++
++    def codes(self, payload: dict, key: str = "errors") -> list[str]:
++        return [finding["code"] for finding in payload.get(key) or []]
++
++    def status_text(self, name: str = "2026-10-28.md") -> str:
++        return (self.tower / "status" / name).read_text(encoding="utf-8")
++
++    def headings(self, text: str) -> list[str]:
++        return [line for line in text.splitlines() if line.startswith("## ")]
++
++
++class SnapshotCase(StatusTowerCase):
++    """status-snapshot: append-only, same-day twice, frozen time."""
++
++    def test_same_day_twice_appends_two_entries(self) -> None:
++        self.assertEqual(self.snapshot("dispatched", "2026-10-28T10:00:00",
++                                       "first").returncode, 0)
++        self.assertEqual(self.snapshot("note", "2026-10-28T11:30:00",
++                                       "second").returncode, 0)
++        text = self.status_text()
++        self.assertTrue(text.startswith("# STATUS — 2026-10-28\n"))
++        self.assertEqual(text.count("# STATUS"), 1)
++        self.assertEqual(self.headings(text),
++                         ["## 10:00 · PILOT-046 · dispatched",
++                          "## 11:30 · PILOT-046 · note"])
++        self.assertIn("- note: first", text)
++        self.assertIn("- note: second", text)
++
++    def test_snapshot_records_campaign_wip_blocked_and_tests(self) -> None:
++        self.write_record("PILOT-047", "rework", "FAIL")
++        self.snapshot("dispatched", "2026-10-28T10:00:00", tests=470)
++        text = self.status_text()
++        self.assertIn("- campaign: C-2026-Q4-01 (1/1)", text)
++        self.assertIn("- wip: 1/1", text)
++        self.assertIn("- blocked: 1", text)
++        self.assertIn("- tests: 470", text)
++
++    def test_at_freezes_the_whole_date(self) -> None:
++        self.snapshot("dispatched", "2026-10-27T09:05:00")
++        self.assertTrue((self.tower / "status/2026-10-27.md").is_file())
++        self.assertFalse((self.tower / "status/2026-10-28.md").exists())
++        text = self.status_text("2026-10-27.md")
++        self.assertIn("# STATUS — 2026-10-27", text)
++        self.assertIn("## 09:05 · PILOT-046 · dispatched", text)
++
++
++class IndexCase(StatusTowerCase):
++    """status-index: entries, hash, key order, recomputability."""
++
++    def test_index_counts_entries_and_matches_file_hash(self) -> None:
++        self.snapshot("dispatched", "2026-10-28T10:00:00")
++        self.snapshot("note", "2026-10-28T11:30:00", "second")
++        self.assertEqual(run_cli(self.tower, "status-index").returncode, 0)
++        data = json.loads((self.tower / "status/index.json")
++                          .read_text(encoding="utf-8"))
++        self.assertEqual(data["schema"], "tower/status-index@1")
++        self.assertEqual(len(data["days"]), 1)
++        entry = data["days"][0]
++        self.assertEqual(entry["date"], DAY)
++        self.assertEqual(entry["file"], "status/2026-10-28.md")
++        self.assertEqual(entry["entries"], 2)
++        day_file = self.tower / "status/2026-10-28.md"
++        self.assertEqual(entry["sha256"], sha(day_file))
++        self.assertEqual(data["cards"], {
++            CARD: {"last_event": "note", "last_date": DAY}})
++        self.assertEqual(data["campaigns"], {
++            "C-2026-Q4-01": {"progress": "1/1"}})
++
++    def test_index_is_byte_stable_and_recomputable(self) -> None:
++        self.snapshot("dispatched", "2026-10-28T10:00:00")
++        index = self.tower / "status/index.json"
++        run_cli(self.tower, "status-index")
++        first = index.read_bytes()
++        run_cli(self.tower, "status-index")
++        self.assertEqual(index.read_bytes(), first)
++        index.unlink()
++        run_cli(self.tower, "status-index")
++        self.assertEqual(index.read_bytes(), first)
++
++    def test_index_ignores_weekly_archive_and_readme(self) -> None:
++        self.snapshot("dispatched", "2026-10-28T10:00:00")
++        self.write_doc("status/README.md", "# STATUS\n")
++        self.write_doc("status/weekly/2026-W44.md", "# WEEKLY\n")
++        self.write_doc("status/archive/2026-Q4.md", "# ARCHIVE\n")
++        run_cli(self.tower, "status-index")
++        data = json.loads((self.tower / "status/index.json")
++                          .read_text(encoding="utf-8"))
++        self.assertEqual([entry["file"] for entry in data["days"]],
++                         ["status/2026-10-28.md"])
++
++
++class RollupCase(StatusTowerCase):
++    """status-rollup: one week, byte-stable, writes only weekly/."""
++
++    def test_rollup_summarises_the_week_and_is_byte_stable(self) -> None:
++        self.write_record("PILOT-047", "rework", "FAIL")
++        self.snapshot("closed", "2026-10-26T09:00:00", task=CLOSED)
++        self.snapshot("note", "2026-10-28T11:00:00")
++        self.assertEqual(run_cli(self.tower, "status-rollup",
++                                 "--week", WEEK).returncode, 0)
++        target = self.tower / "status/weekly" / f"{WEEK}.md"
++        first = target.read_bytes()
++        run_cli(self.tower, "status-rollup", "--week", WEEK)
++        self.assertEqual(target.read_bytes(), first)
++        text = first.decode("utf-8")
++        self.assertIn("- 事件数：2", text)
++        self.assertIn("- closed 卡：PILOT-045", text)
++        self.assertIn("- blocked 计数：1", text)
++        self.assertIn("- wip 变化：1/1", text)
++        self.assertIn("C-2026-Q4-01 1/1", text)
++        self.assertIn("## 事件", text)
++
++    def test_rollup_writes_nothing_but_weekly(self) -> None:
++        self.snapshot("dispatched", "2026-10-28T10:00:00")
++        before = {path.relative_to(self.tower).as_posix(): sha(path)
++                  for path in sorted((self.tower / "status").rglob("*"))
++                  if path.is_file() and "weekly" not in path.parts}
++        run_cli(self.tower, "status-rollup", "--week", WEEK)
++        after = {path.relative_to(self.tower).as_posix(): sha(path)
++                 for path in sorted((self.tower / "status").rglob("*"))
++                 if path.is_file() and "weekly" not in path.parts}
++        self.assertEqual(before, after)
++
++
++class ArchiveCase(StatusTowerCase):
++    """status-archive: keeps originals, byte-stable, one line per day."""
++
++    def test_archive_keeps_originals_and_is_byte_stable(self) -> None:
++        self.snapshot("dispatched", "2026-10-27T10:00:00")
++        self.snapshot("note", "2026-10-28T10:00:00")
++        cp = run_cli(self.tower, "status-archive", "--before", "2026-10-28")
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        archive = self.tower / "status/archive/2026-Q4.md"
++        text = archive.read_text(encoding="utf-8")
++        self.assertIn("2026-10-27", text)
++        self.assertNotIn("2026-10-28", text)
++        self.assertTrue((self.tower / "status/2026-10-27.md").is_file())
++        self.assertTrue((self.tower / "status/2026-10-28.md").is_file())
++        first = archive.read_bytes()
++        run_cli(self.tower, "status-archive", "--before", "2026-10-28")
++        self.assertEqual(archive.read_bytes(), first)
++
++
++class StatusIsolationCase(StatusTowerCase):
++    """Every status command must leave the control plane byte-identical."""
++
++    def test_status_commands_leave_control_plane_untouched(self) -> None:
++        self.snapshot("dispatched", "2026-10-27T10:00:00")
++        before = plane_hashes(self.tower)
++        self.snapshot("note", "2026-10-28T10:00:00")
++        run_cli(self.tower, "status-index")
++        run_cli(self.tower, "status-rollup", "--week", WEEK)
++        run_cli(self.tower, "status-archive", "--before", "2026-10-29")
++        self.assertEqual(plane_hashes(self.tower), before)
++
++
++class BoardShapeCase(StatusTowerCase):
++    """E7: a malformed board exits 2 cleanly instead of raising."""
++
++    def test_board_array_is_clean_exit_two(self) -> None:
++        self.write_json("primary/TASK_BOARD.json", [])
++        cp = self.check()
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.codes(json.loads(cp.stdout)), ["E7"])
++        self.assertNotIn("Traceback", cp.stdout + cp.stderr)
++
++    def test_board_non_object_task_element_is_clean_exit_two(self) -> None:
++        self.write_json("primary/TASK_BOARD.json", {
++            "schema": "tower/task-board@1", "tasks": ["PILOT-001"]})
++        cp = self.check()
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.codes(json.loads(cp.stdout)), ["E7"])
++        self.assertNotIn("Traceback", cp.stdout + cp.stderr)
++
++
++class R3EmptyTaskForcesCase(StatusTowerCase):
++    """R3: an empty ``task_forces`` is 0/0 and never an E5."""
++
++    def test_empty_list_and_empty_key_are_zero_of_zero(self) -> None:
++        for block in ("task_forces: []\n", "task_forces:\n"):
++            with self.subTest(block=block):
++                self.write_doc(CAMPAIGN, campaign_text(forces_block=block))
++                data = self.payload()
++                self.assertEqual(data["errors"], [])
++                brief = run_cli(self.tower, "brief")
++                self.assertEqual(brief.returncode, 0, msg=brief.stdout + brief.stderr)
++                self.assertIn("0/0 closed", brief.stdout)
++
++
++class R4QuotedScalarCase(StatusTowerCase):
++    """R4: single-quoted scalars, ``''`` escapes, clean rejection."""
++
++    def test_single_quotes_parse_and_campaign_goal_is_linked(self) -> None:
++        parsed = towerctl.parse_command_front_matter(
++            ["title: 'it''s fine'", "goal: 'G1'"])
++        self.assertEqual(parsed, {"title": "it's fine", "goal": "G1"})
++        self.write_doc(CAMPAIGN, campaign_text(goal="'G1'"))
++        cp = self.check()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(json.loads(cp.stdout)["errors"], [])
++
++    def test_unsupported_structure_still_exits_two_cleanly(self) -> None:
++        self.write_doc(STRATEGY,
++                       "---\nschema: tower/strategy@1\nid: S\ngoals: [G1]\n---\n")
++        cp = self.check()
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.codes(json.loads(cp.stdout)), ["E1"])
++        self.assertNotIn("Traceback", cp.stdout + cp.stderr)
++
++
++class R5BudgetCase(StatusTowerCase):
++    """R5: card units in both languages, week windows via ``started``."""
++
++    def test_card_budget_units_are_parsed(self) -> None:
++        for task_id in ("PILOT-101", "PILOT-102", "PILOT-103"):
++            self.write_record(task_id, "closed", "PASS")
++        forces = (CLOSED, "PILOT-101", "PILOT-102", "PILOT-103")
++        for budget in ("2 cards", "2 card", "2 张卡"):
++            with self.subTest(budget=budget):
++                self.write_doc(CAMPAIGN, campaign_text(
++                    task_forces=forces, budget=budget, wip_limit=5))
++                data = self.payload()
++                self.assertEqual(data["errors"], [])
++                details = [item["detail"] for item in data["warnings"]
++                           if item["code"] == "W2"]
++                self.assertTrue(any("budget of 2 cards" in item
++                                    for item in details), msg=details)
++
++    def test_started_plus_week_window_is_w2(self) -> None:
++        self.write_doc(CAMPAIGN, campaign_text(
++            started=day(-30), budget="2 cards / 2 weeks"))
++        data = self.payload()
++        self.assertEqual(data["errors"], [])
++        details = [item["detail"] for item in data["warnings"]
++                   if item["code"] == "W2"]
++        self.assertTrue(any("budget window" in item for item in details),
++                        msg=details)
++        self.assertEqual(self.check("--strict").returncode, 2)
++
++    def test_unparseable_budget_is_not_a_false_positive(self) -> None:
++        for budget, started in (("2 cards", None), ("tbd", day(-30))):
++            with self.subTest(budget=budget, started=started):
++                self.write_doc(CAMPAIGN, campaign_text(
++                    budget=budget, started=started))
++                self.assertEqual(self.payload()["warnings"], [])
++
++
++class W3SpecOnlyCase(StatusTowerCase):
++    """W3: spec-only references warn; missing cards stay E5."""
++
++    def test_spec_only_is_warning_and_strict_upgrades(self) -> None:
++        self.write_doc("pilot/PILOT-047.spec.json", "{}\n")
++        self.write_doc(CAMPAIGN, campaign_text(task_forces=(CLOSED, "PILOT-047")))
++        data = self.payload()
++        self.assertEqual(data["errors"], [])
++        self.assertEqual(self.codes(data, "warnings"), ["W3"])
++        strict = self.check("--strict")
++        self.assertEqual(strict.returncode, 2)
++        self.assertEqual(self.codes(json.loads(strict.stdout)), ["W3"])
++
++    def test_missing_card_is_still_e5(self) -> None:
++        self.write_doc(CAMPAIGN, campaign_text(task_forces=(CLOSED, "PILOT-999")))
++        data = self.payload()
++        self.assertEqual(self.codes(data), ["E5"])
++        self.assertEqual(data["warnings"], [])
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tower-dsh/tools/towerctl.py b/tower-dsh/tools/towerctl.py
+index 7b309a4..60be079 100644
+--- a/tower-dsh/tools/towerctl.py
++++ b/tower-dsh/tools/towerctl.py
+@@ -5810,10 +5810,27 @@ COMMAND_IN_FLIGHT = ("dispatched", "delivered", "reviewed", "accepted")
+ COMMAND_TERMINAL = ("closed", "aborted")
+ COMMAND_REVIEW_WINDOW_DAYS = 7
+ COMMAND_BRIEF_MAX_LINES = 60
+-COMMAND_BUDGET_CARDS_RE = re.compile(r"(\d+)\s*张卡")
++COMMAND_BUDGET_CARDS_RE = re.compile(r"(\d+)\s*(?:张卡|cards?)\b", re.IGNORECASE)
++COMMAND_BUDGET_WEEKS_RE = re.compile(r"(\d+)\s*(?:周|weeks?)\b", re.IGNORECASE)
+ COMMAND_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
+ # Superseded cards are archived as ``tasks/<ID>-VOID/``; see read_task_records.
+ COMMAND_ARCHIVE_SUFFIX = "-VOID"
++TASK_BOARD_REL = "primary/TASK_BOARD.json"
++
++# ---------------------------------------------------------------------------
++# PILOT-046: append-only status history
++# ---------------------------------------------------------------------------
++# ``status/YYYY-MM-DD.md`` is the only source of truth: snapshots are appended.
++# ``index.json``, the weekly rollup and the archive are derived and must stay
++# byte-identical across reruns, so every command below writes only ``status/``.
++STATUS_DIR_REL = "status"
++STATUS_INDEX_REL = "status/index.json"
++STATUS_WEEKLY_REL = "status/weekly"
++STATUS_ARCHIVE_REL = "status/archive"
++STATUS_INDEX_SCHEMA = "tower/status-index@1"
++STATUS_EVENTS = ("dispatched", "delivered", "reviewed", "accepted", "closed", "note")
++STATUS_ENTRY_RE = re.compile(r"^## (\d{2}:\d{2}) · (\S+) · ([a-z]+)$")
++STATUS_CAMPAIGN_RE = re.compile(r"^(\S+)(?:\s+\(([^()]*)\))?$")
+ 
+ 
+ class CommandDocError(ValueError):
+@@ -5844,18 +5861,34 @@ def front_matter_block(text: str) -> list[str]:
+     raise CommandDocError("front-matter has no closing ---")
+ 
+ 
++def single_quoted_scalar(text: str) -> str:
++    """A single-quoted scalar, where ``''`` stands for one literal quote."""
++    if len(text) < 2 or not text.endswith("'"):
++        raise CommandDocError(f"unterminated single-quoted string: {text!r}")
++    body = text[1:-1]
++    if "'" in body.replace("''", ""):
++        raise CommandDocError(f"unescaped single quote: {text!r}")
++    return body.replace("''", "'")
++
++
+ def yaml_scalar(raw: str) -> str:
+-    """A plain scalar or a double-quoted one; no flow syntax, no escapes."""
++    """A plain scalar, a single-quoted one, or a double-quoted one.
++
++    Flow syntax (``[...]``/``{...}`` except the empty list, anchors, tags and
++    block markers) is rejected: the command layer supports a strict subset.
++    """
+     text = raw.strip()
+     if not text:
+         raise CommandDocError("empty value where a scalar is required")
++    if text.startswith("'"):
++        return single_quoted_scalar(text)
+     if text.startswith('"'):
+         if len(text) < 2 or not text.endswith('"'):
+             raise CommandDocError(f"unterminated quoted string: {text!r}")
+         if '"' in text[1:-1]:
+             raise CommandDocError(f"escaped quotes are unsupported: {text!r}")
+         return text[1:-1]
+-    if text[0] in "[{&*!|>%@`" or text.endswith('"'):
++    if text[0] in "[{&*!|>%@`" or text.endswith('"') or text.endswith("'"):
+         raise CommandDocError(f"unsupported scalar syntax: {text!r}")
+     return text
+ 
+@@ -5944,14 +5977,17 @@ def parse_command_front_matter(lines: list[str]) -> dict:
+         key, value = yaml_key_value(line, 0)
+         if key in data:
+             raise CommandDocError(f"duplicate key: {key}")
++        if value == "[]":
++            data[key] = []
++            index += 1
++            continue
+         if value:
+             data[key] = yaml_scalar(value)
+             index += 1
+             continue
+-        entries, index = yaml_list_block(lines, index + 1)
+-        if not entries:
+-            raise CommandDocError(f"key {key!r} needs a scalar value or a list")
+-        data[key] = entries
++        # An empty key and an explicit ``[]`` are both the empty list; callers
++        # that need one element say so (e.g. strategy goals stay E1).
++        data[key], index = yaml_list_block(lines, index + 1)
+     return data
+ 
+ 
+@@ -6026,6 +6062,67 @@ def budget_card_limit(raw) -> int | None:
+     return int(match.group(1)) if match else None
+ 
+ 
++def budget_week_limit(raw) -> int | None:
++    """The week window parsed out of a free-form ``budget`` string."""
++    match = COMMAND_BUDGET_WEEKS_RE.search(str(raw or ""))
++    return int(match.group(1)) if match else None
++
++
++def campaign_started(meta: dict) -> date | None:
++    """The campaign's optional ``started`` date, when it is well-formed."""
++    return command_date(meta.get("started"))
++
++
++def budget_window_warnings(campaigns: list[dict], today: date) -> list[dict]:
++    """W2: ``started`` plus the budget's week window is already in the past.
++
++    A campaign without a parseable ``started``/week window is *not* warned
++    about: silence is correct when the deadline cannot be computed.
++    """
++    warnings: list[dict] = []
++    for doc in campaigns:
++        if doc.get("status") in COMMAND_TERMINAL:
++            continue
++        weeks = budget_week_limit(doc.get("budget"))
++        started = campaign_started(doc)
++        if weeks is None or started is None:
++            continue
++        if today > started + timedelta(weeks=weeks):
++            warnings.append(command_finding(
++                "W2", str(doc.get("id") or doc["_path"]),
++                f"budget window of {weeks} weeks from {started.isoformat()} "
++                "has elapsed"))
++    return warnings
++
++
++def spec_only_warnings(root: Path, campaigns: list[dict]) -> list[dict]:
++    """W3: a forced card has a pilot spec but no ``tasks/<id>/`` yet.
++
++    E5 keeps its narrower meaning (neither a task dir nor a spec exists), so a
++    spec-only reference is a warning rather than an error.
++    """
++    warnings: list[dict] = []
++    for doc in campaigns:
++        for task_id in task_force_ids(doc):
++            if not is_safe_id(task_id, TASK_ID_RE):
++                continue
++            if (root / "tasks" / task_id).is_dir():
++                continue
++            if (root / "pilot" / f"{task_id}.spec.json").is_file():
++                warnings.append(command_finding(
++                    "W3", str(doc.get("id") or doc["_path"]),
++                    f"task_forces references a spec-only card "
++                    f"(no tasks/{task_id}/): {task_id}"))
++    return warnings
++
++
++def command_warnings(root: Path, campaigns: list[dict], today: date) -> list[dict]:
++    """Every warning family the report renders: W2 dates/budget plus W3."""
++    warnings = review_warnings(campaigns, today)
++    warnings += budget_window_warnings(campaigns, today)
++    return warnings + spec_only_warnings(root, campaigns)
++
++
+ def command_card_exists(root: Path, task_id: str) -> bool:
+     """A reference is real when the card has a record dir or a pilot spec."""
+     if not is_safe_id(task_id, TASK_ID_RE):
+@@ -6150,16 +6247,47 @@ def task_force_errors(root: Path, campaigns: list[dict]) -> list[dict]:
+     return errors
+ 
+ 
++def board_rows(root: Path) -> tuple[list[dict], list[dict]]:
++    """Board task objects, plus the E7 findings explaining a malformed shape.
++
++    A missing board is still an empty board (``load_board``'s legacy default);
++    a board that *exists* but is not ``{"tasks": [<object>, ...]}`` reports E7
++    instead of raising ``AttributeError`` deeper in the report.
++    """
++    path = root / TASK_BOARD_REL
++    if not path.is_file():
++        return [], []
++    try:
++        board = jload(path)
++    except (OSError, ValueError):
++        return [], [command_finding("E7", TASK_BOARD_REL,
++                                    "board is unreadable or not JSON")]
++    if not isinstance(board, dict):
++        return [], [command_finding("E7", TASK_BOARD_REL,
++                                    f"board must be a JSON object, got "
++                                    f"{type(board).__name__}")]
++    tasks = board.get("tasks")
++    if not isinstance(tasks, list):
++        return [], [command_finding("E7", TASK_BOARD_REL,
++                                    "tasks must be a JSON list")]
++    bad = [index for index, item in enumerate(tasks) if not isinstance(item, dict)]
++    errors = [command_finding("E7", TASK_BOARD_REL,
++                              f"tasks[{index}] must be a JSON object")
++              for index in bad]
++    return [item for item in tasks if isinstance(item, dict) and item.get("id")], errors
++
++
++def board_shape_errors(root: Path) -> list[dict]:
++    """E7: the board is a JSON object whose ``tasks`` are JSON objects."""
++    return board_rows(root)[1]
++
++
+ def board_orphan_warnings(root: Path, campaigns: list[dict]) -> list[dict]:
+     """W1: board cards no campaign lists in ``task_forces`` (backfill pending)."""
+     referenced = {task_id for doc in campaigns for task_id in task_force_ids(doc)}
+-    try:
+-        tasks = load_board(root).get("tasks") or []
+-    except (OSError, ValueError):
+-        return []
+     return [command_finding("W1", str(entry["id"]),
+                             f"board card not referenced by any campaign: {entry['id']}")
+-            for entry in tasks if entry.get("id") and entry["id"] not in referenced]
++            for entry in board_rows(root)[0] if entry["id"] not in referenced]
+ 
+ 
+ def review_warnings(campaigns: list[dict], today: date) -> list[dict]:
+@@ -6197,9 +6325,9 @@ def campaign_check_report(root: Path, strict: bool) -> dict:
+         "E6", COMMAND_CAMPAIGNS_REL, "campaign")
+     wip, wip_summary = wip_errors(root, campaigns)
+     errors += wip
+-    errors += task_force_errors(root, campaigns)
++    errors += task_force_errors(root, campaigns) + board_shape_errors(root)
+     warnings = board_orphan_warnings(root, campaigns) if strategy else []
+-    warnings += review_warnings(campaigns, today)
++    warnings += command_warnings(root, campaigns, today)
+     if strict:
+         errors += warnings
+         warnings = []
+@@ -6389,8 +6517,338 @@ def cmd_brief(root: Path, args) -> None:
+     print("\n".join(brief_markdown(root)))
+ 
+ 
++# ---------------------------------------------------------------------------
++# PILOT-046: status history (append-only snapshots, derived index/rollup/archive)
++# ---------------------------------------------------------------------------
++# Everything below reads the board, records and campaigns and writes only
++# ``status/``; ``primary/``, ``supervision/``, ``ledger/`` and ``tasks/`` are
++# never touched by these commands.
++def status_dir_path(root: Path) -> Path:
++    """The ``status/`` directory of the tower."""
++    return root / STATUS_DIR_REL
++
++
++def status_day_file(root: Path, day: date) -> Path:
++    """The snapshot file for one calendar day."""
++    return status_dir_path(root) / f"{day.isoformat()}.md"
++
++
++def status_moment(raw: str | None) -> datetime:
++    """Local now, or the ISO instant ``--at`` freezes time with in tests."""
++    if raw is None:
++        return datetime.now()
++    try:
++        return datetime.fromisoformat(str(raw).strip())
++    except ValueError:
++        fail([f"--at must be an ISO date-time: {raw!r}"])
++
++
++def status_figures(root: Path) -> dict:
++    """Campaign progress, WIP ratio and blocked count for one snapshot."""
++    campaigns, _ = load_campaign_docs(root)
++    doc = active_campaign(campaigns)
++    records = read_task_records(root)
++    in_flight = sum(1 for record in records
++                    if record.get("status") in COMMAND_IN_FLIGHT)
++    blocked = sum(1 for record in records if record_is_blocked(record))
++    if doc is None:
++        return {"campaign": "-", "progress": "", "wip": "-", "blocked": blocked}
++    closed, total = campaign_progress(root, doc)
++    limit = campaign_wip_limit(doc)
++    return {"campaign": str(doc.get("id") or doc["_path"]),
++            "progress": f"{closed}/{total}",
++            "wip": f"{in_flight}/{limit if limit is not None else '-'}",
++            "blocked": blocked}
++
++
++def status_entry_lines(task_id: str, event: str, moment: datetime,
++                       figures: dict, note: str | None,
++                       tests: int | None) -> list[str]:
++    """One fixed-shape snapshot entry as markdown lines."""
++    campaign = figures["campaign"]
++    progress = f" ({figures['progress']})" if figures["progress"] else ""
++    lines = [f"## {moment.strftime('%H:%M')} · {task_id} · {event}",
++             f"- campaign: {campaign}{progress}",
++             f"- wip: {figures['wip']}",
++             f"- blocked: {figures['blocked']}"]
++    if tests is not None:
++        lines.append(f"- tests: {tests}")
++    if note:
++        lines.append(f"- note: {note}")
++    return lines
++
++
++def status_append(root: Path, day: date, entry: list[str]) -> Path:
++    """Append one entry to ``status/<day>.md``, creating the header if needed."""
++    path = status_day_file(root, day)
++    path.parent.mkdir(parents=True, exist_ok=True)
++    existing = path.read_text(encoding="utf-8") if path.is_file() else ""
++    if not existing:
++        existing = f"# STATUS — {day.isoformat()}\n"
++    separator = "\n" if existing.endswith("\n") else "\n\n"
++    path.write_text(existing + separator + "\n".join(entry) + "\n",
++                    encoding="utf-8", newline="\n")
++    return path
++
++
++def status_blocks(text: str) -> list[list[str]]:
++    """Split a snapshot file into ``## HH:MM · TASK · event`` blocks."""
++    blocks: list[list[str]] = []
++    for line in text.splitlines():
++        if line.startswith("## "):
++            blocks.append([line])
++        elif blocks:
++            blocks[-1].append(line)
++    return blocks
++
++
++def status_entry(block: list[str]) -> dict | None:
++    """Parse one entry block; None when its heading is not the fixed shape."""
++    match = STATUS_ENTRY_RE.match(block[0])
++    if match is None:
++        return None
++    entry = {"time": match.group(1), "task": match.group(2),
++             "event": match.group(3)}
++    for line in block[1:]:
++        if line.startswith("- ") and ":" in line:
++            key, _, value = line[2:].partition(":")
++            entry[key.strip()] = value.strip()
++    return entry
++
++
++def status_day_entries(path: Path) -> list[dict]:
++    """Parsed entries of one snapshot file, in append order."""
++    try:
++        text = path.read_text(encoding="utf-8")
++    except (OSError, UnicodeError):
++        return []
++    return [entry for block in status_blocks(text)
++            if (entry := status_entry(block)) is not None]
++
++
++def status_snapshot_files(root: Path) -> list[Path]:
++    """Every dated snapshot, ascending; weekly/, archive/ and README are out."""
++    base = status_dir_path(root)
++    if not base.is_dir():
++        return []
++    return sorted(path for path in base.glob("*.md")
++                  if path.is_file() and command_date(path.stem) is not None)
++
++
++def status_campaign_value(raw: str | None) -> tuple[str, str] | None:
++    """``C-… (1/2)`` -> ``("C-…", "1/2")``; the ``-`` placeholder is None."""
++    match = STATUS_CAMPAIGN_RE.match(str(raw or "").strip())
++    if match is None or match.group(1) == "-":
++        return None
++    return match.group(1), (match.group(2) or "")
++
++
++def status_index_payload(root: Path) -> dict:
++    """The recomputable ``status/index.json`` payload (no timestamps)."""
++    days: list[dict] = []
++    cards: dict[str, dict] = {}
++    campaigns: dict[str, dict] = {}
++    for path in status_snapshot_files(root):
++        entries = status_day_entries(path)
++        days.append({"date": path.stem,
++                     "file": path.relative_to(root).as_posix(),
++                     "entries": len(entries),
++                     "sha256": sha256_file(path)})
++        for entry in entries:
++            cards[entry["task"]] = {"last_event": entry["event"],
++                                    "last_date": path.stem}
++            pair = status_campaign_value(entry.get("campaign"))
++            if pair is not None:
++                campaigns[pair[0]] = {"progress": pair[1]}
++    return {"schema": STATUS_INDEX_SCHEMA, "days": days,
++            "cards": cards, "campaigns": campaigns}
++
++
++def status_write_json(target: Path, payload: dict) -> None:
++    """Write canonical JSON: sorted keys, UTF-8, one trailing newline."""
++    target.parent.mkdir(parents=True, exist_ok=True)
++    text = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
++    target.write_text(text + "\n", encoding="utf-8", newline="\n")
++
++
++def week_bounds(week: str) -> tuple[date, date]:
++    """``YYYY-Www`` -> (Monday, Sunday); invalid input exits 2."""
++    match = re.match(r"^(\d{4})-W(\d{2})$", str(week or "").strip())
++    if match is None:
++        fail([f"--week must look like YYYY-Www: {week!r}"])
++    try:
++        start = date.fromisocalendar(int(match.group(1)), int(match.group(2)), 1)
++    except ValueError:
++        fail([f"--week is not a valid ISO week: {week!r}"])
++    return start, start + timedelta(days=6)
++
++
++def status_week_entries(root: Path, start: date,
++                        end: date) -> list[tuple[date, dict]]:
++    """Every parsed entry in ``[start, end]``, day by day, in file order."""
++    found: list[tuple[date, dict]] = []
++    day = start
++    while day <= end:
++        for entry in status_day_entries(status_day_file(root, day)):
++            found.append((day, entry))
++        day += timedelta(days=1)
++    return found
++
++
++def status_blocked_count(entries: list[dict]) -> int:
++    """Peak blocked-card count observed in the window (0 when never blocked)."""
++    peak = 0
++    for entry in entries:
++        raw = str(entry.get("blocked") or "0").strip()
++        peak = max(peak, int(raw)) if raw.isdigit() else peak
++    return peak
++
++
++def status_wip_span(entries: list[dict]) -> str:
++    """``first → last`` WIP value of the week, or one value when unchanged."""
++    values = [str(entry.get("wip") or "-") for entry in entries]
++    if not values:
++        return "-"
++    return values[0] if values[0] == values[-1] else f"{values[0]} → {values[-1]}"
++
++
++def status_campaign_rollup(entries: list[dict]) -> list[str]:
++    """Latest progress per campaign id, sorted for byte stability."""
++    latest: dict[str, str] = {}
++    for entry in entries:
++        pair = status_campaign_value(entry.get("campaign"))
++        if pair is not None:
++            latest[pair[0]] = pair[1]
++    return [f"  - {campaign_id} {latest[campaign_id]}"
++            for campaign_id in sorted(latest)]
++
++
++def status_rollup_lines(root: Path, week: str) -> list[str]:
++    """The weekly markdown; every value derives from the snapshots only."""
++    start, end = week_bounds(week)
++    events = status_week_entries(root, start, end)
++    rows = [entry for _, entry in events]
++    closed = sorted({entry["task"] for entry in rows if entry["event"] == "closed"})
++    lines = [f"# WEEKLY — {week}", "",
++             f"- 窗口：{start.isoformat()} → {end.isoformat()}",
++             f"- 事件数：{len(events)}",
++             f"- closed 卡：{'、'.join(closed) if closed else '-'}",
++             f"- blocked 计数：{status_blocked_count(rows)}",
++             f"- wip 变化：{status_wip_span(rows)}",
++             "- campaign 进度：",
++             *(status_campaign_rollup(rows) or ["  - -"]),
++             "", "## 事件"]
++    lines += [f"- {day.isoformat()} {entry['time']} · {entry['task']} · "
++              f"{entry['event']}" for day, entry in events] or ["- （本周无快照）"]
++    return lines
++
++
++def status_quarter(day: date) -> str:
++    """``YYYY-Qn`` for the calendar quarter of ``day``."""
++    return f"{day.year}-Q{(day.month - 1) // 3 + 1}"
++
++
++def status_archive_line(day: date, entries: list[dict]) -> str:
++    """One archive line: date, event count and the day's last event."""
++    line = f"- {day.isoformat()} · {len(entries)} 事件"
++    if entries:
++        last = entries[-1]
++        line += f" · last: {last['task']} {last['event']}"
++    return line
++
++
++def status_archive(root: Path, before: date) -> dict:
++    """Compress snapshots before ``before`` into one file per quarter.
++
++    The originals stay in place (the status history is append-only); rerunning
++    the command rewrites the same archive bytes.
++    """
++    grouped: dict[str, list[str]] = {}
++    for path in status_snapshot_files(root):
++        day = command_date(path.stem)
++        if day is None or day >= before:
++            continue
++        grouped.setdefault(status_quarter(day), []).append(
++            status_archive_line(day, status_day_entries(path)))
++    written: list[str] = []
++    for quarter in sorted(grouped):
++        target = status_dir_path(root) / "archive" / f"{quarter}.md"
++        target.parent.mkdir(parents=True, exist_ok=True)
++        text = f"# ARCHIVE — {quarter}\n\n" + "\n".join(grouped[quarter]) + "\n"
++        target.write_text(text, encoding="utf-8", newline="\n")
++        written.append(target.relative_to(root).as_posix())
++    return {"ok": True, "before": before.isoformat(), "files": written,
++            "days": sum(len(lines) for lines in grouped.values())}
++
++
++def cmd_status_snapshot(root: Path, args) -> None:
++    """Append one status snapshot; only ``status/`` is ever written."""
++    task_id = check_task_id(args.task)
++    moment = status_moment(args.at)
++    if args.tests is not None and args.tests < 0:
++        fail([f"--tests must be a non-negative int: {args.tests}"])
++    entry = status_entry_lines(task_id, args.event, moment,
++                               status_figures(root), args.note, args.tests)
++    path = status_append(root, moment.date(), entry)
++    emit({"ok": True, "command": "status-snapshot", "file": rel(root, path),
++          "task": task_id, "event": args.event,
++          "at": moment.strftime("%Y-%m-%dT%H:%M")})
++
++
++def cmd_status_index(root: Path, args) -> None:
++    """Rebuild ``status/index.json`` from the snapshots (deterministic)."""
++    payload = status_index_payload(root)
++    status_write_json(root / STATUS_INDEX_REL, payload)
++    emit({"ok": True, "command": "status-index", "file": STATUS_INDEX_REL,
++          "days": len(payload["days"]), "cards": len(payload["cards"]),
++          "campaigns": len(payload["campaigns"])})
++
++
++def cmd_status_rollup(root: Path, args) -> None:
++    """Write ``status/weekly/<week>.md`` from that week's snapshots."""
++    start, end = week_bounds(args.week)
++    target = status_dir_path(root) / "weekly" / f"{args.week}.md"
++    target.parent.mkdir(parents=True, exist_ok=True)
++    target.write_text("\n".join(status_rollup_lines(root, args.week)) + "\n",
++                      encoding="utf-8", newline="\n")
++    emit({"ok": True, "command": "status-rollup", "file": rel(root, target),
++          "week": args.week, "window": [start.isoformat(), end.isoformat()]})
++
++
++def cmd_status_archive(root: Path, args) -> None:
++    """Compress snapshots older than ``--before``; originals are kept."""
++    before = command_date(args.before)
++    if before is None:
++        fail([f"--before must be YYYY-MM-DD: {args.before!r}"])
++    emit({"command": "status-archive", **status_archive(root, before)})
++
++
++def status_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
++    """Register the PILOT-046 status commands on the PILOT-045 parser."""
++    for action in parser._actions:
++        if not isinstance(action, argparse._SubParsersAction):
++            continue
++        snapshot = action.add_parser("status-snapshot")
++        snapshot.add_argument("--task", required=True)
++        snapshot.add_argument("--event", required=True,
++                              choices=list(STATUS_EVENTS))
++        snapshot.add_argument("--note")
++        snapshot.add_argument("--tests", type=int)
++        snapshot.add_argument("--at")
++        action.add_parser("status-index")
++        rollup = action.add_parser("status-rollup")
++        rollup.add_argument("--week", required=True)
++        archive = action.add_parser("status-archive")
++        archive.add_argument("--before", required=True)
++    return parser
++
++
+ # Merged into ``main``'s handler table so the command layer owns its own wiring.
+-COMMAND_LAYER_HANDLERS = {"campaign-check": cmd_campaign_check, "brief": cmd_brief}
++COMMAND_LAYER_HANDLERS = {
++    "campaign-check": cmd_campaign_check, "brief": cmd_brief,
++    "status-snapshot": cmd_status_snapshot, "status-index": cmd_status_index,
++    "status-rollup": cmd_status_rollup, "status-archive": cmd_status_archive}
++
+ 
+ 
+ def build_parser() -> argparse.ArgumentParser:
+@@ -6579,7 +7037,7 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
+         cc.add_argument("--strict", action="store_true",
+                         help="treat warnings (W1/W2) as errors")
+         action.add_parser("brief")
+-    return parser
++    return status_layer_parsers(parser)
+ 
+ 
+ def cli_commands() -> list[str]:
