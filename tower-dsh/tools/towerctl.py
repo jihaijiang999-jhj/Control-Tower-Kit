@@ -20,7 +20,7 @@ import sys
 import time
 import uuid
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import spec_coverage
@@ -5796,6 +5796,603 @@ def cmd_spec_coverage(root: Path, args) -> None:
     emit(result, 0 if result["ok"] else 2)
 
 
+# ---------------------------------------------------------------------------
+# PILOT-045: command layer (WHY = STRATEGY.md, NOW = command/campaigns/)
+# ---------------------------------------------------------------------------
+# The command layer stores intent, not tower state: one strategy document plus
+# one file per campaign.  Both carry a YAML-subset front-matter block parsed
+# here (no PyYAML, no network).  ``campaign-check`` judges links/WIP/dates and
+# ``brief`` renders the one-page summary; neither command writes anything.
+COMMAND_STRATEGY_REL = "command/STRATEGY.md"
+COMMAND_CAMPAIGNS_REL = "command/campaigns"
+COMMAND_SCHEMAS = {"strategy": "tower/strategy@1", "campaign": "tower/campaign@1"}
+COMMAND_IN_FLIGHT = ("dispatched", "delivered", "reviewed", "accepted")
+COMMAND_TERMINAL = ("closed", "aborted")
+COMMAND_REVIEW_WINDOW_DAYS = 7
+COMMAND_BRIEF_MAX_LINES = 60
+COMMAND_BUDGET_CARDS_RE = re.compile(r"(\d+)\s*张卡")
+COMMAND_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
+# Superseded cards are archived as ``tasks/<ID>-VOID/``; see read_task_records.
+COMMAND_ARCHIVE_SUFFIX = "-VOID"
+
+
+class CommandDocError(ValueError):
+    """A command document is missing, malformed, or outside the YAML subset."""
+
+
+def command_finding(code: str, target: str, detail: str) -> dict:
+    """One E/W finding: ``{code, target, detail}``."""
+    return {"code": code, "target": target, "detail": detail}
+
+
+def command_date(raw) -> date | None:
+    """``YYYY-MM-DD`` -> date; anything else -> None (reported by the caller)."""
+    try:
+        return date.fromisoformat(str(raw or "").strip())
+    except ValueError:
+        return None
+
+
+def front_matter_block(text: str) -> list[str]:
+    """The lines between the leading and the closing ``---`` fence."""
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        raise CommandDocError("front-matter must start on the first line with ---")
+    for index in range(1, len(lines)):
+        if lines[index].strip() == "---":
+            return lines[1:index]
+    raise CommandDocError("front-matter has no closing ---")
+
+
+def yaml_scalar(raw: str) -> str:
+    """A plain scalar or a double-quoted one; no flow syntax, no escapes."""
+    text = raw.strip()
+    if not text:
+        raise CommandDocError("empty value where a scalar is required")
+    if text.startswith('"'):
+        if len(text) < 2 or not text.endswith('"'):
+            raise CommandDocError(f"unterminated quoted string: {text!r}")
+        if '"' in text[1:-1]:
+            raise CommandDocError(f"escaped quotes are unsupported: {text!r}")
+        return text[1:-1]
+    if text[0] in "[{&*!|>%@`" or text.endswith('"'):
+        raise CommandDocError(f"unsupported scalar syntax: {text!r}")
+    return text
+
+
+def yaml_key_value(text: str, indent: int) -> tuple[str, str]:
+    """Split ``key: value`` at ``indent`` spaces; reject anything else."""
+    if text[:indent].strip():
+        raise CommandDocError(f"unexpected indentation: {text!r}")
+    body = text[indent:]
+    if ":" not in body:
+        raise CommandDocError(f"expected 'key: value': {body!r}")
+    key, _, value = body.partition(":")
+    key = key.strip()
+    if not COMMAND_KEY_RE.match(key):
+        raise CommandDocError(f"unsupported key: {key!r}")
+    return key, value.strip()
+
+
+def yaml_mapping_item(rest: str) -> bool:
+    """True when a list item body is ``key: value`` rather than a scalar."""
+    head = rest.split(":", 1)[0].strip()
+    return ":" in rest and bool(COMMAND_KEY_RE.match(head))
+
+
+def yaml_mapping_entry(lines: list[str], index: int,
+                       head: str) -> tuple[dict, int]:
+    """Parse ``- key: value`` plus its 4-space continuation keys."""
+    key, value = yaml_key_value(head, 0)
+    item = {key: yaml_scalar(value)}
+    index += 1
+    while index < len(lines):
+        line = lines[index]
+        if not line.strip() or line.lstrip().startswith("#"):
+            index += 1
+            continue
+        if line.startswith("     "):
+            raise CommandDocError(f"unsupported nested structure: {line.strip()!r}")
+        if not line.startswith("    "):
+            break
+        key, value = yaml_key_value(line, 4)
+        if key in item:
+            raise CommandDocError(f"duplicate key in mapping item: {key}")
+        item[key] = yaml_scalar(value)
+        index += 1
+    return item, index
+
+
+def yaml_list_block(lines: list[str], start: int) -> tuple[list, int]:
+    """Parse the 2-space list that follows a bare ``key:``."""
+    entries: list = []
+    index = start
+    mode: bool | None = None
+    while index < len(lines):
+        line = lines[index]
+        if not line.strip() or line.lstrip().startswith("#"):
+            index += 1
+            continue
+        if not line.startswith("  - "):
+            break
+        body = line[4:]
+        mapping = yaml_mapping_item(body)
+        if mode is None:
+            mode = mapping
+        elif mode is not mapping:
+            raise CommandDocError("mixed scalar and mapping list items are unsupported")
+        if mapping:
+            entry, index = yaml_mapping_entry(lines, index, body)
+            entries.append(entry)
+            continue
+        entries.append(yaml_scalar(body))
+        index += 1
+    return entries, index
+
+
+def parse_command_front_matter(lines: list[str]) -> dict:
+    """Parse front-matter lines into one mapping (supported subset only)."""
+    data: dict = {}
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if not line.strip() or line.lstrip().startswith("#"):
+            index += 1
+            continue
+        if line[0].isspace():
+            raise CommandDocError(f"unexpected indentation: {line!r}")
+        key, value = yaml_key_value(line, 0)
+        if key in data:
+            raise CommandDocError(f"duplicate key: {key}")
+        if value:
+            data[key] = yaml_scalar(value)
+            index += 1
+            continue
+        entries, index = yaml_list_block(lines, index + 1)
+        if not entries:
+            raise CommandDocError(f"key {key!r} needs a scalar value or a list")
+        data[key] = entries
+    return data
+
+
+def load_command_doc(root: Path, relpath: str) -> tuple[dict, str]:
+    """Read one command document: its front-matter mapping and full text."""
+    path = root / relpath
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise CommandDocError(f"{relpath}: unreadable ({exc.__class__.__name__})") from None
+    try:
+        return parse_command_front_matter(front_matter_block(text)), text
+    except CommandDocError as exc:
+        raise CommandDocError(f"{relpath}: {exc}") from None
+
+
+def command_doc_meta(root: Path, relpath: str, schema: str) -> dict:
+    """Load one document and require its declared schema."""
+    meta, _ = load_command_doc(root, relpath)
+    if meta.get("schema") != schema:
+        raise CommandDocError(f"{relpath}: schema must be {schema}")
+    return meta
+
+
+def campaign_relpaths(root: Path) -> list[str]:
+    """Tower-relative paths of every ``command/campaigns/*.md`` document."""
+    base = root / COMMAND_CAMPAIGNS_REL
+    if not base.is_dir():
+        return []
+    return sorted(path.relative_to(root).as_posix()
+                  for path in base.glob("*.md") if path.is_file())
+
+
+def strategy_goals(meta: dict) -> list[dict]:
+    """Well-formed ``goals`` entries (each one must carry an id)."""
+    raw = meta.get("goals")
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, dict) and item.get("id")]
+
+
+def scalar_items(raw) -> list[str]:
+    """A YAML list of non-empty strings; anything else yields nothing."""
+    if not isinstance(raw, list):
+        return []
+    return [str(item) for item in raw if isinstance(item, str) and item.strip()]
+
+
+def task_force_ids(meta: dict) -> list[str]:
+    """The card ids a campaign forces."""
+    return scalar_items(meta.get("task_forces"))
+
+
+def campaign_wip_limit(meta: dict) -> int | None:
+    """``wip_limit`` as a non-negative int, or None when missing/invalid.
+
+    The YAML subset keeps every scalar as text, so a bare ``1`` arrives as
+    ``"1"``; only decimal digits are accepted here.
+    """
+    raw = meta.get("wip_limit")
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, int):
+        return raw if raw >= 0 else None
+    text = str(raw or "").strip()
+    return int(text) if text.isdigit() else None
+
+
+def budget_card_limit(raw) -> int | None:
+    """The card allowance parsed out of a free-form ``budget`` string."""
+    match = COMMAND_BUDGET_CARDS_RE.search(str(raw or ""))
+    return int(match.group(1)) if match else None
+
+
+def command_card_exists(root: Path, task_id: str) -> bool:
+    """A reference is real when the card has a record dir or a pilot spec."""
+    if not is_safe_id(task_id, TASK_ID_RE):
+        return False
+    return ((root / "tasks" / task_id).is_dir()
+            or (root / "pilot" / f"{task_id}.spec.json").is_file())
+
+
+def duplicate_id_errors(ids: list[str], code: str, target: str,
+                        label: str) -> list[dict]:
+    """One finding per repeated id in ``ids``."""
+    seen: set[str] = set()
+    errors: list[dict] = []
+    for value in ids:
+        if value in seen:
+            errors.append(command_finding(code, target, f"duplicate {label} id: {value}"))
+        seen.add(value)
+    return errors
+
+
+def load_campaign_docs(root: Path) -> tuple[list[dict], list[dict]]:
+    """Every campaign document, plus the ones that failed to parse."""
+    docs: list[dict] = []
+    errors: list[dict] = []
+    for relpath in campaign_relpaths(root):
+        try:
+            meta = command_doc_meta(root, relpath, COMMAND_SCHEMAS["campaign"])
+        except CommandDocError as exc:
+            errors.append(command_finding("E1", relpath, str(exc)))
+            continue
+        docs.append({**meta, "_path": relpath})
+    return docs, errors
+
+
+def check_strategy_doc(root: Path) -> tuple[dict | None, list[dict]]:
+    """E1: STRATEGY.md exists, parses, and declares at least one goal."""
+    if not (root / COMMAND_STRATEGY_REL).is_file():
+        return None, [command_finding("E1", COMMAND_STRATEGY_REL,
+                                      "strategy document missing")]
+    try:
+        meta = command_doc_meta(root, COMMAND_STRATEGY_REL, COMMAND_SCHEMAS["strategy"])
+    except CommandDocError as exc:
+        return None, [command_finding("E1", COMMAND_STRATEGY_REL, str(exc))]
+    if not strategy_goals(meta):
+        return None, [command_finding("E1", COMMAND_STRATEGY_REL,
+                                      "strategy declares no goals")]
+    return meta, []
+
+
+def goal_link_errors(campaigns: list[dict], goal_ids: list[str]) -> list[dict]:
+    """E2: each campaign goal must be one of the strategy goal ids."""
+    errors: list[dict] = []
+    for doc in campaigns:
+        if doc.get("goal") in goal_ids:
+            continue
+        target = str(doc.get("id") or doc["_path"])
+        errors.append(command_finding("E2", target,
+                                      f"goal {doc.get('goal')!r} is not a strategy goal"))
+    return errors
+
+
+def review_by_errors(strategy: dict, campaigns: list[dict], today: date) -> list[dict]:
+    """E3: the strategy and every active campaign are inside ``review_by``."""
+    errors: list[dict] = []
+    deadlines = [(COMMAND_STRATEGY_REL, strategy.get("review_by"))]
+    deadlines += [(str(doc.get("id") or doc["_path"]), doc.get("review_by"))
+                  for doc in campaigns if doc.get("status") == "active"]
+    for target, raw in deadlines:
+        deadline = command_date(raw)
+        if deadline is None:
+            errors.append(command_finding(
+                "E3", target, f"review_by missing or invalid: {raw!r}"))
+        elif deadline < today:
+            errors.append(command_finding(
+                "E3", target, f"review_by {deadline.isoformat()} is past due"))
+    return errors
+
+
+def in_flight_ids(root: Path, task_ids: list[str]) -> list[str]:
+    """Of ``task_ids``, those whose record status is in flight."""
+    found: list[str] = []
+    for task_id in task_ids:
+        record = _optional_task_record(root, task_id)
+        if record and record.get("status") in COMMAND_IN_FLIGHT:
+            found.append(task_id)
+    return found
+
+
+def wip_errors(root: Path, campaigns: list[dict]) -> tuple[list[dict], dict]:
+    """E4 plus the WIP summary rendered by ``campaign-check``."""
+    errors: list[dict] = []
+    summary: dict = {"in_flight": 0, "limit": 0, "campaigns": {}}
+    for doc in campaigns:
+        if doc.get("status") != "active":
+            continue
+        name = str(doc.get("id") or doc["_path"])
+        ids = in_flight_ids(root, task_force_ids(doc))
+        limit = campaign_wip_limit(doc)
+        if limit is None:
+            errors.append(command_finding("E4", name, "wip_limit missing or invalid"))
+            limit = 0
+        summary["in_flight"] += len(ids)
+        summary["limit"] += limit
+        summary["campaigns"][name] = len(ids)
+        if len(ids) > limit:
+            errors.append(command_finding(
+                "E4", name, f"in-flight {len(ids)} exceeds wip_limit {limit}: "
+                            f"{', '.join(ids) or '-'}"))
+    return errors, summary
+
+
+def task_force_errors(root: Path, campaigns: list[dict]) -> list[dict]:
+    """E5: a campaign may only force cards that exist in the tower."""
+    errors: list[dict] = []
+    for doc in campaigns:
+        for task_id in task_force_ids(doc):
+            if command_card_exists(root, task_id):
+                continue
+            errors.append(command_finding(
+                "E5", str(doc.get("id") or doc["_path"]),
+                f"task_forces references an unknown card: {task_id}"))
+    return errors
+
+
+def board_orphan_warnings(root: Path, campaigns: list[dict]) -> list[dict]:
+    """W1: board cards no campaign lists in ``task_forces`` (backfill pending)."""
+    referenced = {task_id for doc in campaigns for task_id in task_force_ids(doc)}
+    try:
+        tasks = load_board(root).get("tasks") or []
+    except (OSError, ValueError):
+        return []
+    return [command_finding("W1", str(entry["id"]),
+                            f"board card not referenced by any campaign: {entry['id']}")
+            for entry in tasks if entry.get("id") and entry["id"] not in referenced]
+
+
+def review_warnings(campaigns: list[dict], today: date) -> list[dict]:
+    """W2: ``review_by`` within a week, or more forced cards than the budget."""
+    warnings: list[dict] = []
+    horizon = today + timedelta(days=COMMAND_REVIEW_WINDOW_DAYS)
+    for doc in campaigns:
+        if doc.get("status") in COMMAND_TERMINAL:
+            continue
+        target = str(doc.get("id") or doc["_path"])
+        deadline = command_date(doc.get("review_by"))
+        if deadline is not None and today <= deadline <= horizon:
+            warnings.append(command_finding(
+                "W2", target, f"review_by {deadline.isoformat()} is within 7 days"))
+        budget = budget_card_limit(doc.get("budget"))
+        if budget is not None and len(task_force_ids(doc)) > budget:
+            warnings.append(command_finding(
+                "W2", target, f"task_forces exceed the budget of {budget} cards"))
+    return warnings
+
+
+def campaign_check_report(root: Path, strict: bool) -> dict:
+    """The ``campaign-check`` payload; reads only, never writes a file."""
+    today = date.today()
+    strategy, errors = check_strategy_doc(root)
+    campaigns, campaign_errors = load_campaign_docs(root)
+    errors += campaign_errors
+    goal_ids = [str(goal["id"]) for goal in strategy_goals(strategy or {})]
+    if strategy is not None:
+        errors += duplicate_id_errors(goal_ids, "E6", COMMAND_STRATEGY_REL, "goal")
+        errors += goal_link_errors(campaigns, goal_ids)
+        errors += review_by_errors(strategy, campaigns, today)
+    errors += duplicate_id_errors(
+        [str(doc.get("id") or doc["_path"]) for doc in campaigns],
+        "E6", COMMAND_CAMPAIGNS_REL, "campaign")
+    wip, wip_summary = wip_errors(root, campaigns)
+    errors += wip
+    errors += task_force_errors(root, campaigns)
+    warnings = board_orphan_warnings(root, campaigns) if strategy else []
+    warnings += review_warnings(campaigns, today)
+    if strict:
+        errors += warnings
+        warnings = []
+    return {"ok": not errors, "strict": strict,
+            "strategy": (strategy or {}).get("id"), "goals": goal_ids,
+            "campaigns": len(campaigns),
+            "campaign_ids": [str(doc.get("id") or doc["_path"]) for doc in campaigns],
+            "wip": wip_summary, "errors": errors, "warnings": warnings}
+
+
+def cmd_campaign_check(root: Path, args) -> None:
+    """Judge strategy/campaign links, WIP and review dates (read-only)."""
+    payload = campaign_check_report(root, args.strict)
+    emit(payload, 0 if payload["ok"] else 2)
+
+
+def load_strategy_quiet(root: Path) -> dict | None:
+    """The strategy mapping, or None when it is missing or unparseable."""
+    try:
+        return command_doc_meta(root, COMMAND_STRATEGY_REL, COMMAND_SCHEMAS["strategy"])
+    except CommandDocError:
+        return None
+
+
+def active_campaign(campaigns: list[dict]) -> dict | None:
+    """The first campaign whose status is ``active``."""
+    for doc in campaigns:
+        if doc.get("status") == "active":
+            return doc
+    return None
+
+
+def campaign_progress(root: Path, doc: dict) -> tuple[int, int]:
+    """``(closed, total)`` over the campaign's ``task_forces``."""
+    ids = task_force_ids(doc)
+    closed = 0
+    for task_id in ids:
+        record = _optional_task_record(root, task_id)
+        if record and record.get("status") == "closed":
+            closed += 1
+    return closed, len(ids)
+
+
+def brief_record_lines(rows: list[dict]) -> list[str]:
+    """``- id · status · next`` for each card."""
+    return [f"- {record.get('id')} · {record.get('status')} · "
+            f"{record.get('next') or ''}".rstrip() for record in rows]
+
+
+def brief_cap(lines: list[str], limit: int) -> list[str]:
+    """At most ``limit`` lines, with an overflow marker instead of silence."""
+    if len(lines) <= limit:
+        return lines
+    return lines[:limit] + [f"- …另有 {len(lines) - limit} 条"]
+
+
+def brief_strategy_lines(strategy: dict | None) -> list[str]:
+    """One-line strategy answer: the first goal, else the title."""
+    if strategy is None:
+        return ["- STRATEGY.md 缺失或无法解析"]
+    goals = strategy_goals(strategy)
+    if goals:
+        goal = goals[0]
+        return [f"- {goal.get('id')}：{goal.get('text') or goal.get('metric') or '（无 text）'}"]
+    return [f"- {strategy.get('title') or strategy.get('id') or '（无 goals）'}"]
+
+
+def brief_campaign_lines(root: Path, doc: dict | None) -> list[str]:
+    """Active campaign identity plus closed/total progress."""
+    if doc is None:
+        return ["- （无 active campaign）"]
+    closed, total = campaign_progress(root, doc)
+    return [f"- {doc.get('id')}：{doc.get('objective') or '（无 objective）'}",
+            f"- 进度：{closed}/{total} closed"]
+
+
+def brief_wip_lines(records: list[dict]) -> list[str]:
+    """Every in-flight card with its status, capped so brief stays one page."""
+    rows = [record for record in records if record.get("status") in COMMAND_IN_FLIGHT]
+    return brief_cap(brief_record_lines(rows), 8) if rows else ["- （空）"]
+
+
+def record_is_blocked(record: dict) -> bool:
+    """Rework, or a failed last review, counts as blocked."""
+    if record.get("status") == "rework":
+        return True
+    return (record.get("review") or {}).get("verdict") == "FAIL"
+
+
+def brief_blocked_lines(records: list[dict]) -> list[str]:
+    """Blocked / rework cards, one line each, capped at six."""
+    rows = [record for record in records if record_is_blocked(record)]
+    return brief_cap(brief_record_lines(rows), 6) if rows else ["- （无）"]
+
+
+def brief_next_lines(root: Path, doc: dict | None) -> list[str]:
+    """The first three not-yet-closed cards of the active campaign."""
+    if doc is None:
+        return ["- （无 active campaign）"]
+    pending: list[str] = []
+    for task_id in task_force_ids(doc):
+        record = _optional_task_record(root, task_id)
+        if record is None or record.get("status") != "closed":
+            pending.append(task_id)
+    if not pending:
+        return ["- （本战役 task_forces 已全部 closed）"]
+    return [f"- {task_id}" for task_id in pending[:3]]
+
+
+def read_current_state(root: Path) -> dict:
+    """CURRENT_STATE.json or ``{}``; brief never fails on a missing state file."""
+    try:
+        return jload(root / "primary" / "CURRENT_STATE.json")
+    except (OSError, ValueError):
+        return {}
+
+
+def brief_pending_lines(root: Path, doc: dict | None) -> list[str]:
+    """Open decisions: campaign stop conditions and tower-level blockers."""
+    lines: list[str] = []
+    if doc is not None:
+        lines += [f"- 停止条件：{item}" for item in scalar_items(doc.get("stop_conditions"))]
+    state = read_current_state(root)
+    lines += [f"- 塔级阻塞：{item}" for item in scalar_items(state.get("blockers"))]
+    if state.get("next_action"):
+        lines.append(f"- next_action：{state['next_action']}")
+    return brief_cap(lines, 6) if lines else ["- （无）"]
+
+
+def brief_constraint_lines(strategy: dict | None, doc: dict | None) -> list[str]:
+    """Strategy non-goals plus the campaign's stop conditions, capped at eight."""
+    lines = [f"- 非目标：{item}"
+             for item in scalar_items((strategy or {}).get("non_goals"))]
+    lines += [f"- 停止条件：{item}"
+              for item in scalar_items((doc or {}).get("stop_conditions"))]
+    return brief_cap(lines, 8) if lines else ["- （无）"]
+
+
+def canonical_task_dir(name: str) -> bool:
+    """True for a live task directory, false for an archive (``*-VOID``).
+
+    Superseded cards are parked in ``tasks/<ID>-VOID/`` and keep their original
+    ``id`` inside the record, so accepting such a directory would list one card
+    twice (once closed, once whatever the archive last said).
+    """
+    return is_safe_id(name, TASK_ID_RE) and not name.endswith(COMMAND_ARCHIVE_SUFFIX)
+
+
+def read_task_records(root: Path) -> list[dict]:
+    """Every live ``tasks/<ID>/record.json`` whose id matches its directory.
+
+    Archive directories and records whose internal ``id`` disagrees with the
+    directory name are skipped, so one card can never appear twice.
+    """
+    records: list[dict] = []
+    for path in sorted((root / "tasks").glob("*/record.json")):
+        name = path.parent.name
+        if not canonical_task_dir(name):
+            continue
+        record = _optional_task_record(root, name)
+        if record and record.get("id") == name:
+            records.append(record)
+    return records
+
+
+def brief_markdown(root: Path) -> list[str]:
+    """The one-page brief as lines, capped at ``COMMAND_BRIEF_MAX_LINES``."""
+    strategy = load_strategy_quiet(root)
+    campaigns, _ = load_campaign_docs(root)
+    doc = active_campaign(campaigns)
+    records = read_task_records(root)
+    lines = [f"# BRIEF — {date.today().isoformat()}",
+             "## 战略一句话", *brief_strategy_lines(strategy),
+             "## 当前战役", *brief_campaign_lines(root, doc),
+             "## 在飞（WIP）", *brief_wip_lines(records),
+             "## 阻塞 / 返工", *brief_blocked_lines(records),
+             "## 下一步 3 件", *brief_next_lines(root, doc),
+             "## 待决", *brief_pending_lines(root, doc),
+             "## 架构约束", *brief_constraint_lines(strategy, doc)]
+    if len(lines) > COMMAND_BRIEF_MAX_LINES:
+        return lines[:COMMAND_BRIEF_MAX_LINES - 1] + ["…（已截断）"]
+    return lines
+
+
+def cmd_brief(root: Path, args) -> None:
+    """Print the one-page brief; stdout only, no state writes."""
+    print("\n".join(brief_markdown(root)))
+
+
+# Merged into ``main``'s handler table so the command layer owns its own wiring.
+COMMAND_LAYER_HANDLERS = {"campaign-check": cmd_campaign_check, "brief": cmd_brief}
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Tower/DSH file-backed control-plane CLI")
     p.add_argument("--root", default=str(DEFAULT_ROOT))
@@ -5964,7 +6561,25 @@ def build_parser() -> argparse.ArgumentParser:
 
     cl = sub.add_parser("close")
     cl.add_argument("--task", required=True)
-    return p
+    return command_layer_parsers(p)
+
+
+def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Register the PILOT-045 commands on the parser built by ``build_parser``.
+
+    The base parser stays at its PILOT-044 size on purpose: ``shape-check``
+    freezes every existing function in ``state/SHAPE-BASELINE.json``, so the
+    command layer adds its subcommands here instead of growing
+    ``build_parser``.  Returns ``parser`` so ``build_parser`` can tail-call it.
+    """
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        cc = action.add_parser("campaign-check")
+        cc.add_argument("--strict", action="store_true",
+                        help="treat warnings (W1/W2) as errors")
+        action.add_parser("brief")
+    return parser
 
 
 def cli_commands() -> list[str]:
@@ -5982,7 +6597,7 @@ def main() -> None:
     root = Path(args.root).resolve()
     if not root.exists():
         fail([f"root not found: {root}"])
-    handlers = {
+    handlers = {**COMMAND_LAYER_HANDLERS,
         "init": cmd_init, "wiring": cmd_wiring, "startup": cmd_startup,
         "status": cmd_status, "phase": cmd_phase, "task-new": cmd_task_new, "check": cmd_check,
         "spec-approve": cmd_spec_approve,

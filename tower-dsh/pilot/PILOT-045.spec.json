@@ -1,0 +1,49 @@
+{
+  "schema": "tower/spec@1",
+  "id": "PILOT-045",
+  "title": "命令层 v1：STRATEGY + campaigns + campaign-check + brief",
+  "authority": "workspace_write",
+  "anchor": "control-tower/COMMAND-LAYER.md §2–§6（阶段 045）",
+  "why_now": "塔目前只能回答“做了什么、做得对不对”，回答不了“为什么做、现在打到哪、该停还是该加码”。045 落四本账里的 WHY（战略）与 NOW 的第一层（战役），并提供只读校验器 campaign-check 与一页纸 brief；不写状态、不改状态机、不接 dispatch 强制，留到 046–048。",
+  "scope": [
+    "新增 tower-dsh/command/STRATEGY.md：front-matter（YAML 子集）含 schema=tower/strategy@1、id=S-2026-Q4、horizon、owner、status、review_by、goals（id/text/metric）、non_goals、bets；正文写战略叙述与本期赌注",
+    "新增 tower-dsh/command/campaigns/C-2026-Q4-01.md：front-matter 含 schema=tower/campaign@1、id、goal（指向 strategy 的 goal id）、status、owner、objective、key_results、task_forces（PILOT-045）、sequence、stop_conditions、budget、wip_limit=1、review_by",
+    "新增 towerctl campaign-check：解析 strategy 与 campaigns 的 front-matter（零依赖 YAML 子集解析器，支持顶层标量、标量列表、映射列表、引号字符串），按 COMMAND-LAYER §4 校验——E1 strategy 缺失/非法；E2 goal 不在 strategy；E3 review_by 过期；E4 active campaign 在飞卡数 > wip_limit；E5 task_forces 引用的卡不存在；E6 goal/campaign id 重复；W1 board 中未被任何 campaign 引用的卡（warning）；W2 campaign 临近/超过 review_by 或 budget（warning）；错误 exit 2，仅警告 exit 0，--strict 把警告升级为错误",
+    "新增 towerctl brief：只读生成一页纸 Markdown（≤60 行），固定七节——战略一句话、当前战役（目标/进度 x/y）、在飞（WIP）、阻塞/返工、下一步 3 件、待决、架构约束（本战役非目标/停止条件）；来源 STRATEGY.md、campaigns/*.md、primary/TASK_BOARD.json、tasks/*/record.json、primary/CURRENT_STATE.json；输出到 stdout，不写任何文件",
+    "在飞定义：record 状态 ∈ dispatched/delivered/reviewed/accepted；进度 x/y = campaign 的 task_forces 中已 closed 的数量 / 总数",
+    "新增 tools/tests/test_command_layer.py：E1–E6 各一例、W1/W2、--strict 升级、brief 七节与 ≤60 行、brief 不写文件、campaign-check 对合法夹具 exit 0、非法 front-matter 干净 exit 2（不 traceback）、YAML 子集解析（标量/列表/映射列表/引号/注释）",
+    "真实塔：创建 S-2026-Q4（goals G1 可信交付、G2 全局指挥、G3 形状可持续、G4 对象层；non_goals 多写者/生产接入/日报周报月报）与 C-2026-Q4-01（goal=G2，task_forces=[PILOT-045]，wip_limit=1，review_by=2026-11-11）；campaign-check exit 0，brief 可用",
+    "真实塔验证：worktree 新工具 campaign-check exit 0、brief 正常、authority-check exit 0、state-verify drift []；建信封前 tasks=45/envelopes=43，建信封后 45/44；merge 前置链与空账本守卫仍通过",
+    "不改 036–044 的信任边界/授权/前置链/空账本/范围门/completion/base_sha/shape 语义；不写状态、不改 record/board/ledger；不引入第三方依赖；不做 status 快照、ARCHITECTURE、dispatch 强制（分属 046–048）"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-045/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-045/tower-dsh/tools/tests/test_command_layer.py",
+    "pilot/worktrees/PILOT-045/tower-dsh/command/STRATEGY.md",
+    "pilot/worktrees/PILOT-045/tower-dsh/command/campaigns/C-2026-Q4-01.md"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies (including PyYAML)",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "hand-editing state/AUTHORITY.json, shared/AUTHORITY_POLICY.json or ledger/*.jsonl",
+    "writing any tower state from campaign-check or brief",
+    "enforcing campaign on dispatch in this card (that is 048)"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-045/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 441 + 新增用例数（main 基线 441）",
+    "campaign-check 在真实塔 exit 0，输出含 strategy id、campaign 数、wip、errors=[]；brief 输出 ≤60 行且含七节标题",
+    "夹具 E1–E6 各自 exit 2 且 errors 点名；W1/W2 默认 exit 0、--strict exit 2；front-matter 语法错误干净 exit 2（无 Traceback）",
+    "YAML 子集解析：顶层标量、标量列表、映射列表（goals/campaign 的 key_results）、引号、注释均可解析；不支持的结构报清晰错误",
+    "brief 只读：运行前后 45 个 record、TASK_BOARD、ledger 哈希不变；不产生新文件",
+    "旧码对照：main 版工具无 campaign-check / brief 子命令（argparse invalid choice, exit 2）；新码存在。证据写进 scratch/probe-old-code.txt",
+    "shape-check 在 worktree exit 0（新增函数全部 ≤80 行/≤12 分支，基线为 main）",
+    "真实塔：worktree 新工具 campaign-check exit 0、authority-check exit 0（configured+required）、state-verify drift []；建信封前 tasks=45/envelopes=43，建信封后 45/44；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-045 diff --name-only main..HEAD 恰四个 allowed_paths（towerctl.py、test_command_layer.py、STRATEGY.md、C-2026-Q4-01.md）"
+  ],
+  "depends_on": ["PILOT-044"],
+  "worktree": "pilot/worktrees/PILOT-045"
+}
