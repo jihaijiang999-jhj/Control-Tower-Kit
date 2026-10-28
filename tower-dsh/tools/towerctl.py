@@ -5810,10 +5810,27 @@ COMMAND_IN_FLIGHT = ("dispatched", "delivered", "reviewed", "accepted")
 COMMAND_TERMINAL = ("closed", "aborted")
 COMMAND_REVIEW_WINDOW_DAYS = 7
 COMMAND_BRIEF_MAX_LINES = 60
-COMMAND_BUDGET_CARDS_RE = re.compile(r"(\d+)\s*张卡")
+COMMAND_BUDGET_CARDS_RE = re.compile(r"(\d+)\s*(?:张卡|cards?)\b", re.IGNORECASE)
+COMMAND_BUDGET_WEEKS_RE = re.compile(r"(\d+)\s*(?:周|weeks?)\b", re.IGNORECASE)
 COMMAND_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 # Superseded cards are archived as ``tasks/<ID>-VOID/``; see read_task_records.
 COMMAND_ARCHIVE_SUFFIX = "-VOID"
+TASK_BOARD_REL = "primary/TASK_BOARD.json"
+
+# ---------------------------------------------------------------------------
+# PILOT-046: append-only status history
+# ---------------------------------------------------------------------------
+# ``status/YYYY-MM-DD.md`` is the only source of truth: snapshots are appended.
+# ``index.json``, the weekly rollup and the archive are derived and must stay
+# byte-identical across reruns, so every command below writes only ``status/``.
+STATUS_DIR_REL = "status"
+STATUS_INDEX_REL = "status/index.json"
+STATUS_WEEKLY_REL = "status/weekly"
+STATUS_ARCHIVE_REL = "status/archive"
+STATUS_INDEX_SCHEMA = "tower/status-index@1"
+STATUS_EVENTS = ("dispatched", "delivered", "reviewed", "accepted", "closed", "note")
+STATUS_ENTRY_RE = re.compile(r"^## (\d{2}:\d{2}) · (\S+) · ([a-z]+)$")
+STATUS_CAMPAIGN_RE = re.compile(r"^(\S+)(?:\s+\(([^()]*)\))?$")
 
 
 class CommandDocError(ValueError):
@@ -5844,18 +5861,34 @@ def front_matter_block(text: str) -> list[str]:
     raise CommandDocError("front-matter has no closing ---")
 
 
+def single_quoted_scalar(text: str) -> str:
+    """A single-quoted scalar, where ``''`` stands for one literal quote."""
+    if len(text) < 2 or not text.endswith("'"):
+        raise CommandDocError(f"unterminated single-quoted string: {text!r}")
+    body = text[1:-1]
+    if "'" in body.replace("''", ""):
+        raise CommandDocError(f"unescaped single quote: {text!r}")
+    return body.replace("''", "'")
+
+
 def yaml_scalar(raw: str) -> str:
-    """A plain scalar or a double-quoted one; no flow syntax, no escapes."""
+    """A plain scalar, a single-quoted one, or a double-quoted one.
+
+    Flow syntax (``[...]``/``{...}`` except the empty list, anchors, tags and
+    block markers) is rejected: the command layer supports a strict subset.
+    """
     text = raw.strip()
     if not text:
         raise CommandDocError("empty value where a scalar is required")
+    if text.startswith("'"):
+        return single_quoted_scalar(text)
     if text.startswith('"'):
         if len(text) < 2 or not text.endswith('"'):
             raise CommandDocError(f"unterminated quoted string: {text!r}")
         if '"' in text[1:-1]:
             raise CommandDocError(f"escaped quotes are unsupported: {text!r}")
         return text[1:-1]
-    if text[0] in "[{&*!|>%@`" or text.endswith('"'):
+    if text[0] in "[{&*!|>%@`" or text.endswith('"') or text.endswith("'"):
         raise CommandDocError(f"unsupported scalar syntax: {text!r}")
     return text
 
@@ -5944,14 +5977,17 @@ def parse_command_front_matter(lines: list[str]) -> dict:
         key, value = yaml_key_value(line, 0)
         if key in data:
             raise CommandDocError(f"duplicate key: {key}")
+        if value == "[]":
+            data[key] = []
+            index += 1
+            continue
         if value:
             data[key] = yaml_scalar(value)
             index += 1
             continue
-        entries, index = yaml_list_block(lines, index + 1)
-        if not entries:
-            raise CommandDocError(f"key {key!r} needs a scalar value or a list")
-        data[key] = entries
+        # An empty key and an explicit ``[]`` are both the empty list; callers
+        # that need one element say so (e.g. strategy goals stay E1).
+        data[key], index = yaml_list_block(lines, index + 1)
     return data
 
 
@@ -6024,6 +6060,67 @@ def budget_card_limit(raw) -> int | None:
     """The card allowance parsed out of a free-form ``budget`` string."""
     match = COMMAND_BUDGET_CARDS_RE.search(str(raw or ""))
     return int(match.group(1)) if match else None
+
+
+def budget_week_limit(raw) -> int | None:
+    """The week window parsed out of a free-form ``budget`` string."""
+    match = COMMAND_BUDGET_WEEKS_RE.search(str(raw or ""))
+    return int(match.group(1)) if match else None
+
+
+def campaign_started(meta: dict) -> date | None:
+    """The campaign's optional ``started`` date, when it is well-formed."""
+    return command_date(meta.get("started"))
+
+
+def budget_window_warnings(campaigns: list[dict], today: date) -> list[dict]:
+    """W2: ``started`` plus the budget's week window is already in the past.
+
+    A campaign without a parseable ``started``/week window is *not* warned
+    about: silence is correct when the deadline cannot be computed.
+    """
+    warnings: list[dict] = []
+    for doc in campaigns:
+        if doc.get("status") in COMMAND_TERMINAL:
+            continue
+        weeks = budget_week_limit(doc.get("budget"))
+        started = campaign_started(doc)
+        if weeks is None or started is None:
+            continue
+        if today > started + timedelta(weeks=weeks):
+            warnings.append(command_finding(
+                "W2", str(doc.get("id") or doc["_path"]),
+                f"budget window of {weeks} weeks from {started.isoformat()} "
+                "has elapsed"))
+    return warnings
+
+
+def spec_only_warnings(root: Path, campaigns: list[dict]) -> list[dict]:
+    """W3: a forced card has a pilot spec but no ``tasks/<id>/`` yet.
+
+    E5 keeps its narrower meaning (neither a task dir nor a spec exists), so a
+    spec-only reference is a warning rather than an error.
+    """
+    warnings: list[dict] = []
+    for doc in campaigns:
+        for task_id in task_force_ids(doc):
+            if not is_safe_id(task_id, TASK_ID_RE):
+                continue
+            if (root / "tasks" / task_id).is_dir():
+                continue
+            if (root / "pilot" / f"{task_id}.spec.json").is_file():
+                warnings.append(command_finding(
+                    "W3", str(doc.get("id") or doc["_path"]),
+                    f"task_forces references a spec-only card "
+                    f"(no tasks/{task_id}/): {task_id}"))
+    return warnings
+
+
+def command_warnings(root: Path, campaigns: list[dict], today: date) -> list[dict]:
+    """Every warning family the report renders: W2 dates/budget plus W3."""
+    warnings = review_warnings(campaigns, today)
+    warnings += budget_window_warnings(campaigns, today)
+    return warnings + spec_only_warnings(root, campaigns)
 
 
 def command_card_exists(root: Path, task_id: str) -> bool:
@@ -6150,16 +6247,47 @@ def task_force_errors(root: Path, campaigns: list[dict]) -> list[dict]:
     return errors
 
 
+def board_rows(root: Path) -> tuple[list[dict], list[dict]]:
+    """Board task objects, plus the E7 findings explaining a malformed shape.
+
+    A missing board is still an empty board (``load_board``'s legacy default);
+    a board that *exists* but is not ``{"tasks": [<object>, ...]}`` reports E7
+    instead of raising ``AttributeError`` deeper in the report.
+    """
+    path = root / TASK_BOARD_REL
+    if not path.is_file():
+        return [], []
+    try:
+        board = jload(path)
+    except (OSError, ValueError):
+        return [], [command_finding("E7", TASK_BOARD_REL,
+                                    "board is unreadable or not JSON")]
+    if not isinstance(board, dict):
+        return [], [command_finding("E7", TASK_BOARD_REL,
+                                    f"board must be a JSON object, got "
+                                    f"{type(board).__name__}")]
+    tasks = board.get("tasks")
+    if not isinstance(tasks, list):
+        return [], [command_finding("E7", TASK_BOARD_REL,
+                                    "tasks must be a JSON list")]
+    bad = [index for index, item in enumerate(tasks) if not isinstance(item, dict)]
+    errors = [command_finding("E7", TASK_BOARD_REL,
+                              f"tasks[{index}] must be a JSON object")
+              for index in bad]
+    return [item for item in tasks if isinstance(item, dict) and item.get("id")], errors
+
+
+def board_shape_errors(root: Path) -> list[dict]:
+    """E7: the board is a JSON object whose ``tasks`` are JSON objects."""
+    return board_rows(root)[1]
+
+
 def board_orphan_warnings(root: Path, campaigns: list[dict]) -> list[dict]:
     """W1: board cards no campaign lists in ``task_forces`` (backfill pending)."""
     referenced = {task_id for doc in campaigns for task_id in task_force_ids(doc)}
-    try:
-        tasks = load_board(root).get("tasks") or []
-    except (OSError, ValueError):
-        return []
     return [command_finding("W1", str(entry["id"]),
                             f"board card not referenced by any campaign: {entry['id']}")
-            for entry in tasks if entry.get("id") and entry["id"] not in referenced]
+            for entry in board_rows(root)[0] if entry["id"] not in referenced]
 
 
 def review_warnings(campaigns: list[dict], today: date) -> list[dict]:
@@ -6197,9 +6325,9 @@ def campaign_check_report(root: Path, strict: bool) -> dict:
         "E6", COMMAND_CAMPAIGNS_REL, "campaign")
     wip, wip_summary = wip_errors(root, campaigns)
     errors += wip
-    errors += task_force_errors(root, campaigns)
+    errors += task_force_errors(root, campaigns) + board_shape_errors(root)
     warnings = board_orphan_warnings(root, campaigns) if strategy else []
-    warnings += review_warnings(campaigns, today)
+    warnings += command_warnings(root, campaigns, today)
     if strict:
         errors += warnings
         warnings = []
@@ -6389,8 +6517,338 @@ def cmd_brief(root: Path, args) -> None:
     print("\n".join(brief_markdown(root)))
 
 
+# ---------------------------------------------------------------------------
+# PILOT-046: status history (append-only snapshots, derived index/rollup/archive)
+# ---------------------------------------------------------------------------
+# Everything below reads the board, records and campaigns and writes only
+# ``status/``; ``primary/``, ``supervision/``, ``ledger/`` and ``tasks/`` are
+# never touched by these commands.
+def status_dir_path(root: Path) -> Path:
+    """The ``status/`` directory of the tower."""
+    return root / STATUS_DIR_REL
+
+
+def status_day_file(root: Path, day: date) -> Path:
+    """The snapshot file for one calendar day."""
+    return status_dir_path(root) / f"{day.isoformat()}.md"
+
+
+def status_moment(raw: str | None) -> datetime:
+    """Local now, or the ISO instant ``--at`` freezes time with in tests."""
+    if raw is None:
+        return datetime.now()
+    try:
+        return datetime.fromisoformat(str(raw).strip())
+    except ValueError:
+        fail([f"--at must be an ISO date-time: {raw!r}"])
+
+
+def status_figures(root: Path) -> dict:
+    """Campaign progress, WIP ratio and blocked count for one snapshot."""
+    campaigns, _ = load_campaign_docs(root)
+    doc = active_campaign(campaigns)
+    records = read_task_records(root)
+    in_flight = sum(1 for record in records
+                    if record.get("status") in COMMAND_IN_FLIGHT)
+    blocked = sum(1 for record in records if record_is_blocked(record))
+    if doc is None:
+        return {"campaign": "-", "progress": "", "wip": "-", "blocked": blocked}
+    closed, total = campaign_progress(root, doc)
+    limit = campaign_wip_limit(doc)
+    return {"campaign": str(doc.get("id") or doc["_path"]),
+            "progress": f"{closed}/{total}",
+            "wip": f"{in_flight}/{limit if limit is not None else '-'}",
+            "blocked": blocked}
+
+
+def status_entry_lines(task_id: str, event: str, moment: datetime,
+                       figures: dict, note: str | None,
+                       tests: int | None) -> list[str]:
+    """One fixed-shape snapshot entry as markdown lines."""
+    campaign = figures["campaign"]
+    progress = f" ({figures['progress']})" if figures["progress"] else ""
+    lines = [f"## {moment.strftime('%H:%M')} · {task_id} · {event}",
+             f"- campaign: {campaign}{progress}",
+             f"- wip: {figures['wip']}",
+             f"- blocked: {figures['blocked']}"]
+    if tests is not None:
+        lines.append(f"- tests: {tests}")
+    if note:
+        lines.append(f"- note: {note}")
+    return lines
+
+
+def status_append(root: Path, day: date, entry: list[str]) -> Path:
+    """Append one entry to ``status/<day>.md``, creating the header if needed."""
+    path = status_day_file(root, day)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing = path.read_text(encoding="utf-8") if path.is_file() else ""
+    if not existing:
+        existing = f"# STATUS — {day.isoformat()}\n"
+    separator = "\n" if existing.endswith("\n") else "\n\n"
+    path.write_text(existing + separator + "\n".join(entry) + "\n",
+                    encoding="utf-8", newline="\n")
+    return path
+
+
+def status_blocks(text: str) -> list[list[str]]:
+    """Split a snapshot file into ``## HH:MM · TASK · event`` blocks."""
+    blocks: list[list[str]] = []
+    for line in text.splitlines():
+        if line.startswith("## "):
+            blocks.append([line])
+        elif blocks:
+            blocks[-1].append(line)
+    return blocks
+
+
+def status_entry(block: list[str]) -> dict | None:
+    """Parse one entry block; None when its heading is not the fixed shape."""
+    match = STATUS_ENTRY_RE.match(block[0])
+    if match is None:
+        return None
+    entry = {"time": match.group(1), "task": match.group(2),
+             "event": match.group(3)}
+    for line in block[1:]:
+        if line.startswith("- ") and ":" in line:
+            key, _, value = line[2:].partition(":")
+            entry[key.strip()] = value.strip()
+    return entry
+
+
+def status_day_entries(path: Path) -> list[dict]:
+    """Parsed entries of one snapshot file, in append order."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return []
+    return [entry for block in status_blocks(text)
+            if (entry := status_entry(block)) is not None]
+
+
+def status_snapshot_files(root: Path) -> list[Path]:
+    """Every dated snapshot, ascending; weekly/, archive/ and README are out."""
+    base = status_dir_path(root)
+    if not base.is_dir():
+        return []
+    return sorted(path for path in base.glob("*.md")
+                  if path.is_file() and command_date(path.stem) is not None)
+
+
+def status_campaign_value(raw: str | None) -> tuple[str, str] | None:
+    """``C-… (1/2)`` -> ``("C-…", "1/2")``; the ``-`` placeholder is None."""
+    match = STATUS_CAMPAIGN_RE.match(str(raw or "").strip())
+    if match is None or match.group(1) == "-":
+        return None
+    return match.group(1), (match.group(2) or "")
+
+
+def status_index_payload(root: Path) -> dict:
+    """The recomputable ``status/index.json`` payload (no timestamps)."""
+    days: list[dict] = []
+    cards: dict[str, dict] = {}
+    campaigns: dict[str, dict] = {}
+    for path in status_snapshot_files(root):
+        entries = status_day_entries(path)
+        days.append({"date": path.stem,
+                     "file": path.relative_to(root).as_posix(),
+                     "entries": len(entries),
+                     "sha256": sha256_file(path)})
+        for entry in entries:
+            cards[entry["task"]] = {"last_event": entry["event"],
+                                    "last_date": path.stem}
+            pair = status_campaign_value(entry.get("campaign"))
+            if pair is not None:
+                campaigns[pair[0]] = {"progress": pair[1]}
+    return {"schema": STATUS_INDEX_SCHEMA, "days": days,
+            "cards": cards, "campaigns": campaigns}
+
+
+def status_write_json(target: Path, payload: dict) -> None:
+    """Write canonical JSON: sorted keys, UTF-8, one trailing newline."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
+    target.write_text(text + "\n", encoding="utf-8", newline="\n")
+
+
+def week_bounds(week: str) -> tuple[date, date]:
+    """``YYYY-Www`` -> (Monday, Sunday); invalid input exits 2."""
+    match = re.match(r"^(\d{4})-W(\d{2})$", str(week or "").strip())
+    if match is None:
+        fail([f"--week must look like YYYY-Www: {week!r}"])
+    try:
+        start = date.fromisocalendar(int(match.group(1)), int(match.group(2)), 1)
+    except ValueError:
+        fail([f"--week is not a valid ISO week: {week!r}"])
+    return start, start + timedelta(days=6)
+
+
+def status_week_entries(root: Path, start: date,
+                        end: date) -> list[tuple[date, dict]]:
+    """Every parsed entry in ``[start, end]``, day by day, in file order."""
+    found: list[tuple[date, dict]] = []
+    day = start
+    while day <= end:
+        for entry in status_day_entries(status_day_file(root, day)):
+            found.append((day, entry))
+        day += timedelta(days=1)
+    return found
+
+
+def status_blocked_count(entries: list[dict]) -> int:
+    """Peak blocked-card count observed in the window (0 when never blocked)."""
+    peak = 0
+    for entry in entries:
+        raw = str(entry.get("blocked") or "0").strip()
+        peak = max(peak, int(raw)) if raw.isdigit() else peak
+    return peak
+
+
+def status_wip_span(entries: list[dict]) -> str:
+    """``first → last`` WIP value of the week, or one value when unchanged."""
+    values = [str(entry.get("wip") or "-") for entry in entries]
+    if not values:
+        return "-"
+    return values[0] if values[0] == values[-1] else f"{values[0]} → {values[-1]}"
+
+
+def status_campaign_rollup(entries: list[dict]) -> list[str]:
+    """Latest progress per campaign id, sorted for byte stability."""
+    latest: dict[str, str] = {}
+    for entry in entries:
+        pair = status_campaign_value(entry.get("campaign"))
+        if pair is not None:
+            latest[pair[0]] = pair[1]
+    return [f"  - {campaign_id} {latest[campaign_id]}"
+            for campaign_id in sorted(latest)]
+
+
+def status_rollup_lines(root: Path, week: str) -> list[str]:
+    """The weekly markdown; every value derives from the snapshots only."""
+    start, end = week_bounds(week)
+    events = status_week_entries(root, start, end)
+    rows = [entry for _, entry in events]
+    closed = sorted({entry["task"] for entry in rows if entry["event"] == "closed"})
+    lines = [f"# WEEKLY — {week}", "",
+             f"- 窗口：{start.isoformat()} → {end.isoformat()}",
+             f"- 事件数：{len(events)}",
+             f"- closed 卡：{'、'.join(closed) if closed else '-'}",
+             f"- blocked 计数：{status_blocked_count(rows)}",
+             f"- wip 变化：{status_wip_span(rows)}",
+             "- campaign 进度：",
+             *(status_campaign_rollup(rows) or ["  - -"]),
+             "", "## 事件"]
+    lines += [f"- {day.isoformat()} {entry['time']} · {entry['task']} · "
+              f"{entry['event']}" for day, entry in events] or ["- （本周无快照）"]
+    return lines
+
+
+def status_quarter(day: date) -> str:
+    """``YYYY-Qn`` for the calendar quarter of ``day``."""
+    return f"{day.year}-Q{(day.month - 1) // 3 + 1}"
+
+
+def status_archive_line(day: date, entries: list[dict]) -> str:
+    """One archive line: date, event count and the day's last event."""
+    line = f"- {day.isoformat()} · {len(entries)} 事件"
+    if entries:
+        last = entries[-1]
+        line += f" · last: {last['task']} {last['event']}"
+    return line
+
+
+def status_archive(root: Path, before: date) -> dict:
+    """Compress snapshots before ``before`` into one file per quarter.
+
+    The originals stay in place (the status history is append-only); rerunning
+    the command rewrites the same archive bytes.
+    """
+    grouped: dict[str, list[str]] = {}
+    for path in status_snapshot_files(root):
+        day = command_date(path.stem)
+        if day is None or day >= before:
+            continue
+        grouped.setdefault(status_quarter(day), []).append(
+            status_archive_line(day, status_day_entries(path)))
+    written: list[str] = []
+    for quarter in sorted(grouped):
+        target = status_dir_path(root) / "archive" / f"{quarter}.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        text = f"# ARCHIVE — {quarter}\n\n" + "\n".join(grouped[quarter]) + "\n"
+        target.write_text(text, encoding="utf-8", newline="\n")
+        written.append(target.relative_to(root).as_posix())
+    return {"ok": True, "before": before.isoformat(), "files": written,
+            "days": sum(len(lines) for lines in grouped.values())}
+
+
+def cmd_status_snapshot(root: Path, args) -> None:
+    """Append one status snapshot; only ``status/`` is ever written."""
+    task_id = check_task_id(args.task)
+    moment = status_moment(args.at)
+    if args.tests is not None and args.tests < 0:
+        fail([f"--tests must be a non-negative int: {args.tests}"])
+    entry = status_entry_lines(task_id, args.event, moment,
+                               status_figures(root), args.note, args.tests)
+    path = status_append(root, moment.date(), entry)
+    emit({"ok": True, "command": "status-snapshot", "file": rel(root, path),
+          "task": task_id, "event": args.event,
+          "at": moment.strftime("%Y-%m-%dT%H:%M")})
+
+
+def cmd_status_index(root: Path, args) -> None:
+    """Rebuild ``status/index.json`` from the snapshots (deterministic)."""
+    payload = status_index_payload(root)
+    status_write_json(root / STATUS_INDEX_REL, payload)
+    emit({"ok": True, "command": "status-index", "file": STATUS_INDEX_REL,
+          "days": len(payload["days"]), "cards": len(payload["cards"]),
+          "campaigns": len(payload["campaigns"])})
+
+
+def cmd_status_rollup(root: Path, args) -> None:
+    """Write ``status/weekly/<week>.md`` from that week's snapshots."""
+    start, end = week_bounds(args.week)
+    target = status_dir_path(root) / "weekly" / f"{args.week}.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("\n".join(status_rollup_lines(root, args.week)) + "\n",
+                      encoding="utf-8", newline="\n")
+    emit({"ok": True, "command": "status-rollup", "file": rel(root, target),
+          "week": args.week, "window": [start.isoformat(), end.isoformat()]})
+
+
+def cmd_status_archive(root: Path, args) -> None:
+    """Compress snapshots older than ``--before``; originals are kept."""
+    before = command_date(args.before)
+    if before is None:
+        fail([f"--before must be YYYY-MM-DD: {args.before!r}"])
+    emit({"command": "status-archive", **status_archive(root, before)})
+
+
+def status_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Register the PILOT-046 status commands on the PILOT-045 parser."""
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        snapshot = action.add_parser("status-snapshot")
+        snapshot.add_argument("--task", required=True)
+        snapshot.add_argument("--event", required=True,
+                              choices=list(STATUS_EVENTS))
+        snapshot.add_argument("--note")
+        snapshot.add_argument("--tests", type=int)
+        snapshot.add_argument("--at")
+        action.add_parser("status-index")
+        rollup = action.add_parser("status-rollup")
+        rollup.add_argument("--week", required=True)
+        archive = action.add_parser("status-archive")
+        archive.add_argument("--before", required=True)
+    return parser
+
+
 # Merged into ``main``'s handler table so the command layer owns its own wiring.
-COMMAND_LAYER_HANDLERS = {"campaign-check": cmd_campaign_check, "brief": cmd_brief}
+COMMAND_LAYER_HANDLERS = {
+    "campaign-check": cmd_campaign_check, "brief": cmd_brief,
+    "status-snapshot": cmd_status_snapshot, "status-index": cmd_status_index,
+    "status-rollup": cmd_status_rollup, "status-archive": cmd_status_archive}
+
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -6579,7 +7037,7 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         cc.add_argument("--strict", action="store_true",
                         help="treat warnings (W1/W2) as errors")
         action.add_parser("brief")
-    return parser
+    return status_layer_parsers(parser)
 
 
 def cli_commands() -> list[str]:

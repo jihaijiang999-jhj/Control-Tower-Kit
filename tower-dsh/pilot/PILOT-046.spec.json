@@ -1,0 +1,57 @@
+{
+  "schema": "tower/spec@1",
+  "id": "PILOT-046",
+  "title": "状态历史 + 命令层硬化：status 快照/rollup/index + R2–R5 + W3",
+  "authority": "workspace_write",
+  "anchor": "control-tower/COMMAND-LAYER.md §5–§6（阶段 046）",
+  "why_now": "045 解决了“打哪、打到哪”的地图与一页纸，但状态仍没有历史：每张卡关闭只改当前态，无法回看；且复核留下 R2（board 损坏 traceback）、R3（空 task_forces）、R4（单引号）、R5（budget 解析）、W3（spec-only 静默）五个边界。046 落“状态只追加 + 摘要自动生成 + 索引可重算”，并把五个边界收紧。",
+  "scope": [
+    "新增 towerctl status-snapshot --task <id> --event <dispatched|delivered|reviewed|accepted|closed|note> [--note <text>] [--tests <int>] [--at <iso>]：向 status/YYYY-MM-DD.md **追加**一条快照（同日多次追加，不覆盖）；内容含时间、卡、事件、当前 campaign/progress、wip、blocked、可选 tests、note；只写 status/ 下文件",
+    "新增 towerctl status-index：扫描 status/*.md（排除 weekly/、archive/、README.md），解析 '## ' 条目，生成 status/index.json（schema tower/status-index@1；days 含 date/file/entries/sha256；cards 含 last_event/last_date；campaigns 含 progress）；键排序、无时间戳；重复运行字节相同；可删除 index 后由快照重算",
+    "新增 towerctl status-rollup --week YYYY-Www：读取该周快照，生成 status/weekly/<week>.md（本周事件数、closed 卡、blocked、wip 变化、campaign 进度）；重复运行字节相同；只写 weekly/",
+    "新增 towerctl status-archive --before YYYY-MM-DD：把该日期之前的快照压缩为 status/archive/<year>-Q<q>.md（每天一行摘要）；**不删除原快照**（append-only），重复运行字节相同",
+    "硬化 R2：campaign-check 对 primary/TASK_BOARD.json 做形状校验——非对象、tasks 非列表、元素非对象 → 干净 exit 2（E7 board invalid），不再 AttributeError/traceback",
+    "硬化 R3：task_forces 支持空列表（`[]` 与空 key 都解析为 []），进度 0/0、不报 E5；非空时行为不变",
+    "硬化 R4：front-matter 支持单引号标量（含 `''` 转义），`goal: 'G1'` 解析为 G1；不支持的结构仍干净 exit 2",
+    "硬化 R5：budget 支持 `N 张卡` / `N cards` / `N card` 的卡数，以及 `N 周` / `N weeks` 的时间窗；campaign 可带可选 `started: YYYY-MM-DD`，若 started + weeks < 今天则 W2；无法解析时不静默假阳（保持不告警）",
+    "硬化 W3：task_forces 引用的卡只有 pilot/<id>.spec.json、没有 tasks/<id>/ 时，campaign-check 发 W3（默认 exit 0，--strict 升级为 2）；E5 仍只在两者都不存在时报错",
+    "新增 tools/tests/test_status_history.py：snapshot 同日两次追加、index 可重算且字节稳定、rollup 字节稳定、archive 不删原文件、E7 board 数组/字符串元素干净 exit 2、R3 空列表、R4 单引号含 `''`、R5 中英文卡数与周数、W3 spec-only",
+    "真实塔文档：status/README.md、status/2026-10-28.md（由 status-snapshot 生成至少一条）、status/index.json（由 status-index 生成）、status/weekly/2026-W44.md（由 status-rollup 生成）；内容基于 worktree 状态，不手写",
+    "真实塔验证：worktree 新工具 campaign-check exit 0、status-index 可重算、authority-check exit 0、state-verify drift []；建信封前 tasks=46/envelopes=44，建信封后 46/45；merge 前置链与空账本守卫仍通过",
+    "不改 036–045 的信任边界/授权/前置链/空账本/范围门/completion/base_sha/shape/命令层语义（除上述硬化）；不写 primary/supervision/ledger；不引入第三方依赖；不做 dispatch 强制 campaign（048）"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-046/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-046/tower-dsh/tools/tests/test_status_history.py",
+    "pilot/worktrees/PILOT-046/tower-dsh/status/README.md",
+    "pilot/worktrees/PILOT-046/tower-dsh/status/2026-10-28.md",
+    "pilot/worktrees/PILOT-046/tower-dsh/status/index.json",
+    "pilot/worktrees/PILOT-046/tower-dsh/status/weekly/2026-W44.md"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "hand-editing state/AUTHORITY.json, shared/AUTHORITY_POLICY.json or ledger/*.jsonl",
+    "rewriting or deleting existing status snapshots (append-only)",
+    "writing primary/supervision/ledger state from status commands",
+    "enforcing campaign on dispatch in this card (that is 048)"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-046/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 467 + 新增用例数（main 基线 467）",
+    "status-snapshot 同日两次：status/2026-10-28.md 出现两条 '## ' 条目（只追加）；index 的 days.entries=2、sha256 等于文件哈希",
+    "status-index 可重算：删除 index.json 后重跑，字节与提交版本相同；两次运行字节相同",
+    "status-rollup --week 2026-W44 两次运行字节相同，含事件数/closed/blocked/wip/campaign 进度；status-archive --before 不删除任何原快照",
+    "campaign-check：board 为 `[]`、tasks 为 `[\"PILOT-001\"]` → E7 exit 2 且无 Traceback；task_forces 空列表 → 0/0 且不报 E5；`goal: 'G1'` 解析为 G1；budget `2 cards` / `2 周` 行为正确；spec-only 引用 → W3（默认 0，--strict 2）",
+    "status 命令只写 status/：运行前后 primary/supervision/ledger/tasks 哈希不变",
+    "旧码对照：main 版无 status-snapshot/status-index/status-rollup/status-archive（argparse invalid choice, exit 2）；board 数组时旧码 traceback（或 exit 1），新码 E7 exit 2。证据写进 scratch/probe-old-code.txt",
+    "shape-check 在 worktree exit 0（新增函数全部 ≤80 行/≤12 分支）",
+    "真实塔：worktree 新工具 campaign-check exit 0、authority-check exit 0（configured+required）、state-verify drift []；建信封前 tasks=46/envelopes=44，建信封后 46/45；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-046 diff --name-only main..HEAD 恰六个 allowed_paths（towerctl.py、test_status_history.py、status/README.md、status/2026-10-28.md、status/index.json、status/weekly/2026-W44.md）"
+  ],
+  "depends_on": ["PILOT-045"],
+  "worktree": "pilot/worktrees/PILOT-046"
+}
