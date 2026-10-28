@@ -1,0 +1,13 @@
+HEAD: 3eedecf462e0d5ea4469fa395620a72a98af8bd1
+TITLE: PILOT-045 fix: brief ignores *-VOID archives and mismatched record ids
+BRANCH: pilot/PILOT-045
+COMMITS main..HEAD:
+3eedecf PILOT-045 fix: brief ignores *-VOID archives and mismatched record ids
+70da78d PILOT-045: command layer v1 (strategy + campaigns + campaign-check + brief)
+DIFF NAME-ONLY main..HEAD:
+tower-dsh/command/STRATEGY.md
+tower-dsh/command/campaigns/C-2026-Q4-01.md
+tower-dsh/tools/tests/test_command_layer.py
+tower-dsh/tools/towerctl.py
+GIT STATUS --SHORT:
+?? scratch/

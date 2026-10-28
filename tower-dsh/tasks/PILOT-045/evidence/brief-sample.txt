@@ -1,0 +1,23 @@
+# BRIEF — 2026-10-28
+## 战略一句话
+- G1：可信交付：记录层缺口关闭
+## 当前战役
+- C-2026-Q4-01：命令层 v1 落地
+- 进度：0/1 closed
+## 在飞（WIP）
+- PILOT-045 · dispatched · 等待 executor 交付
+## 阻塞 / 返工
+- （无）
+## 下一步 3 件
+- PILOT-045
+## 待决
+- 停止条件：drift != 0 立即停
+- 停止条件：连续 2 卡 FAIL 则复盘战役设计
+- next_action：resume from handoffs/HANDOFF-PILOT-002/HANDOFF.md
+## 架构约束
+- 非目标：多写者并行
+- 非目标：生产接入
+- 非目标：日报/周报/月报
+- 非目标：战术地图
+- 停止条件：drift != 0 立即停
+- 停止条件：连续 2 卡 FAIL 则复盘战役设计

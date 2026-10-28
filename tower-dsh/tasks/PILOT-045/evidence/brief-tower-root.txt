@@ -1,0 +1,15 @@
+# BRIEF — 2026-10-28
+## 战略一句话
+- STRATEGY.md 缺失或无法解析
+## 当前战役
+- （无 active campaign）
+## 在飞（WIP）
+- PILOT-045 · dispatched · 等待 executor 交付
+## 阻塞 / 返工
+- （无）
+## 下一步 3 件
+- （无 active campaign）
+## 待决
+- next_action：resume from handoffs/HANDOFF-PILOT-002/HANDOFF.md
+## 架构约束
+- （无）

@@ -1,0 +1,9 @@
+== new code: worktree tower ==
+campaign-check exit=0
+  ok=True strategy=S-2026-Q4 campaigns=1 wip={'in_flight': 0, 'limit': 1, 'campaigns': {'C-2026-Q4-01': 0}}
+  errors=0 warnings=44 warning_codes=['W1']
+campaign-check --strict exit=2 (W1 board backfill is still open, so strict is expected to fail)
+brief exit=0 line_count=23 (cap 60)
+  headers=## 战略一句话, ## 当前战役, ## 在飞（WIP）, ## 阻塞 / 返工, ## 下一步 3 件, ## 待决, ## 架构约束
+read-only: merged_files_hashed=52 unchanged_after_both_commands=True
+VERDICT: PASS
