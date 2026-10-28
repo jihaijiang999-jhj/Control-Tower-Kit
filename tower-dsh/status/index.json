@@ -1,0 +1,22 @@
+{
+  "campaigns": {
+    "C-2026-Q4-01": {
+      "progress": "1/1"
+    }
+  },
+  "cards": {
+    "PILOT-046": {
+      "last_date": "2026-10-28",
+      "last_event": "note"
+    }
+  },
+  "days": [
+    {
+      "date": "2026-10-28",
+      "entries": 2,
+      "file": "status/2026-10-28.md",
+      "sha256": "5e3f576a74b56c856296a66a984ea2797796d7e825e8cefe0a7630eda895a741"
+    }
+  ],
+  "schema": "tower/status-index@1"
+}
