@@ -5812,6 +5812,8 @@ COMMAND_REVIEW_WINDOW_DAYS = 7
 COMMAND_BRIEF_MAX_LINES = 60
 COMMAND_BUDGET_CARDS_RE = re.compile(r"(\d+)\s*张卡")
 COMMAND_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
+# Superseded cards are archived as ``tasks/<ID>-VOID/``; see read_task_records.
+COMMAND_ARCHIVE_SUFFIX = "-VOID"
 
 
 class CommandDocError(ValueError):
@@ -6336,12 +6338,29 @@ def brief_constraint_lines(strategy: dict | None, doc: dict | None) -> list[str]
     return brief_cap(lines, 8) if lines else ["- （无）"]
 
 
+def canonical_task_dir(name: str) -> bool:
+    """True for a live task directory, false for an archive (``*-VOID``).
+
+    Superseded cards are parked in ``tasks/<ID>-VOID/`` and keep their original
+    ``id`` inside the record, so accepting such a directory would list one card
+    twice (once closed, once whatever the archive last said).
+    """
+    return is_safe_id(name, TASK_ID_RE) and not name.endswith(COMMAND_ARCHIVE_SUFFIX)
+
+
 def read_task_records(root: Path) -> list[dict]:
-    """Every readable ``tasks/*/record.json``, sorted by path."""
+    """Every live ``tasks/<ID>/record.json`` whose id matches its directory.
+
+    Archive directories and records whose internal ``id`` disagrees with the
+    directory name are skipped, so one card can never appear twice.
+    """
     records: list[dict] = []
     for path in sorted((root / "tasks").glob("*/record.json")):
-        record = _optional_task_record(root, path.parent.name)
-        if record:
+        name = path.parent.name
+        if not canonical_task_dir(name):
+            continue
+        record = _optional_task_record(root, name)
+        if record and record.get("id") == name:
             records.append(record)
     return records
 

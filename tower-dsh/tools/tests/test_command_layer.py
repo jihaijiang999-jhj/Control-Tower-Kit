@@ -320,6 +320,23 @@ class BriefCase(CommandLayerCase):
         self.assertEqual([line for line in lines if line.startswith("## ")], list(HEADERS))
         self.assertTrue(any("另有" in line for line in lines))
 
+    def test_brief_ignores_void_archives_and_mismatched_ids(self) -> None:
+        write_json(self.tower / "tasks" / "PILOT-900-VOID" / "record.json", {
+            "schema": "tower/task@1", "id": "PILOT-900", "title": "归档",
+            "status": "dispatched", "next": "不应出现", "review": None})
+        write_json(self.tower / "tasks" / "PILOT-901" / "record.json", {
+            "schema": "tower/task@1", "id": "PILOT-902", "title": "错位",
+            "status": "rework", "next": "不应出现", "review": {"verdict": "FAIL"}})
+        cp = self.brief()
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        self.assertNotIn("PILOT-900", cp.stdout)
+        self.assertNotIn("PILOT-902", cp.stdout)
+        wip = cp.stdout.split("## 在飞（WIP）")[1].split("## ")[0]
+        self.assertIn(TASK, wip)
+        self.assertEqual(wip.count("- "), 1)
+        blocked = cp.stdout.split("## 阻塞 / 返工")[1].split("## ")[0]
+        self.assertNotIn("PILOT-9", blocked)
+
     def test_brief_and_campaign_check_write_nothing(self) -> None:
         before = self.snapshot()
         self.assertEqual(self.brief().returncode, 0)
