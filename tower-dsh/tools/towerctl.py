@@ -2896,7 +2896,7 @@ def write_review_md(root: Path, task_id: str, rec: dict, reviewer: str,
              f"- At: {rec['review']['at']}", "", "## Note", "", note or "(none)", "",
              "## Evidence checked", ""]
     lines += [f"- `{e['path']}` `{e['sha256']}`" for e in rec.get("evidence", [])]
-    lines += structure_review_lines(structure)
+    lines += structure_review_lines(structure) + position_review_lines(root, task_id)
     (task_dir(root, task_id) / "REVIEW.md").write_text(
         "\n".join(lines) + "\n", encoding="utf-8")
 
@@ -2927,8 +2927,8 @@ def cmd_checkback(root: Path, args) -> None:
                     args.note or "", structure)
     append_ledger(root, "CHECKBACK", "reviewer",
                   {"task": args.task, "reviewer": reviewer, "verdict": args.verdict})
-    emit({"ok": True, "task": args.task, "status": rec["status"],
-          "verdict": args.verdict, "structure": bool(structure)})
+    emit(with_position(root, {"ok": True, "task": args.task, "status": rec["status"],
+          "verdict": args.verdict, "structure": bool(structure)}))
 
 
 def cmd_accept(root: Path, args) -> None:
@@ -2986,8 +2986,8 @@ def cmd_close(root: Path, args) -> None:
     update_board(root, rec)
     append_ledger(root, "CLOSEOUT", "primary",
                   {"task": args.task, "closeout": rel(root, closeout)})
-    emit({"ok": True, "task": args.task, "status": rec["status"],
-          "closeout": rel(root, closeout)})
+    emit(with_position(root, {"ok": True, "task": args.task, "status": rec["status"],
+          "closeout": rel(root, closeout)}))
 
 
 def _latest_by(items: list[dict], field: str) -> dict:
@@ -4587,7 +4587,7 @@ def cmd_post_merge(root: Path, args) -> None:
                    "review": rel(root, review_file)}
         if merge_record is not None:
             payload["merge_record"] = rel(root, merge_record)
-        emit(payload)
+        emit(with_position(root, payload))
     env["status"] = "CORRECTION_REQUIRED"
     jdump(env_path, env)
     if entry is not None:
@@ -4598,9 +4598,9 @@ def cmd_post_merge(root: Path, args) -> None:
                                "tests_count": tests_count,
                                "tower_tests_count": tower_count,
                                "checks": checks})
-    emit({"ok": False, "envelope": args.envelope, "status": "CORRECTION_REQUIRED",
-          "checks": checks, "tests_count": tests_count,
-          "review": rel(root, review_file)}, 2)
+    emit(with_position(root, {"ok": False, "envelope": args.envelope,
+          "status": "CORRECTION_REQUIRED", "checks": checks,
+          "tests_count": tests_count, "review": rel(root, review_file)}), 2)
 
 
 def cmd_supervision_status(root: Path, args) -> None:
@@ -5816,6 +5816,12 @@ COMMAND_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 # Superseded cards are archived as ``tasks/<ID>-VOID/``; see read_task_records.
 COMMAND_ARCHIVE_SUFFIX = "-VOID"
 TASK_BOARD_REL = "primary/TASK_BOARD.json"
+# PILOT-047 position map: the campaign roadmap/current define where the tower is.
+POSITION_SCHEMA = "tower/position@1"
+POSITION_STATUSES = ("done", "active", "blocked", "planned", "skipped")
+POSITION_GLYPHS = {"done": "✅", "active": "▶", "blocked": "⛔",
+                   "planned": " ", "skipped": "·"}
+POSITION_SOURCES = (TASK_BOARD_REL, "tasks")
 
 # ---------------------------------------------------------------------------
 # PILOT-046: append-only status history
@@ -6120,7 +6126,7 @@ def command_warnings(root: Path, campaigns: list[dict], today: date) -> list[dic
     """Every warning family the report renders: W2 dates/budget plus W3."""
     warnings = review_warnings(campaigns, today)
     warnings += budget_window_warnings(campaigns, today)
-    return warnings + spec_only_warnings(root, campaigns)
+    return warnings + spec_only_warnings(root, campaigns) + roadmap_gap_warnings(root, campaigns)
 
 
 def command_card_exists(root: Path, task_id: str) -> bool:
@@ -6324,7 +6330,7 @@ def campaign_check_report(root: Path, strict: bool) -> dict:
         [str(doc.get("id") or doc["_path"]) for doc in campaigns],
         "E6", COMMAND_CAMPAIGNS_REL, "campaign")
     wip, wip_summary = wip_errors(root, campaigns)
-    errors += wip
+    errors += wip + campaign_roadmap_errors(campaigns)
     errors += task_force_errors(root, campaigns) + board_shape_errors(root)
     warnings = board_orphan_warnings(root, campaigns) if strategy else []
     warnings += command_warnings(root, campaigns, today)
@@ -6399,7 +6405,7 @@ def brief_campaign_lines(root: Path, doc: dict | None) -> list[str]:
     """Active campaign identity plus closed/total progress."""
     if doc is None:
         return ["- （无 active campaign）"]
-    closed, total = campaign_progress(root, doc)
+    closed, total = campaign_map_progress(root, doc)
     return [f"- {doc.get('id')}：{doc.get('objective') or '（无 objective）'}",
             f"- 进度：{closed}/{total} closed"]
 
@@ -6544,7 +6550,12 @@ def status_moment(raw: str | None) -> datetime:
 
 
 def status_figures(root: Path) -> dict:
-    """Campaign progress, WIP ratio and blocked count for one snapshot."""
+    """Campaign progress, WIP ratio, blocked count and position for a snapshot."""
+    return {**status_base_figures(root), "position": position_fig_value(root)}
+
+
+def status_base_figures(root: Path) -> dict:
+    """The PILOT-046 figures, without the PILOT-047 position value."""
     campaigns, _ = load_campaign_docs(root)
     doc = active_campaign(campaigns)
     records = read_task_records(root)
@@ -6564,7 +6575,15 @@ def status_figures(root: Path) -> dict:
 def status_entry_lines(task_id: str, event: str, moment: datetime,
                        figures: dict, note: str | None,
                        tests: int | None) -> list[str]:
-    """One fixed-shape snapshot entry as markdown lines."""
+    """One fixed-shape snapshot entry, with the position line after ``blocked``."""
+    lines = status_entry_base_lines(task_id, event, moment, figures, note, tests)
+    return lines[:4] + [f"- position: {figures.get('position', '-')}"] + lines[4:]
+
+
+def status_entry_base_lines(task_id: str, event: str, moment: datetime,
+                            figures: dict, note: str | None,
+                            tests: int | None) -> list[str]:
+    """The PILOT-046 entry lines (heading, campaign, wip, blocked, tests, note)."""
     campaign = figures["campaign"]
     progress = f" ({figures['progress']})" if figures["progress"] else ""
     lines = [f"## {moment.strftime('%H:%M')} · {task_id} · {event}",
@@ -6843,11 +6862,296 @@ def status_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
     return parser
 
 
+# ---------------------------------------------------------------------------
+# PILOT-047: dual-view position map (campaign roadmap/current + where)
+# ---------------------------------------------------------------------------
+# The campaign declares the ordered roadmap and the current card; records supply
+# each node's status.  ``where`` renders that one model twice: a stable JSON
+# document for machines and a short human view for the owner.  Both are derived
+# and read-only.  ``checkback``/``close``/``post-merge``/``status`` only borrow
+# the position object, and a campaign without a roadmap keeps its old output.
+class PositionUnavailable(RuntimeError):
+    """No active campaign, or its roadmap/current cannot define a position."""
+
+
+def roadmap_ids(meta: dict) -> list[str]:
+    """The campaign's roadmap ids exactly as written (no validation)."""
+    return scalar_items(meta.get("roadmap"))
+
+
+def roadmap_problem(meta: dict, *, required: bool) -> str | None:
+    """Why a campaign roadmap/current pair is unusable, or None when it is fine.
+
+    ``required`` also flags a missing ``roadmap`` key (``where`` demands one);
+    ``campaign-check`` stays lenient so pre-047 campaigns remain valid.
+    """
+    if "roadmap" not in meta:
+        return "roadmap missing" if required else None
+    ids = roadmap_ids(meta)
+    if not ids:
+        return "roadmap is empty"
+    seen: set[str] = set()
+    for task_id in ids:
+        if not is_safe_id(task_id, TASK_ID_RE):
+            return f"roadmap id is not a task id: {task_id!r}"
+        if task_id in seen:
+            return f"duplicate roadmap id: {task_id}"
+        seen.add(task_id)
+    current = str(meta.get("current") or "").strip()
+    if current not in ids:
+        return f"current {current!r} is not in roadmap"
+    return None
+
+
+def campaign_roadmap_errors(campaigns: list[dict]) -> list[dict]:
+    """E8: a declared roadmap must be a unique task-id list containing current."""
+    return [command_finding("E8", str(doc.get("id") or doc["_path"]), problem)
+            for doc in campaigns
+            if (problem := roadmap_problem(doc, required=False))]
+
+
+def roadmap_gap_warnings(root: Path, campaigns: list[dict]) -> list[dict]:
+    """W4: a roadmap node with neither ``tasks/<id>/`` nor a pilot spec yet."""
+    warnings: list[dict] = []
+    for doc in campaigns:
+        target = str(doc.get("id") or doc["_path"])
+        for task_id in roadmap_ids(doc):
+            if not command_card_exists(root, task_id):
+                warnings.append(command_finding(
+                    "W4", target, f"roadmap node not created yet: {task_id}"))
+    return warnings
+
+
+def position_status(record: dict | None, task_id: str, current: str) -> str:
+    """Map one roadmap node's record onto the fixed position enum."""
+    if record is None:
+        return "active" if task_id == current else "planned"
+    if record.get("status") == "closed":
+        return "done"
+    if record_is_blocked(record):
+        return "blocked"
+    if record.get("status") in COMMAND_IN_FLIGHT:
+        return "active"
+    return "planned"
+
+
+def position_nodes(root: Path, roadmap: list[str], current: str) -> list[dict]:
+    """``[{"id", "status"}]`` in roadmap order."""
+    nodes: list[dict] = []
+    for task_id in roadmap:
+        record = _optional_task_record(root, task_id)
+        nodes.append({"id": task_id,
+                      "status": position_status(record, task_id, current)})
+    return nodes
+
+
+def position_index(nodes: list[dict]) -> int:
+    """The completed-step index: how many roadmap nodes are already ``done``.
+
+    The campaign's ``位置 x/y`` is the same progress figure as ``brief``'s
+    ``closed/total`` (2/6 once PILOT-045/046 close), and reaches ``total`` once
+    every roadmap node is done.
+    """
+    return sum(1 for node in nodes if node["status"] == "done")
+
+
+def position_next(nodes: list[dict], current: str) -> str | None:
+    """``current`` while unfinished, else the first planned node; None if done."""
+    node = next((item for item in nodes if item["id"] == current), None)
+    if node is not None and node["status"] != "done":
+        return current
+    return next((item["id"] for item in nodes if item["status"] == "planned"), None)
+
+
+def position_context(root: Path) -> tuple[dict, dict]:
+    """Build ``(payload, campaign)``; raise PositionUnavailable when undefined."""
+    campaigns, _ = load_campaign_docs(root)
+    doc = active_campaign(campaigns)
+    if doc is None:
+        raise PositionUnavailable("E9 no active campaign")
+    problem = roadmap_problem(doc, required=True)
+    if problem:
+        raise PositionUnavailable(f"E8 position invalid: {problem}")
+    roadmap = roadmap_ids(doc)
+    current = str(doc.get("current") or "").strip()
+    nodes = position_nodes(root, roadmap, current)
+    records = read_task_records(root)
+    limit = campaign_wip_limit(doc)
+    position = {
+        "schema": POSITION_SCHEMA,
+        "campaign": str(doc.get("id") or doc["_path"]),
+        "goal": doc.get("goal"),
+        "index": position_index(nodes),
+        "total": len(roadmap),
+        "current": current,
+        "next": position_next(nodes, current),
+        "nodes": nodes,
+        "wip": {"in_flight": sum(1 for record in records
+                                 if record.get("status") in COMMAND_IN_FLIGHT),
+                "limit": limit if limit is not None else 0},
+        "blocked": [node["id"] for node in nodes if node["status"] == "blocked"],
+        "stop_conditions": scalar_items(doc.get("stop_conditions")),
+        "sources": [doc["_path"], *POSITION_SOURCES],
+    }
+    return position, doc
+
+
+def position_payload(root: Path) -> dict:
+    """The ``tower/position@1`` payload alone."""
+    return position_context(root)[0]
+
+
+def position_for(root: Path) -> dict | None:
+    """The position payload when this tower can compute one, else None."""
+    try:
+        return position_payload(root)
+    except PositionUnavailable:
+        return None
+
+
+def with_position(root: Path, payload: dict) -> dict:
+    """Add the position object to a command payload when the tower has one."""
+    position = position_for(root)
+    if position is None:
+        return payload
+    return {**payload, "position": position}
+
+
+def campaign_map_progress(root: Path, doc: dict) -> tuple[int, int]:
+    """``(closed, total)`` over the roadmap when valid, else over task_forces."""
+    ids = roadmap_ids(doc)
+    if not ids or roadmap_problem(doc, required=True):
+        return campaign_progress(root, doc)
+    nodes = position_nodes(root, ids, str(doc.get("current") or "").strip())
+    return sum(1 for node in nodes if node["status"] == "done"), len(nodes)
+
+
+def campaign_heading(root: Path, doc: dict) -> str:
+    """``<campaign id> <H1 name>`` for the human view's first line."""
+    name = str(doc.get("id") or doc["_path"])
+    try:
+        text = (root / doc["_path"]).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return name
+    for line in text.splitlines():
+        if line.startswith("# "):
+            heading = line[2:].strip()
+            parts = heading.split("—", 1)
+            return f"{name} {parts[1].strip() if len(parts) > 1 else heading}"
+    return name
+
+
+def position_spec_title(root: Path, task_id: str) -> str:
+    """The pilot spec title for a roadmap node that has no task card yet."""
+    try:
+        title = jload(root / "pilot" / f"{task_id}.spec.json").get("title")
+    except (OSError, ValueError, AttributeError):
+        return "（未创建）"
+    return str(title or "（未创建）")
+
+
+def position_delivery(root: Path, task_id: str | None) -> str:
+    """What the next card delivers: its title, else an explicit placeholder."""
+    if not task_id:
+        return "（路线图已全部 done）"
+    record = _optional_task_record(root, task_id)
+    if record and record.get("title"):
+        return str(record["title"])
+    try:
+        text = (root / "tasks" / task_id / "TASK.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        text = ""
+    for line in text.splitlines():
+        if line.startswith("# "):
+            return line[2:].strip()
+    return position_spec_title(root, task_id)
+
+
+def position_risk(root: Path, position: dict) -> str:
+    """Blocked ids first, then roadmap nodes that have no task or spec yet."""
+    if position["blocked"]:
+        return "阻塞：" + "、".join(position["blocked"])
+    gaps = [node["id"] for node in position["nodes"]
+            if node["status"] == "planned" and not command_card_exists(root, node["id"])]
+    if gaps:
+        return "未回填：" + "、".join(gaps)
+    return "无"
+
+
+def position_human_lines(root: Path, position: dict, doc: dict) -> list[str]:
+    """The short human view: title, bar, x/y, why/deliver/risk/advice."""
+    bar = "".join(f"[{POSITION_GLYPHS[node['status']]}{node['id'][-3:]}]"
+                  for node in position["nodes"])
+    nxt = position["next"]
+    advice = "先处理阻塞（blocked 非空）" if position["blocked"] else "继续（blocked 为空）"
+    return [campaign_heading(root, doc), bar,
+            f"位置 {position['index']}/{position['total']} · "
+            f"下一站 {nxt[-3:] if nxt else '—'}",
+            f"为什么：{doc.get('objective') or '（无 objective）'}",
+            f"交付：{position_delivery(root, nxt)}",
+            f"风险：{position_risk(root, position)}",
+            f"建议：{advice}"]
+
+
+def emit_sorted(data: dict, code: int = 0) -> None:
+    """Emit canonical JSON (sorted keys) and exit; stdout carries nothing else."""
+    print(json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True))
+    raise SystemExit(code)
+
+
+def cmd_where(root: Path, args) -> None:
+    """Print the position map: ``--json`` machine view or the human view."""
+    try:
+        position, doc = position_context(root)
+    except PositionUnavailable as exc:
+        fail([str(exc)])
+    if args.json:
+        emit_sorted(position)
+    lines = position_human_lines(root, position, doc)
+    if args.md:
+        lines = ["## 位置", ""] + lines
+    print("\n".join(lines))
+
+
+def position_fig_value(root: Path) -> str:
+    """The snapshot ``x/y`` position value, or ``-`` when none is defined."""
+    try:
+        position = position_payload(root)
+    except PositionUnavailable:
+        return "-"
+    return f"{position['index']}/{position['total']}"
+
+
+def position_review_lines(root: Path, task_id: str) -> list[str]:
+    """The ``## Position`` block appended to REVIEW.md when one exists."""
+    position = position_for(root)
+    if position is None:
+        return []
+    return ["", "## Position", "",
+            f"- 位置：{position['index']}/{position['total']}",
+            f"- 下一站：{position['next'] or '—'}",
+            f"- 本次复查：{task_id}"]
+
+
+def position_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Register the PILOT-047 ``where`` command on the command-layer parser."""
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        where = action.add_parser("where")
+        where.add_argument("--json", action="store_true",
+                           help="machine view: tower/position@1 JSON only")
+        where.add_argument("--md", action="store_true",
+                           help="Markdown wrapper around the human view")
+    return parser
+
+
 # Merged into ``main``'s handler table so the command layer owns its own wiring.
 COMMAND_LAYER_HANDLERS = {
     "campaign-check": cmd_campaign_check, "brief": cmd_brief,
     "status-snapshot": cmd_status_snapshot, "status-index": cmd_status_index,
-    "status-rollup": cmd_status_rollup, "status-archive": cmd_status_archive}
+    "status-rollup": cmd_status_rollup, "status-archive": cmd_status_archive,
+    "where": cmd_where}
 
 
 
@@ -7037,7 +7341,7 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         cc.add_argument("--strict", action="store_true",
                         help="treat warnings (W1/W2) as errors")
         action.add_parser("brief")
-    return status_layer_parsers(parser)
+    return position_layer_parsers(status_layer_parsers(parser))
 
 
 def cli_commands() -> list[str]:

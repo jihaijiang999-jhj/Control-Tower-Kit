@@ -1,13 +1,17 @@
 {
   "campaigns": {
     "C-2026-Q4-01": {
-      "progress": "1/1"
+      "progress": "2/3"
     }
   },
   "cards": {
     "PILOT-046": {
       "last_date": "2026-10-28",
       "last_event": "note"
+    },
+    "PILOT-047": {
+      "last_date": "2026-10-29",
+      "last_event": "dispatched"
     }
   },
   "days": [
@@ -16,6 +20,12 @@
       "entries": 2,
       "file": "status/2026-10-28.md",
       "sha256": "5e3f576a74b56c856296a66a984ea2797796d7e825e8cefe0a7630eda895a741"
+    },
+    {
+      "date": "2026-10-29",
+      "entries": 1,
+      "file": "status/2026-10-29.md",
+      "sha256": "e39d3623e438c67bf139481158305d5282e0410baab25d3333d797e315142ffc"
     }
   ],
   "schema": "tower/status-index@1"
