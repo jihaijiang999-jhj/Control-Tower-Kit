@@ -1,4 +1,4 @@
-# NEXT WINDOW — tower-dsh（2026-10-28：036 → 045）
+# NEXT WINDOW — tower-dsh（2026-10-29：036 → 047）
 
 > 给新窗口的第一条消息用。**本文件不是权威状态**；权威在 `primary/CURRENT_STATE.json`、
 > `primary/TASK_BOARD.json`、`supervision/MERGE_QUEUE.json`、`state/AUTHORITY.json`、
@@ -6,33 +6,30 @@
 > 最近一次完整窗口摘要：`control-tower/SESSION-CLOSEOUT-2026-10-23.md`（覆盖 022–035）；
 > `PILOT-036`（信任边界）、`037`（授权态单写者）、`038`（授权必需标记）、`039`（授权态收尾）、
 > `040`（空账本守卫）、`041`（deliver 范围门）、`042`（授权完成清单 + base_sha）、
-> `044`（shape-check 形状门 + REVIEW 五问）、`045`（命令层 v1：战略/战役/brief）
-> 是收官后单独九张卡；`043` 暂缓 ready（未派）。
-> 判例与残余见 `control-tower/MAP.md` §6.16–§6.24；蓝图见 `control-tower/COMMAND-LAYER.md`。
+> `044`（shape-check 形状门 + REVIEW 五问）、`045`（命令层 v1）、`046`（状态历史）、
+> `047`（双视图位置图）是收官后单独十一张卡；`043` 暂缓 ready（未派）。
+> 判例与残余见 `control-tower/MAP.md` §6.16–§6.26；蓝图见 `control-tower/COMMAND-LAYER.md`。
 
-## 当前状态（2026-10-28 PILOT-045 闭环后）
+## 当前状态（2026-10-29 PILOT-047 闭环后）
 
 | 项 | 值 |
 |---|---|
 | 代号 | **应县木塔 / Yingxian**（`YX-001`） |
-| 任务 | `PILOT-001` … `PILOT-045`：44 张 closed + `PILOT-043` ready 暂缓（未派）；44 个信封 `POST_MERGE_VERIFIED` |
-| 测试 | `Ran 467 tests / OK（skipped=1）`（441 + 045 新增 26；skip 为平台 symlink） |
-| 状态自洽 | `state-verify` → 45 任务 / 44 信封 / 361 条证据 / drift 0；skipped 4（`025/039/041/044-VOID`） |
-| 账本 | primary 412 / supervision 228 事件，0 error（legacy 未哈希 53/26，按 INV-05 只计不判） |
+| 任务 | `PILOT-001` … `PILOT-047`：46 张 closed + `PILOT-043` ready 暂缓（未派）；46 个信封 `POST_MERGE_VERIFIED` |
+| 测试 | `Ran 518 tests / OK（skipped=1）`（487 + 047 新增 31；skip 为平台 symlink） |
+| 状态自洽 | `state-verify` → 47 任务 / 46 信封 / 388 条证据 / drift 0；skipped 4（`025/039/041/044-VOID`） |
+| 账本 | primary 428 / supervision 240 事件，0 error（legacy 未哈希 53/26，按 INV-05 只计不判） |
 | 权威态 | `authority-check` → **configured + requirement=required**（13 checks；`revision=2`、pin `sup-phase2-pilot`） |
-| 形状门 | `shape-check` → exit 0（32 文件 / 1,283 函数；基线 1,114 条，16 个既有长函数冻结） |
-| 命令层 | `campaign-check` → exit 0（strategy `S-2026-Q4`、campaign `C-2026-Q4-01`、wip 0/1、**W1 44** 待 048 回填）；`brief` → 23 行七节 |
-| CI | PR #7…#29 全绿；main 最近 run `40672213736` success（6m22s，head `9c227bd`） |
-| 阶段 | `HANDOFF_ACTIVE`；`authority_dirty_count=0`；工作树干净；`HEAD=origin/main=9c227bd` |
-| 036 | PR #21 `d8ef20f`；7/7（塔 `305/293`） |
-| 037 | PR #22 `895141c`；7/7（塔 `328/305`） |
-| 038 | PR #23 `7cb9e0b`；7/7（塔 `341/328`） |
-| 039 | v1 FAIL → VOID → v2 PR #24 `c4efe6d`；7/7（塔 `363/341`） |
-| 040 | PR #25 `2bd870f`；7/7（塔 `371/363`） |
-| 041 | v1 措辞错误 VOID → v2；首轮 FAIL → 返工；PR #26 `cc7c55a`；7/7（塔 `387/371`） |
-| 042 | PR #27 `01213ce`；7/7（塔 `419/387`）；completion + base_sha |
-| 044 | v1 文字重建 → v2；首轮复核 PASS 但 controller 判 FAIL（方法盲区/baseline 自关）→ 返工；PR #28 `129dd4e`；7/7（塔 `441/419`） |
-| 045 | PR #29 `99b61a1`；实现 `70da78d`→`3eedecf`（VOID 修复）；7/7（塔 `467/441`）；命令层 v1；R1 真实根已闭合 |
+| 形状门 | `shape-check` → exit 0（34 文件 / 1,426 函数；基线 1,114 条） |
+| 命令层 | `campaign-check` → exit 0（W1 47 + W4 4；`--strict` 仍红，回填属 049）；`brief` → 23 行七节 |
+| 位置图 | `where --json` → **3/7**、current/next `PILOT-048`；人视图 7 行；位置条 `[✅045][✅046][✅047][▶048][ 049][ 050][ 051]` |
+| CI | PR #7…#31 全绿；main 最近 run `40821801416` success（6m36s，head `4864479`） |
+| 阶段 | `HANDOFF_ACTIVE`；`authority_dirty_count=0`；工作树干净；`HEAD=origin/main=4864479` |
+| 036–042 | PR #21–#27；7/7；塔 `305/293`→`419/387` |
+| 044 | PR #28 `129dd4e`；7/7（塔 `441/419`）；shape ratchet + REVIEW 五问 |
+| 045 | PR #29 `99b61a1`；7/7（塔 `467/441`）；命令层 v1 + VOID 修复 |
+| 046 | PR #30 `63d7b47`；7/7（塔 `487/467`）；状态历史 + E7/R3–R5/W3 |
+| 047 | PR #31 `b4c7859`；7/7（塔 `518/487`）；双视图位置图；首轮 merge GraphQL EOF → MERGE_BLOCKED → 重试成功 |
 | 043 | **ready 暂缓**（spec `8a28c80`）：记录层纵深（deliver 反查 completion 事件、state-verify 审计 base_sha、孤悬 drift） |
 
 ## 新窗口读序
@@ -45,10 +42,11 @@
 6. `primary/TASK_BOARD.json`
 7. `supervision/MERGE_QUEUE.json`
 8. `command/STRATEGY.md` + `command/campaigns/*.md`
-9. `control-tower/COMMAND-LAYER.md`（四本账 / 045–050 阶段）
-10. `control-tower/MAP.md`（§6.9–§6.24）
-11. `control-tower/SESSION-CLOSEOUT-2026-10-23.md`
-12. `RUN-2026-10-22-B.md`、`RUN-2026-10-23-C.md`、`RUN-2026-10-23-D.md`（批授权样本）
+9. `towerctl where --json`（当前位置，3/7）
+10. `control-tower/COMMAND-LAYER.md`（四本账 / 045–051 阶段）
+11. `control-tower/MAP.md`（§6.9–§6.26）
+12. `control-tower/SESSION-CLOSEOUT-2026-10-23.md`
+13. `RUN-2026-10-22-B.md`、`RUN-2026-10-23-C.md`、`RUN-2026-10-23-D.md`（批授权样本）
 
 ## 自检
 
@@ -59,7 +57,8 @@ python tools/towerctl.py wiring
 python tools/towerctl.py status
 python tools/towerctl.py state-verify
 python tools/towerctl.py authority-check      # 必须 exit 0 / configured / requirement=required
-python tools/towerctl.py campaign-check       # exit 0；--strict 目前会因 W1×44 变红（048 前预期）
+python tools/towerctl.py where --json         # 3/7；next PILOT-048
+python tools/towerctl.py campaign-check       # exit 0；--strict 仍因 W1/W4 红（049 前预期）
 python tools/towerctl.py brief                # ≤60 行；七节
 python tools/towerctl.py shape-check          # exit 0
 python -B tools/run_tests.py
@@ -72,15 +71,12 @@ python -B tools/run_tests.py
 
 ## 下一张卡（候选，需 owner 拍板）
 
-1. **`PILOT-046` 状态历史 + 命令层硬化**（推荐）：
-   - `status/` 追加快照 + 周 rollup + `index.json`，替换手写 `NEXT-WINDOW`；
-   - 顺手修 R2（board 为数组时 traceback）、R3（空 `task_forces`）、R4（单引号标量）、R5（budget 英文/时间窗）、W3（spec-only 提示）；
-   - 防：状态文档膨胀、归档误读。
-2. **`PILOT-047` 架构脊柱**：`ARCHITECTURE.md` + `adr/` + `EVENT_CATALOG` + `arch-check`；归档 `DESIGN.md`。
-3. **`PILOT-048` 接线**：dispatch 必填 `campaign`；`campaign-check`/`arch-check` 进 post-merge/CI；回填 44 卡（W1 清零）后再决定 `--strict`。
-4. **`PILOT-049` 对象层**：`PROFILE` + `profile-check`（∅5）。
-5. **恢复 `PILOT-043`**：记录层纵深（与 046–049 独立）。
-6. **`PILOT-050`**：shape-check 接 CI + `towerctl` 模块化（单文件 6,612 行 → <3000）。
+1. **`PILOT-048` 架构脊柱**（当前位置）：`ARCHITECTURE.md` + `adr/` + `EVENT_CATALOG` + `arch-check`；归档 `DESIGN.md`；同时把 campaign 的 `current` 从 047 改 048（已预置）。
+2. **`PILOT-049` 接线/回填**：dispatch 必填 `campaign`；`campaign-check`/`arch-check` 进 post-merge/CI；回填 47 卡（W1 清零）后再决定 `--strict`。
+3. **`PILOT-050` 对象层**：`PROFILE` + `profile-check`（∅5）。
+4. **`PILOT-051` shape 接 CI + `towerctl` 模块化**（单文件 7,000+ 行 → <3000）。
+5. **恢复 `PILOT-043`**：记录层纵深（独立轨道）。
+6. **GameCS 外部评审**：已读 `review-gamcs-20261029/handoff-to-pilot-036/投递卡`，§四 6 问已在本会话作答；是否走正式 handoff/开卡由 owner 决定（当前未建包、未改塔状态）。
 
 ## 备选（parked，2026-10-24 owner 决定「作为备选」）
 
@@ -94,10 +90,12 @@ python -B tools/run_tests.py
 
 - **Primary 不 merge**；merge 走 `--role supervisor --supervisor <id>`，该 id 必须等于 `state/AUTHORITY.json` 的 `merge_authority`，且 ≠ primary。
 - **权威态只由 `authority-require` / `authority-set` 写**；**completion 只由 `completion-add --by <owner>` 写**；**baseline 变更只走 baseline-refresh 卡**；禁止手改这些文件或 ledger。
-- **required / 缺失链 / 空账本+工件 / 越界 deliver / 伪造 completion / 新增形状债务 都不是可选项**（037–045）。
-- **地图是地图，状态是状态**：`command/` 只写方向与战役；进度只写 `status/`（046 起）或由 `brief` 投影；不要把手写进度塞回 `STRATEGY.md`。
-- **brief 是生成物**：手改即伪造；改内容去改来源（STRATEGY/campaign/record）。
-- **`--strict` 在 048 回填前必红**（W1×44）；接 CI 前先决策：回填，或 CI 先跑非 strict。
+- **required / 缺失链 / 空账本+工件 / 越界 deliver / 伪造 completion / 新增形状债务 都不是可选项**（037–047）。
+- **地图是地图，状态是状态**：`command/` 只写方向与战役；进度由 `status/` 快照与 `brief` 投影；不要把手写进度塞回 `STRATEGY.md`。
+- **brief/where 是生成物**：手改即伪造；改内容去改来源（STRATEGY/campaign/record）。
+- **index 语义 errata**：`where.index` = done 节点数（= 进度分子），不是 1-based 偏移；`next` 才是“下一站”，不要拿 index 去索引 nodes。
+- **`current` 要随进度改**：047 关闭后已把 campaign `current` 改为 `PILOT-048`；以后每关一卡同步推进。
+- **`--strict` 在 049 回填前必红**（W1 47 + W4 4）；接 CI 前先决策：回填或先跑非 strict。
 - **需要 §6.11 补齐时**：用 `completion-add`（owner 签名）或重建卡；不要再 bootstrap。
 - **新代码自己受 80 行/12 分支约束**：写不下就拆，别先写长再想着 baseline。
 - **状态提交只在 envelope 之后**；不早于 `envelope-new`。
@@ -112,17 +110,16 @@ python -B tools/run_tests.py
 3. 每卡 post-merge 给四段摘要（不要求回复）；命中硬停立即停；
 4. 完成后更新 `MAP.md` 判例与 `SESSION-CLOSEOUT`，push、看 CI。
 
-## 已知残余（详见 MAP ∅10–∅12 与 §6.14–§6.24）
+## 已知残余（详见 MAP ∅10–∅12 与 §6.14–§6.26）
 
-- **W1×44**：44 张历史卡未被 campaign 引用；`campaign-check --strict` 必红，048 回填前预期。
-- **R2**：`board_orphan_warnings` 对 board 为 JSON 数组/元素为字符串会 `AttributeError` traceback（exit 1），046 修。
-- **R3**：空 `task_forces` 列表被干净拒绝（只能省略 key）；046 补或文档写死。
-- **R4**：单引号标量被静默接受（未按 YAML 处理），`goal: 'G1'` 会得到 E2 而非语法错误；046 修。
-- **R5**：`budget` 只认“N 张卡”，英文/时间窗静默失效；046 决策。
-- **R6**：`CURRENT_STATE.next_action` 仍指向 `HANDOFF-PILOT-002`（brief 如实照搬）；属塔状态陈旧。
-- **VOID 约定**：非 `-VOID` 的归档后缀只靠“内部 id 与目录名不一致”兜底；当前无此约定。
+- **046 R-1**：写失败未硬化（ACL 禁写/`status` 是文件时 index/rollup/snapshot 裸 Traceback exit 1，archive 静默 0）→ 049 补 `OSError → exit 2`。
+- **046 R-2**：截断/损坏快照被 index 静默跳过；无“快照损坏”告警。
+- **046 R-3**：重复 `task_forces` 会重复计数；**R-4**：archive 不清理外部已删快照的陈旧季档；**R-5**：样例快照 `wip 0/1` 对塔低报（已随 047 位置图部分修复）。
+- **047 双分母**：同一条 status 里 `campaign (x/y)`（task_forces）与 `position x/7`（roadmap）并存，建议 048 统一或改名。
+- **047 `where` vs `campaign-check` 错误码**：坏 campaign 时 `where` 报 E9 而非 E1（干净但误导）；`skipped` 枚举不可达；WIP 全塔口径。
+- **W1×47 / W4×4**：历史卡未挂 campaign、048–051 未建档；`--strict` 必红（049 回填前预期）。
 - **记录层残余（043 未做）**：deliver 不反查 completion 备份事件；state-verify 不审计 base_sha；孤悬 completion 被忽略。
-- **11 字节重开空账本守卫**：`{"seq": 1}` 仍可绕过（050 候选：只数 type+payload）。
+- **11 字节重开空账本守卫**：`{"seq": 1}` 仍可绕过（051 候选：只数 type+payload）。
 - **legacy 塔 primary 清 0 字节**仍按 036 放行；**TOFU**（policy+event 双写并重算整链）仍靠 git 追踪做外部锚。
 - **无密钥链**可重算伪造；`--by` 是字符串不是认证。
 - `envelope_head_sha` 两边同时缺失时 `None == None` 可过绑定检查（git 检查仍拦 merge）。
@@ -130,6 +127,7 @@ python -B tools/run_tests.py
 - 035 修复不造 `ENVELOPE_NEW`；非 WAITING 半写 stdout 报 WAITING；反向半写未处理。
 - `.test-tmp` 不自动清理；runner 依赖 Windows `core.longpaths`；直接 discovery 不走沙箱。
 - 分支保护对 admin 无效；真实项目 pilot 未接。
+- 工作区有无关目录 `review-gamcs-20261029/`（GameCS 评审），已本地 `.git/info/exclude`，不属于塔、未提交。
 
 ## 停点格式（硬规则）
 
