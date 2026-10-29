@@ -1,0 +1,14 @@
+branch: pilot/PILOT-047
+commit f270c83a9e7b4e7b97a77c9ec81db5bbd1e33fa6
+subject PILOT-047: dual-view position map (roadmap/current, where --json|--md, injection)
+author mac <mac@local>
+date 2026-10-29 12:33:49 +0800
+
+f270c83 PILOT-047: dual-view position map (roadmap/current, where --json|--md, injection)
+ tower-dsh/command/campaigns/C-2026-Q4-01.md |  12 +-
+ tower-dsh/status/2026-10-29.md              |   8 +
+ tower-dsh/status/index.json                 |  12 +-
+ tower-dsh/tools/tests/test_position.py      | 460 ++++++++++++++++++++++++++++
+ tower-dsh/tools/towerctl.py                 | 336 +++++++++++++++++++-
+ 5 files changed, 810 insertions(+), 18 deletions(-)
+

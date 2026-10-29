@@ -461,7 +461,17 @@
       "reviewer": "subagent:60f3d8a7-46aa-4f30-ba4d-54f07fad7e43",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-046/MERGE.md",
       "updated_at": "2026-10-28T23:03:06+08:00"
+    },
+    {
+      "id": "PILOT-047",
+      "title": "双视图位置图：campaign roadmap/current + where --json|--md + 注入",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:4a3f2452-e2e3-4811-bcb7-a88f646b8e3b",
+      "reviewer": "subagent:adf9823d-0837-480c-949c-90a6c8707149",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-047/MERGE.md",
+      "updated_at": "2026-10-29T12:49:45+08:00"
     }
   ],
-  "updated_at": "2026-10-28T23:03:06+08:00"
+  "updated_at": "2026-10-29T12:49:45+08:00"
 }

@@ -1,0 +1,32 @@
+main functions: 303; 047 functions: 328; added: 25
+  + status_base_figures: 16 lines / 3 branches
+  + status_entry_base_lines: 15 lines / 3 branches
+  + roadmap_ids: 3 lines / 0 branches
+  + roadmap_problem: 22 lines / 8 branches
+  + campaign_roadmap_errors: 5 lines / 1 branches
+  + roadmap_gap_warnings: 10 lines / 4 branches
+  + position_status: 11 lines / 5 branches
+  + position_nodes: 8 lines / 1 branches
+  + position_index: 8 lines / 0 branches
+  + position_next: 6 lines / 2 branches
+  + position_context: 31 lines / 5 branches
+  + position_payload: 3 lines / 0 branches
+  + position_for: 6 lines / 2 branches
+  + with_position: 6 lines / 1 branches
+  + campaign_map_progress: 7 lines / 3 branches
+  + campaign_heading: 13 lines / 6 branches
+  + position_spec_title: 7 lines / 3 branches
+  + position_delivery: 15 lines / 7 branches
+  + position_risk: 9 lines / 3 branches
+  + position_human_lines: 13 lines / 3 branches
+  + emit_sorted: 4 lines / 0 branches
+  + cmd_where: 12 lines / 4 branches
+  + position_fig_value: 7 lines / 2 branches
+  + position_review_lines: 9 lines / 2 branches
+  + position_layer_parsers: 11 lines / 2 branches
+max added: 31 lines / 8 branches
+changed existing functions: 2 (no growth allowed)
+  status_figures: {'lines': 16, 'branches': 3} -> {'lines': 3, 'branches': 0} grown=False
+  status_entry_lines: {'lines': 15, 'branches': 3} -> {'lines': 6, 'branches': 0} grown=False
+removed functions: 0
+test functions: 46; max 22 lines / 2 branches

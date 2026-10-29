@@ -1,0 +1,49 @@
+{
+  "blocked": [],
+  "campaign": "C-2026-Q4-01",
+  "current": "PILOT-047",
+  "goal": "G2",
+  "index": 2,
+  "next": "PILOT-047",
+  "nodes": [
+    {
+      "id": "PILOT-045",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-046",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-047",
+      "status": "active"
+    },
+    {
+      "id": "PILOT-048",
+      "status": "planned"
+    },
+    {
+      "id": "PILOT-049",
+      "status": "planned"
+    },
+    {
+      "id": "PILOT-050",
+      "status": "planned"
+    }
+  ],
+  "schema": "tower/position@1",
+  "sources": [
+    "command/campaigns/C-2026-Q4-01.md",
+    "primary/TASK_BOARD.json",
+    "tasks"
+  ],
+  "stop_conditions": [
+    "drift != 0 立即停",
+    "连续 2 卡 FAIL 则复盘战役设计"
+  ],
+  "total": 6,
+  "wip": {
+    "in_flight": 0,
+    "limit": 1
+  }
+}

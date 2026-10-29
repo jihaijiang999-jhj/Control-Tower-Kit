@@ -1,0 +1,22 @@
+$ where
+
+C-2026-Q4-01 命令层 v1
+[✅045][✅046][▶047][ 048][ 049][ 050]
+位置 2/6 · 下一站 047
+为什么：命令层 v1 落地
+交付：双视图位置图：campaign roadmap/current + where --json|--md + 注入
+风险：未回填：PILOT-048、PILOT-049、PILOT-050
+建议：继续（blocked 为空）
+
+$ where --md
+
+## 位置
+
+C-2026-Q4-01 命令层 v1
+[✅045][✅046][▶047][ 048][ 049][ 050]
+位置 2/6 · 下一站 047
+为什么：命令层 v1 落地
+交付：双视图位置图：campaign roadmap/current + where --json|--md + 注入
+风险：未回填：PILOT-048、PILOT-049、PILOT-050
+建议：继续（blocked 为空）
+

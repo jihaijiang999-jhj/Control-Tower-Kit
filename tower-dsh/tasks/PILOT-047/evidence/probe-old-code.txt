@@ -1,0 +1,17 @@
+== A. main has no `where` ==
+exit: 2
+stderr:
+usage: old-towerctl.py [-h] [--root ROOT]
+                       {init,wiring,startup,status,supervision-init,supervision-status,handoff-status,verify-ledger,state-verify,shape-check,authority-check,authority-set,authority-require,spec-lint,spec-coverage,handoff-new,handoff-check,handoff-claim,handoff-accept,handoff-receipt,handoff-activate,supervision-phase,envelope-new,queue-add,merge-check,merge,post-merge,phase,task-new,task-next,check,spec-approve,hash,dispatch,deliver,completion-add,checkback,accept,close,campaign-check,brief,status-snapshot,status-index,status-rollup,status-archive}
+                       ...
+old-towerctl.py: error: argument cmd: invalid choice: 'where' (choose from init, wiring, startup, status, supervision-init, supervision-status, handoff-status, verify-ledger, state-verify, shape-check, authority-check, authority-set, authority-require, spec-lint, spec-coverage, handoff-new, handoff-check, handoff-claim, handoff-accept, handoff-receipt, handoff-activate, supervision-phase, envelope-new, queue-add, merge-check, merge, post-merge, phase, task-new, task-next, check, spec-approve, hash, dispatch, deliver, completion-add, checkback, accept, close, campaign-check, brief, status-snapshot, status-index, status-rollup, status-archive)
+
+== B. old brief vs new brief on the live campaign ==
+live campaign task_forces now lists PILOT-045/046/047; roadmap 045-050
+main brief  (exit 0): - 进度：2/3 closed
+047 brief   (exit 0): - 进度：2/6 closed
+
+== C. roadmap-less campaign: old and new agree (1/1) ==
+main brief  (exit 0): - 进度：1/1 closed
+047 brief   (exit 0): - 进度：1/1 closed
+(the new code falls back to task_forces when no roadmap is declared)

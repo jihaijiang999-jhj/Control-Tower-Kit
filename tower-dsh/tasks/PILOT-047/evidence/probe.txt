@@ -1,0 +1,44 @@
+== live worktree: where / brief ==
+PASS where --json exit 0 :: 0
+PASS schema tower/position@1
+PASS index=2 total=6 :: 2/6
+PASS current=next=PILOT-047 :: PILOT-047 -> PILOT-047
+PASS nodes follow roadmap order
+PASS statuses are enum values :: ['done', 'done', 'active', 'planned', 'planned', 'planned']
+PASS keys are sorted
+PASS human <= 20 lines :: 7
+PASS human bar
+PASS human position line
+PASS human five parts
+PASS --md wraps the same content
+PASS --md heading
+PASS brief progress 2/6
+== E8 / E9 ==
+PASS E8 roadmap missing: exit 2 :: 2
+PASS E8 roadmap missing: code :: ['E8 position invalid: roadmap missing']
+PASS E8 roadmap missing: no Traceback
+PASS E8 roadmap empty: exit 2 :: 2
+PASS E8 roadmap empty: code :: ['E8 position invalid: roadmap is empty']
+PASS E8 roadmap empty: no Traceback
+PASS E8 roadmap duplicate: exit 2 :: 2
+PASS E8 roadmap duplicate: code :: ['E8 position invalid: duplicate roadmap id: PILOT-045']
+PASS E8 roadmap duplicate: no Traceback
+PASS E8 current outside roadmap: exit 2 :: 2
+PASS E8 current outside roadmap: code :: ["E8 position invalid: current 'PILOT-999' is not in roadmap"]
+PASS E8 current outside roadmap: no Traceback
+PASS E9 no campaign: exit 2 :: 2
+PASS E9 no campaign: code
+PASS E9 no campaign: no Traceback
+== injections ==
+PASS checkback position object
+PASS checkback REVIEW ## Position
+PASS status-snapshot position line
+PASS close exit 0
+PASS close position object
+PASS post-merge position object
+== legacy compatibility ==
+PASS legacy checkback has no position key
+PASS legacy REVIEW has no ## Position
+PASS legacy brief falls back to task_forces
+
+38/38 checks passed
