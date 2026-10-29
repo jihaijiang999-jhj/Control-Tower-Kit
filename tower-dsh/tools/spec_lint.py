@@ -18,6 +18,13 @@ By default :func:`lint_root` scans ``<root>/specs/*.md`` and every
 root with any other schema are skipped; a non-policy Markdown file in
 ``specs/`` is still treated as a workflow so its schema mismatch is reported.
 
+Top-level ``pilot/*.spec.json`` task specs get the ``tower/spec@2`` objective
+gate: a spec declaring that schema must carry ``objective.problem`` /
+``outcome`` / ``approach`` / ``non_goals_and_done`` as non-empty strings of at
+least eight characters. ``tower/spec@1`` cards are frozen legacy and are
+skipped, never backfilled; nested copies under ``pilot/worktrees/`` are never
+scanned because the glob is deliberately non-recursive.
+
 Strict mode (``--strict``) is opt-in and adds structural checks that the
 tolerant default deliberately skips: table row widths, tables interrupted by a
 blank line, duplicate ``## N.`` section numbers and bare ASCII command tokens
@@ -32,6 +39,7 @@ inner pipes to be escaped as ``\\|``; :func:`split_cells` unescapes them before
 """
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -64,6 +72,12 @@ POLICY_REQUIRED_SECTIONS = {
 }
 POLICY_CLAUSE_HEADER = ("ID", "条款", "级别", "enforcement", "判定方法")
 POLICY_LEVELS = frozenset({"MUST", "MUST NOT", "SHOULD", "SHOULD NOT", "MAY"})
+SPEC2_SCHEMA = "tower/spec@2"
+PILOT_SPEC_GLOB = "*.spec.json"
+OBJECTIVE_FIELDS = ("problem", "outcome", "approach", "non_goals_and_done")
+OBJECTIVE_MIN_CHARS = 8
+FILL_MARKER = "__FILL__"
+PLACEHOLDER_RE = re.compile(r"<[^>]+>")
 
 FILE_ID_RE = re.compile(r"^WF-[A-Z]+$")
 POLICY_ID_RE = re.compile(r"^POL-[A-Z-]+$")
@@ -628,6 +642,66 @@ def lint_policy_file(
 
 
 # ---------------------------------------------------------------------------
+# pilot task specs: the tower/spec@2 objective gate
+# ---------------------------------------------------------------------------
+def objective_errors(spec: dict, prefix: str = "") -> list[str]:
+    """Errors for the ``tower/spec@2`` objective gate; empty means sound.
+
+    ``objective`` must be an object with all four fields, and every value must
+    be a string of at least ``OBJECTIVE_MIN_CHARS`` characters after stripping,
+    must not be the bare ``__FILL__`` placeholder and must not be nothing but a
+    ``<...>`` placeholder.  The fill marker is rejected as a whole value, not
+    as a substring, because a legitimate objective may name the marker while
+    explaining the rule (the PILOT-049 bootstrap spec does).  ``prefix`` lets a
+    caller (spec-lint) name the file while task-new keeps bare
+    ``objective.<field>`` labels.
+    """
+    objective = spec.get("objective")
+    if not isinstance(objective, dict):
+        return [f"{prefix}objective must be an object with "
+                f"{'/'.join(OBJECTIVE_FIELDS)}"]
+    errors: list[str] = []
+    for field in OBJECTIVE_FIELDS:
+        label = f"{prefix}objective.{field}"
+        value = objective.get(field)
+        text = value.strip() if isinstance(value, str) else ""
+        if len(text) < OBJECTIVE_MIN_CHARS:
+            errors.append(f"{label} must be a string of at least "
+                          f"{OBJECTIVE_MIN_CHARS} characters")
+            continue
+        if text == FILL_MARKER:
+            errors.append(f"{label} must not be the __FILL__ placeholder")
+        if PLACEHOLDER_RE.fullmatch(text):
+            errors.append(f"{label} must not be a <...> placeholder")
+    return errors
+
+
+def pilot_spec_errors(root: Path) -> list[str]:
+    """Objective errors for top-level ``pilot/*.spec.json`` cards.
+
+    Only ``tower/spec@2`` is enforced: ``tower/spec@1`` cards are frozen
+    legacy, so they are skipped rather than backfilled or re-hashed.  The
+    non-recursive glob keeps copies under ``pilot/worktrees/`` out of the scan.
+    """
+    errors: list[str] = []
+    pilot = root / "pilot"
+    if not pilot.is_dir():
+        return errors
+    for path in sorted(pilot.glob(PILOT_SPEC_GLOB)):
+        if not path.is_file():
+            continue
+        display = _display_path(path, root)
+        try:
+            spec = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
+            errors.append(f"{display}: cannot read spec: {exc}")
+            continue
+        if isinstance(spec, dict) and spec.get("schema") == SPEC2_SCHEMA:
+            errors.extend(objective_errors(spec, prefix=f"{display}: "))
+    return errors
+
+
+# ---------------------------------------------------------------------------
 # discovery / dispatch
 # ---------------------------------------------------------------------------
 def _display_path(path: Path, root: Path) -> str:
@@ -682,31 +756,48 @@ def lint_dir(
     return result
 
 
+def _lint_specs_md(root: Path, result: dict, commands: set[str],
+                   strict: bool) -> None:
+    """Append every ``specs/*.md`` workflow entry and its errors to ``result``."""
+    specs = root / "specs"
+    if not specs.is_dir():
+        return
+    for path in sorted(specs.glob("*.md")):
+        entry = lint_path(path, _display_path(path, root), commands, strict=strict)
+        result["files"].append(entry)
+        result["errors"].extend(entry["errors"])
+
+
+def _lint_root_policies(root: Path, result: dict, commands: set[str],
+                        strict: bool) -> None:
+    """Append root-level Markdown that declares ``tower/policy@1`` only."""
+    for path in sorted(root.glob("*.md")):
+        if _front_matter_fields(path).get("schema") != POLICY_SCHEMA:
+            continue
+        entry = lint_policy_file(path, _display_path(path, root), commands,
+                                 strict=strict)
+        result["files"].append(entry)
+        result["errors"].extend(entry["errors"])
+
+
 def lint_root(
     root: Path,
     *,
     commands: set[str],
     strict: bool = False,
 ) -> dict:
-    """Lint the tower root: ``specs/*.md`` plus root-level policy documents.
+    """Lint the tower root: specs, root policies and top-level pilot specs.
 
     Root-level Markdown that does not declare ``tower/policy@1`` is skipped, so
     prose documents such as ``README.md`` are never validated as policies.
     A missing ``specs/`` directory is tolerated here; ``--dir`` remains the
-    explicit way to assert that a directory exists.
+    explicit way to assert that a directory exists.  ``pilot/*.spec.json``
+    contributes objective errors only and never a ``files`` entry, so the six
+    policy/workflow documents keep their existing shape and count.
     """
     result: dict = {"ok": True, "dir": ".", "files": [], "errors": []}
-    specs = root / "specs"
-    if specs.is_dir():
-        for path in sorted(specs.glob("*.md")):
-            entry = lint_path(path, _display_path(path, root), commands, strict=strict)
-            result["files"].append(entry)
-            result["errors"].extend(entry["errors"])
-    for path in sorted(root.glob("*.md")):
-        if _front_matter_fields(path).get("schema") != POLICY_SCHEMA:
-            continue
-        entry = lint_policy_file(path, _display_path(path, root), commands, strict=strict)
-        result["files"].append(entry)
-        result["errors"].extend(entry["errors"])
+    _lint_specs_md(root, result, commands, strict)
+    _lint_root_policies(root, result, commands, strict)
+    result["errors"].extend(pilot_spec_errors(root))
     result["ok"] = not result["errors"]
     return result

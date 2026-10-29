@@ -3,7 +3,7 @@ schema: tower/workflow@1
 id: WF-TASK
 title: 任务流 — 任务卡从创建到收口
 owner: mac
-version: 1
+version: 2
 enforcement_legend: tool-check | review-check | owner-gate
 ---
 
@@ -79,3 +79,19 @@ enforcement_legend: tool-check | review-check | owner-gate
 | 版本 | 日期 | 变更 | 批准 |
 |---|---|---|---|
 | 1 | 2026-10-19 | 初版，按 PILOT-002/003/006 后的实际行为编写 | owner |
+| 2 | 2026-10-29 | 增加第 8 节“施工目标前置不变量”（spec@2 objective 门） | owner |
+
+## 8. 施工目标前置不变量
+
+`tower/spec@2` 要求每张新卡在顶层携带 `objective` 对象；`tower/spec@1` 旧卡冻结，不回溯、不改哈希。
+
+| 字段 | 语义 |
+|---|---|
+| `problem` | 遇到了什么问题：缺陷或风险、受影响入口、可证明的影响 |
+| `outcome` | 交付后应出现的可验收业务结果 |
+| `approach` | 为什么这样解决：方案、取舍、为什么不是单点补丁 |
+| `non_goals_and_done` | 不解决什么、边界在哪，以及怎么算完成 |
+
+- `task-new` 对**所有**新 spec 校验 objective：必须是对象、四字段齐全、每个值 `strip()` 后至少 8 字符、不是裸 `__FILL__` 占位、不是整体 `<...>` 占位；校验发生在创建 `tasks/<id>/`、写 record/TASK、append `TASK_NEW` 之前，失败 `exit 2` 单 JSON 且**零写入**。`__FILL__` 只在作为整个字段值时拒绝（正文提及该标记是允许的，049 bootstrap 即如此），否则“卡自身 must pass”与“不得含”互相矛盾。
+- `spec-lint` 只对顶层 `pilot/*.spec.json` 中声明 `tower/spec@2` 的卡强制同一规则；`tower/spec@1` 跳过（冻结旧卡）；`pilot/worktrees/**` 的嵌套副本不在扫描范围。
+- 机器检查只证结构与最低内容量，不证目标真实性与 AC 对齐；reviewer 仍须独立审 objective 是否描述真实问题、approach 是否避免单点补丁、`non_goals_and_done` 是否与 acceptance 一致。
