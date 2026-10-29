@@ -1,0 +1,487 @@
+{
+  "events": [
+    {
+      "drift_kinds": [
+        "record_missing",
+        "record_unreadable",
+        "task_status",
+        "board_status",
+        "illegal_transition"
+      ],
+      "ledger": "primary",
+      "note": "reviewed -> accepted; decision is the owner/primary decision id",
+      "payload_required": [
+        "task",
+        "decision"
+      ],
+      "producer": "accept",
+      "state_verify": true,
+      "type": "ACCEPT"
+    },
+    {
+      "drift_kinds": [
+        "authority_policy_missing",
+        "authority_policy_unbacked",
+        "authority_policy_mismatch",
+        "authority_required_unconfigured"
+      ],
+      "ledger": "primary",
+      "note": "pins shared/AUTHORITY_POLICY.json and carries the same keys",
+      "payload_required": [
+        "schema",
+        "tower_id",
+        "require_authority",
+        "set_by",
+        "decision",
+        "set_at"
+      ],
+      "producer": "authority-require",
+      "state_verify": true,
+      "type": "AUTHORITY_REQUIRED"
+    },
+    {
+      "drift_kinds": [
+        "authority_missing",
+        "authority_unreadable",
+        "authority_unbacked",
+        "authority_mismatch"
+      ],
+      "ledger": "primary",
+      "note": "pins state/AUTHORITY.json; the event, not the file, is the authority",
+      "payload_required": [
+        "owner",
+        "primary_id",
+        "supervision_id",
+        "merge_authority",
+        "revision",
+        "set_by",
+        "decision",
+        "set_at"
+      ],
+      "producer": "authority-set",
+      "state_verify": true,
+      "type": "AUTHORITY_SET"
+    },
+    {
+      "drift_kinds": [],
+      "ledger": "primary",
+      "note": "records one spec/ready gate observation; replayed by the spec gate",
+      "payload_required": [
+        "task",
+        "phase",
+        "ok"
+      ],
+      "producer": "check",
+      "state_verify": false,
+      "type": "CHECK"
+    },
+    {
+      "drift_kinds": [
+        "record_missing",
+        "record_unreadable",
+        "task_status",
+        "board_status",
+        "illegal_transition"
+      ],
+      "ledger": "primary",
+      "note": "PASS -> reviewed, FAIL -> rework; reviewer must differ from executor",
+      "payload_required": [
+        "task",
+        "reviewer",
+        "verdict"
+      ],
+      "producer": "checkback",
+      "state_verify": true,
+      "type": "CHECKBACK"
+    },
+    {
+      "drift_kinds": [
+        "record_missing",
+        "record_unreadable",
+        "task_status",
+        "board_status",
+        "illegal_transition"
+      ],
+      "ledger": "primary",
+      "note": "accepted -> closed; closeout names the recorded closeout evidence",
+      "payload_required": [
+        "task",
+        "closeout"
+      ],
+      "producer": "close",
+      "state_verify": true,
+      "type": "CLOSEOUT"
+    },
+    {
+      "drift_kinds": [
+        "completion_missing",
+        "completion_unbacked",
+        "completion_invalid"
+      ],
+      "ledger": "primary",
+      "note": "owner-signed allow-list widening; written through _append_ledger_event_locked",
+      "payload_required": [
+        "task",
+        "path",
+        "by",
+        "reason",
+        "decision",
+        "at"
+      ],
+      "producer": "completion-add",
+      "state_verify": true,
+      "type": "COMPLETION_ADDED"
+    },
+    {
+      "drift_kinds": [
+        "record_missing",
+        "record_unreadable",
+        "task_status",
+        "board_status",
+        "illegal_transition",
+        "evidence_missing",
+        "evidence_unreadable",
+        "evidence_hash_mismatch",
+        "evidence_bytes_mismatch",
+        "spec_missing",
+        "spec_unreadable",
+        "spec_hash_mismatch"
+      ],
+      "ledger": "primary",
+      "note": "dispatched -> delivered after scope/base_sha/shape gates; evidence renumbered",
+      "payload_required": [
+        "task",
+        "evidence"
+      ],
+      "producer": "deliver",
+      "state_verify": true,
+      "type": "DELIVER"
+    },
+    {
+      "drift_kinds": [
+        "record_missing",
+        "record_unreadable",
+        "task_status",
+        "board_status",
+        "illegal_transition"
+      ],
+      "ledger": "primary",
+      "note": "ready/rework -> dispatched; base_sha is the immutable deliver baseline",
+      "payload_required": [
+        "task",
+        "executor",
+        "worktree",
+        "base_sha"
+      ],
+      "producer": "dispatch",
+      "state_verify": true,
+      "type": "DISPATCH"
+    },
+    {
+      "drift_kinds": [],
+      "ledger": "primary",
+      "note": "receiver accepts a claimed handoff package",
+      "payload_required": [
+        "package",
+        "receiver"
+      ],
+      "producer": "handoff-accept",
+      "state_verify": false,
+      "type": "HANDOFF_ACCEPT"
+    },
+    {
+      "drift_kinds": [],
+      "ledger": "primary",
+      "note": "activates the handoff; requires a committed receiver tip",
+      "payload_required": [
+        "package",
+        "controller"
+      ],
+      "producer": "handoff-activate",
+      "state_verify": false,
+      "type": "HANDOFF_ACTIVATE"
+    },
+    {
+      "drift_kinds": [],
+      "ledger": "primary",
+      "note": "receiver claims the package; source controller cannot claim",
+      "payload_required": [
+        "package",
+        "controller"
+      ],
+      "producer": "handoff-claim",
+      "state_verify": false,
+      "type": "HANDOFF_CLAIM"
+    },
+    {
+      "drift_kinds": [],
+      "ledger": "primary",
+      "note": "snapshots task/envelope into a hash-addressed handoff package",
+      "payload_required": [
+        "package",
+        "source",
+        "task",
+        "envelope"
+      ],
+      "producer": "handoff-new",
+      "state_verify": false,
+      "type": "HANDOFF_NEW"
+    },
+    {
+      "drift_kinds": [],
+      "ledger": "primary",
+      "note": "receiver writes the receipt before acceptance",
+      "payload_required": [
+        "package",
+        "controller"
+      ],
+      "producer": "handoff-receipt",
+      "state_verify": false,
+      "type": "HANDOFF_RECEIPT"
+    },
+    {
+      "drift_kinds": [],
+      "ledger": "primary",
+      "note": "bootstrap event; carries only the tower root path",
+      "payload_required": [
+        "root"
+      ],
+      "producer": "init",
+      "state_verify": false,
+      "type": "INIT"
+    },
+    {
+      "drift_kinds": [],
+      "ledger": "primary",
+      "note": "phase transition; updates primary/CURRENT_STATE.json only",
+      "payload_required": [
+        "from",
+        "to",
+        "next"
+      ],
+      "producer": "phase",
+      "state_verify": false,
+      "type": "PHASE"
+    },
+    {
+      "drift_kinds": [],
+      "ledger": "primary",
+      "note": "spec approval by a non-executor; consumed by the spec gate",
+      "payload_required": [
+        "task",
+        "by",
+        "note"
+      ],
+      "producer": "spec-approve",
+      "state_verify": false,
+      "type": "SPEC_APPROVED"
+    },
+    {
+      "drift_kinds": [
+        "record_missing",
+        "record_unreadable",
+        "task_status",
+        "board_status",
+        "illegal_transition"
+      ],
+      "ledger": "primary",
+      "note": "creates/rebuilds an unfinished card; freezes spec_path + spec_sha256",
+      "payload_required": [
+        "task",
+        "title"
+      ],
+      "producer": "task-new",
+      "state_verify": true,
+      "type": "TASK_NEW"
+    },
+    {
+      "drift_kinds": [],
+      "ledger": "primary",
+      "note": "records the record.next hint; not replayed by state-verify",
+      "payload_required": [
+        "task",
+        "next"
+      ],
+      "producer": "task-next",
+      "state_verify": false,
+      "type": "TASK_NEXT"
+    },
+    {
+      "drift_kinds": [
+        "envelope_missing",
+        "envelope_unreadable",
+        "envelope_status",
+        "queue_status",
+        "illegal_transition",
+        "envelope_unbacked"
+      ],
+      "ledger": "supervision",
+      "note": "DRAFT envelope over an accepted task with a PASS review",
+      "payload_required": [
+        "envelope",
+        "task",
+        "head"
+      ],
+      "producer": "envelope-new",
+      "state_verify": true,
+      "type": "ENVELOPE_NEW"
+    },
+    {
+      "drift_kinds": [
+        "envelope_missing",
+        "envelope_unreadable",
+        "envelope_status",
+        "queue_status",
+        "illegal_transition"
+      ],
+      "ledger": "supervision",
+      "note": "MERGED; pr mode adds merge_mode/pr_number/pr_url to the payload",
+      "payload_required": [
+        "envelope",
+        "merge_commit"
+      ],
+      "producer": "merge",
+      "state_verify": true,
+      "type": "MERGE"
+    },
+    {
+      "drift_kinds": [
+        "envelope_missing",
+        "envelope_unreadable",
+        "envelope_status",
+        "queue_status",
+        "illegal_transition"
+      ],
+      "ledger": "supervision",
+      "note": "correction event; payload variants carry reason/detail/base/current_branch/errors",
+      "payload_required": [
+        "envelope"
+      ],
+      "producer": "merge",
+      "state_verify": true,
+      "type": "MERGE_BLOCKED"
+    },
+    {
+      "drift_kinds": [
+        "envelope_missing",
+        "envelope_unreadable",
+        "envelope_status",
+        "queue_status",
+        "illegal_transition"
+      ],
+      "ledger": "supervision",
+      "note": "merge command failed after MERGE_START; envelope stays MERGING",
+      "payload_required": [
+        "envelope",
+        "stderr"
+      ],
+      "producer": "merge",
+      "state_verify": true,
+      "type": "MERGE_FAILED"
+    },
+    {
+      "drift_kinds": [
+        "envelope_missing",
+        "envelope_unreadable",
+        "envelope_status",
+        "queue_status",
+        "illegal_transition"
+      ],
+      "ledger": "supervision",
+      "note": "enters the internal MERGING state; folded status is unchanged",
+      "payload_required": [
+        "envelope",
+        "supervisor"
+      ],
+      "producer": "merge",
+      "state_verify": true,
+      "type": "MERGE_START"
+    },
+    {
+      "drift_kinds": [
+        "envelope_missing",
+        "envelope_unreadable",
+        "envelope_status",
+        "queue_status",
+        "illegal_transition"
+      ],
+      "ledger": "supervision",
+      "note": "correction event; retryable after the next MERGE attempt",
+      "payload_required": [
+        "envelope",
+        "result",
+        "tests_count",
+        "tower_tests_count",
+        "checks"
+      ],
+      "producer": "post-merge",
+      "state_verify": true,
+      "type": "POST_MERGE_FAILED"
+    },
+    {
+      "drift_kinds": [
+        "envelope_missing",
+        "envelope_unreadable",
+        "envelope_status",
+        "queue_status",
+        "illegal_transition"
+      ],
+      "ledger": "supervision",
+      "note": "the only completion state; MERGED alone is not completion",
+      "payload_required": [
+        "envelope",
+        "tests_count",
+        "tower_tests_count",
+        "checks",
+        "merge_record"
+      ],
+      "producer": "post-merge",
+      "state_verify": true,
+      "type": "POST_MERGE_VERIFIED"
+    },
+    {
+      "drift_kinds": [
+        "envelope_missing",
+        "envelope_unreadable",
+        "envelope_status",
+        "queue_status",
+        "illegal_transition",
+        "queue_unbacked"
+      ],
+      "ledger": "supervision",
+      "note": "DRAFT -> WAITING; requires both tests baselines",
+      "payload_required": [
+        "envelope",
+        "task"
+      ],
+      "producer": "queue-add",
+      "state_verify": true,
+      "type": "QUEUE_ADD"
+    },
+    {
+      "drift_kinds": [],
+      "ledger": "supervision",
+      "note": "supervision ledger bootstrap",
+      "payload_required": [
+        "root"
+      ],
+      "producer": "supervision-init",
+      "state_verify": false,
+      "type": "SUPERVISION_INIT"
+    },
+    {
+      "drift_kinds": [],
+      "ledger": "supervision",
+      "note": "supervision phase transition; writes supervision/CURRENT_STATE.json",
+      "payload_required": [
+        "from",
+        "to",
+        "next"
+      ],
+      "producer": "supervision-phase",
+      "state_verify": false,
+      "type": "SUPERVISION_PHASE"
+    }
+  ],
+  "schema": "tower/event-catalog@1"
+}

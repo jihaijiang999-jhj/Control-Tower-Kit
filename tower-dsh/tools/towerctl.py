@@ -7146,12 +7146,600 @@ def position_layer_parsers(parser: argparse.ArgumentParser) -> argparse.Argument
     return parser
 
 
+# ---------------------------------------------------------------------------
+# PILOT-048 architecture spine: ``arch-check`` reconciles the prose with the
+# code, ``arch-graph`` is the deterministic import graph both commands share.
+# Both are read-only: they never write tower state.
+# ---------------------------------------------------------------------------
+ARCH_SCHEMA = "tower/architecture@1"
+ARCH_FILE_REL = "ARCHITECTURE.md"
+ARCH_GATES_REL = "arch/GATES.json"
+ARCH_INVARIANTS_REL = "arch/INVARIANTS.json"
+ARCH_EVENTS_REL = "EVENT_CATALOG.json"
+ARCH_ADR_DIR = "adr"
+ARCH_ADR_TEMPLATE = "ADR-TEMPLATE.md"
+ARCH_GATES_SCHEMA = "tower/gates@1"
+ARCH_INVARIANTS_SCHEMA = "tower/invariants@1"
+ARCH_EVENTS_SCHEMA = "tower/event-catalog@1"
+ARCH_ADR_SCHEMA = "tower/adr@1"
+ARCH_GRAPH_SCHEMA = "tower/arch-graph@1"
+ARCH_ADR_STATUSES = ("proposed", "accepted", "superseded", "archived")
+ARCH_DRIVE_RE = re.compile(r"^[A-Za-z]:")
+ARCH_SECTIONS = (
+    "## 1. 系统上下文", "## 2. 组件与职责", "## 3. 数据流",
+    "## 4. 关键契约", "## 5. 扩展点", "## 6. 不变量")
+ARCH_GATE_IDS = (
+    "GATE-SPEC", "GATE-READY", "GATE-DISPATCH", "GATE-DELIVER-SCOPE",
+    "GATE-DELIVER-BASE-SHA", "GATE-DELIVER-SHAPE", "GATE-REVIEW",
+    "GATE-ACCEPT", "GATE-CLOSE", "GATE-ENVELOPE", "GATE-QUEUE",
+    "GATE-MERGE-CHECK", "GATE-MERGE-PREFLIGHT", "GATE-POST-MERGE", "GATE-CI")
+ARCH_INVARIANT_IDS = tuple(f"C-{index:02d}" for index in range(1, 17))
+# writer -> (event_type argument index, ledger or None for the low-level writer)
+ARCH_LEDGER_WRITERS = {
+    "append_ledger": (1, "primary"),
+    "append_supervision_ledger": (1, "supervision"),
+    "_append_ledger_event_locked": (2, None)}
+
+
+def arch_finding(code: str, target: str, detail: str) -> dict:
+    """One ``arch-check`` error: ``{code, target, detail}`` (sorted on emit)."""
+    return {"code": code, "target": target, "detail": detail}
+
+
+def arch_string_list(value) -> bool:
+    """True for a list of non-empty strings (payload_required, drift kinds)."""
+    return isinstance(value, list) and all(
+        isinstance(item, str) and item.strip() for item in value)
+
+
+def arch_load_json(root: Path, relpath: str, schema: str):
+    """Read one machine document; ``(data | None, findings)``, never raises."""
+    try:
+        data = jload(root / relpath)
+    except (OSError, ValueError) as exc:
+        return None, [arch_finding("JSON_UNREADABLE", relpath, str(exc))]
+    if not isinstance(data, dict):
+        return None, [arch_finding("JSON_SHAPE", relpath,
+                                   "top level must be an object")]
+    if data.get("schema") != schema:
+        return None, [arch_finding("JSON_SCHEMA", relpath,
+                                   f"schema must be {schema}")]
+    return data, []
+
+
+def arch_command_names() -> set[str]:
+    """Every registered towerctl subcommand (the parser is the authority)."""
+    return set(cli_commands())
+
+
+def arch_test_names(root: Path):
+    """``({test function name: file}, findings)`` over ``tools/tests/*.py``."""
+    names: dict[str, str] = {}
+    findings: list[dict] = []
+    for path in sorted((root / "tools" / "tests").glob("*.py")):
+        relpath = f"tools/tests/{path.name}"
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=relpath)
+        except (OSError, SyntaxError, UnicodeError) as exc:
+            findings.append(arch_finding("TESTS_UNREADABLE", relpath, str(exc)))
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name.startswith("test"):
+                names.setdefault(node.name, relpath)
+    if not names:
+        findings.append(arch_finding("TESTS_MISSING", "tools/tests",
+                                     "no test functions found"))
+    return names, findings
+
+
+def arch_constants(tree: ast.Module) -> dict[str, str]:
+    """Module-level ``NAME = "literal"`` assignments (event type constants)."""
+    found: dict[str, str] = {}
+    for node in tree.body:
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, str)):
+            found[node.targets[0].id] = node.value.value
+    return found
+
+
+def arch_literal(node, consts: dict[str, str]) -> str | None:
+    """The string value of a literal or of a module-level string constant."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.Name):
+        return consts.get(node.id)
+    return None
+
+
+def arch_writer_ledger(node: ast.Call, consts: dict[str, str],
+                       writer: str) -> str | None:
+    """Which ledger a writer call appends to, or None when it cannot be read."""
+    fixed = ARCH_LEDGER_WRITERS[writer][1]
+    if fixed is not None:
+        return fixed
+    if len(node.args) < 2:
+        return None
+    subscript = node.args[1]
+    if not (isinstance(subscript, ast.Subscript)
+            and isinstance(subscript.value, ast.Name)
+            and subscript.value.id == "LEDGER_FILES"):
+        return None
+    key = arch_literal(subscript.slice, consts)
+    return key if key in LEDGER_FILES else None
+
+
+def arch_event_types(root: Path):
+    """``({type: ledger}, findings, unresolved)`` from ledger writer call sites.
+
+    Only literal strings and module-level string constants are collected, as
+    the card requires.  The internal forwarder ``_append_ledger_event`` passes
+    its ``event_type`` parameter through to ``_append_ledger_event_locked``, so
+    that call is counted as unresolved instead of guessed.
+    """
+    relpath = "tools/towerctl.py"
+    try:
+        tree = ast.parse((root / relpath).read_text(encoding="utf-8-sig"),
+                         filename=relpath)
+    except (OSError, SyntaxError, UnicodeError) as exc:
+        return {}, [arch_finding("TOWERCTL_UNREADABLE", relpath, str(exc))], 0
+    consts = arch_constants(tree)
+    found: dict[str, str] = {}
+    findings: list[dict] = []
+    unresolved = 0
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
+            continue
+        writer = node.func.id
+        if writer not in ARCH_LEDGER_WRITERS:
+            continue
+        index = ARCH_LEDGER_WRITERS[writer][0]
+        argument = node.args[index] if len(node.args) > index else None
+        event = arch_literal(argument, consts)
+        ledger = arch_writer_ledger(node, consts, writer)
+        if event is None or ledger is None:
+            unresolved += 1
+            continue
+        if found.setdefault(event, ledger) != ledger:
+            findings.append(arch_finding(
+                "EVENT_LEDGER", event,
+                f"appended to both {found[event]} and {ledger}"))
+    return found, findings, unresolved
+
+
+def arch_graph_nodes(root: Path) -> list[str]:
+    """Every ``tools/**/*.py`` module path, sorted (the graph's node set)."""
+    nodes = [path.relative_to(root).as_posix()
+             for path in root.glob("tools/**/*.py")
+             if path.is_file() and "__pycache__" not in path.parts]
+    return sorted(set(nodes))
+
+
+def arch_imports(tree: ast.Module) -> set[str]:
+    """Every imported module/name (``import x.y`` and ``from a.b import c``)."""
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                names.add(node.module)
+            names.update(alias.name for alias in node.names)
+    return names
+
+
+def arch_resolve_imports(names: set[str], by_module: dict[str, str]) -> set[str]:
+    """Map imported names to local node paths by their last dotted component."""
+    resolved: set[str] = set()
+    for name in names:
+        target = by_module.get(name.split(".")[-1])
+        if target:
+            resolved.add(target)
+    return resolved
+
+
+def arch_graph_stem_findings(nodes: list[str]) -> list[dict]:
+    """Two tools modules with the same stem make import edges ambiguous."""
+    counts: dict[str, int] = {}
+    for node in nodes:
+        stem = Path(node).stem
+        counts[stem] = counts.get(stem, 0) + 1
+    return [arch_finding("GRAPH_STEM_DUPLICATE", stem,
+                         "two tools modules share this stem; import edges are "
+                         "ambiguous")
+            for stem, count in sorted(counts.items()) if count > 1]
+
+
+def arch_graph_payload(root: Path):
+    """``(payload, findings)`` for ``tower/arch-graph@1``; keys sorted on emit."""
+    nodes = arch_graph_nodes(root)
+    by_module: dict[str, str] = {}
+    for node in nodes:
+        by_module.setdefault(Path(node).stem, node)
+    edges: list[dict] = []
+    findings = arch_graph_stem_findings(nodes)
+    for node in nodes:
+        try:
+            tree = ast.parse((root / node).read_text(encoding="utf-8-sig"),
+                             filename=node)
+        except (OSError, SyntaxError, UnicodeError) as exc:
+            findings.append(arch_finding("GRAPH_UNREADABLE", node, str(exc)))
+            continue
+        for target in sorted(arch_resolve_imports(arch_imports(tree), by_module)):
+            if target != node:
+                edges.append({"from": node, "to": target})
+    edges.sort(key=lambda edge: (edge["from"], edge["to"]))
+    payload = {"schema": ARCH_GRAPH_SCHEMA, "nodes": nodes, "edges": edges}
+    return payload, findings
+
+
+def arch_boundary_findings(graph: dict) -> list[dict]:
+    """PILOT-048 boundary: ``tools/towerctl.py`` must never import the tests."""
+    return [arch_finding("BOUNDARY_IMPORT", "tools/towerctl.py",
+                         f"towerctl imports {edge['to']}")
+            for edge in graph["edges"]
+            if edge["from"] == "tools/towerctl.py"
+            and edge["to"].startswith("tools/tests/")]
+
+
+def arch_gate_field_findings(gate: dict, gid: str, commands: set[str],
+                             tests: dict[str, str]) -> list[dict]:
+    """One gate entry: command/phase/test/blocks presence and references."""
+    findings: list[dict] = []
+    command = gate.get("command")
+    if command not in commands:
+        findings.append(arch_finding(
+            "GATE_COMMAND", gid,
+            f"command {command!r} is not a towerctl subcommand"))
+    test = gate.get("test")
+    if not (isinstance(test, str) and test in tests):
+        findings.append(arch_finding(
+            "GATE_TEST", gid, f"test {test!r} is not in tools/tests/*.py"))
+    for field in ("phase", "blocks"):
+        value = gate.get(field)
+        if not (isinstance(value, str) and value.strip()):
+            findings.append(arch_finding(
+                "GATE_FIELD", gid, f"{field} must be a non-empty string"))
+    return findings
+
+
+def arch_gates_findings(root: Path, commands: set[str], tests: dict[str, str]):
+    """``arch/GATES.json``: references, duplicates and required gate ids."""
+    data, findings = arch_load_json(root, ARCH_GATES_REL, ARCH_GATES_SCHEMA)
+    if data is None:
+        return findings, 0
+    gates = data.get("gates")
+    if not isinstance(gates, list):
+        return findings + [arch_finding("GATES_SHAPE", ARCH_GATES_REL,
+                                        "gates must be a list")], 0
+    seen: set[str] = set()
+    for index, gate in enumerate(gates):
+        target = f"{ARCH_GATES_REL}#gates[{index}]"
+        if not isinstance(gate, dict):
+            findings.append(arch_finding("GATE_SHAPE", target,
+                                         "gate must be an object"))
+            continue
+        gid = gate.get("id")
+        if not (isinstance(gid, str) and gid):
+            findings.append(arch_finding("GATE_SHAPE", target,
+                                         "id must be a non-empty string"))
+            continue
+        if gid in seen:
+            findings.append(arch_finding("GATE_DUPLICATE", gid,
+                                         "id appears twice"))
+            continue
+        seen.add(gid)
+        findings += arch_gate_field_findings(gate, gid, commands, tests)
+    findings += [arch_finding("GATE_MISSING", gid, "required gate is missing")
+                 for gid in ARCH_GATE_IDS if gid not in seen]
+    return findings, len(gates)
+
+
+def arch_probe_findings(probe, target: str, commands: set[str],
+                        tests: dict[str, str]) -> list[dict]:
+    """One invariant probe: ``kind`` test|command and an existing ``ref``."""
+    if not isinstance(probe, dict):
+        return [arch_finding("INVARIANT_PROBE", target,
+                             "probe must be an object")]
+    kind = probe.get("kind")
+    pools = {"test": tests, "command": commands}
+    pool = pools.get(kind)
+    if pool is None:
+        return [arch_finding("INVARIANT_PROBE", target,
+                             f"kind {kind!r} must be test or command")]
+    ref = probe.get("ref")
+    if not (isinstance(ref, str) and ref in pool):
+        return [arch_finding("INVARIANT_PROBE", target,
+                             f"{kind} ref {ref!r} does not exist")]
+    return []
+
+
+def arch_invariants_findings(root: Path, commands: set[str],
+                             tests: dict[str, str]):
+    """``arch/INVARIANTS.json``: C-01..C-16, each with an existing probe."""
+    data, findings = arch_load_json(root, ARCH_INVARIANTS_REL,
+                                    ARCH_INVARIANTS_SCHEMA)
+    if data is None:
+        return findings, 0
+    invariants = data.get("invariants")
+    if not isinstance(invariants, list):
+        return findings + [arch_finding("INVARIANTS_SHAPE", ARCH_INVARIANTS_REL,
+                                        "invariants must be a list")], 0
+    seen: set[str] = set()
+    for index, item in enumerate(invariants):
+        target = f"{ARCH_INVARIANTS_REL}#invariants[{index}]"
+        if not isinstance(item, dict):
+            findings.append(arch_finding("INVARIANT_SHAPE", target,
+                                         "entry must be an object"))
+            continue
+        invariant_id = item.get("id")
+        if not (isinstance(invariant_id, str) and invariant_id):
+            findings.append(arch_finding("INVARIANT_SHAPE", target,
+                                         "id must be a non-empty string"))
+            continue
+        if invariant_id in seen:
+            findings.append(arch_finding("INVARIANT_DUPLICATE", invariant_id,
+                                         "id appears twice"))
+            continue
+        seen.add(invariant_id)
+        if not (isinstance(item.get("text"), str) and item["text"].strip()):
+            findings.append(arch_finding("INVARIANT_TEXT", invariant_id,
+                                         "text must be a non-empty string"))
+        findings += arch_probe_findings(item.get("probe"), invariant_id,
+                                        commands, tests)
+    findings += [arch_finding("INVARIANT_MISSING", invariant_id,
+                              "required clause is missing")
+                 for invariant_id in ARCH_INVARIANT_IDS
+                 if invariant_id not in seen]
+    return findings, len(invariants)
+
+
+def arch_event_fields_findings(entry: dict, event: str,
+                               commands: set[str]) -> list[dict]:
+    """One catalog entry: producer, payload keys, state flag, drifts and note."""
+    findings: list[dict] = []
+    if entry.get("producer") not in commands:
+        findings.append(arch_finding(
+            "EVENT_PRODUCER", event,
+            f"producer {entry.get('producer')!r} is not a towerctl subcommand"))
+    if not arch_string_list(entry.get("payload_required")):
+        findings.append(arch_finding(
+            "EVENT_PAYLOAD", event,
+            "payload_required must be a list of non-empty strings"))
+    if not isinstance(entry.get("state_verify"), bool):
+        findings.append(arch_finding("EVENT_FIELD", event,
+                                     "state_verify must be a boolean"))
+    if not arch_string_list(entry.get("drift_kinds")):
+        findings.append(arch_finding("EVENT_FIELD", event,
+                                     "drift_kinds must be a list of strings"))
+    if not (isinstance(entry.get("note"), str) and entry["note"].strip()):
+        findings.append(arch_finding("EVENT_FIELD", event,
+                                     "note must be a non-empty string"))
+    return findings
+
+
+def arch_event_entry_findings(entry, index: int, commands: set[str],
+                              code_types: dict[str, str]) -> list[dict]:
+    """One EVENT_CATALOG entry: shape, ledger and code linkage."""
+    target = f"{ARCH_EVENTS_REL}#events[{index}]"
+    if not isinstance(entry, dict):
+        return [arch_finding("EVENT_SHAPE", target, "entry must be an object")]
+    event = entry.get("type")
+    if not (isinstance(event, str) and event):
+        return [arch_finding("EVENT_SHAPE", target,
+                             "type must be a non-empty string")]
+    findings: list[dict] = []
+    ledger = entry.get("ledger")
+    if ledger not in LEDGER_FILES:
+        findings.append(arch_finding("EVENT_LEDGER", event,
+                                     "ledger must be primary or supervision"))
+    if event not in code_types:
+        findings.append(arch_finding("EVENT_EXTRA", event,
+                                     "type does not appear in towerctl.py"))
+    elif ledger != code_types[event]:
+        findings.append(arch_finding(
+            "EVENT_LEDGER", event,
+            f"catalog says {ledger}, code appends to {code_types[event]}"))
+    findings += arch_event_fields_findings(entry, event, commands)
+    return findings
+
+
+def arch_events_findings(root: Path, commands: set[str],
+                         code_types: dict[str, str]):
+    """``EVENT_CATALOG.json`` against the call sites: bidirectional equality."""
+    data, findings = arch_load_json(root, ARCH_EVENTS_REL, ARCH_EVENTS_SCHEMA)
+    if data is None:
+        return findings, 0
+    entries = data.get("events")
+    if not isinstance(entries, list):
+        return findings + [arch_finding("EVENTS_SHAPE", ARCH_EVENTS_REL,
+                                        "events must be a list")], 0
+    seen: dict[str, int] = {}
+    for index, entry in enumerate(entries):
+        findings += arch_event_entry_findings(entry, index, commands, code_types)
+        if isinstance(entry, dict) and isinstance(entry.get("type"), str):
+            seen[entry["type"]] = seen.get(entry["type"], 0) + 1
+    findings += [arch_finding("EVENT_DUPLICATE", event, "type appears twice")
+                 for event, count in sorted(seen.items()) if count > 1]
+    findings += [arch_finding("EVENT_MISSING", event,
+                              "code appends this type but the catalog omits it")
+                 for event in sorted(set(code_types) - set(seen))]
+    return findings, len(entries)
+
+
+def arch_resolve_rel(root: Path, raw) -> Path | None:
+    """Resolve one tower/repo-relative reference inside the tower root, or None.
+
+    Fail closed: absolute paths, Windows drive paths (``C:/...``), ``..``
+    segments and anything whose resolved target leaves the tower root (symlink
+    escapes included) are rejected, so an ADR cannot vouch for a host file.
+    """
+    text = str(raw or "").replace("\\", "/").strip()
+    if (not text or text.startswith("/") or ARCH_DRIVE_RE.match(text)
+            or ".." in text.split("/")):
+        return None
+    root_abs = root.resolve()
+    candidates = [root / text, root.parent / text]
+    if text.startswith(root.name + "/"):
+        candidates.append(root / text[len(root.name) + 1:])
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        resolved = candidate.resolve()
+        if resolved == root_abs or root_abs in resolved.parents:
+            return resolved
+    return None
+
+
+def arch_adr_meta_findings(root: Path, meta: dict, relpath: str) -> list[dict]:
+    """ADR front-matter schema, id, status, date, cards and existing files."""
+    findings: list[dict] = []
+    if meta.get("schema") != ARCH_ADR_SCHEMA:
+        findings.append(arch_finding("ADR_SCHEMA", relpath,
+                                     f"schema must be {ARCH_ADR_SCHEMA}"))
+    if not (isinstance(meta.get("id"), str) and meta["id"].strip()):
+        findings.append(arch_finding("ADR_FIELD", relpath,
+                                     "id must be a non-empty string"))
+    if meta.get("status") not in ARCH_ADR_STATUSES:
+        findings.append(arch_finding(
+            "ADR_STATUS", relpath,
+            f"status {meta.get('status')!r} is not one of {ARCH_ADR_STATUSES}"))
+    if command_date(meta.get("date")) is None:
+        findings.append(arch_finding("ADR_FIELD", relpath,
+                                     "date must be YYYY-MM-DD"))
+    if not isinstance(meta.get("related_cards"), list):
+        findings.append(arch_finding("ADR_FIELD", relpath,
+                                     "related_cards must be a list"))
+    related = meta.get("related_files")
+    if not arch_string_list(related):
+        findings.append(arch_finding("ADR_FIELD", relpath,
+                                     "related_files must be a non-empty list"))
+        return findings
+    findings += [arch_finding("ADR_RELATED", relpath,
+                              f"related file does not exist: {item}")
+                 for item in related if arch_resolve_rel(root, item) is None]
+    return findings
+
+
+def arch_adr_file_findings(root: Path, path: Path) -> list[dict]:
+    """Read one ADR and check its front-matter; a missing fence is one error."""
+    relpath = f"{ARCH_ADR_DIR}/{path.name}"
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError) as exc:
+        return [arch_finding("ADR_UNREADABLE", relpath, str(exc))]
+    try:
+        meta = parse_command_front_matter(front_matter_block(text))
+    except CommandDocError as exc:
+        return [arch_finding("ADR_FRONT_MATTER", relpath, str(exc))]
+    return arch_adr_meta_findings(root, meta, relpath)
+
+
+def arch_adr_findings(root: Path):
+    """Every ``adr/*.md`` except the template: front-matter and related files."""
+    adr_dir = root / ARCH_ADR_DIR
+    if not adr_dir.is_dir():
+        return [arch_finding("ADR_MISSING", ARCH_ADR_DIR,
+                             "adr/ directory is missing")], 0
+    findings: list[dict] = []
+    count = 0
+    for path in sorted(adr_dir.glob("*.md")):
+        if path.name == ARCH_ADR_TEMPLATE:
+            continue
+        count += 1
+        findings += arch_adr_file_findings(root, path)
+    if not count:
+        findings.append(arch_finding("ADR_MISSING", ARCH_ADR_DIR,
+                                     "no ADR document"))
+    return findings, count
+
+
+def arch_architecture_findings(root: Path):
+    """``ARCHITECTURE.md``: front-matter fields plus the six fixed sections."""
+    path = root / ARCH_FILE_REL
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError) as exc:
+        return [arch_finding("ARCH_MISSING", ARCH_FILE_REL, str(exc))], 0
+    try:
+        meta = parse_command_front_matter(front_matter_block(text))
+    except CommandDocError as exc:
+        return [arch_finding("ARCH_FRONT_MATTER", ARCH_FILE_REL, str(exc))], 0
+    findings: list[dict] = []
+    if meta.get("schema") != ARCH_SCHEMA:
+        findings.append(arch_finding("ARCH_SCHEMA", ARCH_FILE_REL,
+                                     f"schema must be {ARCH_SCHEMA}"))
+    for field in ("id", "version", "updated", "review_by", "owner"):
+        if not (isinstance(meta.get(field), str) and meta[field].strip()):
+            findings.append(arch_finding(
+                "ARCH_FIELD", ARCH_FILE_REL,
+                f"{field} must be a non-empty string"))
+    headings = {line.strip() for line in text.splitlines()}
+    findings += [arch_finding("ARCH_SECTION", ARCH_FILE_REL,
+                              f"missing section {title}")
+                 for title in ARCH_SECTIONS if title not in headings]
+    return findings, len(ARCH_SECTIONS)
+
+
+def arch_check_payload(root: Path) -> dict:
+    """The full ``arch-check`` result: counts plus every finding (read-only)."""
+    commands = arch_command_names()
+    tests, findings = arch_test_names(root)
+    code_types, scan_findings, unresolved = arch_event_types(root)
+    findings += scan_findings
+    gates, gate_count = arch_gates_findings(root, commands, tests)
+    invariants, invariant_count = arch_invariants_findings(root, commands, tests)
+    events, event_count = arch_events_findings(root, commands, code_types)
+    adrs, adr_count = arch_adr_findings(root)
+    sections, section_count = arch_architecture_findings(root)
+    graph, graph_findings = arch_graph_payload(root)
+    findings += gates + invariants + events + adrs + sections + graph_findings
+    findings += arch_boundary_findings(graph)
+    findings.sort(key=lambda item: (item["code"], item["target"], item["detail"]))
+    counts = {"gates": gate_count, "invariants": invariant_count,
+              "events": event_count, "event_types_in_code": len(code_types),
+              "unresolved_event_calls": unresolved, "adrs": adr_count,
+              "sections": section_count, "nodes": len(graph["nodes"]),
+              "edges": len(graph["edges"])}
+    return {"ok": not findings, "counts": counts, "errors": findings}
+
+
+def cmd_arch_check(root: Path, args) -> None:
+    """Read-only: reconcile ARCHITECTURE/GATES/INVARIANTS/EVENT_CATALOG with code."""
+    payload = arch_check_payload(root)
+    if not payload["ok"]:
+        emit({"ok": False, "errors": payload["errors"]}, 2)
+    emit({"ok": True, "counts": payload["counts"], "errors": []}, 0)
+
+
+def cmd_arch_graph(root: Path, args) -> None:
+    """Read-only: print the deterministic ``tower/arch-graph@1`` import graph."""
+    graph, findings = arch_graph_payload(root)
+    if findings:
+        emit({"ok": False, "errors": findings}, 2)
+    emit_sorted(graph)
+
+
+def arch_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Register the PILOT-048 ``arch-check`` / ``arch-graph`` subcommands."""
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        action.add_parser("arch-check")
+        graph = action.add_parser("arch-graph")
+        graph.add_argument("--json", action="store_true",
+                           help="machine view: tower/arch-graph@1 JSON only")
+    return parser
+
+
 # Merged into ``main``'s handler table so the command layer owns its own wiring.
 COMMAND_LAYER_HANDLERS = {
     "campaign-check": cmd_campaign_check, "brief": cmd_brief,
     "status-snapshot": cmd_status_snapshot, "status-index": cmd_status_index,
     "status-rollup": cmd_status_rollup, "status-archive": cmd_status_archive,
-    "where": cmd_where}
+    "where": cmd_where, "arch-check": cmd_arch_check,
+    "arch-graph": cmd_arch_graph}
 
 
 
@@ -7341,7 +7929,7 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         cc.add_argument("--strict", action="store_true",
                         help="treat warnings (W1/W2) as errors")
         action.add_parser("brief")
-    return position_layer_parsers(status_layer_parsers(parser))
+    return arch_layer_parsers(position_layer_parsers(status_layer_parsers(parser)))
 
 
 def cli_commands() -> list[str]:

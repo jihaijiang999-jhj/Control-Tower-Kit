@@ -1,0 +1,57 @@
+{
+  "schema": "tower/spec@1",
+  "id": "PILOT-048",
+  "title": "架构脊柱：ARCHITECTURE + adr/ + EVENT_CATALOG + arch-check；归档 DESIGN.md",
+  "authority": "workspace_write",
+  "anchor": "control-tower/COMMAND-LAYER.md §2 HOW（047 之后、049 之前）",
+  "why_now": "047 之后塔能回答“我在哪”，但回答不了“结构是什么、为什么这么设计、怎么改”：ARCHITECTURE 不存在，DESIGN.md 是 v0.3 历史提案，事件类型没有目录，AD 没有记录，RED-LINES 的 probe 没有映射。048 建架构脊柱，并让 arch-check 把“文档说的”与“代码有的”逐条对账，防止架构描述半年后过期。",
+  "scope": [
+    "新增 ARCHITECTURE.md（一页活文档，front-matter：schema=tower/architecture@1、id、version、updated、review_by=2026-12-31、owner）：系统上下文、组件与职责、数据流（spec→task→dispatch→deliver→envelope→merge→post-merge→CI）、关键契约（事件/状态/命令/证据）、扩展点（加 gate/命令/事件/字段的步骤与影响面）、不变量（引用 RED-LINES C-01..C-16 + arch/INVARIANTS.json）、已知边界（单文件、无密钥链、legacy、TOFU）",
+    "新增 arch/GATES.json：机读门表——每项 {id, command, phase, test, blocks}，覆盖 gate 清单（spec/ready/dispatch/deliver 范围/deliver base_sha/deliver shape/review/accept/close/envelope/queue/merge-check/merge 前置/post-merge/CI）；arch-check 校验每项 command 在 parser 中、test 在 tools/tests/*.py 中存在",
+    "新增 arch/INVARIANTS.json：RED-LINES C-01..C-16 每条 {id, text, probe:{kind:test|command, ref}}；probe 必须是真实测试函数名或真实命令；arch-check 校验 ref 存在（测试函数在 tests 文件中、命令在 parser 中），缺 probe 或 ref 不存在 → exit 2",
+    "新增 EVENT_CATALOG.json：事件目录——每条 {type, ledger: primary|supervision, producer, payload_required:[...], state_verify: bool, drift_kinds:[...], note}；覆盖当前代码里所有 append_ledger/append_supervision_ledger 的字面 type（至少：TASK_NEW/SPEC_APPROVED/DISPATCH/DELIVER/CHECKBACK/ACCEPT/CLOSE/AUTHORITY_SET/AUTHORITY_REQUIRED/COMPLETION_ADDED/ENVELOPE_NEW/QUEUE_ADD/MERGE_START/MERGED/MERGE_BLOCKED/POST_MERGE_VERIFIED 及代码中实际存在的其它 type）；arch-check 用 AST 扫描全部字面 type，与目录双向比对（漏目录/多余目录 → exit 2）",
+    "新增 towerctl arch-check：只读，校验——① arch/GATES.json 的 command 在 parser、test 在 tests；② arch/INVARIANTS.json 的 probe ref 存在且覆盖 C-01..C-16；③ EVENT_CATALOG.json 与代码字面 type 双向一致；④ adr/*.md 的 front-matter（schema=tower/adr@1、id、status∈proposed|accepted|superseded|archived、date、related_cards、related_files）且 related_files 存在；⑤ ARCHITECTURE.md 含固定六节标题（系统上下文/组件/数据流/契约/扩展点/不变量）；⑥ 禁止边界：tools/towerctl.py 不得 import tools/tests/*（AST）；错误 exit 2 单 JSON、无 traceback",
+    "新增 towerctl arch-graph --json：AST 生成 tools/ 内部 import 图（{schema:tower/arch-graph@1, nodes:[...], edges:[...]}，键排序、无时间戳）；只读；arch-check 用同一图做边界校验",
+    "归档 DESIGN.md：git mv DESIGN.md adr/ADR-0001-initial-design.md，前置 ADR front-matter（id=ADR-0001、status=archived、date=2026-10-19、title=初始设计提案 v0.3、related_cards=[]、related_files=[tower-dsh/tools/towerctl.py]），正文不改（保留历史提案原文）；新增 adr/ADR-TEMPLATE.md（背景/决策/替代方案/后果/关联卡/关联文件）",
+    "新增 tools/tests/test_arch.py：正例（真实 worktree arch-check exit 0、arch-graph 合法）；反例——GATES 的 command 不存在、GATES 的 test 不存在、INVARIANTS 缺 C-16 或 probe ref 不存在、EVENT_CATALOG 漏一个代码 type、EVENT_CATALOG 多一个不存在 type、ADR status 非法/related_files 不存在、ARCHITECTURE 缺节、towerctl import tests；全部干净 exit 2 无 Traceback",
+    "真实塔验证：worktree 新工具 arch-check exit 0、arch-graph 可解析、campaign-check exit 0、authority-check exit 0、state-verify drift []；建信封前 tasks=48/envelopes=46，建信封后 48/47",
+    "不改 036–047 的信任边界/授权/前置链/空账本/范围门/completion/base_sha/shape/命令层语义；不写 primary/supervision/ledger；不引入依赖；不接 CI（049）"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-048/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-048/tower-dsh/tools/tests/test_arch.py",
+    "pilot/worktrees/PILOT-048/tower-dsh/ARCHITECTURE.md",
+    "pilot/worktrees/PILOT-048/tower-dsh/arch/GATES.json",
+    "pilot/worktrees/PILOT-048/tower-dsh/arch/INVARIANTS.json",
+    "pilot/worktrees/PILOT-048/tower-dsh/EVENT_CATALOG.json",
+    "pilot/worktrees/PILOT-048/tower-dsh/adr/ADR-TEMPLATE.md",
+    "pilot/worktrees/PILOT-048/tower-dsh/adr/ADR-0001-initial-design.md",
+    "pilot/worktrees/PILOT-048/tower-dsh/DESIGN.md"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "hand-editing state/AUTHORITY.json, shared/AUTHORITY_POLICY.json or ledger/*.jsonl",
+    "writing primary/supervision/ledger state from arch-check/arch-graph",
+    "deleting DESIGN.md content (must move to adr/ADR-0001 with unchanged body)",
+    "letting arch-check guess when a gate/event/invariant is missing (must exit 2)"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-048/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 518 + 新增用例数（main 基线 518）",
+    "arch-check 在真实 worktree exit 0；ARCHITECTURE.md 六节齐全；arch/GATES.json 覆盖 gate 清单且 command/test 全部存在；arch/INVARIANTS.json 覆盖 C-01..C-16 且 probe ref 全部存在；EVENT_CATALOG 与代码字面 type 双向一致；adr/ADR-0001 front-matter 合法且 related_files 存在",
+    "arch-graph --json 输出 schema=tower/arch-graph@1、nodes/edges 键排序、无时间戳、stdout 纯 JSON；重复运行字节相同",
+    "反例夹具：GATES command/test 不存在、INVARIANTS 缺项/probe 不存在、EVENT_CATALOG 漏/多 type、ADR status 非法/related_files 不存在、ARCHITECTURE 缺节、towerctl import tests → 全部 exit 2 单 JSON 无 Traceback",
+    "DESIGN.md 已移动到 adr/ADR-0001-initial-design.md（git diff 显示 rename），正文与移动前逐字节相同（只多前置 front-matter）；DESIGN.md 不再存在",
+    "arch-check/arch-graph 只读：运行前后 primary/supervision/ledger/tasks 哈希不变",
+    "旧码对照：main 版无 arch-check/arch-graph（argparse invalid choice, exit 2）；新码存在。证据写进 scratch/probe-old-code.txt",
+    "shape-check 在 worktree exit 0（新增函数全部 ≤80 行/≤12 分支）",
+    "真实塔：worktree 新工具 arch-check/arch-graph/campaign-check/authority-check exit 0、state-verify drift []；建信封前 tasks=48/envelopes=46，建信封后 48/47；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-048 diff --name-only main..HEAD 恰为 9 个 allowed_paths（含 DESIGN.md 的删除）"
+  ],
+  "depends_on": ["PILOT-047"],
+  "worktree": "pilot/worktrees/PILOT-048"
+}
