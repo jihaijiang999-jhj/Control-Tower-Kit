@@ -1,0 +1,96 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-048",
+  "task": "PILOT-048",
+  "repository": "..",
+  "branch": "pilot/PILOT-048",
+  "base": "main",
+  "implementation_head_sha": "875cd8cd42d40f5bcd4aa0baf6d9ab23008df11d",
+  "envelope_path": "merge-envelopes/ENV-PILOT-048.json",
+  "created_at": "2026-10-29T15:45:09+08:00",
+  "scope": "PILOT-048: architecture spine (ARCHITECTURE, ADRs, GATES/INVARIANTS, EVENT_CATALOG, arch-check/arch-graph); DESIGN.md archived to ADR-0001",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 518,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-048/evidence/towerctl.py",
+      "sha256": "e17467d7aaf133d035264b6c3cef3f764595e5eda4bfd81497f1c4c2d97323af"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/test_arch.py",
+      "sha256": "2d8781e862172bd46703aa94a945bc64fe43081177127f4db19a51f9cc22e8a7"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/ARCHITECTURE.md",
+      "sha256": "5f16711a4958318c17bf1a9c53f3bd5d82bdb08fa7763920f6751f615403c050"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/GATES.json",
+      "sha256": "5ad52b4dc0ac8dbee381e79f9494d4067a65d2847381329069bc3855fa95738b"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/INVARIANTS.json",
+      "sha256": "e119d7864425327f9b05ae6d853a64cf3a877ee436919ec13579c7e9b12ee2d4"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/EVENT_CATALOG.json",
+      "sha256": "8eefc6160425c332c6c08a533ec134999b2ca8e2279d97dfa47bfea74df4a9cc"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/ADR-TEMPLATE.md",
+      "sha256": "00c15cfa6496e203a01e02fba121d4424d3d6fcf5463d0e539253669ed795739"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/ADR-0001-initial-design.md",
+      "sha256": "892b359eacfbd3c83f040bce5b39cf169e88cf554273ed9260e19dcb56f64a08"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/test-output.txt",
+      "sha256": "143f2f514890d4274247bb64d838f81f6075624d3f2590ae550a8d01df666566"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/arch_probe.py",
+      "sha256": "bf695ae42295c41e5aa95a5f2b2ba1e1da37ac8c6e26ec219f3fbee366824f08"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/probe.txt",
+      "sha256": "9908b9a672ad08ac95047f6904d39a371e1f9aa79558a55ca56ee0366d552200"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/probe-old-code.txt",
+      "sha256": "fbe842ebf5f0e9c5dc8fe8a831d40e0b08ac08bc8b5e0b54dc093e8968fd42e5"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/commit.txt",
+      "sha256": "075c2e40ea5141d502501b19768b804e1d18d505b4d10d4135d4fb6c12179982"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/diff.txt",
+      "sha256": "c02a2647d6d96748960ae9912803b8b0925805e1b935c7a76e1ee70cfbae83b3"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/arch-check.json",
+      "sha256": "39b4cba785760a63fa8d951113c7fb080d9d30a040235302a5064a96d281a002"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/arch-graph.json",
+      "sha256": "0878c3f7ee400372b9cc11c8e57269d4e8c554f5ddcf74dda7f08804de69a157"
+    }
+  ],
+  "envelope_head_sha": "548c2e2d41c6b971ec9ed09fe783adad1f8797e4",
+  "status": "MERGED",
+  "pr_number": 32,
+  "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/32",
+  "remote_merged": true,
+  "remote_merged_at": "2026-10-29T15:52:41+08:00",
+  "merge_commit": "aaa4dfeddb75651eeed4a6fcf5bfb32fe0daa046",
+  "merged_at": "2026-10-29T15:52:43+08:00",
+  "supervisor": "sup-phase2-pilot",
+  "merge_mode": "pr",
+  "check_conclusion": "success"
+}

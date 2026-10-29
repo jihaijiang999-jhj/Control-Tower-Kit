@@ -1,0 +1,126 @@
+{
+  "edges": [
+    {
+      "from": "tools/spec_coverage.py",
+      "to": "tools/spec_lint.py"
+    },
+    {
+      "from": "tools/tests/test_authority_hardening.py",
+      "to": "tools/towerctl.py"
+    },
+    {
+      "from": "tools/tests/test_authority_required.py",
+      "to": "tools/towerctl.py"
+    },
+    {
+      "from": "tools/tests/test_authority_state.py",
+      "to": "tools/towerctl.py"
+    },
+    {
+      "from": "tools/tests/test_command_layer.py",
+      "to": "tools/towerctl.py"
+    },
+    {
+      "from": "tools/tests/test_completion_and_base.py",
+      "to": "tools/towerctl.py"
+    },
+    {
+      "from": "tools/tests/test_coverage.py",
+      "to": "tools/towerctl.py"
+    },
+    {
+      "from": "tools/tests/test_empty_ledger_guard.py",
+      "to": "tools/towerctl.py"
+    },
+    {
+      "from": "tools/tests/test_envelope_baseline.py",
+      "to": "tools/towerctl.py"
+    },
+    {
+      "from": "tools/tests/test_git_config_isolation.py",
+      "to": "tools/tests/test_coverage.py"
+    },
+    {
+      "from": "tools/tests/test_git_config_isolation.py",
+      "to": "tools/tests/test_hardening2.py"
+    },
+    {
+      "from": "tools/tests/test_hardening2.py",
+      "to": "tools/towerctl.py"
+    },
+    {
+      "from": "tools/tests/test_ledger_chain.py",
+      "to": "tools/towerctl.py"
+    },
+    {
+      "from": "tools/tests/test_ledger_lock_windows.py",
+      "to": "tools/towerctl.py"
+    },
+    {
+      "from": "tools/tests/test_position.py",
+      "to": "tools/towerctl.py"
+    },
+    {
+      "from": "tools/tests/test_post_merge.py",
+      "to": "tools/towerctl.py"
+    },
+    {
+      "from": "tools/tests/test_run_tests.py",
+      "to": "tools/run_tests.py"
+    },
+    {
+      "from": "tools/tests/test_state_verify.py",
+      "to": "tools/towerctl.py"
+    },
+    {
+      "from": "tools/tests/test_status_history.py",
+      "to": "tools/towerctl.py"
+    },
+    {
+      "from": "tools/towerctl.py",
+      "to": "tools/spec_coverage.py"
+    },
+    {
+      "from": "tools/towerctl.py",
+      "to": "tools/spec_lint.py"
+    }
+  ],
+  "nodes": [
+    "tools/run_tests.py",
+    "tools/spec_coverage.py",
+    "tools/spec_lint.py",
+    "tools/tests/clause_bindings.py",
+    "tools/tests/test_arch.py",
+    "tools/tests/test_authority_drift.py",
+    "tools/tests/test_authority_hardening.py",
+    "tools/tests/test_authority_required.py",
+    "tools/tests/test_authority_state.py",
+    "tools/tests/test_ci_gate.py",
+    "tools/tests/test_command_layer.py",
+    "tools/tests/test_completion_and_base.py",
+    "tools/tests/test_coverage.py",
+    "tools/tests/test_deliver_ids.py",
+    "tools/tests/test_deliver_scope.py",
+    "tools/tests/test_empty_ledger_guard.py",
+    "tools/tests/test_envelope_baseline.py",
+    "tools/tests/test_gates.py",
+    "tools/tests/test_git_config_isolation.py",
+    "tools/tests/test_handoff_generic.py",
+    "tools/tests/test_hardening2.py",
+    "tools/tests/test_ledger_chain.py",
+    "tools/tests/test_ledger_lock_windows.py",
+    "tools/tests/test_merge_pr_mode.py",
+    "tools/tests/test_output_encoding.py",
+    "tools/tests/test_policy_lint.py",
+    "tools/tests/test_position.py",
+    "tools/tests/test_post_merge.py",
+    "tools/tests/test_run_tests.py",
+    "tools/tests/test_shape_check.py",
+    "tools/tests/test_spec_lint.py",
+    "tools/tests/test_state_verify.py",
+    "tools/tests/test_status_history.py",
+    "tools/tests/test_trust_boundary.py",
+    "tools/towerctl.py"
+  ],
+  "schema": "tower/arch-graph@1"
+}

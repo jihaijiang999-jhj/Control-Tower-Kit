@@ -1,0 +1,3277 @@
+# PILOT-048 diff evidence (main..HEAD)
+
+$ git log --oneline main..HEAD
+875cd8c PILOT-048: correct CI attribution in ARCHITECTURE
+bf97d5a PILOT-048: refresh towerctl line count in ARCHITECTURE
+637e8c7 PILOT-048: correct architecture facts and harden arch-check fences
+debfe51 PILOT-048: architecture spine (ARCHITECTURE, ADRs, EVENT_CATALOG, arch-check)
+
+$ git diff --name-status main..HEAD
+A	tower-dsh/ARCHITECTURE.md
+A	tower-dsh/EVENT_CATALOG.json
+R099	control-tower/DESIGN.md	tower-dsh/adr/ADR-0001-initial-design.md
+A	tower-dsh/adr/ADR-TEMPLATE.md
+A	tower-dsh/arch/GATES.json
+A	tower-dsh/arch/INVARIANTS.json
+A	tower-dsh/tools/tests/test_arch.py
+M	tower-dsh/tools/towerctl.py
+
+$ git diff --name-only --no-renames main..HEAD
+control-tower/DESIGN.md
+tower-dsh/ARCHITECTURE.md
+tower-dsh/EVENT_CATALOG.json
+tower-dsh/adr/ADR-0001-initial-design.md
+tower-dsh/adr/ADR-TEMPLATE.md
+tower-dsh/arch/GATES.json
+tower-dsh/arch/INVARIANTS.json
+tower-dsh/tools/tests/test_arch.py
+tower-dsh/tools/towerctl.py
+
+$ git diff --stat main..HEAD
+ tower-dsh/ARCHITECTURE.md                          | 140 +++++
+ tower-dsh/EVENT_CATALOG.json                       | 487 +++++++++++++++++
+ .../adr/ADR-0001-initial-design.md                 |  13 +
+ tower-dsh/adr/ADR-TEMPLATE.md                      |  48 ++
+ tower-dsh/arch/GATES.json                          | 110 ++++
+ tower-dsh/arch/INVARIANTS.json                     | 133 +++++
+ tower-dsh/tools/tests/test_arch.py                 | 270 ++++++++++
+ tower-dsh/tools/towerctl.py                        | 592 ++++++++++++++++++++-
+ 8 files changed, 1791 insertions(+), 2 deletions(-)
+
+$ git diff --no-renames main..HEAD
+diff --git a/control-tower/DESIGN.md b/control-tower/DESIGN.md
+deleted file mode 100644
+index 0c5bca5..0000000
+--- a/control-tower/DESIGN.md
++++ /dev/null
+@@ -1,686 +0,0 @@
+-# Tower/DSH — 控制塔重构设计 v0.3
+-
+-> 状态：设计提案 v0.3，待 owner 拍板后进入实现。
+-> v0.2 变更：**双塔分离**、**文件化控制面**、**接线门**、**project-handoff v2.1**、**9 塔审计**。
+-> v0.3 变更：补上“站在所有 coding agent 之上的 control plane”定位、Boomi/Warp/MAQA 分工，
+-> 并把**首版范围收窄为 Core + Skill + Reviewer 门 + worktree 隔离**。
+-> 目标：不是复刻某一座现有塔，而是把它们的治理内核抽成一套
+-> DSH 原生、可实例化、可检查、可审计、可交接的控制塔。
+->
+-> **代号：应县木塔 / Yingxian** —— 命名与构件隐喻见 [`NAMING.md`](NAMING.md)。
+-
+----
+-
+-## 0. 一句话
+-
+-把现有 9 座塔的共性抽成 **Tower Core + Tower Preset + Tower Skill + Tower Console + Tower Instance** 五件套；
+-每个实例内固定 **主控制塔（Primary）+ 监督控制塔（Supervision）** 双塔：
+-主塔把目标变成任务和交付，监督塔独立验收、串行合并、合并后验证。
+-**没有 `.ct` 运行时也能跑**——文件化控制面是默认形态。
+-
+----
+-
+-## 0.1 定位：站在所有 coding agent 之上的 control plane
+-
+-Tower/DSH 不训练更强的模型，也不做另一个 orchestrator。它站在 Claude Code、Codex、Cursor、Warp、Jules 等所有 coding agent 之上，负责五件事：
+-
+-- **spec**：把意图变成可验收的规格、任务卡、验收条款；
+-- **routing**：选专业 owner、协作模式、模型/推理档；
+-- **gates**：四闸 + 阶段门 + PR/合并门；
+-- **evidence**：证据、哈希、版本、回执、账本；
+-- **handoff**：project-handoff v2.1 的交接与接续。
+-
+-执行交给 `subagents` / cloud agents。Tower/DSH 不追求自己变强，而追求**让整支 agent 队伍的输出可信**。
+-
+-## 0.2 与业界的分工
+-
+-| 层 | 代表 | 强项 | 不覆盖 | Tower/DSH 的关系 |
+-|---|---|---|---|---|
+-| 企业 agent 治理 | Boomi Agent Control Tower / Agent Control Plane | agent 资产、身份、策略、可观测、agent sprawl | 编码工作流、PR/合并、spec/证据 | 借治理语义，不替代 |
+-| 编码编排 | Warp Factories、MAQA、Claude Code Agent Teams | 多 agent、worktree、任务队列、QA gate | owner 四闸、证据账本、交接状态机 | 站在它们之上，补治理层 |
+-| 规格驱动 | GitHub Spec Kit | Specify → Plan → Tasks → Implement → Converge | 运行时门禁、合并、证据审计 | 作为输入契约 |
+-| 单 agent 执行 | Claude Code、Codex、Cursor、Jules | 代码生成、工具、上下文 | 跨 agent 治理、owner 闸 | 把执行交给它们 |
+-| **Tower/DSH** | 本项目 | spec/routing/gates/evidence/handoff + 双塔 | 不训练模型、不做执行 | **control plane** |
+-
+-一句话：**Boomi 管“企业里有哪些 agent”，Warp/MAQA 管“编码 agent 怎么并行干活”，Tower/DSH 管“这些 agent 的输出能不能被 owner 相信”。**
+-
+----
+-
+-## 1. 从现有塔里提炼出的设计理念
+-
+-v0.1 的 12 条仍然成立，v0.2 补 4 条：
+-
+-1. **控制塔是治理角色，不是执行者。** 它负责路由、核验、收口、晋级；专项工作交给专项会话。
+-2. **Owner 主权。** 四个闸永远归 owner：merge / 真实外部调用 / 部署与生产数据 / L0 文档写 main。
+-3. **真值层级。** owner 决定 > 项目宪法 > 已批准规格 > 原始证据 > 聊天与推断。
+-4. **单一写者 + 执行路由。** 同一时刻只有一个控制塔写治理状态；不该它做的事不因为工具在手就自己做。
+-5. **证据优先于声明。** 文件存在、脚本通过、实际执行、独立接收、真实业务验收是五个不同层级。
+-6. **失败闭合。** 先命名失败类型，再选一个处置：下一动作 / 显式门槛 / 补证 / 熔断；不无限重试。
+-7. **连续性。** 启动读序、CURRENT、交接包、恢复说明是塔的一部分，不靠聊天记忆。
+-8. **最小状态复制。** 一份账本 + 投影；引用原始证据，不复制业务总账。
+-9. **收口契约。** 每个任务记录范围、证据、验证、变更、副作用、失败、门变化、下一步。
+-10. **显式授权。** advisory / read_only / workspace_write / runtime_mutation / production_enforcement 五级，不能从角色描述自动扩张。
+-11. **可审计。** 哈希、版本、回执、时间、执行者，缺一不可。
+-12. **自动化最后。** 手动流程跑稳、完成规定周期后，才允许上心跳/调度。
+-
+-v0.2 新增：
+-
+-13. **职责分离。** 作者 ≠ 独立验收者 ≠ 合并批准者；同一个人格不能同时持有“提交”和“合并”权限。
+-14. **自动权限上限。** 工程 PR 轨可以给常备授权；生产轨默认无权限，必须逐次 owner 决定。
+-15. **诚实能力缺口。** 同 GitHub 身份、无服务端分支保护、无密码学身份等缺口要写明补偿控制，不假装已解决。
+-16. **接线门。** 塔必须被 `AGENTS.md` / `README.md` / `START-HERE.md` 引用；否则视为“孤儿基建”，不算塔。
+-
+----
+-
+-## 2. 现有实现的取舍
+-
+-| 来源 | 保留 | 不搬 |
+-|---|---|---|
+-| **BI CODE UP 03/04 双塔** | 双塔职责分离、`PROJECT_PROFILE`、`AUTHORITY_MODEL`、PR 状态机、串行合并队列、两提交合并信封、合并后验证、机制改进注册表、上下文轮换注册表 | BI 业务事实、仓库清单、G2–G7 具体内容 |
+-| **CT-HOME / `.ct` 运行时** | identity、registration anchor、checkpoints、ledger、tasks/returns、profile、forbiddenActions、hostPlanes | 版本化 bootstrap runtime 的全部实现细节；不要求每座塔都装 `.ct` |
+-| **project-handoff v2.1** | 交出塔台写包、整包重生成、真相源指针化、§0/§0a 实值、七节正文、交出自查、接收首验、断路器 | 各项目专册的具体命令/路径/口令 |
+-| **GameShield 主塔** | 四闸、权限分级、`tower_gate.py` 的 ready/deliver/accept/close、模板化任务卡/交付/评审/收口 | 39KB 的 GameShield 业务宪法、GameShield 专属任务状态 |
+-| **智能客服控制塔** | 单一 owner、`CURRENT.json`、启动读序、独立入口、`startup_check` 只读核验 | `create_thread` / `wait_threads` / `list_projects` 这类 Kimi 桌面线程 API |
+-| **SeeMake Governance Tower** | 两轴路由（专业 owner + 协作模式）、owner-decision 独立闸、promotion rule、pending work register | 具体 workstream 注册表、Feishu/PM Agent 写入链 |
+-| **SeeMake-K3** | `tower-exam` / `tower-clerical` 的角色区分：只读自证 vs 文书候选；K3 单执行器治理层 | Codex 多会话线程机制 |
+-| **BI-CLEAN-REBUILD（反例）** | 业务定义、项目简报、施工/交接文档、检查点 | **只做文档、不做状态/身份/验证/交接/双塔**；7 份文件未接线，不构成可运行控制塔 |
+-
+-**结论：** 保留“治理语义”，用 DSH 的 session / subagent / skill / plugin 重新实现；
+-`.ct` 是可选运行时，不是控制塔的前提。
+-
+----
+-
+-## 3. 新架构总览
+-
+-```
+-┌──────────────────────────────────────────────────────────────┐
+-│  Tower Console（DSH 客户端插件）                               │
+-│  只读：双塔状态 / 四闸 / 合并队列 / 任务 / 阻塞 / 下一步        │
+-├──────────────────────────────────────────────────────────────┤
+-│  Tower Presets（DSH agent presets）                            │
+-│  tower-primary：拆解、派发、PR、提交合并信封，无 merge 权       │
+-│  tower-supervisor：独立验收、串行合并、合并后验证，无实现权      │
+-│  Tower Skill：启动读序、任务卡、核验、收口、交接 v2.1           │
+-├──────────────────────────────────────────────────────────────┤
+-│  Tower Core（协议层，项目无关）                                │
+-│  schema / 事件账本 / 双塔门禁 / towerctl / 模板 / 接线检查      │
+-├──────────────────────────────────────────────────────────────┤
+-│  Tower Instance（项目实例）                                    │
+-│  tower/shared + tower/primary + tower/supervision              │
+-└──────────────────────────────────────────────────────────────┘
+-```
+-
+-### 3.1 五件套
+-
+-1. **Tower Core** — 项目无关的协议：状态 schema、事件类型、双塔门禁、`towerctl`、模板。
+-2. **Tower Preset** — 两个 DSH agent preset：`tower-primary`、`tower-supervisor`。
+-3. **Tower Skill** — 模型可加载的操作手册：启动、路由、派发、核验、收口、交接 v2.1。
+-4. **Tower Console** — 只读状态面板；不写状态，避免第二写者。
+-5. **Tower Instance** — 每个项目一份 `tower/` 目录，绑定项目宪法、owner、四闸、路径和证据根。
+-
+-### 3.2 双塔模型
+-
+-| 角色 | 谁 | 拥有 | 禁止 |
+-|---|---|---|---|
+-| **Owner** | 人 | 四闸、生产读写、外部调用、部署/切流、数据迁移、退役、终局合同变更 | 不代替主塔做日常路由 |
+-| **Primary Control Tower** | `tower-primary` 会话 | 目标拆解、任务卡、职责窗口、分支/worktree、commit/push、PR 创建与修正、提交合并信封 | 实际 merge、以自查代替独立验收、改监督塔的合并决定/队列 |
+-| **Supervision Control Tower** | `tower-supervisor` 会话 | 独立验收、串行合并队列、实际 merge、合并后验证、纠正单、机制审计 | 改候选 PR 实现、批准自己的实现、跳过必需证据 |
+-| **Executor** | 子 agent / 专项会话 | 在任务卡范围内实施、交付证据 | 改治理状态、merge、晋级 |
+-| **Reviewer** | 独立子 agent / 独立会话 | 亲查证据、独立复算、出评审结论 | 与执行者同一上下文，不以作者自查代替 |
+-
+-**职责分离不变量：**
+-
+-- `pr_author_must_not_be_merge_approver`
+-- `merge_must_follow_dependency_order`
+-- `merge_requires_machine_valid_merge_envelope`
+-- `merge_requires_independent_checkback`
+-- `merged_is_not_complete_until_post_merge_verified`
+-- `repository_authority_does_not_imply_production_authority`
+-
+-**自动权限上限（来自 BI CODE UP）：**
+-
+-| 轨道 | 风险 | 常备授权 |
+-|---|---|---|
+-| 工程 PR 轨 | 可逆的新仓工程 | 主塔可走完整日常 PR 生命周期，**但不含 merge** |
+-| 生产轨 | 真实系统影响 | **none**；逐次 owner 决定 + 独立证据门 |
+-
+-> `global_pause_authority` 只归 owner，入口是监督塔；主塔不能全局暂停，也不能把局部等待升级为全局阻塞。
+-
+-### 3.3 文件化控制面优先
+-
+-`.ct` 运行时不是必需。默认采用 **file-backed control plane**：
+-
+-```text
+-shared/PROJECT_PROFILE.yaml      # 项目、根目录、权限上限、轨
+-shared/AUTHORITY_MODEL.yaml      # 双塔角色、owner 保留、分离不变量
+-shared/TARGET.md                 # 不可被局部里程碑替代的终局
+-primary/CURRENT_STATE.yaml       # 当前门、下一动作、局部等待
+-primary/TASK_BOARD.yaml          # 任务卡与状态
+-primary/registries/              # gate / evidence / decision / routing / queue
+-primary/work-packages/           # 工作包
+-supervision/CURRENT_STATE.yaml   # 监督塔状态
+-supervision/MERGE_QUEUE.yaml     # 唯一串行合并队列
+-supervision/registries/merge-ledger.yaml
+-supervision/outbox/corrections/  # 纠正单
+-tools/towerctl.py                # 机器检查
+-```
+-
+-原则：
+-
+-- 文件是权威，聊天/窗口状态不是；
+-- 每个塔只写自己的目录；
+-- `shared/` 由 owner 控制，主塔提案、监督塔复核；
+-- `.ct` 可选：需要 identity/checkpoint/ledger 的运行时时再挂，不因缺 `.ct` 退化成纯文档塔。
+-
+-### 3.4 接线门（v0.2 新增）
+-
+-一座塔如果没有被入口引用，就是**孤儿基建**。强制：
+-
+-- `AGENTS.md` 必须包含 `TOWER.md` 指针；
+-- `README.md` 或 `START-HERE.md` 必须说明启动读序；
+-- `towerctl wiring check` 验证：
+-  - `TOWER.md` 存在；
+-  - `AGENTS.md` 含 `tower/TOWER.md`；
+-  - `START-HERE.md` 含 `CURRENT_STATE` 路径；
+-  - `shared/PROJECT_PROFILE.yaml` 指向正确的 `workspace_root`；
+-  - 新增的塔文件不是“只被自己引用”。
+-
+-未通过接线门 → 状态 `ORPHANED`，不计入“已建成塔”。
+-
+-### 3.5 交接 v2.1（project-handoff）
+-
+-采用 `project-handoff` 技能的 v2.1 机制，不自造一套：
+-
+-- **三原则**：交出塔台写包 / 整包重生成 / 真相源指针化。
+-- **包结构**：§0 实值 + §0a 漂移警示 + 七节正文 + 交出自查 + 校验。
+-- **交出**：实值复核 → 整包重生成 → 装配路径 → 流水收官条 → 高危零半截自查。
+-- **接续**：读最新包 → 项目宪法 → 真相源/流水尾部 → 在途锚点；**只读自检** → 报一句结果 + 在途清单 → 停，等 owner 口令。
+-- **纪律**：只读自检、凭据零回显、不认预填结论、四闸归 owner、断路器、诚实账。
+-- **DSH 适配**：把 Kimi 的窗口交接映射为 `towerctl handoff` + `claim` 两阶段；`project-handoff` 的 6 本专册作为只读参考，不整包复制业务。
+-
+-> 现有 `project-handoff/references/` 实际有 6 本：`gameradar`、`gameshield`、`game-cs`、`seemake-k3`、`ci-self-hosted-runner`、`infra`；不是 4 本。
+-
+----
+-
+-## 4. 状态模型
+-
+-### 4.1 目录
+-
+-```text
+-tower/
+-├─ TOWER.md                     # 实例身份 + 接线入口
+-├─ AGENTS.md                    # 项目宪法（必须指向 TOWER.md）
+-├─ START-HERE.md                # 启动读序
+-├─ shared/
+-│  ├─ PROJECT_PROFILE.yaml      # 项目/根/权限上限/轨
+-│  ├─ AUTHORITY_MODEL.yaml      # 双塔角色/owner 保留/分离不变量
+-│  ├─ TARGET.md                 # 终局目标
+-│  └─ PROJECT-MAP.md            # 仓库/环境/真值入口
+-├─ primary/
+-│  ├─ CURRENT_STATE.yaml
+-│  ├─ TASK_BOARD.yaml
+-│  ├─ WORK_PACKAGES/
+-│  ├─ decisions/
+-│  ├─ registries/
+-│  │  ├─ gate-registry.yaml
+-│  │  ├─ evidence-registry.yaml
+-│  │  ├─ evidence-acceptance-registry.yaml
+-│  │  ├─ decision-registry.yaml
+-│  │  ├─ model-routing-registry.yaml
+-│  │  └─ work-package-orchestration.yaml
+-│  ├─ handoffs/                 # 交给监督塔的合并信封
+-│  └─ evidence/
+-├─ supervision/
+-│  ├─ CURRENT_STATE.yaml
+-│  ├─ MERGE_QUEUE.yaml
+-│  ├─ TASK_BOARD.yaml
+-│  ├─ reviews/
+-│  ├─ outbox/corrections/
+-│  └─ registries/
+-│     ├─ merge-ledger.yaml
+-│     ├─ mechanism-improvement-register.yaml
+-│     └─ context-rotation-register.yaml
+-├─ ledger/
+-│  ├─ primary.jsonl
+-│  └─ supervision.jsonl
+-├─ receipts/
+-├─ handoffs/
+-└─ tools/
+-   ├─ towerctl.py
+-   └─ templates/
+-```
+-
+-### 4.2 `PROJECT_PROFILE.yaml`
+-
+-```yaml
+-schema_version: '0.1'
+-project_id: 'TOWER-DSH'
+-project_name: 'DeepSeek Harness Control Tower'
+-control_tower_version: '0.2'
+-operating_mode: 'goal_mode_control_tower'
+-control_tower_execution_policy: 'dispatch_only_no_direct_domain_execution'
+-workspace_root: 'C:/Users/mac/Documents/deepseek-harness/default-workspace'
+-automatic_authority_ceiling:
+-  engineering_pr_track: 'full_daily_PR_lifecycle_except_merge'
+-  production_track: 'no_access'
+-current_gate: 'G0'
+-global_pause_authority: 'human_owner_via_supervising_control_tower_only'
+-```
+-
+-### 4.3 `AUTHORITY_MODEL.yaml`
+-
+-```yaml
+-schema_version: '0.1'
+-authorization_id: 'TOWER-DSH-AUTH-001'
+-authorized_by: 'human_owner'
+-operating_model: 'dual_tower_separation_of_duties'
+-roles:
+-  primary_control_tower:
+-    owns: [goal_decomposition, task_cards, branch_and_worktree, commit_and_push,
+-           pr_create_and_update, merge_envelope_submission]
+-    forbidden: [merge_pull_request, substitute_self_review,
+-                rewrite_supervisor_decision]
+-  supervising_control_tower:
+-    owns: [independent_acceptance, serial_merge_queue, actual_merge,
+-           post_merge_validation, correction_return, mechanism_audit]
+-    forbidden: [edit_candidate_implementation, approve_own_implementation,
+-                bypass_required_evidence]
+-  human_owner:
+-    reserves: [production_read_write, real_external_call, deployment_and_traffic,
+-               data_migration, legacy_retirement, terminal_contract_change]
+-separation_invariants:
+-  - 'pr_author_must_not_be_merge_approver'
+-  - 'merge_must_follow_dependency_order'
+-  - 'merge_requires_machine_valid_merge_envelope'
+-  - 'merge_requires_independent_checkback'
+-  - 'merged_is_not_complete_until_post_merge_verified'
+-  - 'repository_authority_does_not_imply_production_authority'
+-```
+-
+-### 4.4 `CURRENT_STATE.yaml`（主塔/监督塔各一份）
+-
+-```yaml
+-schema_version: '0.1'
+-goal_status: 'ACTIVE_WITH_LOCAL_WAITS'
+-current_gate: 'G2'
+-runtime_truth: 'unverified'
+-next_actions:
+-  - '……'
+-local_waits:
+-  - wait_id: '……'
+-    failure_class: 'data_gap'
+-    disposition: 'next_action'
+-    global_effect: 'none'
+-forbidden_progress_claims:
+-  - 'merged_pull_request_equals_terminal_completion'
+-  - 'source_evidence_equals_runtime_truth'
+-```
+-
+-### 4.5 `MERGE_QUEUE.yaml`（只有监督塔写）
+-
+-```yaml
+-schema_version: '0.1'
+-entries:
+-  - envelope_id: 'ME-001'
+-    pr: 42
+-    base: 'main'
+-    head: 'feature/x'
+-    dependency: null
+-    status: 'WAITING'   # WAITING | CHECKING | MERGE_APPROVED | MERGING | MERGED | CORRECTION_REQUIRED
+-    implementation_head_sha: 'A'
+-    envelope_head_sha: 'B'
+-    merged_sha: null
+-```
+-
+-### 4.6 `ledger/*.jsonl`
+-
+-每个塔一份追加式账本：
+-
+-```json
+-{"seq":1,"at":"…","type":"DECISION","actor":"owner","payload":{"id":"D-001"}}
+-{"seq":2,"at":"…","type":"DISPATCH","actor":"primary","payload":{"task":"T-001"}}
+-{"seq":3,"at":"…","type":"RETURN","actor":"executor","payload":{"task":"T-001"}}
+-{"seq":4,"at":"…","type":"CHECKBACK","actor":"supervisor","payload":{"task":"T-001"}}
+-{"seq":5,"at":"…","type":"MERGE","actor":"supervisor","payload":{"envelope":"ME-001"}}
+-{"seq":6,"at":"…","type":"POST_MERGE_VERIFY","actor":"supervisor","payload":{"result":"PASS"}}
+-```
+-
+-投影（`CURRENT_STATE`、`TASK_BOARD`、`MERGE_QUEUE`）必须能由账本 + 任务文件重放得到。
+-
+----
+-
+-## 5. 生命周期与门禁
+-
+-### 5.1 任务生命周期
+-
+-```text
+-INTAKE → ROUTE → READY → DISPATCHED → RETURNED → CHECKBACK
+-      → ACCEPT / REWORK → CLOSEOUT → HANDOFF
+-```
+-
+-| 阶段 | 必须有什么 | 检查 |
+-|---|---|---|
+-| INTAKE | 目标、对象、owner、真值入口 | `check --phase intake` |
+-| ROUTE | 专业 owner、协作模式、权限等级、owner-decision | `check --phase route` |
+-| READY | 任务卡、范围、允许/禁止、依赖、验收、回执格式 | `check --phase ready` |
+-| DISPATCHED | 派发记录、执行者、模型/推理档、任务卡哈希 | `check --phase dispatch` |
+-| RETURNED | 交付封面、逐条证据、实际检查值、失败分类 | `check --phase deliver` |
+-| CHECKBACK | 独立评审、证据绑定、无作者自查代替 | `check --phase review` |
+-| ACCEPT | owner/授权人决定、证据版本有效、无越界 | `check --phase accept` |
+-| CLOSEOUT | 范围、证据、副作用、门变化、下一动作 | `check --phase close` |
+-| HANDOFF | v2.1 包、§0/§0a、自查、包哈希、接收方 claim | `check --phase handoff` |
+-
+-### 5.2 PR / 交付状态机
+-
+-代码仓使用 PR 状态机（来自 BI CODE UP）：
+-
+-```text
+-DRAFT
+-  → READY_FOR_SUPERVISOR
+-  → INDEPENDENT_CHECKBACK
+-  → CORRECTION_REQUIRED | MERGE_APPROVED
+-  → MERGED
+-  → POST_MERGE_VERIFIED
+-```
+-
+-非 Git 交付使用等价状态机：
+-
+-```text
+-DRAFT → DELIVERED → INDEPENDENT_CHECKBACK
+-      → REWORK | ACCEPTED → POST_ACCEPT_VERIFIED
+-```
+-
+-规则：
+-
+-- `CORRECTION_REQUIRED` 必须命名具体失败模式、限界处置、可执行验收命令；
+-- 修正留在同一 PR，除非原范围失效；重开 PR 必须链接旧 PR 和关闭理由；
+-- `MERGED` / `ACCEPTED` 不是完成态，只有目标分支/目标环境验证通过才是 `POST_MERGE_VERIFIED` / `POST_ACCEPT_VERIFIED`。
+-
+-### 5.3 串行合并队列
+-
+-- 监督塔独占写 `MERGE_QUEUE.yaml`；
+-- 同一时刻只允许一个 `MERGING`；
+-- 顺序：依赖 → 兼容性/风险 → 到达时间（最后才用）；
+-- 基础提交漂移时必须重新验收，不允许沿用旧批准；
+-- 禁止“带病合并”；任一门失败 → 纠正单或熔断。
+-
+-### 5.4 两提交合并信封
+-
+-候选 PR 最后两步固定：
+-
+-1. 主塔形成实现提交 `A`；
+-2. 主塔形成只改合并信封的提交 `B`。
+-
+-信封记录 `implementation_head_sha=A`，不记录包含自身的 `B`。
+-监督塔用 GitHub CLI 独立读取当前 head `B`，证明 `B` 的父提交是 `A`、`B` 只修改信封路径；合并回执记录 `A`、`B`、最终 merge commit。
+-
+-任何纠正都会使旧批准失效；主塔必须产生新的 `A` 和新的 `B`，监督塔重新读取 head 并复核。
+-
+-### 5.5 四闸与自动权限上限
+-
+-四闸（永远独立于阶段门）：
+-
+-- `merge`
+-- `external_call`
+-- `deploy_prod`
+-- `l0_main`（AGENTS/治理主干写入）
+-
+-阶段门通过 **不等于** 四闸通过。四闸必须逐次 owner 决定，记录到 `DECISIONS.md`/`decision-registry` 和 ledger。
+-
+-自动权限上限：
+-
+-- 工程 PR 轨：主塔可走完整日常 PR 生命周期，**不含 merge**；
+-- 生产轨：`no_access`；生产读取、外部真实调用、部署、切流、数据迁移、退役都必须单独授权 + 证据门；
+-- 两条轨不能通过文件命名、脚本包装或 PR 合并相互隐式授权。
+-
+-### 5.6 权限等级
+-
+-| 等级 | 允许 | 典型 |
+-|---|---|---|
+-| `advisory` | 分析、建议、解释 | 研究、诊断 |
+-| `read_only` | 只读发现、核验、复算 | 独立评审、监督塔检查 |
+-| `workspace_write` | 任务卡允许的工作区写入 | 实施 |
+-| `runtime_mutation` | 启动服务、改远端配置、生产准备 | 需明确授权 |
+-| `production_enforcement` | 真实处罚、封禁、生产数据动作 | 逐次 owner 精确批准 |
+-
+-### 5.7 Promotion rule
+-
+-专项会话的产出默认只是 **evidence**，不是项目真值。晋级前检查：
+-
+-- 范围是否完成、改动是否匹配授权；
+-- 验证是否实跑，失败是否分类；
+-- 是否含秘密/原始隐私/凭据；
+-- L2/L3 假设是否已记成 gate 或 owner decision；
+-- 证据身份、版本、哈希是否匹配；
+-- 晋级子集、目标路径、证据处置是否明确；
+-- 是否经过独立 checkback；
+-- `MERGED` 是否已 `POST_MERGE_VERIFIED`。
+-
+----
+-
+-## 6. DSH 映射
+-
+-| 塔概念 | DSH 机制 | 说明 |
+-|---|---|---|
+-| Primary 会话 | 运行 `tower-primary` preset 的 DSH session | 用户在创建会话时选 preset |
+-| Supervision 会话 | 运行 `tower-supervisor` preset 的独立 session | 不与主塔同一会话/同一上下文 |
+-| 控制塔手册 | `~/.agents/skills/control-tower/SKILL.md` | 与现有 arkcli 技能同一发现机制 |
+-| Executor | `subagent`（spawn）或用户专项会话 | 任务卡 + 明确禁止项 |
+-| Reviewer | `subagent`（fresh context）或独立会话 | 必须亲跑证据，不能只看执行者摘要 |
+-| Owner 决定 | `ask_user_question` + `DECISIONS.md`/`decision-registry` + ledger | 结构化选项，不靠聊天“同意” |
+-| Checkback | `send_message` / `list_agents` / `job_output` + 证据文件 | 不看“已完成”字样，看原始输出 |
+-| 长任务 | `create_goal` + `schedule_create` + `job_*` | 只做提醒/状态，不自动晋级 |
+-| 交付物 | `present` | 文件卡片 |
+-| 状态面板 | DSH 客户端插件页面 | 只读 `CURRENT_STATE`/`TASK_BOARD`/`MERGE_QUEUE` |
+-| 检查器 | `python towerctl.py …` | 本地 Python，JSON 输出，0/2 退出码 |
+-| 权限 | DSH permission preset + skill 内四闸 | 主塔 `workspace_write`，监督塔 `read_only`（merge 由受控命令执行） |
+-| 合并 | 监督塔专用命令/服务 | 主塔 preset 不暴露 merge 工具 |
+-
+-### 会话身份（DSH 的限制与补法）
+-
+-DSH 没有 Kimi 的 `create_thread` / `wait_threads`。因此：
+-
+-- 主塔启动时生成 `primary.id = ctl-<uuid>`，写入 `primary/CURRENT_STATE.yaml`；
+-- 监督塔启动时生成 `supervisor.id = sup-<uuid>`，写入 `supervision/CURRENT_STATE.yaml`；
+-- owner 在两个会话里分别确认一次“本会话是 primary/supervisor”；
+-- 交接采用两阶段：
+-  1. 旧塔写 `handoffs/<id>/`，`status = PREPARED`；
+-  2. 新会话运行 `towerctl claim --package <id>`，写 `CLAIM.json`，`status = READY_FOR_RECEIVER`；
+-  3. 旧塔核 claim 的 `id`、包哈希、包摘要，写 `ACCEPTED` 后停写；
+-  4. 新塔读 `CURRENT_STATE`，写启动回执。
+-- 这是**程序性锁**，不是密码学身份；真正的保证来自 owner 在场确认 + 回执 + 证据 + 独立监督。
+-
+-### 与 Kimi 的差异
+-
+-- 不复制 `create_thread` / `wait_threads` / `list_projects`；
+-- 不把“窗口存在/空闲”当权威；
+-- 不依赖桌面应用 UI 状态；
+-- 不复制项目专属业务规则，只保留可迁移的治理协议。
+-
+----
+-
+-## 7. 检查器 `towerctl.py`
+-
+-一个入口，子命令，机器可读：
+-
+-```bash
+-python towerctl.py init      --root tower --tower-id tower-dsh
+-python towerctl.py wiring    --root tower
+-python towerctl.py startup   --root tower --role primary|supervision
+-python towerctl.py check     --root tower --task T-001 --phase ready
+-python towerctl.py hash      <path>
+-python towerctl.py dispatch  --root tower --task T-001 --executor <id> --model <model>
+-python towerctl.py deliver   --root tower --task T-001 --evidence E-001
+-python towerctl.py checkback --root tower --task T-001 --reviewer <id> --verdict PASS
+-python towerctl.py accept    --root tower --task T-001 --decision D-002
+-python towerctl.py close     --root tower --task T-001
+-python towerctl.py envelope  --root tower --pr 42 --implementation A --envelope B
+-python towerctl.py merge     --root tower --envelope ME-001
+-python towerctl.py post-merge --root tower --envelope ME-001 --result PASS
+-python towerctl.py handoff   --root tower --role primary --package <id>
+-python towerctl.py claim     --root tower --package <id> --controller ctl-<uuid>
+-python towerctl.py status    --root tower
+-```
+-
+-规则：
+-
+-- 只读优先；写操作只改自己拥有的状态文件，并追加 ledger；
+-- `wiring` 失败 → `ORPHANED`；
+-- `check` 输出 `{ok, errors[], warnings[], phase, task}`；
+-- 退出码 `0` 通过，`2` 不通过；
+-- 不执行任务正文、不跑网络、不读未引用文件；
+-- 失败时保留原始错误，不把“工具不可用”说成“检查通过”。
+-
+----
+-
+-## 8. 现有塔审计与迁移
+-
+-### 8.1 现有 9 座塔
+-
+-| # | 塔 | 根 | 形态 | 状态/缺口 |
+-|---|---|---|---|---|
+-| 1 | BI 主控制塔 | `D:\BI CODE UP\03-control-tower` | 文件化双塔 | G2，工程 PR 轨，无 merge 权 |
+-| 2 | BI 监督控制塔 | `D:\BI CODE UP\04-supervision-control-tower` | 文件化双塔 | 独立验收/串行合并，最成熟 |
+-| 3 | CT-REAL-BI-TAKEOVER-01 | `D:\CT-REAL-BI-TAKEOVER-01` | CT-HOME runtime | `.ct` 全，文档/交接薄 |
+-| 4 | CT-GAME-CREATIVE-OPS-01 | `D:\CT-GAME-CREATIVE-OPS-01` | CT-HOME runtime | `.ct` 全，业务资产多 |
+-| 5 | BI-CLEAN-REBUILD | `D:\BI-CLEAN-REBUILD` | 文档塔 | 7 文件就位，未运营 |
+-| 6 | GameShield 主塔 | `D:\game  os` | 混合 | 四闸+Codex 包+CS 子塔 |
+-| 7 | 智能客服控制塔 | `D:\game  os\work\智能客服控制塔` | 文件塔+skill | 交接 v2.1，强 |
+-| 8 | SeeMake Governance Tower | `D:\SeeMake` | 治理流程 | 旧塔/已改名废弃 |
+-| 9 | SeeMake-K3 塔台 | `D:\SeeMake-K3\_k3-ops` | K3 治理层 | 单执行器，无 5 文件标准 |
+-
+-不计入：`D:\CT-EP`（空）、`D:\BI CODE UP\03-control tower`（空格旧副本）、`D:\quant-K3`（无塔规则）。
+-
+-### 8.2 BI-CLEAN-REBUILD 的 9 个遗漏
+-
+-1. **来源漏了 BI CODE UP 双塔**：报告没有引用 `03/04`，这是最成熟的 BI 控制塔。
+-2. **形态选错**：因 `.ct` 未安装退成纯文档塔；但 BI CODE UP 证明无 `.ct` 也能跑文件化双塔。
+-3. **状态层缺失**：无 `CURRENT_STATE`/`TASK_BOARD`/`EVIDENCE`/`DECISIONS`/`RECOVERY`/`START-HERE`；只有 46KB 检查点。
+-4. **身份/权限层缺失**：无 `PROJECT_PROFILE`/`AUTHORITY_MODEL`/controller identity/`profile.json`。
+-5. **验证层缺失**：无 `tower_gate.py`/`validate-control-tower.py`/`startup_check.py`；只有语法检查。
+-6. **交接层只有草稿**：无 v2.1 模板、§0 锚点、交接包、接收自查；专册未落位。
+-7. **没有双塔监督**：无双塔、合并队列、合并账本、post-merge verification；作者=验收者风险。
+-8. **接线缺失**：`AGENTS.md`/`README.md`/`MAINLINE_CHECKPOINT.md` 都没引用新增 7 文件；grep 只在新文件自身命中。
+-9. **seed 只有合同，没有资产**：`seed/` 只有 README + schema，没有实际证据清单/样本/冻结 manifest。
+-
+-> 另：报告说 project-handoff “四本专册”，实际 `references/` 有 6 本（gameradar / gameshield / game-cs / seemake-k3 / ci-self-hosted-runner / infra）。
+-
+-### 8.3 其他塔的缺口
+-
+-- **CT runtime 双塔**：`.ct` 的 identity/registration/checkpoint 齐全；缺 `MAINLINE_CHECKPOINT.md`、`docs/handoff` 专册、project-handoff v2.1；状态是 `.ct` 内部格式，人读入口弱。
+-- **BI CODE UP 双塔**：治理最成熟；但没有全局 `AGENTS.md`/`README` 入口，也没有 CT-HOME 注册；状态是文件化，不是 `.ct`。
+-- **GameShield**：四闸、Codex 规范包、客服子塔很强；但没有统一 5 文件业务定义/项目简报，状态分散在 `operator_workspace`、`ai-game-ops`、`work/智能客服控制塔`。
+-- **SeeMake**：只有 governance workflow；无状态/证据/交接层；已改名“废弃seem”。
+-- **SeeMake-K3**：`_k3-ops` + workflows 完整；无 5 文件标准；交接走 `_k3-ops` 模板，不走 `project-handoff`。
+-- **CT-EP**：空壳，0 文件。
+-
+-### 8.4 迁移策略
+-
+-1. **不整体复制**：现有塔继续在各自目录运行，作为只读参考。
+-2. **抽协议，不抽业务**：只迁四闸、权限、双塔、任务卡、证据、交接、收口。
+-3. **文件化优先**：先建 `tower/shared + primary + supervision` 文件骨架；`.ct` 只在需要 identity/checkpoint 时挂。
+-4. **新实例优先**：先建一个 greenfield 实例跑通，再把 BI CODE UP/GameShield 作为第二个实例接入。
+-5. **历史只引用**：旧塔的 `CURRENT/WORK` 不复制成新塔的总账，只记“来源 + 迁移决定”。
+-6. **双向不覆盖**：新塔不修改旧塔状态；旧塔的 owner 仍是旧塔的 owner。
+-
+----
+-
+-## 9. 分阶段落地
+-
+-| 阶段 | 交付 | 验收 |
+-|---|---|---|
+-| **0. 设计** | 本文档 v0.3 | owner 确认双塔、文件化、交接 v2.1、首版收窄、首实例 |
+-| **1. 首版（收窄）** | Core + Skill + Reviewer 门 + worktree 隔离：schema/ledger/templates、`tower-primary` preset、独立 reviewer、worktree 隔离、接线门、`towerctl` 基础 | 一个任务 `READY → DISPATCHED → RETURNED → REVIEW → ACCEPT`，reviewer 独立、worktree 隔离、接线门通过；**不含 merge/生产/双塔/Console** |
+-| **2. 双塔** | `tower-supervisor` preset、`MERGE_QUEUE`、PR 状态机、两提交信封、post-merge | 主塔不能 merge；监督塔能独立验收并合并；分离不变量检查通过 |
+-| **3. 交接 v2.1** | `project-handoff` 适配、§0/§0a、七节包、claim | 两个 DSH 会话完成一次完整交接 |
+-| **4. Console** | DSH 客户端插件只读面板 | 面板状态与文件一致，无写权限 |
+-| **5. 自动化** | `schedule`/`goal` 提醒 | 手动跑稳后才开，且只提醒不晋级 |
+-
+-### 9.1 首版范围（v0.3 收窄）
+-
+-**做：**
+-
+-- Tower Core：schema、ledger、模板、`towerctl init/wiring/startup/check/hash`
+-- Tower Skill：启动读序、路由、任务卡、reviewer 门
+-- `tower-primary` preset
+-- 独立 Reviewer（`subagent` fresh context，read-only）
+-- worktree 隔离（每个 executor 一个 worktree，one file one owner）
+-- 接线门（AGENTS/README/START-HERE → TOWER.md）
+-
+-**不做（留到后续阶段）：**
+-
+-- merge / 合并队列 / 两提交信封（Phase 2）
+-- 监督塔与双塔分离（Phase 2）
+-- 生产/外部调用/部署（四闸，永远 owner）
+-- Console（Phase 4）
+-- 自动化/心跳（Phase 5）
+-
+-**首版验收：**
+-
+-- 一个真实任务走完 `READY → DISPATCHED → RETURNED → REVIEW → ACCEPT`（不 merge）
+-- Reviewer 与 Executor 不同上下文，亲跑证据
+-- worktree 隔离，主工作树无脏写
+-- `towerctl wiring` 通过，没有孤儿文件
+-
+----
+-
+-## 10. 验收标准（v1）
+-
+-- **首版**：一个任务走完 `READY → DISPATCHED → RETURNED → REVIEW → ACCEPT`（不 merge），reviewer 独立、worktree 隔离、接线门通过；
+-- 接线门通过：`AGENTS.md`/`README.md`/`START-HERE.md` 都指向 `TOWER.md`；
+-- 一个任务能从 `INTAKE` 走到 `CLOSEOUT`，每个阶段 `check` 通过；
+-- 主塔不能 merge；监督塔能独立验收并合并；`pr_author != merge_approver` 检查通过；
+-- 两提交合并信封可被监督塔独立复算；`MERGED` 必须 `POST_MERGE_VERIFIED`；
+-- 账本能重放出 `CURRENT_STATE`/`TASK_BOARD`/`MERGE_QUEUE` 的当前值；
+-- 一次 project-handoff v2.1 交接完成，旧塔停写、新塔有启动回执；
+-- Console 只读，不能改状态；
+-- 所有四闸动作都有 `decision-registry` + ledger 记录；
+-- 没有“只被自己引用”的孤儿塔文件。
+-
+----
+-
+-## 11. 待 owner 拍板
+-
+-1. **首实例选哪个？**
+-   - A. `tower-dsh`：绿field，先跑通机制（推荐）
+-   - B. BI CODE UP：直接接最成熟的双塔，但业务包袱重
+-   - C. GameShield 主塔：四闸/Codex 包成熟
+-   - D. 智能客服控制塔：交接 v2.1 最完整
+-2. **第一版要不要 Console？**
+-   - A. 先 Skill + CLI，Console 放第四阶段（推荐）
+-   - B. 一开始就做只读 Console
+-3. **命名**：`Tower/DSH`、`DSH Tower`、`控制塔 v2`，选一个。
+-4. **主塔默认权限**：`workspace_write` 还是 `read_only`（治理只读，执行另开）？
+-5. **小任务是否保留 `tower-lite` 快路径**（不建完整任务卡，只记 ledger + 回执）？
+-6. **首版是否按 v0.3 收窄？**
+-   - A. 是：Core + Skill + Reviewer 门 + worktree 隔离，不做 merge/双塔/Console（推荐）
+-   - B. 否：首版就上双塔
+-7. **双塔 Phase 2 是否确认？** 推荐 Phase 2，但在任何 merge 之前必须完成。
+-8. **PR 状态机**：直接采用 BI CODE UP 的 `DRAFT → … → POST_MERGE_VERIFIED`，还是先做简化版？推荐直接采用。
+-
+----
+-
+-## 附录 A · 现有塔清单
+-
+-| # | 塔 | 根 | 形态 |
+-|---|---|---|---|
+-| 1 | BI 主控制塔 | `D:\BI CODE UP\03-control-tower` | 文件化主塔 |
+-| 2 | BI 监督控制塔 | `D:\BI CODE UP\04-supervision-control-tower` | 文件化监督塔 |
+-| 3 | CT-REAL-BI-TAKEOVER-01 | `D:\CT-REAL-BI-TAKEOVER-01` | CT-HOME runtime |
+-| 4 | CT-GAME-CREATIVE-OPS-01 | `D:\CT-GAME-CREATIVE-OPS-01` | CT-HOME runtime |
+-| 5 | BI-CLEAN-REBUILD | `D:\BI-CLEAN-REBUILD` | 文档塔 |
+-| 6 | GameShield 主塔 | `D:\game  os` | 混合 |
+-| 7 | 智能客服控制塔 | `D:\game  os\work\智能客服控制塔` | 文件塔 + skill |
+-| 8 | SeeMake Governance Tower | `D:\SeeMake` | 治理流程（旧） |
+-| 9 | SeeMake-K3 塔台 | `D:\SeeMake-K3\_k3-ops` | K3 治理层 |
+-
+-## 附录 B · 关键参考
+-
+-- BI 双塔：`D:\BI CODE UP\03-control-tower\README.md`、`04-supervision-control-tower\README.md`、`AUTHORITY_MODEL.yaml`、`SUPERVISION_PROTOCOL.md`
+-- CT 运行时：`D:\CT-HOME\profiles`、`D:\CT-REAL-BI-TAKEOVER-01\.ct`
+-- 交接 v2.1：`%APPDATA%\kimi-desktop\daimon-share\daimon\skills\project-handoff\SKILL.md` 及 `references/`
+-- BI-CLEAN 迁移报告：`D:\BI-CLEAN-REBUILD\governance\infra-migration-20261004\MIGRATION_REPORT.md`
+-
+----
+-
+-*本文是设计提案，不含实现代码。确认后从 Phase 1 开始落地。*
+diff --git a/tower-dsh/ARCHITECTURE.md b/tower-dsh/ARCHITECTURE.md
+new file mode 100644
+index 0000000..7849959
+--- /dev/null
++++ b/tower-dsh/ARCHITECTURE.md
+@@ -0,0 +1,140 @@
++---
++schema: tower/architecture@1
++id: ARCH-001
++version: 1
++updated: 2026-10-29
++review_by: 2026-12-31
++owner: mac
++---
++
++# ARCH-001 — tower-dsh 架构（一页活文档）
++
++> 这是 HOW 账：**当前结构是什么、为什么这么设计、以后怎么改**。
++> 机读部分：`arch/GATES.json`（门表）、`arch/INVARIANTS.json`（红线 probe）、
++> `EVENT_CATALOG.json`（事件目录）、`adr/`（关键决策）。
++> `towerctl arch-check` 把本文档说的与代码有的逐条对账；文档过期即 exit 2。
++
++## 1. 系统上下文
++
++**塔管什么**：把意图变成可验收的事实——spec、任务卡、路由、门禁、证据、
++账本、合并信封、交接。所有事实都落成文件，可 diff、可复算、可审计。
++
++**塔不管什么**：
++
++- 不执行任务：执行在 `pilot/worktrees/<ID>` 的隔离 worktree 里，由 executor 完成；
++- 不运行产品代码、不部署、不接生产、不读凭据、不联网（`merge --mode pr` 是唯一出网路径）；
++- 不代替 owner 决定四闸：merge / 外部调用 / 部署·生产数据 / L0 文档写 main。
++
++**边界**：单实例、单写者、串行合并。塔是控制面，不是 orchestrator，也不训练模型。
++
++## 2. 组件与职责
++
++| 组件 | 位置 | 职责 | 不碰 |
++|---|---|---|---|
++| Primary | `primary/` | spec、routing、任务卡、worktree、commit、信封、证据、closeout | merge、生产、外部调用 |
++| Supervision | `supervision/` | 独立验收、串行合并队列、实际 merge、post-merge 验证、纠正单 | 候选实现、自批 |
++| Ledger | `ledger/primary.jsonl` / `ledger/supervision.jsonl` | 只追加的权威事实链（seq + prev_hash + hash） | 手改 |
++| Tasks | `tasks/<ID>/{TASK.md,record.json,evidence/,DELIVERY.md,REVIEW.md}` | 任务卡与证据 | 绕过 `towerctl` 写 |
++| Pilot | `pilot/<ID>.spec.json` + `pilot/worktrees/<ID>/` | 冻结 spec、隔离执行区 | merge |
++| Tools | `tools/towerctl.py`、`tools/run_tests.py`、`tools/spec_lint.py`、`tools/spec_coverage.py` | 唯一状态/门禁 CLI 与静态检查 | 联网、写塔外路径 |
++| CI | `.github/workflows/tower-gate.yml` | 只读复跑 5 步：unit tests / spec-lint --strict / spec-coverage / verify-ledger / status；campaign-check/arch-check 于 049 接入、shape-check 于 051 接入，state-verify/authority-check 待 049 spec 冻结后明确 | 改状态、merge |
++| Docs | `ARCHITECTURE.md`、`arch/`、`adr/`、`EVENT_CATALOG.json` | WHY/HOW 的可证伪描述 | 冒充权威（代码与 ledger 才是） |
++
++## 3. 数据流
++
++```text
++spec (pilot/<ID>.spec.json)
++  → task-new       记录 TASK_NEW，冻结 spec_path + spec_sha256，状态 ready
++  → spec-approve   记录 SPEC_APPROVED（批准人 ≠ executor）
++  → check --phase spec / ready   记录 CHECK；spec_gate=PASS 才能 dispatch
++  → dispatch       记录 DISPATCH，锚定 dispatch.base_sha，状态 dispatched
++  → deliver        scope / base_sha / shape 三闸 → 复制证据 → 记录 DELIVER
++  → checkback      独立 reviewer，PASS → reviewed，FAIL → rework
++  → accept         reviewed → accepted（证据哈希复核）
++  → close          accepted → closed（CLOSEOUT 证据落盘）
++  → envelope-new   记录 ENVELOPE_NEW，DRAFT
++  → queue-add      记录 QUEUE_ADD，WAITING（两条 tests 基线）
++  → merge          记录 MERGE_START / MERGE（或 MERGE_BLOCKED / MERGE_FAILED）
++  → post-merge     独立复跑 → 记录 POST_MERGE_VERIFIED（或 POST_MERGE_FAILED）
++  → CI             当前只跑 5 步：unit tests / spec-lint --strict / spec-coverage /
++                   verify-ledger / status（GATE-CI）；campaign-check/arch-check 于 049
++                   接入，shape-check 于 051 接入，state-verify/authority-check 待 049
++                   spec 冻结后明确
++```
++
++每一步的输入/输出都是文件：ledger 事件是权威，record/board/queue/envelope 是
++工作副本，`state-verify` 用 ledger 重放并比对工作副本；不一致即 drift。
++
++## 4. 关键契约
++
++**事件**：`EVENT_CATALOG.json` 是唯一目录（29 条：primary 19 / supervision 10）。
++每条声明 `ledger`、`producer`（真实子命令）、`payload_required`、
++`state_verify`、`drift_kinds`、`note`。目录与代码**双向**对账（AST 扫描三个
++ledger writer 的字面 type）：代码有而目录无、目录有而代码无都 exit 2；
++`state-verify` 只重放目录中 `state_verify=true` 的
++生命周期事件（未知名默认被忽略——这是已知边界，不是许可）。
++
++**状态**：`primary/CURRENT_STATE.json`、`primary/TASK_BOARD.json`、
++`supervision/CURRENT_STATE.json`、`supervision/MERGE_QUEUE.json`、
++`supervision/envelopes/*.json`、`state/AUTHORITY.json`、`shared/AUTHORITY_POLICY.json`。
++状态文件只能由 `towerctl` 写；手改会被 `state-verify` / `authority-check` 报 drift。
++
++**命令**：`python tools/towerctl.py <cmd>` 是唯一入口；argparse 的子命令名是
++命令名的权威，`arch/GATES.json.gates[].command` 必须命中它。
++
++**证据**：所有完成声明必须有 sha256 证据（`tasks/<ID>/evidence/`）、ledger 事件
++与 `check_evidence` 复核；`MERGED` 不等于完成，只有 `POST_MERGE_VERIFIED` 是。
++
++**门表**：`arch/GATES.json`（15 道门，含 spec/ready/dispatch/deliver 三闸/review/
++accept/close/envelope/queue/merge-check/merge 前置/post-merge/CI）。每道门优先指向
++**拒绝路径**测试（负例）；`weak: true` 表示该门当前只有正例测试，只证“能过”、
++不证“会拒”。本卡 15 道门均为负例（或无 `weak` 字段）。
++**红线 probe**：`arch/INVARIANTS.json`（C-01..C-16，每条一个真实测试或真实命令）。
++**决策**：`adr/`（`tower/adr@1`，status ∈ proposed|accepted|superseded|archived）。
++
++## 5. 扩展点
++
++| 要加什么 | 步骤 | 影响面 |
++|---|---|---|
++| 门 | ① `towerctl` 里实现并在真实测试中覆盖；② `arch/GATES.json` 加一条 `{id,command,phase,test,blocks}`；③ 本节/§4 引用；④ `arch-check` 绿灯 | 门表、CI、reviewer 检查单 |
++| 命令 | ① 写 `cmd_*`（新 layer 函数，不改既有函数行数/分支）；② parser 注册 + `COMMAND_LAYER_HANDLERS`；③ 测试（正例 + 反例 exit 2 单 JSON）；④ 文档提及 | CLI 表面、shape 棘轮、GATES.command 集合 |
++| 事件 | ① `append_ledger` 用字面 type（或模块常量）；② **同卡**补 `EVENT_CATALOG.json`（producer 必须是真实命令）；③ 需要重放时补 `state-verify` 规则与 drift kind；④ 测试 | 目录双向一致、state-verify、审计 |
++| 字段 | ① 只追加、不改名（L1 兼容性）；② 先 ADR（`adr/ADR-00NN-*.md`）；③ schema 校验与迁移计划；④ 测试 | adapter/legacy 回退、arch-check、下游读取方 |
++
++原则：**文档不可证伪就不写**。任何“结构变了”都必须让 `arch-check` 或测试变红，
++否则视为文档谎言。
++
++## 6. 不变量
++
++红线条款见 `RED-LINES.md`（C-01..C-16），机读映射见 `arch/INVARIANTS.json`：
++
++- **owner-gate**（C-01/02/03/04/05/06/07/15/16）：执行点是 `merge`、
++  `dispatch`、`post-merge` 的授权/分支/现场校验；塔只记录决定，不代替 owner。
++- **tool-check**（C-09/11/14）：ledger 哈希链、`checkback` 拒绝自审、`dispatch`/`merge`/
++  `post-merge` 拒绝跳闸。
++- **review-check**（C-08/10/12/13）：`state-verify` 重放、`deliver` 范围门、完成声明必须
++  引用 ledger 事件与证据哈希；C-12（凭据零回显）由 review 执行，`merge` 只是最近的
++  出网执行点。
++
++> **C-12 / C-15 没有自动化 proof**：`arch/INVARIANTS.json` 里它们的 `probe` 只是
++> review/owner 的执行点，不是“已证明”的测试；`arch-check` 只验证该执行点存在。
++
++**已知边界（Known limits）**：
++
++1. **单文件**：`tools/towerctl.py` 7,981 行（约 8k；本卡 HEAD 实测）；模块化
++   （PILOT-051）之前，所有命令共享一个进程与一个 parser。
++2. **无密钥链**：owner 四闸依赖人工决定与记录，没有密码学签名；信任是 TOFU
++   （首次设置即信任，之后靠 revision 与事件复核）。
++3. **legacy 兼容**：无 `dispatch.base_sha` 的旧卡回退到 `merge-base main HEAD`；
++   无 baselines 的旧信封跳过部分门。
++4. **事件目录只覆盖字面量/模块常量**：`append_ledger`、`append_supervision_ledger` 与
++   低层 `_append_ledger_event_locked` 的字面 type 都会扫描（`COMPLETION_ADDED` 由低层
++   writer 写入，因此也在目录里）。**任何非字面量传 type（变量、f-string、字符串拼接）
++   都会逃逸**，`arch-check` 的 `counts.unresolved_event_calls` 只**计数不失败**
++   （051 候选：非零即 warning 或 exit 2）。新增非字面事件必须人工补目录，
++   否则 `state-verify` 默认放行。
++5. **arch-check 只证“引用存在”**：它证明门/ probe/事件有落点，不证明语义正确；
++   语义证据在 `tools/tests/*.py`。
++6. **单写者假设**：primary 与 supervision 串行；并行战役未实现（见 STRATEGY 非目标）。
++7. **归档正文不可改**：`adr/ADR-0001-initial-design.md` 的正文是 v0.3 提案逐字节原文，
++   其中的相对链接（如 `NAMING.md`）按原位置 `control-tower/` 解读，不随文件移动重写。
+diff --git a/tower-dsh/EVENT_CATALOG.json b/tower-dsh/EVENT_CATALOG.json
+new file mode 100644
+index 0000000..133c319
+--- /dev/null
++++ b/tower-dsh/EVENT_CATALOG.json
+@@ -0,0 +1,487 @@
++{
++  "events": [
++    {
++      "drift_kinds": [
++        "record_missing",
++        "record_unreadable",
++        "task_status",
++        "board_status",
++        "illegal_transition"
++      ],
++      "ledger": "primary",
++      "note": "reviewed -> accepted; decision is the owner/primary decision id",
++      "payload_required": [
++        "task",
++        "decision"
++      ],
++      "producer": "accept",
++      "state_verify": true,
++      "type": "ACCEPT"
++    },
++    {
++      "drift_kinds": [
++        "authority_policy_missing",
++        "authority_policy_unbacked",
++        "authority_policy_mismatch",
++        "authority_required_unconfigured"
++      ],
++      "ledger": "primary",
++      "note": "pins shared/AUTHORITY_POLICY.json and carries the same keys",
++      "payload_required": [
++        "schema",
++        "tower_id",
++        "require_authority",
++        "set_by",
++        "decision",
++        "set_at"
++      ],
++      "producer": "authority-require",
++      "state_verify": true,
++      "type": "AUTHORITY_REQUIRED"
++    },
++    {
++      "drift_kinds": [
++        "authority_missing",
++        "authority_unreadable",
++        "authority_unbacked",
++        "authority_mismatch"
++      ],
++      "ledger": "primary",
++      "note": "pins state/AUTHORITY.json; the event, not the file, is the authority",
++      "payload_required": [
++        "owner",
++        "primary_id",
++        "supervision_id",
++        "merge_authority",
++        "revision",
++        "set_by",
++        "decision",
++        "set_at"
++      ],
++      "producer": "authority-set",
++      "state_verify": true,
++      "type": "AUTHORITY_SET"
++    },
++    {
++      "drift_kinds": [],
++      "ledger": "primary",
++      "note": "records one spec/ready gate observation; replayed by the spec gate",
++      "payload_required": [
++        "task",
++        "phase",
++        "ok"
++      ],
++      "producer": "check",
++      "state_verify": false,
++      "type": "CHECK"
++    },
++    {
++      "drift_kinds": [
++        "record_missing",
++        "record_unreadable",
++        "task_status",
++        "board_status",
++        "illegal_transition"
++      ],
++      "ledger": "primary",
++      "note": "PASS -> reviewed, FAIL -> rework; reviewer must differ from executor",
++      "payload_required": [
++        "task",
++        "reviewer",
++        "verdict"
++      ],
++      "producer": "checkback",
++      "state_verify": true,
++      "type": "CHECKBACK"
++    },
++    {
++      "drift_kinds": [
++        "record_missing",
++        "record_unreadable",
++        "task_status",
++        "board_status",
++        "illegal_transition"
++      ],
++      "ledger": "primary",
++      "note": "accepted -> closed; closeout names the recorded closeout evidence",
++      "payload_required": [
++        "task",
++        "closeout"
++      ],
++      "producer": "close",
++      "state_verify": true,
++      "type": "CLOSEOUT"
++    },
++    {
++      "drift_kinds": [
++        "completion_missing",
++        "completion_unbacked",
++        "completion_invalid"
++      ],
++      "ledger": "primary",
++      "note": "owner-signed allow-list widening; written through _append_ledger_event_locked",
++      "payload_required": [
++        "task",
++        "path",
++        "by",
++        "reason",
++        "decision",
++        "at"
++      ],
++      "producer": "completion-add",
++      "state_verify": true,
++      "type": "COMPLETION_ADDED"
++    },
++    {
++      "drift_kinds": [
++        "record_missing",
++        "record_unreadable",
++        "task_status",
++        "board_status",
++        "illegal_transition",
++        "evidence_missing",
++        "evidence_unreadable",
++        "evidence_hash_mismatch",
++        "evidence_bytes_mismatch",
++        "spec_missing",
++        "spec_unreadable",
++        "spec_hash_mismatch"
++      ],
++      "ledger": "primary",
++      "note": "dispatched -> delivered after scope/base_sha/shape gates; evidence renumbered",
++      "payload_required": [
++        "task",
++        "evidence"
++      ],
++      "producer": "deliver",
++      "state_verify": true,
++      "type": "DELIVER"
++    },
++    {
++      "drift_kinds": [
++        "record_missing",
++        "record_unreadable",
++        "task_status",
++        "board_status",
++        "illegal_transition"
++      ],
++      "ledger": "primary",
++      "note": "ready/rework -> dispatched; base_sha is the immutable deliver baseline",
++      "payload_required": [
++        "task",
++        "executor",
++        "worktree",
++        "base_sha"
++      ],
++      "producer": "dispatch",
++      "state_verify": true,
++      "type": "DISPATCH"
++    },
++    {
++      "drift_kinds": [],
++      "ledger": "primary",
++      "note": "receiver accepts a claimed handoff package",
++      "payload_required": [
++        "package",
++        "receiver"
++      ],
++      "producer": "handoff-accept",
++      "state_verify": false,
++      "type": "HANDOFF_ACCEPT"
++    },
++    {
++      "drift_kinds": [],
++      "ledger": "primary",
++      "note": "activates the handoff; requires a committed receiver tip",
++      "payload_required": [
++        "package",
++        "controller"
++      ],
++      "producer": "handoff-activate",
++      "state_verify": false,
++      "type": "HANDOFF_ACTIVATE"
++    },
++    {
++      "drift_kinds": [],
++      "ledger": "primary",
++      "note": "receiver claims the package; source controller cannot claim",
++      "payload_required": [
++        "package",
++        "controller"
++      ],
++      "producer": "handoff-claim",
++      "state_verify": false,
++      "type": "HANDOFF_CLAIM"
++    },
++    {
++      "drift_kinds": [],
++      "ledger": "primary",
++      "note": "snapshots task/envelope into a hash-addressed handoff package",
++      "payload_required": [
++        "package",
++        "source",
++        "task",
++        "envelope"
++      ],
++      "producer": "handoff-new",
++      "state_verify": false,
++      "type": "HANDOFF_NEW"
++    },
++    {
++      "drift_kinds": [],
++      "ledger": "primary",
++      "note": "receiver writes the receipt before acceptance",
++      "payload_required": [
++        "package",
++        "controller"
++      ],
++      "producer": "handoff-receipt",
++      "state_verify": false,
++      "type": "HANDOFF_RECEIPT"
++    },
++    {
++      "drift_kinds": [],
++      "ledger": "primary",
++      "note": "bootstrap event; carries only the tower root path",
++      "payload_required": [
++        "root"
++      ],
++      "producer": "init",
++      "state_verify": false,
++      "type": "INIT"
++    },
++    {
++      "drift_kinds": [],
++      "ledger": "primary",
++      "note": "phase transition; updates primary/CURRENT_STATE.json only",
++      "payload_required": [
++        "from",
++        "to",
++        "next"
++      ],
++      "producer": "phase",
++      "state_verify": false,
++      "type": "PHASE"
++    },
++    {
++      "drift_kinds": [],
++      "ledger": "primary",
++      "note": "spec approval by a non-executor; consumed by the spec gate",
++      "payload_required": [
++        "task",
++        "by",
++        "note"
++      ],
++      "producer": "spec-approve",
++      "state_verify": false,
++      "type": "SPEC_APPROVED"
++    },
++    {
++      "drift_kinds": [
++        "record_missing",
++        "record_unreadable",
++        "task_status",
++        "board_status",
++        "illegal_transition"
++      ],
++      "ledger": "primary",
++      "note": "creates/rebuilds an unfinished card; freezes spec_path + spec_sha256",
++      "payload_required": [
++        "task",
++        "title"
++      ],
++      "producer": "task-new",
++      "state_verify": true,
++      "type": "TASK_NEW"
++    },
++    {
++      "drift_kinds": [],
++      "ledger": "primary",
++      "note": "records the record.next hint; not replayed by state-verify",
++      "payload_required": [
++        "task",
++        "next"
++      ],
++      "producer": "task-next",
++      "state_verify": false,
++      "type": "TASK_NEXT"
++    },
++    {
++      "drift_kinds": [
++        "envelope_missing",
++        "envelope_unreadable",
++        "envelope_status",
++        "queue_status",
++        "illegal_transition",
++        "envelope_unbacked"
++      ],
++      "ledger": "supervision",
++      "note": "DRAFT envelope over an accepted task with a PASS review",
++      "payload_required": [
++        "envelope",
++        "task",
++        "head"
++      ],
++      "producer": "envelope-new",
++      "state_verify": true,
++      "type": "ENVELOPE_NEW"
++    },
++    {
++      "drift_kinds": [
++        "envelope_missing",
++        "envelope_unreadable",
++        "envelope_status",
++        "queue_status",
++        "illegal_transition"
++      ],
++      "ledger": "supervision",
++      "note": "MERGED; pr mode adds merge_mode/pr_number/pr_url to the payload",
++      "payload_required": [
++        "envelope",
++        "merge_commit"
++      ],
++      "producer": "merge",
++      "state_verify": true,
++      "type": "MERGE"
++    },
++    {
++      "drift_kinds": [
++        "envelope_missing",
++        "envelope_unreadable",
++        "envelope_status",
++        "queue_status",
++        "illegal_transition"
++      ],
++      "ledger": "supervision",
++      "note": "correction event; payload variants carry reason/detail/base/current_branch/errors",
++      "payload_required": [
++        "envelope"
++      ],
++      "producer": "merge",
++      "state_verify": true,
++      "type": "MERGE_BLOCKED"
++    },
++    {
++      "drift_kinds": [
++        "envelope_missing",
++        "envelope_unreadable",
++        "envelope_status",
++        "queue_status",
++        "illegal_transition"
++      ],
++      "ledger": "supervision",
++      "note": "merge command failed after MERGE_START; envelope stays MERGING",
++      "payload_required": [
++        "envelope",
++        "stderr"
++      ],
++      "producer": "merge",
++      "state_verify": true,
++      "type": "MERGE_FAILED"
++    },
++    {
++      "drift_kinds": [
++        "envelope_missing",
++        "envelope_unreadable",
++        "envelope_status",
++        "queue_status",
++        "illegal_transition"
++      ],
++      "ledger": "supervision",
++      "note": "enters the internal MERGING state; folded status is unchanged",
++      "payload_required": [
++        "envelope",
++        "supervisor"
++      ],
++      "producer": "merge",
++      "state_verify": true,
++      "type": "MERGE_START"
++    },
++    {
++      "drift_kinds": [
++        "envelope_missing",
++        "envelope_unreadable",
++        "envelope_status",
++        "queue_status",
++        "illegal_transition"
++      ],
++      "ledger": "supervision",
++      "note": "correction event; retryable after the next MERGE attempt",
++      "payload_required": [
++        "envelope",
++        "result",
++        "tests_count",
++        "tower_tests_count",
++        "checks"
++      ],
++      "producer": "post-merge",
++      "state_verify": true,
++      "type": "POST_MERGE_FAILED"
++    },
++    {
++      "drift_kinds": [
++        "envelope_missing",
++        "envelope_unreadable",
++        "envelope_status",
++        "queue_status",
++        "illegal_transition"
++      ],
++      "ledger": "supervision",
++      "note": "the only completion state; MERGED alone is not completion",
++      "payload_required": [
++        "envelope",
++        "tests_count",
++        "tower_tests_count",
++        "checks",
++        "merge_record"
++      ],
++      "producer": "post-merge",
++      "state_verify": true,
++      "type": "POST_MERGE_VERIFIED"
++    },
++    {
++      "drift_kinds": [
++        "envelope_missing",
++        "envelope_unreadable",
++        "envelope_status",
++        "queue_status",
++        "illegal_transition",
++        "queue_unbacked"
++      ],
++      "ledger": "supervision",
++      "note": "DRAFT -> WAITING; requires both tests baselines",
++      "payload_required": [
++        "envelope",
++        "task"
++      ],
++      "producer": "queue-add",
++      "state_verify": true,
++      "type": "QUEUE_ADD"
++    },
++    {
++      "drift_kinds": [],
++      "ledger": "supervision",
++      "note": "supervision ledger bootstrap",
++      "payload_required": [
++        "root"
++      ],
++      "producer": "supervision-init",
++      "state_verify": false,
++      "type": "SUPERVISION_INIT"
++    },
++    {
++      "drift_kinds": [],
++      "ledger": "supervision",
++      "note": "supervision phase transition; writes supervision/CURRENT_STATE.json",
++      "payload_required": [
++        "from",
++        "to",
++        "next"
++      ],
++      "producer": "supervision-phase",
++      "state_verify": false,
++      "type": "SUPERVISION_PHASE"
++    }
++  ],
++  "schema": "tower/event-catalog@1"
++}
+diff --git a/tower-dsh/adr/ADR-0001-initial-design.md b/tower-dsh/adr/ADR-0001-initial-design.md
+new file mode 100644
+index 0000000..b7b0242
+--- /dev/null
++++ b/tower-dsh/adr/ADR-0001-initial-design.md
+@@ -0,0 +1,699 @@
++---
++schema: tower/adr@1
++id: ADR-0001
++title: "初始设计提案 v0.3（历史）"
++status: archived
++date: 2026-10-19
++deciders:
++  - mac
++related_cards: []
++related_files:
++  - tower-dsh/tools/towerctl.py
++  - tower-dsh/ARCHITECTURE.md
++---
++# Tower/DSH — 控制塔重构设计 v0.3
++
++> 状态：设计提案 v0.3，待 owner 拍板后进入实现。
++> v0.2 变更：**双塔分离**、**文件化控制面**、**接线门**、**project-handoff v2.1**、**9 塔审计**。
++> v0.3 变更：补上“站在所有 coding agent 之上的 control plane”定位、Boomi/Warp/MAQA 分工，
++> 并把**首版范围收窄为 Core + Skill + Reviewer 门 + worktree 隔离**。
++> 目标：不是复刻某一座现有塔，而是把它们的治理内核抽成一套
++> DSH 原生、可实例化、可检查、可审计、可交接的控制塔。
++>
++> **代号：应县木塔 / Yingxian** —— 命名与构件隐喻见 [`NAMING.md`](NAMING.md)。
++
++---
++
++## 0. 一句话
++
++把现有 9 座塔的共性抽成 **Tower Core + Tower Preset + Tower Skill + Tower Console + Tower Instance** 五件套；
++每个实例内固定 **主控制塔（Primary）+ 监督控制塔（Supervision）** 双塔：
++主塔把目标变成任务和交付，监督塔独立验收、串行合并、合并后验证。
++**没有 `.ct` 运行时也能跑**——文件化控制面是默认形态。
++
++---
++
++## 0.1 定位：站在所有 coding agent 之上的 control plane
++
++Tower/DSH 不训练更强的模型，也不做另一个 orchestrator。它站在 Claude Code、Codex、Cursor、Warp、Jules 等所有 coding agent 之上，负责五件事：
++
++- **spec**：把意图变成可验收的规格、任务卡、验收条款；
++- **routing**：选专业 owner、协作模式、模型/推理档；
++- **gates**：四闸 + 阶段门 + PR/合并门；
++- **evidence**：证据、哈希、版本、回执、账本；
++- **handoff**：project-handoff v2.1 的交接与接续。
++
++执行交给 `subagents` / cloud agents。Tower/DSH 不追求自己变强，而追求**让整支 agent 队伍的输出可信**。
++
++## 0.2 与业界的分工
++
++| 层 | 代表 | 强项 | 不覆盖 | Tower/DSH 的关系 |
++|---|---|---|---|---|
++| 企业 agent 治理 | Boomi Agent Control Tower / Agent Control Plane | agent 资产、身份、策略、可观测、agent sprawl | 编码工作流、PR/合并、spec/证据 | 借治理语义，不替代 |
++| 编码编排 | Warp Factories、MAQA、Claude Code Agent Teams | 多 agent、worktree、任务队列、QA gate | owner 四闸、证据账本、交接状态机 | 站在它们之上，补治理层 |
++| 规格驱动 | GitHub Spec Kit | Specify → Plan → Tasks → Implement → Converge | 运行时门禁、合并、证据审计 | 作为输入契约 |
++| 单 agent 执行 | Claude Code、Codex、Cursor、Jules | 代码生成、工具、上下文 | 跨 agent 治理、owner 闸 | 把执行交给它们 |
++| **Tower/DSH** | 本项目 | spec/routing/gates/evidence/handoff + 双塔 | 不训练模型、不做执行 | **control plane** |
++
++一句话：**Boomi 管“企业里有哪些 agent”，Warp/MAQA 管“编码 agent 怎么并行干活”，Tower/DSH 管“这些 agent 的输出能不能被 owner 相信”。**
++
++---
++
++## 1. 从现有塔里提炼出的设计理念
++
++v0.1 的 12 条仍然成立，v0.2 补 4 条：
++
++1. **控制塔是治理角色，不是执行者。** 它负责路由、核验、收口、晋级；专项工作交给专项会话。
++2. **Owner 主权。** 四个闸永远归 owner：merge / 真实外部调用 / 部署与生产数据 / L0 文档写 main。
++3. **真值层级。** owner 决定 > 项目宪法 > 已批准规格 > 原始证据 > 聊天与推断。
++4. **单一写者 + 执行路由。** 同一时刻只有一个控制塔写治理状态；不该它做的事不因为工具在手就自己做。
++5. **证据优先于声明。** 文件存在、脚本通过、实际执行、独立接收、真实业务验收是五个不同层级。
++6. **失败闭合。** 先命名失败类型，再选一个处置：下一动作 / 显式门槛 / 补证 / 熔断；不无限重试。
++7. **连续性。** 启动读序、CURRENT、交接包、恢复说明是塔的一部分，不靠聊天记忆。
++8. **最小状态复制。** 一份账本 + 投影；引用原始证据，不复制业务总账。
++9. **收口契约。** 每个任务记录范围、证据、验证、变更、副作用、失败、门变化、下一步。
++10. **显式授权。** advisory / read_only / workspace_write / runtime_mutation / production_enforcement 五级，不能从角色描述自动扩张。
++11. **可审计。** 哈希、版本、回执、时间、执行者，缺一不可。
++12. **自动化最后。** 手动流程跑稳、完成规定周期后，才允许上心跳/调度。
++
++v0.2 新增：
++
++13. **职责分离。** 作者 ≠ 独立验收者 ≠ 合并批准者；同一个人格不能同时持有“提交”和“合并”权限。
++14. **自动权限上限。** 工程 PR 轨可以给常备授权；生产轨默认无权限，必须逐次 owner 决定。
++15. **诚实能力缺口。** 同 GitHub 身份、无服务端分支保护、无密码学身份等缺口要写明补偿控制，不假装已解决。
++16. **接线门。** 塔必须被 `AGENTS.md` / `README.md` / `START-HERE.md` 引用；否则视为“孤儿基建”，不算塔。
++
++---
++
++## 2. 现有实现的取舍
++
++| 来源 | 保留 | 不搬 |
++|---|---|---|
++| **BI CODE UP 03/04 双塔** | 双塔职责分离、`PROJECT_PROFILE`、`AUTHORITY_MODEL`、PR 状态机、串行合并队列、两提交合并信封、合并后验证、机制改进注册表、上下文轮换注册表 | BI 业务事实、仓库清单、G2–G7 具体内容 |
++| **CT-HOME / `.ct` 运行时** | identity、registration anchor、checkpoints、ledger、tasks/returns、profile、forbiddenActions、hostPlanes | 版本化 bootstrap runtime 的全部实现细节；不要求每座塔都装 `.ct` |
++| **project-handoff v2.1** | 交出塔台写包、整包重生成、真相源指针化、§0/§0a 实值、七节正文、交出自查、接收首验、断路器 | 各项目专册的具体命令/路径/口令 |
++| **GameShield 主塔** | 四闸、权限分级、`tower_gate.py` 的 ready/deliver/accept/close、模板化任务卡/交付/评审/收口 | 39KB 的 GameShield 业务宪法、GameShield 专属任务状态 |
++| **智能客服控制塔** | 单一 owner、`CURRENT.json`、启动读序、独立入口、`startup_check` 只读核验 | `create_thread` / `wait_threads` / `list_projects` 这类 Kimi 桌面线程 API |
++| **SeeMake Governance Tower** | 两轴路由（专业 owner + 协作模式）、owner-decision 独立闸、promotion rule、pending work register | 具体 workstream 注册表、Feishu/PM Agent 写入链 |
++| **SeeMake-K3** | `tower-exam` / `tower-clerical` 的角色区分：只读自证 vs 文书候选；K3 单执行器治理层 | Codex 多会话线程机制 |
++| **BI-CLEAN-REBUILD（反例）** | 业务定义、项目简报、施工/交接文档、检查点 | **只做文档、不做状态/身份/验证/交接/双塔**；7 份文件未接线，不构成可运行控制塔 |
++
++**结论：** 保留“治理语义”，用 DSH 的 session / subagent / skill / plugin 重新实现；
++`.ct` 是可选运行时，不是控制塔的前提。
++
++---
++
++## 3. 新架构总览
++
++```
++┌──────────────────────────────────────────────────────────────┐
++│  Tower Console（DSH 客户端插件）                               │
++│  只读：双塔状态 / 四闸 / 合并队列 / 任务 / 阻塞 / 下一步        │
++├──────────────────────────────────────────────────────────────┤
++│  Tower Presets（DSH agent presets）                            │
++│  tower-primary：拆解、派发、PR、提交合并信封，无 merge 权       │
++│  tower-supervisor：独立验收、串行合并、合并后验证，无实现权      │
++│  Tower Skill：启动读序、任务卡、核验、收口、交接 v2.1           │
++├──────────────────────────────────────────────────────────────┤
++│  Tower Core（协议层，项目无关）                                │
++│  schema / 事件账本 / 双塔门禁 / towerctl / 模板 / 接线检查      │
++├──────────────────────────────────────────────────────────────┤
++│  Tower Instance（项目实例）                                    │
++│  tower/shared + tower/primary + tower/supervision              │
++└──────────────────────────────────────────────────────────────┘
++```
++
++### 3.1 五件套
++
++1. **Tower Core** — 项目无关的协议：状态 schema、事件类型、双塔门禁、`towerctl`、模板。
++2. **Tower Preset** — 两个 DSH agent preset：`tower-primary`、`tower-supervisor`。
++3. **Tower Skill** — 模型可加载的操作手册：启动、路由、派发、核验、收口、交接 v2.1。
++4. **Tower Console** — 只读状态面板；不写状态，避免第二写者。
++5. **Tower Instance** — 每个项目一份 `tower/` 目录，绑定项目宪法、owner、四闸、路径和证据根。
++
++### 3.2 双塔模型
++
++| 角色 | 谁 | 拥有 | 禁止 |
++|---|---|---|---|
++| **Owner** | 人 | 四闸、生产读写、外部调用、部署/切流、数据迁移、退役、终局合同变更 | 不代替主塔做日常路由 |
++| **Primary Control Tower** | `tower-primary` 会话 | 目标拆解、任务卡、职责窗口、分支/worktree、commit/push、PR 创建与修正、提交合并信封 | 实际 merge、以自查代替独立验收、改监督塔的合并决定/队列 |
++| **Supervision Control Tower** | `tower-supervisor` 会话 | 独立验收、串行合并队列、实际 merge、合并后验证、纠正单、机制审计 | 改候选 PR 实现、批准自己的实现、跳过必需证据 |
++| **Executor** | 子 agent / 专项会话 | 在任务卡范围内实施、交付证据 | 改治理状态、merge、晋级 |
++| **Reviewer** | 独立子 agent / 独立会话 | 亲查证据、独立复算、出评审结论 | 与执行者同一上下文，不以作者自查代替 |
++
++**职责分离不变量：**
++
++- `pr_author_must_not_be_merge_approver`
++- `merge_must_follow_dependency_order`
++- `merge_requires_machine_valid_merge_envelope`
++- `merge_requires_independent_checkback`
++- `merged_is_not_complete_until_post_merge_verified`
++- `repository_authority_does_not_imply_production_authority`
++
++**自动权限上限（来自 BI CODE UP）：**
++
++| 轨道 | 风险 | 常备授权 |
++|---|---|---|
++| 工程 PR 轨 | 可逆的新仓工程 | 主塔可走完整日常 PR 生命周期，**但不含 merge** |
++| 生产轨 | 真实系统影响 | **none**；逐次 owner 决定 + 独立证据门 |
++
++> `global_pause_authority` 只归 owner，入口是监督塔；主塔不能全局暂停，也不能把局部等待升级为全局阻塞。
++
++### 3.3 文件化控制面优先
++
++`.ct` 运行时不是必需。默认采用 **file-backed control plane**：
++
++```text
++shared/PROJECT_PROFILE.yaml      # 项目、根目录、权限上限、轨
++shared/AUTHORITY_MODEL.yaml      # 双塔角色、owner 保留、分离不变量
++shared/TARGET.md                 # 不可被局部里程碑替代的终局
++primary/CURRENT_STATE.yaml       # 当前门、下一动作、局部等待
++primary/TASK_BOARD.yaml          # 任务卡与状态
++primary/registries/              # gate / evidence / decision / routing / queue
++primary/work-packages/           # 工作包
++supervision/CURRENT_STATE.yaml   # 监督塔状态
++supervision/MERGE_QUEUE.yaml     # 唯一串行合并队列
++supervision/registries/merge-ledger.yaml
++supervision/outbox/corrections/  # 纠正单
++tools/towerctl.py                # 机器检查
++```
++
++原则：
++
++- 文件是权威，聊天/窗口状态不是；
++- 每个塔只写自己的目录；
++- `shared/` 由 owner 控制，主塔提案、监督塔复核；
++- `.ct` 可选：需要 identity/checkpoint/ledger 的运行时时再挂，不因缺 `.ct` 退化成纯文档塔。
++
++### 3.4 接线门（v0.2 新增）
++
++一座塔如果没有被入口引用，就是**孤儿基建**。强制：
++
++- `AGENTS.md` 必须包含 `TOWER.md` 指针；
++- `README.md` 或 `START-HERE.md` 必须说明启动读序；
++- `towerctl wiring check` 验证：
++  - `TOWER.md` 存在；
++  - `AGENTS.md` 含 `tower/TOWER.md`；
++  - `START-HERE.md` 含 `CURRENT_STATE` 路径；
++  - `shared/PROJECT_PROFILE.yaml` 指向正确的 `workspace_root`；
++  - 新增的塔文件不是“只被自己引用”。
++
++未通过接线门 → 状态 `ORPHANED`，不计入“已建成塔”。
++
++### 3.5 交接 v2.1（project-handoff）
++
++采用 `project-handoff` 技能的 v2.1 机制，不自造一套：
++
++- **三原则**：交出塔台写包 / 整包重生成 / 真相源指针化。
++- **包结构**：§0 实值 + §0a 漂移警示 + 七节正文 + 交出自查 + 校验。
++- **交出**：实值复核 → 整包重生成 → 装配路径 → 流水收官条 → 高危零半截自查。
++- **接续**：读最新包 → 项目宪法 → 真相源/流水尾部 → 在途锚点；**只读自检** → 报一句结果 + 在途清单 → 停，等 owner 口令。
++- **纪律**：只读自检、凭据零回显、不认预填结论、四闸归 owner、断路器、诚实账。
++- **DSH 适配**：把 Kimi 的窗口交接映射为 `towerctl handoff` + `claim` 两阶段；`project-handoff` 的 6 本专册作为只读参考，不整包复制业务。
++
++> 现有 `project-handoff/references/` 实际有 6 本：`gameradar`、`gameshield`、`game-cs`、`seemake-k3`、`ci-self-hosted-runner`、`infra`；不是 4 本。
++
++---
++
++## 4. 状态模型
++
++### 4.1 目录
++
++```text
++tower/
++├─ TOWER.md                     # 实例身份 + 接线入口
++├─ AGENTS.md                    # 项目宪法（必须指向 TOWER.md）
++├─ START-HERE.md                # 启动读序
++├─ shared/
++│  ├─ PROJECT_PROFILE.yaml      # 项目/根/权限上限/轨
++│  ├─ AUTHORITY_MODEL.yaml      # 双塔角色/owner 保留/分离不变量
++│  ├─ TARGET.md                 # 终局目标
++│  └─ PROJECT-MAP.md            # 仓库/环境/真值入口
++├─ primary/
++│  ├─ CURRENT_STATE.yaml
++│  ├─ TASK_BOARD.yaml
++│  ├─ WORK_PACKAGES/
++│  ├─ decisions/
++│  ├─ registries/
++│  │  ├─ gate-registry.yaml
++│  │  ├─ evidence-registry.yaml
++│  │  ├─ evidence-acceptance-registry.yaml
++│  │  ├─ decision-registry.yaml
++│  │  ├─ model-routing-registry.yaml
++│  │  └─ work-package-orchestration.yaml
++│  ├─ handoffs/                 # 交给监督塔的合并信封
++│  └─ evidence/
++├─ supervision/
++│  ├─ CURRENT_STATE.yaml
++│  ├─ MERGE_QUEUE.yaml
++│  ├─ TASK_BOARD.yaml
++│  ├─ reviews/
++│  ├─ outbox/corrections/
++│  └─ registries/
++│     ├─ merge-ledger.yaml
++│     ├─ mechanism-improvement-register.yaml
++│     └─ context-rotation-register.yaml
++├─ ledger/
++│  ├─ primary.jsonl
++│  └─ supervision.jsonl
++├─ receipts/
++├─ handoffs/
++└─ tools/
++   ├─ towerctl.py
++   └─ templates/
++```
++
++### 4.2 `PROJECT_PROFILE.yaml`
++
++```yaml
++schema_version: '0.1'
++project_id: 'TOWER-DSH'
++project_name: 'DeepSeek Harness Control Tower'
++control_tower_version: '0.2'
++operating_mode: 'goal_mode_control_tower'
++control_tower_execution_policy: 'dispatch_only_no_direct_domain_execution'
++workspace_root: 'C:/Users/mac/Documents/deepseek-harness/default-workspace'
++automatic_authority_ceiling:
++  engineering_pr_track: 'full_daily_PR_lifecycle_except_merge'
++  production_track: 'no_access'
++current_gate: 'G0'
++global_pause_authority: 'human_owner_via_supervising_control_tower_only'
++```
++
++### 4.3 `AUTHORITY_MODEL.yaml`
++
++```yaml
++schema_version: '0.1'
++authorization_id: 'TOWER-DSH-AUTH-001'
++authorized_by: 'human_owner'
++operating_model: 'dual_tower_separation_of_duties'
++roles:
++  primary_control_tower:
++    owns: [goal_decomposition, task_cards, branch_and_worktree, commit_and_push,
++           pr_create_and_update, merge_envelope_submission]
++    forbidden: [merge_pull_request, substitute_self_review,
++                rewrite_supervisor_decision]
++  supervising_control_tower:
++    owns: [independent_acceptance, serial_merge_queue, actual_merge,
++           post_merge_validation, correction_return, mechanism_audit]
++    forbidden: [edit_candidate_implementation, approve_own_implementation,
++                bypass_required_evidence]
++  human_owner:
++    reserves: [production_read_write, real_external_call, deployment_and_traffic,
++               data_migration, legacy_retirement, terminal_contract_change]
++separation_invariants:
++  - 'pr_author_must_not_be_merge_approver'
++  - 'merge_must_follow_dependency_order'
++  - 'merge_requires_machine_valid_merge_envelope'
++  - 'merge_requires_independent_checkback'
++  - 'merged_is_not_complete_until_post_merge_verified'
++  - 'repository_authority_does_not_imply_production_authority'
++```
++
++### 4.4 `CURRENT_STATE.yaml`（主塔/监督塔各一份）
++
++```yaml
++schema_version: '0.1'
++goal_status: 'ACTIVE_WITH_LOCAL_WAITS'
++current_gate: 'G2'
++runtime_truth: 'unverified'
++next_actions:
++  - '……'
++local_waits:
++  - wait_id: '……'
++    failure_class: 'data_gap'
++    disposition: 'next_action'
++    global_effect: 'none'
++forbidden_progress_claims:
++  - 'merged_pull_request_equals_terminal_completion'
++  - 'source_evidence_equals_runtime_truth'
++```
++
++### 4.5 `MERGE_QUEUE.yaml`（只有监督塔写）
++
++```yaml
++schema_version: '0.1'
++entries:
++  - envelope_id: 'ME-001'
++    pr: 42
++    base: 'main'
++    head: 'feature/x'
++    dependency: null
++    status: 'WAITING'   # WAITING | CHECKING | MERGE_APPROVED | MERGING | MERGED | CORRECTION_REQUIRED
++    implementation_head_sha: 'A'
++    envelope_head_sha: 'B'
++    merged_sha: null
++```
++
++### 4.6 `ledger/*.jsonl`
++
++每个塔一份追加式账本：
++
++```json
++{"seq":1,"at":"…","type":"DECISION","actor":"owner","payload":{"id":"D-001"}}
++{"seq":2,"at":"…","type":"DISPATCH","actor":"primary","payload":{"task":"T-001"}}
++{"seq":3,"at":"…","type":"RETURN","actor":"executor","payload":{"task":"T-001"}}
++{"seq":4,"at":"…","type":"CHECKBACK","actor":"supervisor","payload":{"task":"T-001"}}
++{"seq":5,"at":"…","type":"MERGE","actor":"supervisor","payload":{"envelope":"ME-001"}}
++{"seq":6,"at":"…","type":"POST_MERGE_VERIFY","actor":"supervisor","payload":{"result":"PASS"}}
++```
++
++投影（`CURRENT_STATE`、`TASK_BOARD`、`MERGE_QUEUE`）必须能由账本 + 任务文件重放得到。
++
++---
++
++## 5. 生命周期与门禁
++
++### 5.1 任务生命周期
++
++```text
++INTAKE → ROUTE → READY → DISPATCHED → RETURNED → CHECKBACK
++      → ACCEPT / REWORK → CLOSEOUT → HANDOFF
++```
++
++| 阶段 | 必须有什么 | 检查 |
++|---|---|---|
++| INTAKE | 目标、对象、owner、真值入口 | `check --phase intake` |
++| ROUTE | 专业 owner、协作模式、权限等级、owner-decision | `check --phase route` |
++| READY | 任务卡、范围、允许/禁止、依赖、验收、回执格式 | `check --phase ready` |
++| DISPATCHED | 派发记录、执行者、模型/推理档、任务卡哈希 | `check --phase dispatch` |
++| RETURNED | 交付封面、逐条证据、实际检查值、失败分类 | `check --phase deliver` |
++| CHECKBACK | 独立评审、证据绑定、无作者自查代替 | `check --phase review` |
++| ACCEPT | owner/授权人决定、证据版本有效、无越界 | `check --phase accept` |
++| CLOSEOUT | 范围、证据、副作用、门变化、下一动作 | `check --phase close` |
++| HANDOFF | v2.1 包、§0/§0a、自查、包哈希、接收方 claim | `check --phase handoff` |
++
++### 5.2 PR / 交付状态机
++
++代码仓使用 PR 状态机（来自 BI CODE UP）：
++
++```text
++DRAFT
++  → READY_FOR_SUPERVISOR
++  → INDEPENDENT_CHECKBACK
++  → CORRECTION_REQUIRED | MERGE_APPROVED
++  → MERGED
++  → POST_MERGE_VERIFIED
++```
++
++非 Git 交付使用等价状态机：
++
++```text
++DRAFT → DELIVERED → INDEPENDENT_CHECKBACK
++      → REWORK | ACCEPTED → POST_ACCEPT_VERIFIED
++```
++
++规则：
++
++- `CORRECTION_REQUIRED` 必须命名具体失败模式、限界处置、可执行验收命令；
++- 修正留在同一 PR，除非原范围失效；重开 PR 必须链接旧 PR 和关闭理由；
++- `MERGED` / `ACCEPTED` 不是完成态，只有目标分支/目标环境验证通过才是 `POST_MERGE_VERIFIED` / `POST_ACCEPT_VERIFIED`。
++
++### 5.3 串行合并队列
++
++- 监督塔独占写 `MERGE_QUEUE.yaml`；
++- 同一时刻只允许一个 `MERGING`；
++- 顺序：依赖 → 兼容性/风险 → 到达时间（最后才用）；
++- 基础提交漂移时必须重新验收，不允许沿用旧批准；
++- 禁止“带病合并”；任一门失败 → 纠正单或熔断。
++
++### 5.4 两提交合并信封
++
++候选 PR 最后两步固定：
++
++1. 主塔形成实现提交 `A`；
++2. 主塔形成只改合并信封的提交 `B`。
++
++信封记录 `implementation_head_sha=A`，不记录包含自身的 `B`。
++监督塔用 GitHub CLI 独立读取当前 head `B`，证明 `B` 的父提交是 `A`、`B` 只修改信封路径；合并回执记录 `A`、`B`、最终 merge commit。
++
++任何纠正都会使旧批准失效；主塔必须产生新的 `A` 和新的 `B`，监督塔重新读取 head 并复核。
++
++### 5.5 四闸与自动权限上限
++
++四闸（永远独立于阶段门）：
++
++- `merge`
++- `external_call`
++- `deploy_prod`
++- `l0_main`（AGENTS/治理主干写入）
++
++阶段门通过 **不等于** 四闸通过。四闸必须逐次 owner 决定，记录到 `DECISIONS.md`/`decision-registry` 和 ledger。
++
++自动权限上限：
++
++- 工程 PR 轨：主塔可走完整日常 PR 生命周期，**不含 merge**；
++- 生产轨：`no_access`；生产读取、外部真实调用、部署、切流、数据迁移、退役都必须单独授权 + 证据门；
++- 两条轨不能通过文件命名、脚本包装或 PR 合并相互隐式授权。
++
++### 5.6 权限等级
++
++| 等级 | 允许 | 典型 |
++|---|---|---|
++| `advisory` | 分析、建议、解释 | 研究、诊断 |
++| `read_only` | 只读发现、核验、复算 | 独立评审、监督塔检查 |
++| `workspace_write` | 任务卡允许的工作区写入 | 实施 |
++| `runtime_mutation` | 启动服务、改远端配置、生产准备 | 需明确授权 |
++| `production_enforcement` | 真实处罚、封禁、生产数据动作 | 逐次 owner 精确批准 |
++
++### 5.7 Promotion rule
++
++专项会话的产出默认只是 **evidence**，不是项目真值。晋级前检查：
++
++- 范围是否完成、改动是否匹配授权；
++- 验证是否实跑，失败是否分类；
++- 是否含秘密/原始隐私/凭据；
++- L2/L3 假设是否已记成 gate 或 owner decision；
++- 证据身份、版本、哈希是否匹配；
++- 晋级子集、目标路径、证据处置是否明确；
++- 是否经过独立 checkback；
++- `MERGED` 是否已 `POST_MERGE_VERIFIED`。
++
++---
++
++## 6. DSH 映射
++
++| 塔概念 | DSH 机制 | 说明 |
++|---|---|---|
++| Primary 会话 | 运行 `tower-primary` preset 的 DSH session | 用户在创建会话时选 preset |
++| Supervision 会话 | 运行 `tower-supervisor` preset 的独立 session | 不与主塔同一会话/同一上下文 |
++| 控制塔手册 | `~/.agents/skills/control-tower/SKILL.md` | 与现有 arkcli 技能同一发现机制 |
++| Executor | `subagent`（spawn）或用户专项会话 | 任务卡 + 明确禁止项 |
++| Reviewer | `subagent`（fresh context）或独立会话 | 必须亲跑证据，不能只看执行者摘要 |
++| Owner 决定 | `ask_user_question` + `DECISIONS.md`/`decision-registry` + ledger | 结构化选项，不靠聊天“同意” |
++| Checkback | `send_message` / `list_agents` / `job_output` + 证据文件 | 不看“已完成”字样，看原始输出 |
++| 长任务 | `create_goal` + `schedule_create` + `job_*` | 只做提醒/状态，不自动晋级 |
++| 交付物 | `present` | 文件卡片 |
++| 状态面板 | DSH 客户端插件页面 | 只读 `CURRENT_STATE`/`TASK_BOARD`/`MERGE_QUEUE` |
++| 检查器 | `python towerctl.py …` | 本地 Python，JSON 输出，0/2 退出码 |
++| 权限 | DSH permission preset + skill 内四闸 | 主塔 `workspace_write`，监督塔 `read_only`（merge 由受控命令执行） |
++| 合并 | 监督塔专用命令/服务 | 主塔 preset 不暴露 merge 工具 |
++
++### 会话身份（DSH 的限制与补法）
++
++DSH 没有 Kimi 的 `create_thread` / `wait_threads`。因此：
++
++- 主塔启动时生成 `primary.id = ctl-<uuid>`，写入 `primary/CURRENT_STATE.yaml`；
++- 监督塔启动时生成 `supervisor.id = sup-<uuid>`，写入 `supervision/CURRENT_STATE.yaml`；
++- owner 在两个会话里分别确认一次“本会话是 primary/supervisor”；
++- 交接采用两阶段：
++  1. 旧塔写 `handoffs/<id>/`，`status = PREPARED`；
++  2. 新会话运行 `towerctl claim --package <id>`，写 `CLAIM.json`，`status = READY_FOR_RECEIVER`；
++  3. 旧塔核 claim 的 `id`、包哈希、包摘要，写 `ACCEPTED` 后停写；
++  4. 新塔读 `CURRENT_STATE`，写启动回执。
++- 这是**程序性锁**，不是密码学身份；真正的保证来自 owner 在场确认 + 回执 + 证据 + 独立监督。
++
++### 与 Kimi 的差异
++
++- 不复制 `create_thread` / `wait_threads` / `list_projects`；
++- 不把“窗口存在/空闲”当权威；
++- 不依赖桌面应用 UI 状态；
++- 不复制项目专属业务规则，只保留可迁移的治理协议。
++
++---
++
++## 7. 检查器 `towerctl.py`
++
++一个入口，子命令，机器可读：
++
++```bash
++python towerctl.py init      --root tower --tower-id tower-dsh
++python towerctl.py wiring    --root tower
++python towerctl.py startup   --root tower --role primary|supervision
++python towerctl.py check     --root tower --task T-001 --phase ready
++python towerctl.py hash      <path>
++python towerctl.py dispatch  --root tower --task T-001 --executor <id> --model <model>
++python towerctl.py deliver   --root tower --task T-001 --evidence E-001
++python towerctl.py checkback --root tower --task T-001 --reviewer <id> --verdict PASS
++python towerctl.py accept    --root tower --task T-001 --decision D-002
++python towerctl.py close     --root tower --task T-001
++python towerctl.py envelope  --root tower --pr 42 --implementation A --envelope B
++python towerctl.py merge     --root tower --envelope ME-001
++python towerctl.py post-merge --root tower --envelope ME-001 --result PASS
++python towerctl.py handoff   --root tower --role primary --package <id>
++python towerctl.py claim     --root tower --package <id> --controller ctl-<uuid>
++python towerctl.py status    --root tower
++```
++
++规则：
++
++- 只读优先；写操作只改自己拥有的状态文件，并追加 ledger；
++- `wiring` 失败 → `ORPHANED`；
++- `check` 输出 `{ok, errors[], warnings[], phase, task}`；
++- 退出码 `0` 通过，`2` 不通过；
++- 不执行任务正文、不跑网络、不读未引用文件；
++- 失败时保留原始错误，不把“工具不可用”说成“检查通过”。
++
++---
++
++## 8. 现有塔审计与迁移
++
++### 8.1 现有 9 座塔
++
++| # | 塔 | 根 | 形态 | 状态/缺口 |
++|---|---|---|---|---|
++| 1 | BI 主控制塔 | `D:\BI CODE UP\03-control-tower` | 文件化双塔 | G2，工程 PR 轨，无 merge 权 |
++| 2 | BI 监督控制塔 | `D:\BI CODE UP\04-supervision-control-tower` | 文件化双塔 | 独立验收/串行合并，最成熟 |
++| 3 | CT-REAL-BI-TAKEOVER-01 | `D:\CT-REAL-BI-TAKEOVER-01` | CT-HOME runtime | `.ct` 全，文档/交接薄 |
++| 4 | CT-GAME-CREATIVE-OPS-01 | `D:\CT-GAME-CREATIVE-OPS-01` | CT-HOME runtime | `.ct` 全，业务资产多 |
++| 5 | BI-CLEAN-REBUILD | `D:\BI-CLEAN-REBUILD` | 文档塔 | 7 文件就位，未运营 |
++| 6 | GameShield 主塔 | `D:\game  os` | 混合 | 四闸+Codex 包+CS 子塔 |
++| 7 | 智能客服控制塔 | `D:\game  os\work\智能客服控制塔` | 文件塔+skill | 交接 v2.1，强 |
++| 8 | SeeMake Governance Tower | `D:\SeeMake` | 治理流程 | 旧塔/已改名废弃 |
++| 9 | SeeMake-K3 塔台 | `D:\SeeMake-K3\_k3-ops` | K3 治理层 | 单执行器，无 5 文件标准 |
++
++不计入：`D:\CT-EP`（空）、`D:\BI CODE UP\03-control tower`（空格旧副本）、`D:\quant-K3`（无塔规则）。
++
++### 8.2 BI-CLEAN-REBUILD 的 9 个遗漏
++
++1. **来源漏了 BI CODE UP 双塔**：报告没有引用 `03/04`，这是最成熟的 BI 控制塔。
++2. **形态选错**：因 `.ct` 未安装退成纯文档塔；但 BI CODE UP 证明无 `.ct` 也能跑文件化双塔。
++3. **状态层缺失**：无 `CURRENT_STATE`/`TASK_BOARD`/`EVIDENCE`/`DECISIONS`/`RECOVERY`/`START-HERE`；只有 46KB 检查点。
++4. **身份/权限层缺失**：无 `PROJECT_PROFILE`/`AUTHORITY_MODEL`/controller identity/`profile.json`。
++5. **验证层缺失**：无 `tower_gate.py`/`validate-control-tower.py`/`startup_check.py`；只有语法检查。
++6. **交接层只有草稿**：无 v2.1 模板、§0 锚点、交接包、接收自查；专册未落位。
++7. **没有双塔监督**：无双塔、合并队列、合并账本、post-merge verification；作者=验收者风险。
++8. **接线缺失**：`AGENTS.md`/`README.md`/`MAINLINE_CHECKPOINT.md` 都没引用新增 7 文件；grep 只在新文件自身命中。
++9. **seed 只有合同，没有资产**：`seed/` 只有 README + schema，没有实际证据清单/样本/冻结 manifest。
++
++> 另：报告说 project-handoff “四本专册”，实际 `references/` 有 6 本（gameradar / gameshield / game-cs / seemake-k3 / ci-self-hosted-runner / infra）。
++
++### 8.3 其他塔的缺口
++
++- **CT runtime 双塔**：`.ct` 的 identity/registration/checkpoint 齐全；缺 `MAINLINE_CHECKPOINT.md`、`docs/handoff` 专册、project-handoff v2.1；状态是 `.ct` 内部格式，人读入口弱。
++- **BI CODE UP 双塔**：治理最成熟；但没有全局 `AGENTS.md`/`README` 入口，也没有 CT-HOME 注册；状态是文件化，不是 `.ct`。
++- **GameShield**：四闸、Codex 规范包、客服子塔很强；但没有统一 5 文件业务定义/项目简报，状态分散在 `operator_workspace`、`ai-game-ops`、`work/智能客服控制塔`。
++- **SeeMake**：只有 governance workflow；无状态/证据/交接层；已改名“废弃seem”。
++- **SeeMake-K3**：`_k3-ops` + workflows 完整；无 5 文件标准；交接走 `_k3-ops` 模板，不走 `project-handoff`。
++- **CT-EP**：空壳，0 文件。
++
++### 8.4 迁移策略
++
++1. **不整体复制**：现有塔继续在各自目录运行，作为只读参考。
++2. **抽协议，不抽业务**：只迁四闸、权限、双塔、任务卡、证据、交接、收口。
++3. **文件化优先**：先建 `tower/shared + primary + supervision` 文件骨架；`.ct` 只在需要 identity/checkpoint 时挂。
++4. **新实例优先**：先建一个 greenfield 实例跑通，再把 BI CODE UP/GameShield 作为第二个实例接入。
++5. **历史只引用**：旧塔的 `CURRENT/WORK` 不复制成新塔的总账，只记“来源 + 迁移决定”。
++6. **双向不覆盖**：新塔不修改旧塔状态；旧塔的 owner 仍是旧塔的 owner。
++
++---
++
++## 9. 分阶段落地
++
++| 阶段 | 交付 | 验收 |
++|---|---|---|
++| **0. 设计** | 本文档 v0.3 | owner 确认双塔、文件化、交接 v2.1、首版收窄、首实例 |
++| **1. 首版（收窄）** | Core + Skill + Reviewer 门 + worktree 隔离：schema/ledger/templates、`tower-primary` preset、独立 reviewer、worktree 隔离、接线门、`towerctl` 基础 | 一个任务 `READY → DISPATCHED → RETURNED → REVIEW → ACCEPT`，reviewer 独立、worktree 隔离、接线门通过；**不含 merge/生产/双塔/Console** |
++| **2. 双塔** | `tower-supervisor` preset、`MERGE_QUEUE`、PR 状态机、两提交信封、post-merge | 主塔不能 merge；监督塔能独立验收并合并；分离不变量检查通过 |
++| **3. 交接 v2.1** | `project-handoff` 适配、§0/§0a、七节包、claim | 两个 DSH 会话完成一次完整交接 |
++| **4. Console** | DSH 客户端插件只读面板 | 面板状态与文件一致，无写权限 |
++| **5. 自动化** | `schedule`/`goal` 提醒 | 手动跑稳后才开，且只提醒不晋级 |
++
++### 9.1 首版范围（v0.3 收窄）
++
++**做：**
++
++- Tower Core：schema、ledger、模板、`towerctl init/wiring/startup/check/hash`
++- Tower Skill：启动读序、路由、任务卡、reviewer 门
++- `tower-primary` preset
++- 独立 Reviewer（`subagent` fresh context，read-only）
++- worktree 隔离（每个 executor 一个 worktree，one file one owner）
++- 接线门（AGENTS/README/START-HERE → TOWER.md）
++
++**不做（留到后续阶段）：**
++
++- merge / 合并队列 / 两提交信封（Phase 2）
++- 监督塔与双塔分离（Phase 2）
++- 生产/外部调用/部署（四闸，永远 owner）
++- Console（Phase 4）
++- 自动化/心跳（Phase 5）
++
++**首版验收：**
++
++- 一个真实任务走完 `READY → DISPATCHED → RETURNED → REVIEW → ACCEPT`（不 merge）
++- Reviewer 与 Executor 不同上下文，亲跑证据
++- worktree 隔离，主工作树无脏写
++- `towerctl wiring` 通过，没有孤儿文件
++
++---
++
++## 10. 验收标准（v1）
++
++- **首版**：一个任务走完 `READY → DISPATCHED → RETURNED → REVIEW → ACCEPT`（不 merge），reviewer 独立、worktree 隔离、接线门通过；
++- 接线门通过：`AGENTS.md`/`README.md`/`START-HERE.md` 都指向 `TOWER.md`；
++- 一个任务能从 `INTAKE` 走到 `CLOSEOUT`，每个阶段 `check` 通过；
++- 主塔不能 merge；监督塔能独立验收并合并；`pr_author != merge_approver` 检查通过；
++- 两提交合并信封可被监督塔独立复算；`MERGED` 必须 `POST_MERGE_VERIFIED`；
++- 账本能重放出 `CURRENT_STATE`/`TASK_BOARD`/`MERGE_QUEUE` 的当前值；
++- 一次 project-handoff v2.1 交接完成，旧塔停写、新塔有启动回执；
++- Console 只读，不能改状态；
++- 所有四闸动作都有 `decision-registry` + ledger 记录；
++- 没有“只被自己引用”的孤儿塔文件。
++
++---
++
++## 11. 待 owner 拍板
++
++1. **首实例选哪个？**
++   - A. `tower-dsh`：绿field，先跑通机制（推荐）
++   - B. BI CODE UP：直接接最成熟的双塔，但业务包袱重
++   - C. GameShield 主塔：四闸/Codex 包成熟
++   - D. 智能客服控制塔：交接 v2.1 最完整
++2. **第一版要不要 Console？**
++   - A. 先 Skill + CLI，Console 放第四阶段（推荐）
++   - B. 一开始就做只读 Console
++3. **命名**：`Tower/DSH`、`DSH Tower`、`控制塔 v2`，选一个。
++4. **主塔默认权限**：`workspace_write` 还是 `read_only`（治理只读，执行另开）？
++5. **小任务是否保留 `tower-lite` 快路径**（不建完整任务卡，只记 ledger + 回执）？
++6. **首版是否按 v0.3 收窄？**
++   - A. 是：Core + Skill + Reviewer 门 + worktree 隔离，不做 merge/双塔/Console（推荐）
++   - B. 否：首版就上双塔
++7. **双塔 Phase 2 是否确认？** 推荐 Phase 2，但在任何 merge 之前必须完成。
++8. **PR 状态机**：直接采用 BI CODE UP 的 `DRAFT → … → POST_MERGE_VERIFIED`，还是先做简化版？推荐直接采用。
++
++---
++
++## 附录 A · 现有塔清单
++
++| # | 塔 | 根 | 形态 |
++|---|---|---|---|
++| 1 | BI 主控制塔 | `D:\BI CODE UP\03-control-tower` | 文件化主塔 |
++| 2 | BI 监督控制塔 | `D:\BI CODE UP\04-supervision-control-tower` | 文件化监督塔 |
++| 3 | CT-REAL-BI-TAKEOVER-01 | `D:\CT-REAL-BI-TAKEOVER-01` | CT-HOME runtime |
++| 4 | CT-GAME-CREATIVE-OPS-01 | `D:\CT-GAME-CREATIVE-OPS-01` | CT-HOME runtime |
++| 5 | BI-CLEAN-REBUILD | `D:\BI-CLEAN-REBUILD` | 文档塔 |
++| 6 | GameShield 主塔 | `D:\game  os` | 混合 |
++| 7 | 智能客服控制塔 | `D:\game  os\work\智能客服控制塔` | 文件塔 + skill |
++| 8 | SeeMake Governance Tower | `D:\SeeMake` | 治理流程（旧） |
++| 9 | SeeMake-K3 塔台 | `D:\SeeMake-K3\_k3-ops` | K3 治理层 |
++
++## 附录 B · 关键参考
++
++- BI 双塔：`D:\BI CODE UP\03-control-tower\README.md`、`04-supervision-control-tower\README.md`、`AUTHORITY_MODEL.yaml`、`SUPERVISION_PROTOCOL.md`
++- CT 运行时：`D:\CT-HOME\profiles`、`D:\CT-REAL-BI-TAKEOVER-01\.ct`
++- 交接 v2.1：`%APPDATA%\kimi-desktop\daimon-share\daimon\skills\project-handoff\SKILL.md` 及 `references/`
++- BI-CLEAN 迁移报告：`D:\BI-CLEAN-REBUILD\governance\infra-migration-20261004\MIGRATION_REPORT.md`
++
++---
++
++*本文是设计提案，不含实现代码。确认后从 Phase 1 开始落地。*
+diff --git a/tower-dsh/adr/ADR-TEMPLATE.md b/tower-dsh/adr/ADR-TEMPLATE.md
+new file mode 100644
+index 0000000..2bb6224
+--- /dev/null
++++ b/tower-dsh/adr/ADR-TEMPLATE.md
+@@ -0,0 +1,48 @@
++# ADR 模板 — 架构决策记录
++
++> 复制本文件为 `adr/ADR-00NN-<slug>.md`，填入 front-matter 与正文。
++> 决策一旦落地：`status: accepted`；被后续 ADR 取代后改 `superseded` 并链接新 ADR；
++> 历史提案归档用 `archived`。`towerctl arch-check` 校验 front-matter 与 `related_files` 是否存在。
++
++## 模板
++
++```yaml
++---
++schema: tower/adr@1
++id: ADR-00NN
++title: "一句话标题"
++status: proposed          # proposed | accepted | superseded | archived
++date: YYYY-MM-DD
++deciders:
++  - mac
++related_cards:
++  - PILOT-0NN
++related_files:
++  - tower-dsh/tools/towerctl.py
++---
++```
++
++## 背景
++
++问题与约束：现在是什么状态、为什么会痛、不做会怎样。引用 RED-LINES / ARCHITECTURE 的对应章节，不重复它们。
++
++## 决策
++
++选了什么，边界是什么，怎么被执行（命令、门、测试、CI）。写清“不做”的部分同样重要。
++
++## 替代方案
++
++至少一个被否掉的方案，以及否掉的具体理由（成本/风险/不可验证），不要写“没想到”。
++
++## 后果
++
++正面：得到什么可验证的能力。
++负面：新增的维护面、兼容性负担、已知边界；需要补的卡（PILOT-0NN）。
++
++## 关联卡
++
++- `PILOT-0NN` — 落地本决策的卡（必须是 `tasks/` 里真实存在的卡）。
++
++## 关联文件
++
++- `tower-dsh/tools/towerctl.py` — 决策的执行点（`arch-check` 会校验文件存在）。
+diff --git a/tower-dsh/arch/GATES.json b/tower-dsh/arch/GATES.json
+new file mode 100644
+index 0000000..b2414dc
+--- /dev/null
++++ b/tower-dsh/arch/GATES.json
+@@ -0,0 +1,110 @@
++{
++  "gates": [
++    {
++      "blocks": "ready/dispatch before SPEC_APPROVED and a fresh spec gate PASS",
++      "command": "check",
++      "id": "GATE-SPEC",
++      "phase": "spec",
++      "test": "test_dispatch_rejects_missing_spec_gate"
++    },
++    {
++      "blocks": "dispatch when the frozen spec changed after the spec gate passed",
++      "command": "check",
++      "id": "GATE-READY",
++      "phase": "ready",
++      "test": "test_check_ready_rejects_spec_changed_after_gate_pass"
++    },
++    {
++      "blocks": "dispatch without a passing spec gate; anchors dispatch.base_sha",
++      "command": "dispatch",
++      "id": "GATE-DISPATCH",
++      "phase": "dispatch",
++      "test": "test_dispatch_rejects_spec_changed_after_task_new"
++    },
++    {
++      "blocks": "delivery of paths outside allowed_paths + completions",
++      "command": "deliver",
++      "id": "GATE-DELIVER-SCOPE",
++      "phase": "deliver",
++      "test": "test_out_of_scope_change_rejected_with_zero_writes"
++    },
++    {
++      "blocks": "delivery whose dispatch.base_sha is not an ancestor of HEAD",
++      "command": "deliver",
++      "id": "GATE-DELIVER-BASE-SHA",
++      "phase": "deliver",
++      "test": "test_base_sha_not_ancestor_is_rejected"
++    },
++    {
++      "blocks": "delivery that adds new shape debt over the frozen baseline",
++      "command": "deliver",
++      "id": "GATE-DELIVER-SHAPE",
++      "phase": "deliver",
++      "test": "test_new_long_function_blocks_delivery_with_no_writes"
++    },
++    {
++      "blocks": "self-review (reviewer == executor) and verdict-free review",
++      "command": "checkback",
++      "id": "GATE-REVIEW",
++      "phase": "review",
++      "test": "test_checkback_rejects_reviewer_equal_to_executor"
++    },
++    {
++      "blocks": "acceptance without a PASS review and hash-clean evidence",
++      "command": "accept",
++      "id": "GATE-ACCEPT",
++      "phase": "accept",
++      "test": "test_accept_rejects_missing_evidence"
++    },
++    {
++      "blocks": "closeout with missing TASK.md/CLOSEOUT or stale evidence",
++      "command": "close",
++      "id": "GATE-CLOSE",
++      "phase": "close",
++      "test": "test_close_rejects_missing_task_md"
++    },
++    {
++      "blocks": "a merge envelope before the task is accepted and reviewed",
++      "command": "envelope-new",
++      "id": "GATE-ENVELOPE",
++      "phase": "envelope",
++      "test": "test_envelope_new_requires_accepted_task_and_pass_review"
++    },
++    {
++      "blocks": "merging an envelope that is not queued with tests baselines",
++      "command": "queue-add",
++      "id": "GATE-QUEUE",
++      "phase": "queue",
++      "test": "test_queue_add_rejects_handwritten_missing_tests_baseline"
++    },
++    {
++      "blocks": "merge-check when reviewer == executor or evidence drifted",
++      "command": "merge-check",
++      "id": "GATE-MERGE-CHECK",
++      "phase": "merge-check",
++      "test": "test_merge_check_requires_independent_reviewer"
++    },
++    {
++      "blocks": "merge of an unqueued envelope, wrong branch or mismatched base",
++      "command": "merge",
++      "id": "GATE-MERGE-PREFLIGHT",
++      "phase": "merge",
++      "test": "test_merge_rejects_current_branch_not_envelope_base"
++    },
++    {
++      "blocks": "completion claims while the envelope is only MERGED",
++      "command": "post-merge",
++      "id": "GATE-POST-MERGE",
++      "phase": "post-merge",
++      "test": "test_merged_is_not_completion_until_post_merge_verified"
++    },
++    {
++      "blocks": "merge --mode pr while GitHub checks are red or unregistered",
++      "command": "merge",
++      "id": "GATE-CI",
++      "phase": "ci",
++      "test": "test_failing_checks_block_with_correction_required"
++    }
++  ],
++  "schema": "tower/gates@1"
++}
+diff --git a/tower-dsh/arch/INVARIANTS.json b/tower-dsh/arch/INVARIANTS.json
+new file mode 100644
+index 0000000..3de8c85
+--- /dev/null
++++ b/tower-dsh/arch/INVARIANTS.json
+@@ -0,0 +1,133 @@
++{
++  "invariants": [
++    {
++      "id": "C-01",
++      "probe": {
++        "kind": "command",
++        "ref": "merge"
++      },
++      "text": "merge 只能由 owner 逐次授权、并只由 supervision 执行；owner-gate 的执行点是 merge 的 supervisor/authority 校验。"
++    },
++    {
++      "id": "C-02",
++      "probe": {
++        "kind": "command",
++        "ref": "merge"
++      },
++      "text": "任何离开本机的调用只能由 owner 逐次授权；owner-gate 的执行点是 merge --mode pr（唯一走 gh 的路径）。"
++    },
++    {
++      "id": "C-03",
++      "probe": {
++        "kind": "command",
++        "ref": "dispatch"
++      },
++      "text": "部署、发布、生产读写、数据迁移、退役默认 no_access；owner-gate 的执行点是 dispatch 对 workspace_write 上限的校验。"
++    },
++    {
++      "id": "C-04",
++      "probe": {
++        "kind": "command",
++        "ref": "merge"
++      },
++      "text": "写 L0 文档到 main 只能由 owner 逐次授权；owner-gate 的执行点是 merge（L0 变更必须经合并队列与 owner 决定）。"
++    },
++    {
++      "id": "C-05",
++      "probe": {
++        "kind": "command",
++        "ref": "merge"
++      },
++      "text": "未授权 merge、强推、改远端受保护分支禁止；owner-gate 的执行点是 merge 的分支/base_sha 断言。"
++    },
++    {
++      "id": "C-06",
++      "probe": {
++        "kind": "command",
++        "ref": "merge"
++      },
++      "text": "未授权外部调用（含上传到未批准服务）禁止；owner-gate 的执行点是 merge --mode pr 的唯一出网路径。"
++    },
++    {
++      "id": "C-07",
++      "probe": {
++        "kind": "command",
++        "ref": "dispatch"
++      },
++      "text": "部署、生产读写、数据迁移、退役禁止；owner-gate 的执行点是 dispatch/authority 校验与 PROJECT_PROFILE 上限。"
++    },
++    {
++      "id": "C-08",
++      "probe": {
++        "kind": "test",
++        "ref": "test_modified_task_record_is_authority_drift"
++      },
++      "text": "禁止手改 primary/CURRENT_STATE.json、TASK_BOARD.json、supervision/*.json、ledger/*.jsonl、tasks/*/record.json；review-check 由 state-verify 重放比对。"
++    },
++    {
++      "id": "C-09",
++      "probe": {
++        "kind": "test",
++        "ref": "test_tampered_hash_is_detected"
++      },
++      "text": "禁止伪造证据（改证据文件、补造 ledger 事件、以文件存在代替检查通过）；tool-check 复算哈希链。"
++    },
++    {
++      "id": "C-10",
++      "probe": {
++        "kind": "test",
++        "ref": "test_out_of_scope_change_rejected_with_zero_writes"
++      },
++      "text": "executor 不得写 allowed_paths 之外的文件，reviewer 不得改工作树；review-check 由 deliver 范围门强制。"
++    },
++    {
++      "id": "C-11",
++      "probe": {
++        "kind": "test",
++        "ref": "test_checkback_rejects_reviewer_equal_to_executor"
++      },
++      "text": "禁止自审自批（executor=reviewer、primary=merge 批准者、作者=验收者）；tool-check 由 checkback/merge 拒绝。"
++    },
++    {
++      "id": "C-12",
++      "probe": {
++        "kind": "command",
++        "ref": "merge"
++      },
++      "text": "禁止读取或回显凭据（token/私钥/密码/cookie）；review-check 的最近执行点是 merge 的出网路径（无自动化 proof，仅 review 执行点）。"
++    },
++    {
++      "id": "C-13",
++      "probe": {
++        "kind": "test",
++        "ref": "test_merged_is_not_completion_until_post_merge_verified"
++      },
++      "text": "禁止把聊天记录当状态、或在没有证据时声明完成；完成声明必须引用 ledger 事件与证据哈希。"
++    },
++    {
++      "id": "C-14",
++      "probe": {
++        "kind": "test",
++        "ref": "test_state_transitions_reject_skips"
++      },
++      "text": "禁止跳过闸点（spec_gate != PASS 时 dispatch、未 queued 时 merge、未 POST_MERGE_VERIFIED 时宣布完成）。"
++    },
++    {
++      "id": "C-15",
++      "probe": {
++        "kind": "command",
++        "ref": "merge"
++      },
++      "text": "触碰红线后必须停止、记录并报告 owner 等待口令；owner-gate 的执行点是 merge/accept 的 owner 决定记录（无自动化 proof，仅 owner 执行点）。"
++    },
++    {
++      "id": "C-16",
++      "probe": {
++        "kind": "command",
++        "ref": "post-merge"
++      },
++      "text": "已产生副作用时必须保留现场，不清理、不回滚；owner-gate 的执行点是 post-merge 的现场复核与 owner 处置。"
++    }
++  ],
++  "schema": "tower/invariants@1"
++}
+diff --git a/tower-dsh/tools/tests/test_arch.py b/tower-dsh/tools/tests/test_arch.py
+new file mode 100644
+index 0000000..66027c4
+--- /dev/null
++++ b/tower-dsh/tools/tests/test_arch.py
+@@ -0,0 +1,270 @@
++"""Tests for the PILOT-048 architecture spine: ``arch-check`` / ``arch-graph``.
++
++Positive cases run against the real worktree; every negative case builds its own
++throw-away copy of the tower (``tools/``, ``arch/``, ``adr/``, ``ARCHITECTURE.md``,
++``EVENT_CATALOG.json``) under the runner's ``TMP`` sandbox, mutates exactly one
++fact and drives the real CLI, so exit codes and the single-JSON error contract are
++asserted as a caller observes them::
++
++    python -B tools/run_tests.py --pattern test_arch.py
++"""
++from __future__ import annotations
++
++import hashlib
++import json
++import shutil
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++TOOLS_DIR = Path(__file__).resolve().parents[1]
++TOWER_ROOT = TOOLS_DIR.parent
++WORKTREE = TOWER_ROOT.parent
++TCLI = TOOLS_DIR / "towerctl.py"
++ADR_REL = "adr/ADR-0001-initial-design.md"
++ORIGINAL_DESIGN_SHA256 = (
++    "46ae26fe4850bd7acdc805654624e4d25fc34d08ce5c20a4398209ec6ae6d5b8")
++COPIED = ("tools", "arch", "adr", "ARCHITECTURE.md", "EVENT_CATALOG.json")
++TREE_DIRS = ("primary", "supervision", "ledger", "tasks")
++
++
++def run_cli(root: Path, *args: str) -> subprocess.CompletedProcess:
++    return subprocess.run(
++        [sys.executable, "-B", str(TCLI), "--root", str(root), *args],
++        capture_output=True, text=True, encoding="utf-8",
++    )
++
++
++def read_json(path: Path):
++    return json.loads(path.read_text(encoding="utf-8"))
++
++
++def write_json(path: Path, data) -> None:
++    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
++                    encoding="utf-8")
++
++
++def tower_copy() -> Path:
++    """A writable copy of the tower laid out as ``<tmp>/tower-dsh``."""
++    target = Path(tempfile.mkdtemp(prefix="pilot048-")) / "tower-dsh"
++    target.mkdir()
++    for name in COPIED:
++        source = TOWER_ROOT / name
++        if source.is_dir():
++            shutil.copytree(source, target / name,
++                            ignore=shutil.ignore_patterns("__pycache__"))
++        else:
++            shutil.copy2(source, target / name)
++    return target
++
++
++def tree_digest(bases: tuple[Path, ...]) -> str:
++    """One digest over every file under ``bases`` (path + bytes, sorted)."""
++    digest = hashlib.sha256()
++    for base in bases:
++        for path in sorted(base.rglob("*")):
++            if path.is_file():
++                digest.update(path.relative_to(TOWER_ROOT).as_posix().encode())
++                digest.update(path.read_bytes())
++    return digest.hexdigest()
++
++
++def adr_body(path: Path) -> bytes:
++    """Everything after the closing front-matter fence, byte-for-byte."""
++    data = path.read_bytes()
++    head, separator, body = data.partition(b"\n---\n")
++    if not separator:
++        raise AssertionError("ADR has no closing front-matter fence")
++    return body
++
++
++class ArchCheckPositiveCase(unittest.TestCase):
++    def test_real_worktree_arch_check_is_green(self) -> None:
++        cp = run_cli(TOWER_ROOT, "arch-check")
++        self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)
++        payload = json.loads(cp.stdout)
++        self.assertTrue(payload["ok"])
++        self.assertEqual(payload["errors"], [])
++        counts = payload["counts"]
++        self.assertEqual(counts["gates"], 15)
++        self.assertEqual(counts["invariants"], 16)
++        self.assertEqual(counts["sections"], 6)
++        self.assertEqual(counts["events"], counts["event_types_in_code"])
++        self.assertGreaterEqual(counts["adrs"], 1)
++        self.assertGreaterEqual(counts["edges"], 1)
++
++    def test_arch_graph_is_parseable_and_byte_stable(self) -> None:
++        first = run_cli(TOWER_ROOT, "arch-graph", "--json")
++        second = run_cli(TOWER_ROOT, "arch-graph", "--json")
++        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
++        self.assertEqual(first.stdout, second.stdout)
++        graph = json.loads(first.stdout)
++        self.assertEqual(graph["schema"], "tower/arch-graph@1")
++        self.assertEqual(sorted(graph), ["edges", "nodes", "schema"])
++        self.assertEqual(graph["nodes"], sorted(graph["nodes"]))
++        pairs = [(edge["from"], edge["to"]) for edge in graph["edges"]]
++        self.assertEqual(pairs, sorted(pairs))
++        self.assertIn("tools/towerctl.py", graph["nodes"])
++        self.assertNotIn("generated", first.stdout.lower())
++        self.assertNotIn("2026-", first.stdout)
++
++    def test_design_md_is_archived_as_adr_0001(self) -> None:
++        self.assertFalse((TOWER_ROOT / "DESIGN.md").exists())
++        self.assertFalse((WORKTREE / "control-tower" / "DESIGN.md").exists())
++        adr = TOWER_ROOT / ADR_REL
++        self.assertTrue(adr.is_file())
++        self.assertEqual(hashlib.sha256(adr_body(adr)).hexdigest(),
++                         ORIGINAL_DESIGN_SHA256)
++
++    def test_arch_commands_are_read_only(self) -> None:
++        bases = tuple(TOWER_ROOT / name for name in TREE_DIRS)
++        before = tree_digest(bases)
++        check = run_cli(TOWER_ROOT, "arch-check")
++        graph = run_cli(TOWER_ROOT, "arch-graph", "--json")
++        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
++        self.assertEqual(graph.returncode, 0, graph.stdout + graph.stderr)
++        self.assertEqual(before, tree_digest(bases))
++
++
++class ArchCheckNegativeCase(unittest.TestCase):
++    def fixture(self) -> Path:
++        root = tower_copy()
++        self.addCleanup(shutil.rmtree, root.parent, ignore_errors=True)
++        return root
++
++    def assert_arch_failure(self, root: Path, code: str) -> None:
++        cp = run_cli(root, "arch-check")
++        self.assertEqual(cp.returncode, 2, cp.stdout + cp.stderr)
++        self.assertNotIn("Traceback", cp.stderr)
++        payload = json.loads(cp.stdout)
++        self.assertFalse(payload["ok"])
++        for item in payload["errors"]:
++            self.assertEqual(sorted(item), ["code", "detail", "target"])
++        self.assertIn(code, {item["code"] for item in payload["errors"]})
++
++    def test_unknown_gate_command_is_rejected(self) -> None:
++        root = self.fixture()
++        path = root / "arch" / "GATES.json"
++        data = read_json(path)
++        data["gates"][0]["command"] = "no-such-command"
++        write_json(path, data)
++        self.assert_arch_failure(root, "GATE_COMMAND")
++
++    def test_unknown_gate_test_is_rejected(self) -> None:
++        root = self.fixture()
++        path = root / "arch" / "GATES.json"
++        data = read_json(path)
++        data["gates"][0]["test"] = "test_missing_gate_probe_048"
++        write_json(path, data)
++        self.assert_arch_failure(root, "GATE_TEST")
++
++    def test_invariant_without_c16_is_rejected(self) -> None:
++        root = self.fixture()
++        path = root / "arch" / "INVARIANTS.json"
++        data = read_json(path)
++        data["invariants"] = [item for item in data["invariants"]
++                              if item["id"] != "C-16"]
++        write_json(path, data)
++        self.assert_arch_failure(root, "INVARIANT_MISSING")
++
++    def test_invariant_probe_must_exist(self) -> None:
++        root = self.fixture()
++        path = root / "arch" / "INVARIANTS.json"
++        data = read_json(path)
++        for item in data["invariants"]:
++            if item["id"] == "C-16":
++                item["probe"] = {"kind": "test", "ref": "test_missing_probe_048"}
++        write_json(path, data)
++        self.assert_arch_failure(root, "INVARIANT_PROBE")
++
++    def test_catalog_missing_a_code_type_is_rejected(self) -> None:
++        root = self.fixture()
++        path = root / "EVENT_CATALOG.json"
++        data = read_json(path)
++        data["events"] = [item for item in data["events"]
++                          if item["type"] != "MERGE"]
++        write_json(path, data)
++        self.assert_arch_failure(root, "EVENT_MISSING")
++
++    def test_catalog_extra_type_is_rejected(self) -> None:
++        root = self.fixture()
++        path = root / "EVENT_CATALOG.json"
++        data = read_json(path)
++        extra = dict(data["events"][0])
++        extra.update({"type": "NO_SUCH_EVENT", "producer": "merge",
++                      "ledger": "primary", "payload_required": ["x"],
++                      "state_verify": False, "drift_kinds": [],
++                      "note": "fixture"})
++        data["events"].append(extra)
++        write_json(path, data)
++        self.assert_arch_failure(root, "EVENT_EXTRA")
++
++    def test_invalid_adr_status_is_rejected(self) -> None:
++        root = self.fixture()
++        path = root / ADR_REL
++        path.write_text(path.read_text(encoding="utf-8").replace(
++            "status: archived", "status: bogus"), encoding="utf-8")
++        self.assert_arch_failure(root, "ADR_STATUS")
++
++    def test_missing_adr_related_file_is_rejected(self) -> None:
++        root = self.fixture()
++        path = root / ADR_REL
++        path.write_text(path.read_text(encoding="utf-8").replace(
++            "  - tower-dsh/tools/towerctl.py",
++            "  - tower-dsh/tools/does-not-exist.py"), encoding="utf-8")
++        self.assert_arch_failure(root, "ADR_RELATED")
++
++    def test_adr_related_file_rejects_drive_path(self) -> None:
++        root = self.fixture()
++        path = root / ADR_REL
++        path.write_text(path.read_text(encoding="utf-8").replace(
++            "  - tower-dsh/tools/towerctl.py",
++            '  - "C:/Windows/win.ini"'), encoding="utf-8")
++        self.assert_arch_failure(root, "ADR_RELATED")
++
++    def test_adr_related_file_rejects_parent_escape(self) -> None:
++        root = self.fixture()
++        path = root / ADR_REL
++        path.write_text(path.read_text(encoding="utf-8").replace(
++            "  - tower-dsh/tools/towerctl.py",
++            "  - ../outside-the-tower.md"), encoding="utf-8")
++        self.assert_arch_failure(root, "ADR_RELATED")
++
++    def test_duplicate_tool_stem_is_rejected(self) -> None:
++        root = self.fixture()
++        source = root / "tools" / "towerctl.py"
++        duplicate = root / "tools" / "zzz" / "towerctl.py"
++        duplicate.parent.mkdir()
++        duplicate.write_text(source.read_text(encoding="utf-8"),
++                             encoding="utf-8")
++        self.assert_arch_failure(root, "GRAPH_STEM_DUPLICATE")
++        cp = run_cli(root, "arch-graph", "--json")
++        self.assertEqual(cp.returncode, 2, cp.stdout + cp.stderr)
++        self.assertNotIn("Traceback", cp.stderr)
++        self.assertFalse(json.loads(cp.stdout)["ok"])
++
++    def test_missing_architecture_section_is_rejected(self) -> None:
++        root = self.fixture()
++        path = root / "ARCHITECTURE.md"
++        path.write_text(path.read_text(encoding="utf-8").replace(
++            "## 3. 数据流\n", ""), encoding="utf-8")
++        self.assert_arch_failure(root, "ARCH_SECTION")
++
++    def test_towerctl_must_not_import_tests(self) -> None:
++        root = self.fixture()
++        path = root / "tools" / "towerctl.py"
++        with path.open("a", encoding="utf-8", newline="\n") as handle:
++            handle.write("\n\ndef _arch_boundary_fixture():\n"
++                         "    import test_arch  # noqa: F401\n")
++        self.assert_arch_failure(root, "BOUNDARY_IMPORT")
++
++    def test_unreadable_catalog_is_one_json_error(self) -> None:
++        root = self.fixture()
++        (root / "EVENT_CATALOG.json").write_text("{not json", encoding="utf-8")
++        self.assert_arch_failure(root, "JSON_UNREADABLE")
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tower-dsh/tools/towerctl.py b/tower-dsh/tools/towerctl.py
+index 51a3191..66d475b 100644
+--- a/tower-dsh/tools/towerctl.py
++++ b/tower-dsh/tools/towerctl.py
+@@ -7146,12 +7146,600 @@ def position_layer_parsers(parser: argparse.ArgumentParser) -> argparse.Argument
+     return parser
+ 
+ 
++# ---------------------------------------------------------------------------
++# PILOT-048 architecture spine: ``arch-check`` reconciles the prose with the
++# code, ``arch-graph`` is the deterministic import graph both commands share.
++# Both are read-only: they never write tower state.
++# ---------------------------------------------------------------------------
++ARCH_SCHEMA = "tower/architecture@1"
++ARCH_FILE_REL = "ARCHITECTURE.md"
++ARCH_GATES_REL = "arch/GATES.json"
++ARCH_INVARIANTS_REL = "arch/INVARIANTS.json"
++ARCH_EVENTS_REL = "EVENT_CATALOG.json"
++ARCH_ADR_DIR = "adr"
++ARCH_ADR_TEMPLATE = "ADR-TEMPLATE.md"
++ARCH_GATES_SCHEMA = "tower/gates@1"
++ARCH_INVARIANTS_SCHEMA = "tower/invariants@1"
++ARCH_EVENTS_SCHEMA = "tower/event-catalog@1"
++ARCH_ADR_SCHEMA = "tower/adr@1"
++ARCH_GRAPH_SCHEMA = "tower/arch-graph@1"
++ARCH_ADR_STATUSES = ("proposed", "accepted", "superseded", "archived")
++ARCH_DRIVE_RE = re.compile(r"^[A-Za-z]:")
++ARCH_SECTIONS = (
++    "## 1. 系统上下文", "## 2. 组件与职责", "## 3. 数据流",
++    "## 4. 关键契约", "## 5. 扩展点", "## 6. 不变量")
++ARCH_GATE_IDS = (
++    "GATE-SPEC", "GATE-READY", "GATE-DISPATCH", "GATE-DELIVER-SCOPE",
++    "GATE-DELIVER-BASE-SHA", "GATE-DELIVER-SHAPE", "GATE-REVIEW",
++    "GATE-ACCEPT", "GATE-CLOSE", "GATE-ENVELOPE", "GATE-QUEUE",
++    "GATE-MERGE-CHECK", "GATE-MERGE-PREFLIGHT", "GATE-POST-MERGE", "GATE-CI")
++ARCH_INVARIANT_IDS = tuple(f"C-{index:02d}" for index in range(1, 17))
++# writer -> (event_type argument index, ledger or None for the low-level writer)
++ARCH_LEDGER_WRITERS = {
++    "append_ledger": (1, "primary"),
++    "append_supervision_ledger": (1, "supervision"),
++    "_append_ledger_event_locked": (2, None)}
++
++
++def arch_finding(code: str, target: str, detail: str) -> dict:
++    """One ``arch-check`` error: ``{code, target, detail}`` (sorted on emit)."""
++    return {"code": code, "target": target, "detail": detail}
++
++
++def arch_string_list(value) -> bool:
++    """True for a list of non-empty strings (payload_required, drift kinds)."""
++    return isinstance(value, list) and all(
++        isinstance(item, str) and item.strip() for item in value)
++
++
++def arch_load_json(root: Path, relpath: str, schema: str):
++    """Read one machine document; ``(data | None, findings)``, never raises."""
++    try:
++        data = jload(root / relpath)
++    except (OSError, ValueError) as exc:
++        return None, [arch_finding("JSON_UNREADABLE", relpath, str(exc))]
++    if not isinstance(data, dict):
++        return None, [arch_finding("JSON_SHAPE", relpath,
++                                   "top level must be an object")]
++    if data.get("schema") != schema:
++        return None, [arch_finding("JSON_SCHEMA", relpath,
++                                   f"schema must be {schema}")]
++    return data, []
++
++
++def arch_command_names() -> set[str]:
++    """Every registered towerctl subcommand (the parser is the authority)."""
++    return set(cli_commands())
++
++
++def arch_test_names(root: Path):
++    """``({test function name: file}, findings)`` over ``tools/tests/*.py``."""
++    names: dict[str, str] = {}
++    findings: list[dict] = []
++    for path in sorted((root / "tools" / "tests").glob("*.py")):
++        relpath = f"tools/tests/{path.name}"
++        try:
++            tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=relpath)
++        except (OSError, SyntaxError, UnicodeError) as exc:
++            findings.append(arch_finding("TESTS_UNREADABLE", relpath, str(exc)))
++            continue
++        for node in ast.walk(tree):
++            if isinstance(node, ast.FunctionDef) and node.name.startswith("test"):
++                names.setdefault(node.name, relpath)
++    if not names:
++        findings.append(arch_finding("TESTS_MISSING", "tools/tests",
++                                     "no test functions found"))
++    return names, findings
++
++
++def arch_constants(tree: ast.Module) -> dict[str, str]:
++    """Module-level ``NAME = "literal"`` assignments (event type constants)."""
++    found: dict[str, str] = {}
++    for node in tree.body:
++        if (isinstance(node, ast.Assign) and len(node.targets) == 1
++                and isinstance(node.targets[0], ast.Name)
++                and isinstance(node.value, ast.Constant)
++                and isinstance(node.value.value, str)):
++            found[node.targets[0].id] = node.value.value
++    return found
++
++
++def arch_literal(node, consts: dict[str, str]) -> str | None:
++    """The string value of a literal or of a module-level string constant."""
++    if isinstance(node, ast.Constant) and isinstance(node.value, str):
++        return node.value
++    if isinstance(node, ast.Name):
++        return consts.get(node.id)
++    return None
++
++
++def arch_writer_ledger(node: ast.Call, consts: dict[str, str],
++                       writer: str) -> str | None:
++    """Which ledger a writer call appends to, or None when it cannot be read."""
++    fixed = ARCH_LEDGER_WRITERS[writer][1]
++    if fixed is not None:
++        return fixed
++    if len(node.args) < 2:
++        return None
++    subscript = node.args[1]
++    if not (isinstance(subscript, ast.Subscript)
++            and isinstance(subscript.value, ast.Name)
++            and subscript.value.id == "LEDGER_FILES"):
++        return None
++    key = arch_literal(subscript.slice, consts)
++    return key if key in LEDGER_FILES else None
++
++
++def arch_event_types(root: Path):
++    """``({type: ledger}, findings, unresolved)`` from ledger writer call sites.
++
++    Only literal strings and module-level string constants are collected, as
++    the card requires.  The internal forwarder ``_append_ledger_event`` passes
++    its ``event_type`` parameter through to ``_append_ledger_event_locked``, so
++    that call is counted as unresolved instead of guessed.
++    """
++    relpath = "tools/towerctl.py"
++    try:
++        tree = ast.parse((root / relpath).read_text(encoding="utf-8-sig"),
++                         filename=relpath)
++    except (OSError, SyntaxError, UnicodeError) as exc:
++        return {}, [arch_finding("TOWERCTL_UNREADABLE", relpath, str(exc))], 0
++    consts = arch_constants(tree)
++    found: dict[str, str] = {}
++    findings: list[dict] = []
++    unresolved = 0
++    for node in ast.walk(tree):
++        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
++            continue
++        writer = node.func.id
++        if writer not in ARCH_LEDGER_WRITERS:
++            continue
++        index = ARCH_LEDGER_WRITERS[writer][0]
++        argument = node.args[index] if len(node.args) > index else None
++        event = arch_literal(argument, consts)
++        ledger = arch_writer_ledger(node, consts, writer)
++        if event is None or ledger is None:
++            unresolved += 1
++            continue
++        if found.setdefault(event, ledger) != ledger:
++            findings.append(arch_finding(
++                "EVENT_LEDGER", event,
++                f"appended to both {found[event]} and {ledger}"))
++    return found, findings, unresolved
++
++
++def arch_graph_nodes(root: Path) -> list[str]:
++    """Every ``tools/**/*.py`` module path, sorted (the graph's node set)."""
++    nodes = [path.relative_to(root).as_posix()
++             for path in root.glob("tools/**/*.py")
++             if path.is_file() and "__pycache__" not in path.parts]
++    return sorted(set(nodes))
++
++
++def arch_imports(tree: ast.Module) -> set[str]:
++    """Every imported module/name (``import x.y`` and ``from a.b import c``)."""
++    names: set[str] = set()
++    for node in ast.walk(tree):
++        if isinstance(node, ast.Import):
++            names.update(alias.name for alias in node.names)
++        elif isinstance(node, ast.ImportFrom):
++            if node.module:
++                names.add(node.module)
++            names.update(alias.name for alias in node.names)
++    return names
++
++
++def arch_resolve_imports(names: set[str], by_module: dict[str, str]) -> set[str]:
++    """Map imported names to local node paths by their last dotted component."""
++    resolved: set[str] = set()
++    for name in names:
++        target = by_module.get(name.split(".")[-1])
++        if target:
++            resolved.add(target)
++    return resolved
++
++
++def arch_graph_stem_findings(nodes: list[str]) -> list[dict]:
++    """Two tools modules with the same stem make import edges ambiguous."""
++    counts: dict[str, int] = {}
++    for node in nodes:
++        stem = Path(node).stem
++        counts[stem] = counts.get(stem, 0) + 1
++    return [arch_finding("GRAPH_STEM_DUPLICATE", stem,
++                         "two tools modules share this stem; import edges are "
++                         "ambiguous")
++            for stem, count in sorted(counts.items()) if count > 1]
++
++
++def arch_graph_payload(root: Path):
++    """``(payload, findings)`` for ``tower/arch-graph@1``; keys sorted on emit."""
++    nodes = arch_graph_nodes(root)
++    by_module: dict[str, str] = {}
++    for node in nodes:
++        by_module.setdefault(Path(node).stem, node)
++    edges: list[dict] = []
++    findings = arch_graph_stem_findings(nodes)
++    for node in nodes:
++        try:
++            tree = ast.parse((root / node).read_text(encoding="utf-8-sig"),
++                             filename=node)
++        except (OSError, SyntaxError, UnicodeError) as exc:
++            findings.append(arch_finding("GRAPH_UNREADABLE", node, str(exc)))
++            continue
++        for target in sorted(arch_resolve_imports(arch_imports(tree), by_module)):
++            if target != node:
++                edges.append({"from": node, "to": target})
++    edges.sort(key=lambda edge: (edge["from"], edge["to"]))
++    payload = {"schema": ARCH_GRAPH_SCHEMA, "nodes": nodes, "edges": edges}
++    return payload, findings
++
++
++def arch_boundary_findings(graph: dict) -> list[dict]:
++    """PILOT-048 boundary: ``tools/towerctl.py`` must never import the tests."""
++    return [arch_finding("BOUNDARY_IMPORT", "tools/towerctl.py",
++                         f"towerctl imports {edge['to']}")
++            for edge in graph["edges"]
++            if edge["from"] == "tools/towerctl.py"
++            and edge["to"].startswith("tools/tests/")]
++
++
++def arch_gate_field_findings(gate: dict, gid: str, commands: set[str],
++                             tests: dict[str, str]) -> list[dict]:
++    """One gate entry: command/phase/test/blocks presence and references."""
++    findings: list[dict] = []
++    command = gate.get("command")
++    if command not in commands:
++        findings.append(arch_finding(
++            "GATE_COMMAND", gid,
++            f"command {command!r} is not a towerctl subcommand"))
++    test = gate.get("test")
++    if not (isinstance(test, str) and test in tests):
++        findings.append(arch_finding(
++            "GATE_TEST", gid, f"test {test!r} is not in tools/tests/*.py"))
++    for field in ("phase", "blocks"):
++        value = gate.get(field)
++        if not (isinstance(value, str) and value.strip()):
++            findings.append(arch_finding(
++                "GATE_FIELD", gid, f"{field} must be a non-empty string"))
++    return findings
++
++
++def arch_gates_findings(root: Path, commands: set[str], tests: dict[str, str]):
++    """``arch/GATES.json``: references, duplicates and required gate ids."""
++    data, findings = arch_load_json(root, ARCH_GATES_REL, ARCH_GATES_SCHEMA)
++    if data is None:
++        return findings, 0
++    gates = data.get("gates")
++    if not isinstance(gates, list):
++        return findings + [arch_finding("GATES_SHAPE", ARCH_GATES_REL,
++                                        "gates must be a list")], 0
++    seen: set[str] = set()
++    for index, gate in enumerate(gates):
++        target = f"{ARCH_GATES_REL}#gates[{index}]"
++        if not isinstance(gate, dict):
++            findings.append(arch_finding("GATE_SHAPE", target,
++                                         "gate must be an object"))
++            continue
++        gid = gate.get("id")
++        if not (isinstance(gid, str) and gid):
++            findings.append(arch_finding("GATE_SHAPE", target,
++                                         "id must be a non-empty string"))
++            continue
++        if gid in seen:
++            findings.append(arch_finding("GATE_DUPLICATE", gid,
++                                         "id appears twice"))
++            continue
++        seen.add(gid)
++        findings += arch_gate_field_findings(gate, gid, commands, tests)
++    findings += [arch_finding("GATE_MISSING", gid, "required gate is missing")
++                 for gid in ARCH_GATE_IDS if gid not in seen]
++    return findings, len(gates)
++
++
++def arch_probe_findings(probe, target: str, commands: set[str],
++                        tests: dict[str, str]) -> list[dict]:
++    """One invariant probe: ``kind`` test|command and an existing ``ref``."""
++    if not isinstance(probe, dict):
++        return [arch_finding("INVARIANT_PROBE", target,
++                             "probe must be an object")]
++    kind = probe.get("kind")
++    pools = {"test": tests, "command": commands}
++    pool = pools.get(kind)
++    if pool is None:
++        return [arch_finding("INVARIANT_PROBE", target,
++                             f"kind {kind!r} must be test or command")]
++    ref = probe.get("ref")
++    if not (isinstance(ref, str) and ref in pool):
++        return [arch_finding("INVARIANT_PROBE", target,
++                             f"{kind} ref {ref!r} does not exist")]
++    return []
++
++
++def arch_invariants_findings(root: Path, commands: set[str],
++                             tests: dict[str, str]):
++    """``arch/INVARIANTS.json``: C-01..C-16, each with an existing probe."""
++    data, findings = arch_load_json(root, ARCH_INVARIANTS_REL,
++                                    ARCH_INVARIANTS_SCHEMA)
++    if data is None:
++        return findings, 0
++    invariants = data.get("invariants")
++    if not isinstance(invariants, list):
++        return findings + [arch_finding("INVARIANTS_SHAPE", ARCH_INVARIANTS_REL,
++                                        "invariants must be a list")], 0
++    seen: set[str] = set()
++    for index, item in enumerate(invariants):
++        target = f"{ARCH_INVARIANTS_REL}#invariants[{index}]"
++        if not isinstance(item, dict):
++            findings.append(arch_finding("INVARIANT_SHAPE", target,
++                                         "entry must be an object"))
++            continue
++        invariant_id = item.get("id")
++        if not (isinstance(invariant_id, str) and invariant_id):
++            findings.append(arch_finding("INVARIANT_SHAPE", target,
++                                         "id must be a non-empty string"))
++            continue
++        if invariant_id in seen:
++            findings.append(arch_finding("INVARIANT_DUPLICATE", invariant_id,
++                                         "id appears twice"))
++            continue
++        seen.add(invariant_id)
++        if not (isinstance(item.get("text"), str) and item["text"].strip()):
++            findings.append(arch_finding("INVARIANT_TEXT", invariant_id,
++                                         "text must be a non-empty string"))
++        findings += arch_probe_findings(item.get("probe"), invariant_id,
++                                        commands, tests)
++    findings += [arch_finding("INVARIANT_MISSING", invariant_id,
++                              "required clause is missing")
++                 for invariant_id in ARCH_INVARIANT_IDS
++                 if invariant_id not in seen]
++    return findings, len(invariants)
++
++
++def arch_event_fields_findings(entry: dict, event: str,
++                               commands: set[str]) -> list[dict]:
++    """One catalog entry: producer, payload keys, state flag, drifts and note."""
++    findings: list[dict] = []
++    if entry.get("producer") not in commands:
++        findings.append(arch_finding(
++            "EVENT_PRODUCER", event,
++            f"producer {entry.get('producer')!r} is not a towerctl subcommand"))
++    if not arch_string_list(entry.get("payload_required")):
++        findings.append(arch_finding(
++            "EVENT_PAYLOAD", event,
++            "payload_required must be a list of non-empty strings"))
++    if not isinstance(entry.get("state_verify"), bool):
++        findings.append(arch_finding("EVENT_FIELD", event,
++                                     "state_verify must be a boolean"))
++    if not arch_string_list(entry.get("drift_kinds")):
++        findings.append(arch_finding("EVENT_FIELD", event,
++                                     "drift_kinds must be a list of strings"))
++    if not (isinstance(entry.get("note"), str) and entry["note"].strip()):
++        findings.append(arch_finding("EVENT_FIELD", event,
++                                     "note must be a non-empty string"))
++    return findings
++
++
++def arch_event_entry_findings(entry, index: int, commands: set[str],
++                              code_types: dict[str, str]) -> list[dict]:
++    """One EVENT_CATALOG entry: shape, ledger and code linkage."""
++    target = f"{ARCH_EVENTS_REL}#events[{index}]"
++    if not isinstance(entry, dict):
++        return [arch_finding("EVENT_SHAPE", target, "entry must be an object")]
++    event = entry.get("type")
++    if not (isinstance(event, str) and event):
++        return [arch_finding("EVENT_SHAPE", target,
++                             "type must be a non-empty string")]
++    findings: list[dict] = []
++    ledger = entry.get("ledger")
++    if ledger not in LEDGER_FILES:
++        findings.append(arch_finding("EVENT_LEDGER", event,
++                                     "ledger must be primary or supervision"))
++    if event not in code_types:
++        findings.append(arch_finding("EVENT_EXTRA", event,
++                                     "type does not appear in towerctl.py"))
++    elif ledger != code_types[event]:
++        findings.append(arch_finding(
++            "EVENT_LEDGER", event,
++            f"catalog says {ledger}, code appends to {code_types[event]}"))
++    findings += arch_event_fields_findings(entry, event, commands)
++    return findings
++
++
++def arch_events_findings(root: Path, commands: set[str],
++                         code_types: dict[str, str]):
++    """``EVENT_CATALOG.json`` against the call sites: bidirectional equality."""
++    data, findings = arch_load_json(root, ARCH_EVENTS_REL, ARCH_EVENTS_SCHEMA)
++    if data is None:
++        return findings, 0
++    entries = data.get("events")
++    if not isinstance(entries, list):
++        return findings + [arch_finding("EVENTS_SHAPE", ARCH_EVENTS_REL,
++                                        "events must be a list")], 0
++    seen: dict[str, int] = {}
++    for index, entry in enumerate(entries):
++        findings += arch_event_entry_findings(entry, index, commands, code_types)
++        if isinstance(entry, dict) and isinstance(entry.get("type"), str):
++            seen[entry["type"]] = seen.get(entry["type"], 0) + 1
++    findings += [arch_finding("EVENT_DUPLICATE", event, "type appears twice")
++                 for event, count in sorted(seen.items()) if count > 1]
++    findings += [arch_finding("EVENT_MISSING", event,
++                              "code appends this type but the catalog omits it")
++                 for event in sorted(set(code_types) - set(seen))]
++    return findings, len(entries)
++
++
++def arch_resolve_rel(root: Path, raw) -> Path | None:
++    """Resolve one tower/repo-relative reference inside the tower root, or None.
++
++    Fail closed: absolute paths, Windows drive paths (``C:/...``), ``..``
++    segments and anything whose resolved target leaves the tower root (symlink
++    escapes included) are rejected, so an ADR cannot vouch for a host file.
++    """
++    text = str(raw or "").replace("\\", "/").strip()
++    if (not text or text.startswith("/") or ARCH_DRIVE_RE.match(text)
++            or ".." in text.split("/")):
++        return None
++    root_abs = root.resolve()
++    candidates = [root / text, root.parent / text]
++    if text.startswith(root.name + "/"):
++        candidates.append(root / text[len(root.name) + 1:])
++    for candidate in candidates:
++        if not candidate.is_file():
++            continue
++        resolved = candidate.resolve()
++        if resolved == root_abs or root_abs in resolved.parents:
++            return resolved
++    return None
++
++
++def arch_adr_meta_findings(root: Path, meta: dict, relpath: str) -> list[dict]:
++    """ADR front-matter schema, id, status, date, cards and existing files."""
++    findings: list[dict] = []
++    if meta.get("schema") != ARCH_ADR_SCHEMA:
++        findings.append(arch_finding("ADR_SCHEMA", relpath,
++                                     f"schema must be {ARCH_ADR_SCHEMA}"))
++    if not (isinstance(meta.get("id"), str) and meta["id"].strip()):
++        findings.append(arch_finding("ADR_FIELD", relpath,
++                                     "id must be a non-empty string"))
++    if meta.get("status") not in ARCH_ADR_STATUSES:
++        findings.append(arch_finding(
++            "ADR_STATUS", relpath,
++            f"status {meta.get('status')!r} is not one of {ARCH_ADR_STATUSES}"))
++    if command_date(meta.get("date")) is None:
++        findings.append(arch_finding("ADR_FIELD", relpath,
++                                     "date must be YYYY-MM-DD"))
++    if not isinstance(meta.get("related_cards"), list):
++        findings.append(arch_finding("ADR_FIELD", relpath,
++                                     "related_cards must be a list"))
++    related = meta.get("related_files")
++    if not arch_string_list(related):
++        findings.append(arch_finding("ADR_FIELD", relpath,
++                                     "related_files must be a non-empty list"))
++        return findings
++    findings += [arch_finding("ADR_RELATED", relpath,
++                              f"related file does not exist: {item}")
++                 for item in related if arch_resolve_rel(root, item) is None]
++    return findings
++
++
++def arch_adr_file_findings(root: Path, path: Path) -> list[dict]:
++    """Read one ADR and check its front-matter; a missing fence is one error."""
++    relpath = f"{ARCH_ADR_DIR}/{path.name}"
++    try:
++        text = path.read_text(encoding="utf-8-sig")
++    except (OSError, UnicodeError) as exc:
++        return [arch_finding("ADR_UNREADABLE", relpath, str(exc))]
++    try:
++        meta = parse_command_front_matter(front_matter_block(text))
++    except CommandDocError as exc:
++        return [arch_finding("ADR_FRONT_MATTER", relpath, str(exc))]
++    return arch_adr_meta_findings(root, meta, relpath)
++
++
++def arch_adr_findings(root: Path):
++    """Every ``adr/*.md`` except the template: front-matter and related files."""
++    adr_dir = root / ARCH_ADR_DIR
++    if not adr_dir.is_dir():
++        return [arch_finding("ADR_MISSING", ARCH_ADR_DIR,
++                             "adr/ directory is missing")], 0
++    findings: list[dict] = []
++    count = 0
++    for path in sorted(adr_dir.glob("*.md")):
++        if path.name == ARCH_ADR_TEMPLATE:
++            continue
++        count += 1
++        findings += arch_adr_file_findings(root, path)
++    if not count:
++        findings.append(arch_finding("ADR_MISSING", ARCH_ADR_DIR,
++                                     "no ADR document"))
++    return findings, count
++
++
++def arch_architecture_findings(root: Path):
++    """``ARCHITECTURE.md``: front-matter fields plus the six fixed sections."""
++    path = root / ARCH_FILE_REL
++    try:
++        text = path.read_text(encoding="utf-8-sig")
++    except (OSError, UnicodeError) as exc:
++        return [arch_finding("ARCH_MISSING", ARCH_FILE_REL, str(exc))], 0
++    try:
++        meta = parse_command_front_matter(front_matter_block(text))
++    except CommandDocError as exc:
++        return [arch_finding("ARCH_FRONT_MATTER", ARCH_FILE_REL, str(exc))], 0
++    findings: list[dict] = []
++    if meta.get("schema") != ARCH_SCHEMA:
++        findings.append(arch_finding("ARCH_SCHEMA", ARCH_FILE_REL,
++                                     f"schema must be {ARCH_SCHEMA}"))
++    for field in ("id", "version", "updated", "review_by", "owner"):
++        if not (isinstance(meta.get(field), str) and meta[field].strip()):
++            findings.append(arch_finding(
++                "ARCH_FIELD", ARCH_FILE_REL,
++                f"{field} must be a non-empty string"))
++    headings = {line.strip() for line in text.splitlines()}
++    findings += [arch_finding("ARCH_SECTION", ARCH_FILE_REL,
++                              f"missing section {title}")
++                 for title in ARCH_SECTIONS if title not in headings]
++    return findings, len(ARCH_SECTIONS)
++
++
++def arch_check_payload(root: Path) -> dict:
++    """The full ``arch-check`` result: counts plus every finding (read-only)."""
++    commands = arch_command_names()
++    tests, findings = arch_test_names(root)
++    code_types, scan_findings, unresolved = arch_event_types(root)
++    findings += scan_findings
++    gates, gate_count = arch_gates_findings(root, commands, tests)
++    invariants, invariant_count = arch_invariants_findings(root, commands, tests)
++    events, event_count = arch_events_findings(root, commands, code_types)
++    adrs, adr_count = arch_adr_findings(root)
++    sections, section_count = arch_architecture_findings(root)
++    graph, graph_findings = arch_graph_payload(root)
++    findings += gates + invariants + events + adrs + sections + graph_findings
++    findings += arch_boundary_findings(graph)
++    findings.sort(key=lambda item: (item["code"], item["target"], item["detail"]))
++    counts = {"gates": gate_count, "invariants": invariant_count,
++              "events": event_count, "event_types_in_code": len(code_types),
++              "unresolved_event_calls": unresolved, "adrs": adr_count,
++              "sections": section_count, "nodes": len(graph["nodes"]),
++              "edges": len(graph["edges"])}
++    return {"ok": not findings, "counts": counts, "errors": findings}
++
++
++def cmd_arch_check(root: Path, args) -> None:
++    """Read-only: reconcile ARCHITECTURE/GATES/INVARIANTS/EVENT_CATALOG with code."""
++    payload = arch_check_payload(root)
++    if not payload["ok"]:
++        emit({"ok": False, "errors": payload["errors"]}, 2)
++    emit({"ok": True, "counts": payload["counts"], "errors": []}, 0)
++
++
++def cmd_arch_graph(root: Path, args) -> None:
++    """Read-only: print the deterministic ``tower/arch-graph@1`` import graph."""
++    graph, findings = arch_graph_payload(root)
++    if findings:
++        emit({"ok": False, "errors": findings}, 2)
++    emit_sorted(graph)
++
++
++def arch_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
++    """Register the PILOT-048 ``arch-check`` / ``arch-graph`` subcommands."""
++    for action in parser._actions:
++        if not isinstance(action, argparse._SubParsersAction):
++            continue
++        action.add_parser("arch-check")
++        graph = action.add_parser("arch-graph")
++        graph.add_argument("--json", action="store_true",
++                           help="machine view: tower/arch-graph@1 JSON only")
++    return parser
++
++
+ # Merged into ``main``'s handler table so the command layer owns its own wiring.
+ COMMAND_LAYER_HANDLERS = {
+     "campaign-check": cmd_campaign_check, "brief": cmd_brief,
+     "status-snapshot": cmd_status_snapshot, "status-index": cmd_status_index,
+     "status-rollup": cmd_status_rollup, "status-archive": cmd_status_archive,
+-    "where": cmd_where}
++    "where": cmd_where, "arch-check": cmd_arch_check,
++    "arch-graph": cmd_arch_graph}
+ 
+ 
+ 
+@@ -7341,7 +7929,7 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
+         cc.add_argument("--strict", action="store_true",
+                         help="treat warnings (W1/W2) as errors")
+         action.add_parser("brief")
+-    return position_layer_parsers(status_layer_parsers(parser))
++    return arch_layer_parsers(position_layer_parsers(status_layer_parsers(parser)))
+ 
+ 
+ def cli_commands() -> list[str]:

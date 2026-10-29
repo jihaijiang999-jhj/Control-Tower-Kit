@@ -471,7 +471,17 @@
       "reviewer": "subagent:adf9823d-0837-480c-949c-90a6c8707149",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-047/MERGE.md",
       "updated_at": "2026-10-29T12:49:45+08:00"
+    },
+    {
+      "id": "PILOT-048",
+      "title": "架构脊柱：ARCHITECTURE + adr/ + EVENT_CATALOG + arch-check；归档 DESIGN.md",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:e18823a1-15ca-4b92-8f45-4bee4c111521",
+      "reviewer": "subagent:81305cc0-e15e-4a7d-8912-1e5345b8065c",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-048/MERGE.md",
+      "updated_at": "2026-10-29T15:44:40+08:00"
     }
   ],
-  "updated_at": "2026-10-29T12:49:45+08:00"
+  "updated_at": "2026-10-29T15:44:40+08:00"
 }

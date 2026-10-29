@@ -1,0 +1,11 @@
+arch-check exit=0
+arch-check ok= True
+arch-check counts= {"adrs": 1, "edges": 21, "event_types_in_code": 29, "events": 29, "gates": 15, "invariants": 16, "nodes": 35, "sections": 6, "unresolved_event_calls": 1}
+arch-graph exit=0/0
+schema= tower/arch-graph@1
+nodes= 35 edges= 21
+byte-identical= True
+control-plane digest before= ee679c50bf80433daa2bc17843cc92e3f6ac96dcb4e3c20ad39fda68c4c1122f
+control-plane digest after = ee679c50bf80433daa2bc17843cc92e3f6ac96dcb4e3c20ad39fda68c4c1122f
+read-only= True
+RESULT= PASS

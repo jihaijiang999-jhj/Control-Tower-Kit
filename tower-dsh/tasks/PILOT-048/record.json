@@ -1,0 +1,217 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-048",
+  "title": "架构脊柱：ARCHITECTURE + adr/ + EVENT_CATALOG + arch-check；归档 DESIGN.md",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "新增 ARCHITECTURE.md（一页活文档，front-matter：schema=tower/architecture@1、id、version、updated、review_by=2026-12-31、owner）：系统上下文、组件与职责、数据流（spec→task→dispatch→deliver→envelope→merge→post-merge→CI）、关键契约（事件/状态/命令/证据）、扩展点（加 gate/命令/事件/字段的步骤与影响面）、不变量（引用 RED-LINES C-01..C-16 + arch/INVARIANTS.json）、已知边界（单文件、无密钥链、legacy、TOFU）",
+    "新增 arch/GATES.json：机读门表——每项 {id, command, phase, test, blocks}，覆盖 gate 清单（spec/ready/dispatch/deliver 范围/deliver base_sha/deliver shape/review/accept/close/envelope/queue/merge-check/merge 前置/post-merge/CI）；arch-check 校验每项 command 在 parser 中、test 在 tools/tests/*.py 中存在",
+    "新增 arch/INVARIANTS.json：RED-LINES C-01..C-16 每条 {id, text, probe:{kind:test|command, ref}}；probe 必须是真实测试函数名或真实命令；arch-check 校验 ref 存在（测试函数在 tests 文件中、命令在 parser 中），缺 probe 或 ref 不存在 → exit 2",
+    "新增 EVENT_CATALOG.json：事件目录——每条 {type, ledger: primary|supervision, producer, payload_required:[...], state_verify: bool, drift_kinds:[...], note}；覆盖当前代码里所有 append_ledger/append_supervision_ledger 的字面 type（至少：TASK_NEW/SPEC_APPROVED/DISPATCH/DELIVER/CHECKBACK/ACCEPT/CLOSE/AUTHORITY_SET/AUTHORITY_REQUIRED/COMPLETION_ADDED/ENVELOPE_NEW/QUEUE_ADD/MERGE_START/MERGED/MERGE_BLOCKED/POST_MERGE_VERIFIED 及代码中实际存在的其它 type）；arch-check 用 AST 扫描全部字面 type，与目录双向比对（漏目录/多余目录 → exit 2）",
+    "新增 towerctl arch-check：只读，校验——① arch/GATES.json 的 command 在 parser、test 在 tests；② arch/INVARIANTS.json 的 probe ref 存在且覆盖 C-01..C-16；③ EVENT_CATALOG.json 与代码字面 type 双向一致；④ adr/*.md 的 front-matter（schema=tower/adr@1、id、status∈proposed|accepted|superseded|archived、date、related_cards、related_files）且 related_files 存在；⑤ ARCHITECTURE.md 含固定六节标题（系统上下文/组件/数据流/契约/扩展点/不变量）；⑥ 禁止边界：tools/towerctl.py 不得 import tools/tests/*（AST）；错误 exit 2 单 JSON、无 traceback",
+    "新增 towerctl arch-graph --json：AST 生成 tools/ 内部 import 图（{schema:tower/arch-graph@1, nodes:[...], edges:[...]}，键排序、无时间戳）；只读；arch-check 用同一图做边界校验",
+    "归档 DESIGN.md：git mv DESIGN.md adr/ADR-0001-initial-design.md，前置 ADR front-matter（id=ADR-0001、status=archived、date=2026-10-19、title=初始设计提案 v0.3、related_cards=[]、related_files=[tower-dsh/tools/towerctl.py]），正文不改（保留历史提案原文）；新增 adr/ADR-TEMPLATE.md（背景/决策/替代方案/后果/关联卡/关联文件）",
+    "新增 tools/tests/test_arch.py：正例（真实 worktree arch-check exit 0、arch-graph 合法）；反例——GATES 的 command 不存在、GATES 的 test 不存在、INVARIANTS 缺 C-16 或 probe ref 不存在、EVENT_CATALOG 漏一个代码 type、EVENT_CATALOG 多一个不存在 type、ADR status 非法/related_files 不存在、ARCHITECTURE 缺节、towerctl import tests；全部干净 exit 2 无 Traceback",
+    "真实塔验证：worktree 新工具 arch-check exit 0、arch-graph 可解析、campaign-check exit 0、authority-check exit 0、state-verify drift []；建信封前 tasks=48/envelopes=46，建信封后 48/47",
+    "不改 036–047 的信任边界/授权/前置链/空账本/范围门/completion/base_sha/shape/命令层语义；不写 primary/supervision/ledger；不引入依赖；不接 CI（049）"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-048/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-048/tower-dsh/tools/tests/test_arch.py",
+    "pilot/worktrees/PILOT-048/tower-dsh/ARCHITECTURE.md",
+    "pilot/worktrees/PILOT-048/tower-dsh/arch/GATES.json",
+    "pilot/worktrees/PILOT-048/tower-dsh/arch/INVARIANTS.json",
+    "pilot/worktrees/PILOT-048/tower-dsh/EVENT_CATALOG.json",
+    "pilot/worktrees/PILOT-048/tower-dsh/adr/ADR-TEMPLATE.md",
+    "pilot/worktrees/PILOT-048/tower-dsh/adr/ADR-0001-initial-design.md",
+    "pilot/worktrees/PILOT-048/tower-dsh/DESIGN.md"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "hand-editing state/AUTHORITY.json, shared/AUTHORITY_POLICY.json or ledger/*.jsonl",
+    "writing primary/supervision/ledger state from arch-check/arch-graph",
+    "deleting DESIGN.md content (must move to adr/ADR-0001 with unchanged body)",
+    "letting arch-check guess when a gate/event/invariant is missing (must exit 2)"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-048/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 518 + 新增用例数（main 基线 518）",
+    "arch-check 在真实 worktree exit 0；ARCHITECTURE.md 六节齐全；arch/GATES.json 覆盖 gate 清单且 command/test 全部存在；arch/INVARIANTS.json 覆盖 C-01..C-16 且 probe ref 全部存在；EVENT_CATALOG 与代码字面 type 双向一致；adr/ADR-0001 front-matter 合法且 related_files 存在",
+    "arch-graph --json 输出 schema=tower/arch-graph@1、nodes/edges 键排序、无时间戳、stdout 纯 JSON；重复运行字节相同",
+    "反例夹具：GATES command/test 不存在、INVARIANTS 缺项/probe 不存在、EVENT_CATALOG 漏/多 type、ADR status 非法/related_files 不存在、ARCHITECTURE 缺节、towerctl import tests → 全部 exit 2 单 JSON 无 Traceback",
+    "DESIGN.md 已移动到 adr/ADR-0001-initial-design.md（git diff 显示 rename），正文与移动前逐字节相同（只多前置 front-matter）；DESIGN.md 不再存在",
+    "arch-check/arch-graph 只读：运行前后 primary/supervision/ledger/tasks 哈希不变",
+    "旧码对照：main 版无 arch-check/arch-graph（argparse invalid choice, exit 2）；新码存在。证据写进 scratch/probe-old-code.txt",
+    "shape-check 在 worktree exit 0（新增函数全部 ≤80 行/≤12 分支）",
+    "真实塔：worktree 新工具 arch-check/arch-graph/campaign-check/authority-check exit 0、state-verify drift []；建信封前 tasks=48/envelopes=46，建信封后 48/47；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-048 diff --name-only main..HEAD 恰为 9 个 allowed_paths（含 DESIGN.md 的删除）"
+  ],
+  "depends_on": [
+    "PILOT-047"
+  ],
+  "worktree": "pilot/worktrees/PILOT-048",
+  "spec_path": "pilot/PILOT-048.spec.json",
+  "spec_sha256": "cc21f4a5359a4422203acca7338007c1ab307f922606423bc4a282c5d0bee118",
+  "spec_gate": "PASS",
+  "executor": "subagent:e18823a1-15ca-4b92-8f45-4bee4c111521",
+  "dispatch": {
+    "executor": "subagent:e18823a1-15ca-4b92-8f45-4bee4c111521",
+    "worktree": "pilot/worktrees/PILOT-048",
+    "at": "2026-10-29T13:54:21+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "58e357d54b0f1331e69b88552f0dbc05ec9d06d6"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-048/evidence/towerctl.py",
+      "sha256": "e17467d7aaf133d035264b6c3cef3f764595e5eda4bfd81497f1c4c2d97323af",
+      "bytes": 355458,
+      "at": "2026-10-29T15:36:05+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/test_arch.py",
+      "sha256": "2d8781e862172bd46703aa94a945bc64fe43081177127f4db19a51f9cc22e8a7",
+      "bytes": 11228,
+      "at": "2026-10-29T15:36:05+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/ARCHITECTURE.md",
+      "sha256": "5f16711a4958318c17bf1a9c53f3bd5d82bdb08fa7763920f6751f615403c050",
+      "bytes": 9372,
+      "at": "2026-10-29T15:36:05+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/GATES.json",
+      "sha256": "5ad52b4dc0ac8dbee381e79f9494d4067a65d2847381329069bc3855fa95738b",
+      "bytes": 3638,
+      "at": "2026-10-29T15:36:05+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/INVARIANTS.json",
+      "sha256": "e119d7864425327f9b05ae6d853a64cf3a877ee436919ec13579c7e9b12ee2d4",
+      "bytes": 4519,
+      "at": "2026-10-29T15:36:05+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/EVENT_CATALOG.json",
+      "sha256": "8eefc6160425c332c6c08a533ec134999b2ca8e2279d97dfa47bfea74df4a9cc",
+      "bytes": 12103,
+      "at": "2026-10-29T15:36:05+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/ADR-TEMPLATE.md",
+      "sha256": "00c15cfa6496e203a01e02fba121d4424d3d6fcf5463d0e539253669ed795739",
+      "bytes": 1420,
+      "at": "2026-10-29T15:36:06+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/ADR-0001-initial-design.md",
+      "sha256": "892b359eacfbd3c83f040bce5b39cf169e88cf554273ed9260e19dcb56f64a08",
+      "bytes": 36657,
+      "at": "2026-10-29T15:36:06+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/test-output.txt",
+      "sha256": "143f2f514890d4274247bb64d838f81f6075624d3f2590ae550a8d01df666566",
+      "bytes": 74983,
+      "at": "2026-10-29T15:36:06+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/arch_probe.py",
+      "sha256": "bf695ae42295c41e5aa95a5f2b2ba1e1da37ac8c6e26ec219f3fbee366824f08",
+      "bytes": 2649,
+      "at": "2026-10-29T15:36:06+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/probe.txt",
+      "sha256": "9908b9a672ad08ac95047f6904d39a371e1f9aa79558a55ca56ee0366d552200",
+      "bytes": 527,
+      "at": "2026-10-29T15:36:06+08:00",
+      "id": "E-011"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/probe-old-code.txt",
+      "sha256": "fbe842ebf5f0e9c5dc8fe8a831d40e0b08ac08bc8b5e0b54dc093e8968fd42e5",
+      "bytes": 3241,
+      "at": "2026-10-29T15:36:06+08:00",
+      "id": "E-012"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/commit.txt",
+      "sha256": "075c2e40ea5141d502501b19768b804e1d18d505b4d10d4135d4fb6c12179982",
+      "bytes": 1125,
+      "at": "2026-10-29T15:36:06+08:00",
+      "id": "E-013"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/diff.txt",
+      "sha256": "c02a2647d6d96748960ae9912803b8b0925805e1b935c7a76e1ee70cfbae83b3",
+      "bytes": 149424,
+      "at": "2026-10-29T15:36:06+08:00",
+      "id": "E-014"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/arch-check.json",
+      "sha256": "39b4cba785760a63fa8d951113c7fb080d9d30a040235302a5064a96d281a002",
+      "bytes": 255,
+      "at": "2026-10-29T15:36:06+08:00",
+      "id": "E-015"
+    },
+    {
+      "path": "tasks/PILOT-048/evidence/arch-graph.json",
+      "sha256": "0878c3f7ee400372b9cc11c8e57269d4e8c554f5ddcf74dda7f08804de69a157",
+      "bytes": 3598,
+      "at": "2026-10-29T15:36:06+08:00",
+      "id": "E-016"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:81305cc0-e15e-4a7d-8912-1e5345b8065c",
+    "verdict": "PASS",
+    "note": "048 PASS（第三轮最终确认）。16/16 证据哈希+字节数；9 路径（8 allowed + `control-tower/DESIGN.md` completion）；spec 哈希未变；亲跑 Ran 536 OK(skipped=1)、arch-check exit 0（gates 15 / invariants 16 / events 29=29 / adr 1 / sections 6 / graph 35 nodes 21 edges）、arch-graph 两次 3,598 B 字节相同且 UTF-8 可 json.load、shape-check exit 0；三处文档事实已修正（CI 当前 5 步、campaign/arch 于 049、shape 于 051、state-verify/authority 待 049 spec 冻结；C-12 归 review-check；行数 7,981）；GATES 15 条全部指向真实负例；围栏复验（盘符/绝对/`..`/出塔根均 ADR_RELATED exit 2；duplicate stem GRAPH_STEM_DUPLICATE exit 2；合法路径可解析）；ADR-0001 正文与 `git show 58e357d:control-tower/DESIGN.md` 逐字节相同（36,424 B，sha 46ae26fe…d5b8）；completion 事件 seq 433 可核；旧码无 arch-check/arch-graph；真实塔只读 48/46 drift []、authority configured+required、ledger 0（436/240）、coverage 27/27、lint 6/6、control-plane digest 不变。残余（非阻塞）：GATE-SPEC 的 test 是 dispatch 级拒绝（轻微交叉）；事件扫描只覆盖字面量/模块常量，变量/f-string 会逃逸（known-limit #4 已明示，051 候选：unresolved 非零 warning/exit 2）；C-12/C-15 无自动化 proof（已如实标注）；DELIVER payload 不持久化 scope_completions（可由 completion 事件重建）；冻结 spec 仍含 typo `tower-dsh/DESIGN.md`（completion 兜底，建议后续卡修模板）。",
+    "structure": "",
+    "at": "2026-10-29T15:44:39+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-048",
+    "actor": "owner",
+    "text": "third-round PASS (536 tests, 16/16, 9 paths + completion; CI attribution and UTF-8 evidence fixed)",
+    "at": "2026-10-29T15:44:40+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-048/CLOSEOUT.md",
+    "at": "2026-10-29T15:44:40+08:00"
+  },
+  "created_at": "2026-10-29T13:35:00+08:00",
+  "updated_at": "2026-10-29T15:44:40+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-048/MERGE.md",
+  "completions": [
+    {
+      "task": "PILOT-048",
+      "path": "pilot/worktrees/PILOT-048/control-tower/DESIGN.md",
+      "by": "mac",
+      "reason": "DESIGN.md lives at control-tower/DESIGN.md, not tower-dsh/DESIGN.md; spec allowed_paths typo; owner authorizes archive move",
+      "decision": "D-PILOT-048",
+      "at": "2026-10-29T14:04:53+08:00"
+    }
+  ],
+  "delivered_at": "2026-10-29T15:36:06+08:00",
+  "accepted_at": "2026-10-29T15:44:40+08:00"
+}

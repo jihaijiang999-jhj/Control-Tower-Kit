@@ -1,0 +1,32 @@
+# PILOT-048 commit evidence
+
+HEAD: 875cd8cd42d40f5bcd4aa0baf6d9ab23008df11d
+parent: bf97d5a877ed073b728e944d564640323e7e8783
+branch: pilot/PILOT-048
+subject: PILOT-048: correct CI attribution in ARCHITECTURE
+author: mac <mac@local>
+committed: 2026-10-29 15:33:40 +0800
+
+commits on this branch:
+875cd8c PILOT-048: correct CI attribution in ARCHITECTURE
+bf97d5a PILOT-048: refresh towerctl line count in ARCHITECTURE
+637e8c7 PILOT-048: correct architecture facts and harden arch-check fences
+debfe51 PILOT-048: architecture spine (ARCHITECTURE, ADRs, EVENT_CATALOG, arch-check)
+
+suite: Ran 536 tests in 361.884s / OK (skipped=1) -- ran on 875cd8c tree.
+previous suites: 533 on debfe51, 536 on 637e8c7.
+baseline: main 518 tests; new: 18 in tower-dsh/tools/tests/test_arch.py.
+
+$ git diff --name-only --no-renames main..HEAD
+control-tower/DESIGN.md
+tower-dsh/ARCHITECTURE.md
+tower-dsh/EVENT_CATALOG.json
+tower-dsh/adr/ADR-0001-initial-design.md
+tower-dsh/adr/ADR-TEMPLATE.md
+tower-dsh/arch/GATES.json
+tower-dsh/arch/INVARIANTS.json
+tower-dsh/tools/tests/test_arch.py
+tower-dsh/tools/towerctl.py
+
+$ git status --short
+?? scratch/

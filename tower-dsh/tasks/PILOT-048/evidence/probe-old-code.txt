@@ -1,0 +1,37 @@
+exported main:tower-dsh/tools/towerctl.py -> scratch/old-towerctl.py (328830 bytes)
+main tree defines arch-check/arch-graph: False
+
+=== old code (main) ===
+$ python scratch/old-towerctl.py arch-check
+exit=2
+output (last 4 lines):
+  usage: old-towerctl.py [-h] [--root ROOT]
+                         {init,wiring,startup,status,supervision-init,supervision-status,handoff-status,verify-ledger,state-verify,shape-check,authority-check,authority-set,authority-require,spec-lint,spec-coverage,handoff-new,handoff-check,handoff-claim,handoff-accept,handoff-receipt,handoff-activate,supervision-phase,envelope-new,queue-add,merge-check,merge,post-merge,phase,task-new,task-next,check,spec-approve,hash,dispatch,deliver,completion-add,checkback,accept,close,campaign-check,brief,status-snapshot,status-index,status-rollup,status-archive,where}
+                         ...
+  old-towerctl.py: error: argument cmd: invalid choice: 'arch-check' (choose from init, wiring, startup, status, supervision-init, supervision-status, handoff-status, verify-ledger, state-verify, shape-check, authority-check, authority-set, authority-require, spec-lint, spec-coverage, handoff-new, handoff-check, handoff-claim, handoff-accept, handoff-receipt, handoff-activate, supervision-phase, envelope-new, queue-add, merge-check, merge, post-merge, phase, task-new, task-next, check, spec-approve, hash, dispatch, deliver, completion-add, checkback, accept, close, campaign-check, brief, status-snapshot, status-index, status-rollup, status-archive, where)
+
+$ python scratch/old-towerctl.py arch-graph --json
+exit=2
+output (last 4 lines):
+  usage: old-towerctl.py [-h] [--root ROOT]
+                         {init,wiring,startup,status,supervision-init,supervision-status,handoff-status,verify-ledger,state-verify,shape-check,authority-check,authority-set,authority-require,spec-lint,spec-coverage,handoff-new,handoff-check,handoff-claim,handoff-accept,handoff-receipt,handoff-activate,supervision-phase,envelope-new,queue-add,merge-check,merge,post-merge,phase,task-new,task-next,check,spec-approve,hash,dispatch,deliver,completion-add,checkback,accept,close,campaign-check,brief,status-snapshot,status-index,status-rollup,status-archive,where}
+                         ...
+  old-towerctl.py: error: argument cmd: invalid choice: 'arch-graph' (choose from init, wiring, startup, status, supervision-init, supervision-status, handoff-status, verify-ledger, state-verify, shape-check, authority-check, authority-set, authority-require, spec-lint, spec-coverage, handoff-new, handoff-check, handoff-claim, handoff-accept, handoff-receipt, handoff-activate, supervision-phase, envelope-new, queue-add, merge-check, merge, post-merge, phase, task-new, task-next, check, spec-approve, hash, dispatch, deliver, completion-add, checkback, accept, close, campaign-check, brief, status-snapshot, status-index, status-rollup, status-archive, where)
+
+=== new code (worktree) ===
+$ python tools/towerctl.py arch-check
+exit=0
+output (last 4 lines):
+      "edges": 21
+    },
+    "errors": []
+  }
+
+$ python tools/towerctl.py arch-graph --json
+exit=0
+output (last 4 lines):
+      "tools/towerctl.py"
+    ],
+    "schema": "tower/arch-graph@1"
+  }
+

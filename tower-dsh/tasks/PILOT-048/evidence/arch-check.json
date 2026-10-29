@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "counts": {
+    "gates": 15,
+    "invariants": 16,
+    "events": 29,
+    "event_types_in_code": 29,
+    "unresolved_event_calls": 1,
+    "adrs": 1,
+    "sections": 6,
+    "nodes": 35,
+    "edges": 21
+  },
+  "errors": []
+}
