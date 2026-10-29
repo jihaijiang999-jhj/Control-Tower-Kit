@@ -1854,6 +1854,8 @@ def cmd_startup(root: Path, args) -> None:
 
 
 SPEC_SCHEMA = "tower/spec@1"
+SPEC2_SCHEMA = "tower/spec@2"
+SPEC_SCHEMAS = (SPEC_SCHEMA, SPEC2_SCHEMA)
 
 
 def validate_spec(spec: dict) -> list[str]:
@@ -1862,8 +1864,8 @@ def validate_spec(spec: dict) -> list[str]:
     Returns a list of human-readable errors; empty means the spec is sound.
     """
     errors = []
-    if spec.get("schema") != SPEC_SCHEMA:
-        errors.append(f"spec.schema must be {SPEC_SCHEMA}")
+    if spec.get("schema") not in SPEC_SCHEMAS:
+        errors.append(f"spec.schema must be one of {' | '.join(SPEC_SCHEMAS)}")
     acceptance = spec.get("acceptance") or []
     if not all(isinstance(x, str) and x.strip() for x in acceptance):
         errors.append("spec.acceptance items must be non-empty strings")
@@ -1878,12 +1880,8 @@ def validate_spec(spec: dict) -> list[str]:
     return errors
 
 
-def cmd_task_new(root: Path, args) -> None:
-    spec_path = resolve_input_within(root, args.spec, "spec")
-    if not spec_path.exists():
-        fail([f"spec not found: {spec_path}"])
-    spec = jload(spec_path)
-    tid = str(spec.get("id", ""))
+def task_new_errors(root: Path, spec: dict, tid: str) -> list[str]:
+    """Every task-new refusal reason, objective gate included; never writes."""
     errors = []
     if not TASK_ID_RE.match(tid):
         errors.append(f"invalid id: {tid!r} (task id must match {TASK_ID_RE.pattern})")
@@ -1892,6 +1890,7 @@ def cmd_task_new(root: Path, args) -> None:
             errors.append(f"spec.{field} required")
     if not errors:
         errors += validate_spec(spec)
+    errors += spec_lint.objective_errors(spec)
     worktree = spec.get("worktree")
     if not worktree:
         errors.append("spec.worktree required")
@@ -1899,11 +1898,13 @@ def cmd_task_new(root: Path, args) -> None:
         worktree_path = ensure_within(root, root / worktree, label="worktree")
         if not worktree_path.exists():
             errors.append(f"worktree missing: {worktree}")
-    if errors:
-        fail(errors)
+    return errors
+
+
+def write_task_card(root: Path, tid: str, spec: dict, spec_path: Path) -> dict:
+    """Write record.json + TASK.md, update the board and append TASK_NEW."""
+    worktree = spec["worktree"]
     tdir = task_dir(root, tid)
-    if tdir.exists():
-        fail([f"task already exists: {tid}"])
     (tdir / "evidence").mkdir(parents=True, exist_ok=True)
     record = {
         "schema": "tower/task@1", "id": tid, "title": spec["title"],
@@ -1932,7 +1933,29 @@ def cmd_task_new(root: Path, args) -> None:
     (tdir / "TASK.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     update_board(root, record)
     append_ledger(root, "TASK_NEW", "primary", {"task": tid, "title": record["title"]})
-    emit({"ok": True, "task": tid, "record": rel(root, tdir / "record.json"),
+    return record
+
+
+def cmd_task_new(root: Path, args) -> None:
+    spec_path = resolve_input_within(root, args.spec, "spec")
+    if not spec_path.exists():
+        fail([f"spec not found: {spec_path}"])
+    try:
+        spec = jload(spec_path)
+    except (OSError, ValueError) as exc:
+        fail([f"spec is not readable JSON: {exc}"])
+    if not isinstance(spec, dict):
+        fail(["spec must be a JSON object"])
+    tid = str(spec.get("id", ""))
+    errors = task_new_errors(root, spec, tid)
+    if errors:
+        fail(errors)
+    tdir = task_dir(root, tid)
+    if tdir.exists():
+        fail([f"task already exists: {tid}"])
+    write_task_card(root, tid, spec, spec_path)
+    emit({"ok": True, "task": tid,
+          "record": rel(root, tdir / "record.json"),
           "task_md": rel(root, tdir / "TASK.md")})
 
 
@@ -7169,7 +7192,8 @@ ARCH_SECTIONS = (
     "## 1. 系统上下文", "## 2. 组件与职责", "## 3. 数据流",
     "## 4. 关键契约", "## 5. 扩展点", "## 6. 不变量")
 ARCH_GATE_IDS = (
-    "GATE-SPEC", "GATE-READY", "GATE-DISPATCH", "GATE-DELIVER-SCOPE",
+    "GATE-SPEC", "GATE-SPEC-OBJECTIVE", "GATE-READY", "GATE-DISPATCH",
+    "GATE-DELIVER-SCOPE",
     "GATE-DELIVER-BASE-SHA", "GATE-DELIVER-SHAPE", "GATE-REVIEW",
     "GATE-ACCEPT", "GATE-CLOSE", "GATE-ENVELOPE", "GATE-QUEUE",
     "GATE-MERGE-CHECK", "GATE-MERGE-PREFLIGHT", "GATE-POST-MERGE", "GATE-CI")
