@@ -1,0 +1,32 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PROJ-NNN",
+  "title": "一句话说明任务目标",
+  "objective": {
+    "problem": "当前某个入口可以被写成只有标题和文件路径的卡，施工时被收窄成清状态、调参或单点补丁，受影响的任务卡因此无法证明它解决了真实问题。",
+    "outcome": "新卡创建时必须携带可机检的四要素施工目标；缺项、占位或过短的卡在 task-new 零写入拒绝，spec-lint 对 @2 卡给出同一结论。",
+    "approach": "在创建入口与 lint 入口各校验一次同一份规则，规则原生实现、不依赖外部工具；旧 @1 卡冻结跳过，不回溯也不改哈希。",
+    "non_goals_and_done": "不回写已冻结的旧卡，不改状态机、证据与合并语义；正反例测试全绿、独立复核通过并合并后 state-verify 无 drift 才算完成。"
+  },
+  "authority": "workspace_write",
+  "scope": [
+    "要做什么，逐条列出，每条可独立验证",
+    "不做什么也尽量写进 forbidden"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PROJ-NNN/允许写入的文件，逐文件列出"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access"
+  ],
+  "acceptance": [
+    "每条都是可执行的验收条件：能跑、能测、能核哈希",
+    "禁止『基本完成』『大致可用』这类不可测表述"
+  ],
+  "depends_on": [],
+  "worktree": "pilot/worktrees/PROJ-NNN"
+}

@@ -1,0 +1,211 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-049",
+  "title": "objective 硬门：spec@2 四要素 + task-new/spec-lint 双层拒绝",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "templates/task.spec.json 升级为 tower/spec@2，带 objective 四字段的真实示例（非占位符），并保留其余字段",
+    "task-new：接受 tower/spec@1 与 tower/spec@2；对所有新 spec 校验 objective（对象存在、四字段齐全、均为非空 str、trim 后 ≥8、不含 __FILL__、不是 <...> 占位）；校验在创建 tasks/<id>/、写 record/TASK、append TASK_NEW 之前，失败零写入",
+    "task-new：校验失败 exit 2 单 JSON（ok:false, errors:[...]），不产生半截任务卡；错误文案点名 objective.<field>",
+    "spec-lint：扫描 pilot/*.spec.json；对 schema=tower/spec@2 强制 objective（同上规则），对 tower/spec@1 跳过（冻结旧卡，不回溯、不改哈希）；失败 exit 2 单 JSON、无 Traceback；不改变现有 6 份 policy/spec 文档的校验",
+    "specs/WF-TASK.md 增加“施工目标前置不变量”一节：objective 四字段语义、task-new 零写入、spec-lint @2 强制、旧 @1 冻结、reviewer 仍需审真实性与 AC 对齐",
+    "arch/GATES.json 增加 GATE-SPEC-OBJECTIVE（command=task-new、phase=spec、test 指向 test_objective 里的拒绝用例、blocks=无 objective/占位/过短）",
+    "新增 tools/tests/test_objective.py：正例 @2；缺 objective/逐字段缺/非字符串/空串/<8/__FILL__/<...> 全部 exit 2 且零写入；@1 旧 spec 在 spec-lint 下 exit 0；@2 坏 spec spec-lint exit 2；task-new 失败后 tasks/<id>/ 不存在、ledger 无 TASK_NEW；模板 @2 可被 task-new 接受（用临时 id）",
+    "不改 TOWER.md（L0，由 owner 单独提交一行不变量）；不改 044–048 的冻结 spec；不引依赖、不联网"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-049/tower-dsh/templates/task.spec.json",
+    "pilot/worktrees/PILOT-049/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-049/tower-dsh/tools/spec_lint.py",
+    "pilot/worktrees/PILOT-049/tower-dsh/tools/tests/test_objective.py",
+    "pilot/worktrees/PILOT-049/tower-dsh/specs/WF-TASK.md",
+    "pilot/worktrees/PILOT-049/tower-dsh/arch/GATES.json"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "rewriting frozen task specs (044-048)",
+    "weakening existing gates",
+    "changing TOWER.md in this card (L0; owner commits separately)",
+    "accepting a spec with missing/placeholder objective"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-049/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 536 + 新增用例数（main 基线 536）",
+    "task-new 对 @2 spec：缺 objective、逐字段缺、非字符串、空串、<8、__FILL__、<...> 全部 exit 2 单 JSON，且 tasks/<id>/ 不存在、ledger 无 TASK_NEW（零写入）；完整 @2 可通过",
+    "task-new 对 @1 spec（含 objective 的 049 bootstrap）可通过；@1 无 objective 不在本卡回归范围（旧卡不重发）",
+    "spec-lint：@2 坏 spec exit 2 单 JSON 无 Traceback；@1 旧 spec（无 objective）exit 0；现有 6 份 policy/spec 文档校验不变",
+    "templates/task.spec.json 的 schema=tower/spec@2 且 objective 四字段为非占位示例；用临时 id/真实 worktree 可被 task-new 接受",
+    "specs/WF-TASK.md 含 objective 前置不变量；arch/GATES.json 含 GATE-SPEC-OBJECTIVE 且 test 真实存在；arch-check 在 worktree exit 0",
+    "旧码对照：main 版 task-new 接受无 objective 的 spec、spec-lint 不扫 pilot/*.spec.json；新码拒绝。证据写进 scratch/probe-old-code.txt",
+    "shape-check 在 worktree exit 0（新增函数全部 ≤80 行/≤12 分支）",
+    "真实塔：worktree 新工具 campaign-check/arch-check/authority-check exit 0、state-verify drift []；建信封前 tasks=49/envelopes=47，建信封后 49/48；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-049 diff --name-only main..HEAD 恰六个 allowed_paths"
+  ],
+  "depends_on": [
+    "PILOT-048"
+  ],
+  "worktree": "pilot/worktrees/PILOT-049",
+  "spec_path": "pilot/PILOT-049.spec.json",
+  "spec_sha256": "799454967db2d51caaa0de37103bfd187e50991c9811333450bb5de275828be9",
+  "spec_gate": "PASS",
+  "executor": "subagent:bd290de8-3c54-4bc0-9a78-e7dab6b92891",
+  "dispatch": {
+    "executor": "subagent:bd290de8-3c54-4bc0-9a78-e7dab6b92891",
+    "worktree": "pilot/worktrees/PILOT-049",
+    "at": "2026-10-29T23:20:45+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "51f1fb11bfc4e44146036f93f72a6da3e4c8bd3c"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-049/evidence/towerctl.py",
+      "sha256": "1c7273074bbc5a3b15e40791b5edad080b4378fd85b330e4290a96e8d4d79118",
+      "bytes": 356328,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-049/evidence/spec_lint.py",
+      "sha256": "1abe279991927e292bd1675b8f50f1cb2a9bd6db6465d71ba4ab15fe5f8477d2",
+      "bytes": 31601,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-049/evidence/task.spec.json",
+      "sha256": "101b4153ea6c61fcee231020a83640a0d92c697d634bf8e566d5f38846b0672b",
+      "bytes": 1512,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-049/evidence/test_objective.py",
+      "sha256": "f00df3c8ab28d91189f730a46f23903e43a2c61f15e63170af0da4e7901d40e6",
+      "bytes": 10723,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-049/evidence/WF-TASK.md",
+      "sha256": "a3b60963e52bc3ce67c073adf9b6f84c8281d43f30c02afddff3517bde1ee4b1",
+      "bytes": 5794,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-049/evidence/GATES.json",
+      "sha256": "80fc157403f9b9c74670fe8314fff9d384c07e985b195c7ac51d464d3f07ec1b",
+      "bytes": 3869,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-049/evidence/test_arch.py",
+      "sha256": "fde27b142af14c66c35df0dc2374ff576408e5a5a55cb2864f8ef873a7c82532",
+      "bytes": 11228,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-049/evidence/test-output.txt",
+      "sha256": "9cc5c0f053bbcdaa3385ab2a86c6dd52a3af7a6a409bf5cef4530e3cc8fdb25f",
+      "bytes": 76684,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-049/evidence/objective_probe.py",
+      "sha256": "e807f739e14aa6dc6287a0235ce8735a32a3765fce186b1e073e7219ce83aff5",
+      "bytes": 6152,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-049/evidence/probe.txt",
+      "sha256": "37e4fd2923f480eb184ca2227e08128c426e08c04e27c6029a99f764749a30f0",
+      "bytes": 3160,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-049/evidence/probe-old-code.txt",
+      "sha256": "3ff8a751db8fc1973857232d7d163ee71a862e2259fc00f3ac7052fbd73aadf5",
+      "bytes": 1442,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-011"
+    },
+    {
+      "path": "tasks/PILOT-049/evidence/commit.txt",
+      "sha256": "8e0138fe458ae1349f77e170b3b039313489711692861f01417414ce1b2936ab",
+      "bytes": 1478,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-012"
+    },
+    {
+      "path": "tasks/PILOT-049/evidence/diff.txt",
+      "sha256": "2cff2a7e545026dd703d395debd655eba8b54bbbcb2f9d5fb33f5540147da5f5",
+      "bytes": 54378,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-013"
+    },
+    {
+      "path": "tasks/PILOT-049/evidence/diff-names.txt",
+      "sha256": "f5945a4334e1e165d1168a6f0e762fe0d062945b74011f4f80d96cc5022dcbe5",
+      "bytes": 456,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-014"
+    },
+    {
+      "path": "tasks/PILOT-049/evidence/spec-lint.txt",
+      "sha256": "85b54ab102dfc3b86e0eb4bc245e1ff116a83d2d189c9d05bb0ccb2dece2737c",
+      "bytes": 7986,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-015"
+    },
+    {
+      "path": "tasks/PILOT-049/evidence/gates.txt",
+      "sha256": "54a3de00a3007e1069e1ffb3257af65e2345028a1324dbefdcb623bbb1b1ed42",
+      "bytes": 15455,
+      "at": "2026-10-30T00:21:42+08:00",
+      "id": "E-016"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:b45e8bd9-f024-4cb0-bc60-adb5837c9da5",
+    "verdict": "PASS",
+    "note": "049 PASS（独立亲跑）。16/16 证据哈希+字节数；7 路径（6 allowed + `test_arch.py` completion D-PILOT-049）；spec 哈希 79945496…；亲跑 Ran 552 OK(skipped=1)、arch-check exit 0（gates=16 / invariants=16 / events=29 / adrs=2）、spec-lint --strict 6/6、shape-check exit 0；task-new 零写入（自建 64 夹具：缺 objective/逐字段缺/非字符串/空串/空白/7 字符/__FILL__/尖括号/坏 JSON 全部 exit 2 单 JSON，tasks/<id> 不存在、ledger 无 TASK_NEW、board 不变；已有 task 不覆盖；完整 @2 与 049 @1+objective 通过）；spec-lint 只扫顶层 pilot/*.spec.json，@2 坏 exit 2、@1 跳过、嵌套/非 JSON 不误扫；模板 @2 四字段真实示例可被 task-new 接受；WF-TASK §8；GATES GATE-SPEC-OBJECTIVE 可解析；test_arch 仅 15→16 一行；旧码 main task-new 接受无 objective 并建卡、spec-lint 不扫 pilot，新码均拒；真实塔只读 49/47 drift []、authority configured+required、ledger 0（445/245）、coverage 27/27、lint 6/6、11 关键文件哈希不变。判断：__FILL__ 整值相等可接受（049 自身 objective 正文含该词，子串会自锁），但确实放过 TODO __FILL__/__FILL__x 与“补充 <待填写>”；属内容门边界，建议 050/051 加“前缀 marker + 混合占位”规则（非阻塞）。其它残余：长度按 code point（ZWJ emoji 误判）；template 测试用子串而门口用整值（口径不一致）；spec acceptance 仍写“恰六个 allowed_paths”（实际 7=6+1，completion 授权）；真实塔暂无 @2 卡，门口首次实战是下一张新卡。",
+    "structure": "",
+    "at": "2026-10-30T00:45:28+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-049",
+    "actor": "owner",
+    "text": "independent review PASS (552 tests, 16/16, 7=6+1); __FILL__ whole-value ruled acceptable; TODO-marker residual noted",
+    "at": "2026-10-30T00:45:28+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-049/CLOSEOUT.md",
+    "at": "2026-10-30T00:45:28+08:00"
+  },
+  "created_at": "2026-10-29T22:59:41+08:00",
+  "updated_at": "2026-10-30T00:45:28+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-049/MERGE.md",
+  "completions": [
+    {
+      "task": "PILOT-049",
+      "path": "pilot/worktrees/PILOT-049/tower-dsh/tools/tests/test_arch.py",
+      "by": "mac",
+      "reason": "test_arch.py hardcodes gates=15; adding GATE-SPEC-OBJECTIVE requires 16; spec allowed_paths omitted the test file (card contradiction)",
+      "decision": "D-PILOT-049",
+      "at": "2026-10-29T23:42:57+08:00"
+    }
+  ],
+  "delivered_at": "2026-10-30T00:21:42+08:00",
+  "accepted_at": "2026-10-30T00:45:28+08:00"
+}

@@ -481,7 +481,17 @@
       "reviewer": "subagent:81305cc0-e15e-4a7d-8912-1e5345b8065c",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-048/MERGE.md",
       "updated_at": "2026-10-29T15:44:40+08:00"
+    },
+    {
+      "id": "PILOT-049",
+      "title": "objective 硬门：spec@2 四要素 + task-new/spec-lint 双层拒绝",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:bd290de8-3c54-4bc0-9a78-e7dab6b92891",
+      "reviewer": "subagent:b45e8bd9-f024-4cb0-bc60-adb5837c9da5",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-049/MERGE.md",
+      "updated_at": "2026-10-30T00:45:28+08:00"
     }
   ],
-  "updated_at": "2026-10-29T15:44:40+08:00"
+  "updated_at": "2026-10-30T00:45:28+08:00"
 }
