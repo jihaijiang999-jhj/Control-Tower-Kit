@@ -120,8 +120,8 @@ accept/close/envelope/queue/merge-check/merge 前置/post-merge/CI）。每道�
 
 **已知边界（Known limits）**：
 
-1. **单文件**：`tools/towerctl.py` 7,956 行（约 8k）；模块化（PILOT-051）之前，所有命令
-   共享一个进程与一个 parser。
+1. **单文件**：`tools/towerctl.py` 7,981 行（约 8k；本卡 HEAD 实测）；模块化
+   （PILOT-051）之前，所有命令共享一个进程与一个 parser。
 2. **无密钥链**：owner 四闸依赖人工决定与记录，没有密码学签名；信任是 TOFU
    （首次设置即信任，之后靠 revision 与事件复核）。
 3. **legacy 兼容**：无 `dispatch.base_sha` 的旧卡回退到 `merge-base main HEAD`；
