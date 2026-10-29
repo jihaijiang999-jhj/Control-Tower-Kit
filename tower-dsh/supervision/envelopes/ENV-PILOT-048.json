@@ -83,7 +83,7 @@
     }
   ],
   "envelope_head_sha": "548c2e2d41c6b971ec9ed09fe783adad1f8797e4",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "pr_number": 32,
   "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/32",
   "remote_merged": true,
@@ -92,5 +92,9 @@
   "merged_at": "2026-10-29T15:52:43+08:00",
   "supervisor": "sup-phase2-pilot",
   "merge_mode": "pr",
-  "check_conclusion": "success"
+  "check_conclusion": "success",
+  "tests_count": 2,
+  "tower_tests_count": 536,
+  "post_merge_at": "2026-10-29T16:05:09+08:00",
+  "post_merge_note": "architecture spine (ARCHITECTURE, ADRs, GATES/INVARIANTS, EVENT_CATALOG, arch-check/arch-graph); DESIGN archived to ADR-0001"
 }
