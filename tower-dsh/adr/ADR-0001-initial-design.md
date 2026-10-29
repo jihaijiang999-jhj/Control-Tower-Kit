@@ -1,3 +1,16 @@
+---
+schema: tower/adr@1
+id: ADR-0001
+title: "初始设计提案 v0.3（历史）"
+status: archived
+date: 2026-10-19
+deciders:
+  - mac
+related_cards: []
+related_files:
+  - tower-dsh/tools/towerctl.py
+  - tower-dsh/ARCHITECTURE.md
+---
 # Tower/DSH — 控制塔重构设计 v0.3
 
 > 状态：设计提案 v0.3，待 owner 拍板后进入实现。

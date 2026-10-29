@@ -1,0 +1,133 @@
+{
+  "invariants": [
+    {
+      "id": "C-01",
+      "probe": {
+        "kind": "command",
+        "ref": "merge"
+      },
+      "text": "merge 只能由 owner 逐次授权、并只由 supervision 执行；owner-gate 的执行点是 merge 的 supervisor/authority 校验。"
+    },
+    {
+      "id": "C-02",
+      "probe": {
+        "kind": "command",
+        "ref": "merge"
+      },
+      "text": "任何离开本机的调用只能由 owner 逐次授权；owner-gate 的执行点是 merge --mode pr（唯一走 gh 的路径）。"
+    },
+    {
+      "id": "C-03",
+      "probe": {
+        "kind": "command",
+        "ref": "dispatch"
+      },
+      "text": "部署、发布、生产读写、数据迁移、退役默认 no_access；owner-gate 的执行点是 dispatch 对 workspace_write 上限的校验。"
+    },
+    {
+      "id": "C-04",
+      "probe": {
+        "kind": "command",
+        "ref": "merge"
+      },
+      "text": "写 L0 文档到 main 只能由 owner 逐次授权；owner-gate 的执行点是 merge（L0 变更必须经合并队列与 owner 决定）。"
+    },
+    {
+      "id": "C-05",
+      "probe": {
+        "kind": "command",
+        "ref": "merge"
+      },
+      "text": "未授权 merge、强推、改远端受保护分支禁止；owner-gate 的执行点是 merge 的分支/base_sha 断言。"
+    },
+    {
+      "id": "C-06",
+      "probe": {
+        "kind": "command",
+        "ref": "merge"
+      },
+      "text": "未授权外部调用（含上传到未批准服务）禁止；owner-gate 的执行点是 merge --mode pr 的唯一出网路径。"
+    },
+    {
+      "id": "C-07",
+      "probe": {
+        "kind": "command",
+        "ref": "dispatch"
+      },
+      "text": "部署、生产读写、数据迁移、退役禁止；owner-gate 的执行点是 dispatch/authority 校验与 PROJECT_PROFILE 上限。"
+    },
+    {
+      "id": "C-08",
+      "probe": {
+        "kind": "test",
+        "ref": "test_modified_task_record_is_authority_drift"
+      },
+      "text": "禁止手改 primary/CURRENT_STATE.json、TASK_BOARD.json、supervision/*.json、ledger/*.jsonl、tasks/*/record.json；review-check 由 state-verify 重放比对。"
+    },
+    {
+      "id": "C-09",
+      "probe": {
+        "kind": "test",
+        "ref": "test_tampered_hash_is_detected"
+      },
+      "text": "禁止伪造证据（改证据文件、补造 ledger 事件、以文件存在代替检查通过）；tool-check 复算哈希链。"
+    },
+    {
+      "id": "C-10",
+      "probe": {
+        "kind": "test",
+        "ref": "test_out_of_scope_change_rejected_with_zero_writes"
+      },
+      "text": "executor 不得写 allowed_paths 之外的文件，reviewer 不得改工作树；review-check 由 deliver 范围门强制。"
+    },
+    {
+      "id": "C-11",
+      "probe": {
+        "kind": "test",
+        "ref": "test_checkback_rejects_reviewer_equal_to_executor"
+      },
+      "text": "禁止自审自批（executor=reviewer、primary=merge 批准者、作者=验收者）；tool-check 由 checkback/merge 拒绝。"
+    },
+    {
+      "id": "C-12",
+      "probe": {
+        "kind": "command",
+        "ref": "merge"
+      },
+      "text": "禁止读取或回显凭据（token/私钥/密码/cookie）；review-check 的最近执行点是 merge 的出网路径（凭据零回显）。"
+    },
+    {
+      "id": "C-13",
+      "probe": {
+        "kind": "test",
+        "ref": "test_merged_is_not_completion_until_post_merge_verified"
+      },
+      "text": "禁止把聊天记录当状态、或在没有证据时声明完成；完成声明必须引用 ledger 事件与证据哈希。"
+    },
+    {
+      "id": "C-14",
+      "probe": {
+        "kind": "test",
+        "ref": "test_state_transitions_reject_skips"
+      },
+      "text": "禁止跳过闸点（spec_gate != PASS 时 dispatch、未 queued 时 merge、未 POST_MERGE_VERIFIED 时宣布完成）。"
+    },
+    {
+      "id": "C-15",
+      "probe": {
+        "kind": "command",
+        "ref": "merge"
+      },
+      "text": "触碰红线后必须停止、记录并报告 owner 等待口令；owner-gate 的执行点是 merge/accept 的 owner 决定记录。"
+    },
+    {
+      "id": "C-16",
+      "probe": {
+        "kind": "command",
+        "ref": "post-merge"
+      },
+      "text": "已产生副作用时必须保留现场，不清理、不回滚；owner-gate 的执行点是 post-merge 的现场复核与 owner 处置。"
+    }
+  ],
+  "schema": "tower/invariants@1"
+}
