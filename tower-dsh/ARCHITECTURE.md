@@ -37,7 +37,7 @@ owner: mac
 | Tasks | `tasks/<ID>/{TASK.md,record.json,evidence/,DELIVERY.md,REVIEW.md}` | 任务卡与证据 | 绕过 `towerctl` 写 |
 | Pilot | `pilot/<ID>.spec.json` + `pilot/worktrees/<ID>/` | 冻结 spec、隔离执行区 | merge |
 | Tools | `tools/towerctl.py`、`tools/run_tests.py`、`tools/spec_lint.py`、`tools/spec_coverage.py` | 唯一状态/门禁 CLI 与静态检查 | 联网、写塔外路径 |
-| CI | `.github/workflows/tower-gate.yml` | 只读复跑 5 步：unit tests / spec-lint --strict / spec-coverage / verify-ledger / status；shape/state-verify/authority/campaign/arch 在 049 接入 CI | 改状态、merge |
+| CI | `.github/workflows/tower-gate.yml` | 只读复跑 5 步：unit tests / spec-lint --strict / spec-coverage / verify-ledger / status；campaign-check/arch-check 于 049 接入、shape-check 于 051 接入，state-verify/authority-check 待 049 spec 冻结后明确 | 改状态、merge |
 | Docs | `ARCHITECTURE.md`、`arch/`、`adr/`、`EVENT_CATALOG.json` | WHY/HOW 的可证伪描述 | 冒充权威（代码与 ledger 才是） |
 
 ## 3. 数据流
@@ -56,9 +56,10 @@ spec (pilot/<ID>.spec.json)
   → queue-add      记录 QUEUE_ADD，WAITING（两条 tests 基线）
   → merge          记录 MERGE_START / MERGE（或 MERGE_BLOCKED / MERGE_FAILED）
   → post-merge     独立复跑 → 记录 POST_MERGE_VERIFIED（或 POST_MERGE_FAILED）
-  → CI             当前 5 步：unit tests / spec-lint --strict / spec-coverage /
-                   verify-ledger / status（GATE-CI）；shape/state-verify/authority/
-                   campaign/arch 于 049 接入 CI
+  → CI             当前只跑 5 步：unit tests / spec-lint --strict / spec-coverage /
+                   verify-ledger / status（GATE-CI）；campaign-check/arch-check 于 049
+                   接入，shape-check 于 051 接入，state-verify/authority-check 待 049
+                   spec 冻结后明确
 ```
 
 每一步的输入/输出都是文件：ledger 事件是权威，record/board/queue/envelope 是
