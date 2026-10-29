@@ -7164,6 +7164,7 @@ ARCH_EVENTS_SCHEMA = "tower/event-catalog@1"
 ARCH_ADR_SCHEMA = "tower/adr@1"
 ARCH_GRAPH_SCHEMA = "tower/arch-graph@1"
 ARCH_ADR_STATUSES = ("proposed", "accepted", "superseded", "archived")
+ARCH_DRIVE_RE = re.compile(r"^[A-Za-z]:")
 ARCH_SECTIONS = (
     "## 1. 系统上下文", "## 2. 组件与职责", "## 3. 数据流",
     "## 4. 关键契约", "## 5. 扩展点", "## 6. 不变量")
@@ -7338,12 +7339,26 @@ def arch_resolve_imports(names: set[str], by_module: dict[str, str]) -> set[str]
     return resolved
 
 
+def arch_graph_stem_findings(nodes: list[str]) -> list[dict]:
+    """Two tools modules with the same stem make import edges ambiguous."""
+    counts: dict[str, int] = {}
+    for node in nodes:
+        stem = Path(node).stem
+        counts[stem] = counts.get(stem, 0) + 1
+    return [arch_finding("GRAPH_STEM_DUPLICATE", stem,
+                         "two tools modules share this stem; import edges are "
+                         "ambiguous")
+            for stem, count in sorted(counts.items()) if count > 1]
+
+
 def arch_graph_payload(root: Path):
     """``(payload, findings)`` for ``tower/arch-graph@1``; keys sorted on emit."""
     nodes = arch_graph_nodes(root)
-    by_module = {Path(node).stem: node for node in nodes}
+    by_module: dict[str, str] = {}
+    for node in nodes:
+        by_module.setdefault(Path(node).stem, node)
     edges: list[dict] = []
-    findings: list[dict] = []
+    findings = arch_graph_stem_findings(nodes)
     for node in nodes:
         try:
             tree = ast.parse((root / node).read_text(encoding="utf-8-sig"),
@@ -7554,16 +7569,26 @@ def arch_events_findings(root: Path, commands: set[str],
 
 
 def arch_resolve_rel(root: Path, raw) -> Path | None:
-    """Resolve one tower/repo-relative reference to an existing file, or None."""
+    """Resolve one tower/repo-relative reference inside the tower root, or None.
+
+    Fail closed: absolute paths, Windows drive paths (``C:/...``), ``..``
+    segments and anything whose resolved target leaves the tower root (symlink
+    escapes included) are rejected, so an ADR cannot vouch for a host file.
+    """
     text = str(raw or "").replace("\\", "/").strip()
-    if not text or text.startswith("/") or ".." in text.split("/"):
+    if (not text or text.startswith("/") or ARCH_DRIVE_RE.match(text)
+            or ".." in text.split("/")):
         return None
+    root_abs = root.resolve()
     candidates = [root / text, root.parent / text]
     if text.startswith(root.name + "/"):
         candidates.append(root / text[len(root.name) + 1:])
     for candidate in candidates:
-        if candidate.is_file():
-            return candidate
+        if not candidate.is_file():
+            continue
+        resolved = candidate.resolve()
+        if resolved == root_abs or root_abs in resolved.parents:
+            return resolved
     return None
 
 

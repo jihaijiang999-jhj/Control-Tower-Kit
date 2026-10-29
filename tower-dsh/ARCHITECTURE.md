@@ -37,7 +37,7 @@ owner: mac
 | Tasks | `tasks/<ID>/{TASK.md,record.json,evidence/,DELIVERY.md,REVIEW.md}` | 任务卡与证据 | 绕过 `towerctl` 写 |
 | Pilot | `pilot/<ID>.spec.json` + `pilot/worktrees/<ID>/` | 冻结 spec、隔离执行区 | merge |
 | Tools | `tools/towerctl.py`、`tools/run_tests.py`、`tools/spec_lint.py`、`tools/spec_coverage.py` | 唯一状态/门禁 CLI 与静态检查 | 联网、写塔外路径 |
-| CI | `.github/workflows/` | 只读复跑门禁（shape/state-verify/authority/campaign/arch） | 改状态、merge |
+| CI | `.github/workflows/tower-gate.yml` | 只读复跑 5 步：unit tests / spec-lint --strict / spec-coverage / verify-ledger / status；shape/state-verify/authority/campaign/arch 在 049 接入 CI | 改状态、merge |
 | Docs | `ARCHITECTURE.md`、`arch/`、`adr/`、`EVENT_CATALOG.json` | WHY/HOW 的可证伪描述 | 冒充权威（代码与 ledger 才是） |
 
 ## 3. 数据流
@@ -56,7 +56,9 @@ spec (pilot/<ID>.spec.json)
   → queue-add      记录 QUEUE_ADD，WAITING（两条 tests 基线）
   → merge          记录 MERGE_START / MERGE（或 MERGE_BLOCKED / MERGE_FAILED）
   → post-merge     独立复跑 → 记录 POST_MERGE_VERIFIED（或 POST_MERGE_FAILED）
-  → CI             同一批只读门禁在 PR 上复跑（GATE-CI）
+  → CI             当前 5 步：unit tests / spec-lint --strict / spec-coverage /
+                   verify-ledger / status（GATE-CI）；shape/state-verify/authority/
+                   campaign/arch 于 049 接入 CI
 ```
 
 每一步的输入/输出都是文件：ledger 事件是权威，record/board/queue/envelope 是
@@ -83,7 +85,9 @@ ledger writer 的字面 type）：代码有而目录无、目录有而代码无�
 与 `check_evidence` 复核；`MERGED` 不等于完成，只有 `POST_MERGE_VERIFIED` 是。
 
 **门表**：`arch/GATES.json`（15 道门，含 spec/ready/dispatch/deliver 三闸/review/
-accept/close/envelope/queue/merge-check/merge 前置/post-merge/CI）。
+accept/close/envelope/queue/merge-check/merge 前置/post-merge/CI）。每道门优先指向
+**拒绝路径**测试（负例）；`weak: true` 表示该门当前只有正例测试，只证“能过”、
+不证“会拒”。本卡 15 道门均为负例（或无 `weak` 字段）。
 **红线 probe**：`arch/INVARIANTS.json`（C-01..C-16，每条一个真实测试或真实命令）。
 **决策**：`adr/`（`tower/adr@1`，status ∈ proposed|accepted|superseded|archived）。
 
@@ -103,25 +107,31 @@ accept/close/envelope/queue/merge-check/merge 前置/post-merge/CI）。
 
 红线条款见 `RED-LINES.md`（C-01..C-16），机读映射见 `arch/INVARIANTS.json`：
 
-- **owner-gate**（C-01/02/03/04/05/06/07/12/15/16）：执行点是 `merge`、
+- **owner-gate**（C-01/02/03/04/05/06/07/15/16）：执行点是 `merge`、
   `dispatch`、`post-merge` 的授权/分支/现场校验；塔只记录决定，不代替 owner。
 - **tool-check**（C-09/11/14）：ledger 哈希链、`checkback` 拒绝自审、`dispatch`/`merge`/
   `post-merge` 拒绝跳闸。
-- **review-check**（C-08/10/13）：`state-verify` 重放、`deliver` 范围门、完成声明必须
-  引用 ledger 事件与证据哈希。
+- **review-check**（C-08/10/12/13）：`state-verify` 重放、`deliver` 范围门、完成声明必须
+  引用 ledger 事件与证据哈希；C-12（凭据零回显）由 review 执行，`merge` 只是最近的
+  出网执行点。
+
+> **C-12 / C-15 没有自动化 proof**：`arch/INVARIANTS.json` 里它们的 `probe` 只是
+> review/owner 的执行点，不是“已证明”的测试；`arch-check` 只验证该执行点存在。
 
 **已知边界（Known limits）**：
 
-1. **单文件**：`tools/towerctl.py` ≈ 7.4k 行；模块化（PILOT-050）之前，所有命令共享
-   一个进程与一个 parser。
+1. **单文件**：`tools/towerctl.py` 7,956 行（约 8k）；模块化（PILOT-051）之前，所有命令
+   共享一个进程与一个 parser。
 2. **无密钥链**：owner 四闸依赖人工决定与记录，没有密码学签名；信任是 TOFU
    （首次设置即信任，之后靠 revision 与事件复核）。
 3. **legacy 兼容**：无 `dispatch.base_sha` 的旧卡回退到 `merge-base main HEAD`；
    无 baselines 的旧信封跳过部分门。
 4. **事件目录只覆盖字面量/模块常量**：`append_ledger`、`append_supervision_ledger` 与
-   低层 `_append_ledger_event_locked` 的字面 type 都会被扫描（`COMPLETION_ADDED` 由低层
-   writer 写入，因此也在目录里）；只有把 type 当参数转发的 `_append_ledger_event` 不在
-   扫描内。新增非字面事件必须人工补目录（否则 `state-verify` 默认放行）。
+   低层 `_append_ledger_event_locked` 的字面 type 都会扫描（`COMPLETION_ADDED` 由低层
+   writer 写入，因此也在目录里）。**任何非字面量传 type（变量、f-string、字符串拼接）
+   都会逃逸**，`arch-check` 的 `counts.unresolved_event_calls` 只**计数不失败**
+   （051 候选：非零即 warning 或 exit 2）。新增非字面事件必须人工补目录，
+   否则 `state-verify` 默认放行。
 5. **arch-check 只证“引用存在”**：它证明门/ probe/事件有落点，不证明语义正确；
    语义证据在 `tools/tests/*.py`。
 6. **单写者假设**：primary 与 supervision 串行；并行战役未实现（见 STRATEGY 非目标）。

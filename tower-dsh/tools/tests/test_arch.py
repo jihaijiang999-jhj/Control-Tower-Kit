@@ -216,6 +216,35 @@ class ArchCheckNegativeCase(unittest.TestCase):
             "  - tower-dsh/tools/does-not-exist.py"), encoding="utf-8")
         self.assert_arch_failure(root, "ADR_RELATED")
 
+    def test_adr_related_file_rejects_drive_path(self) -> None:
+        root = self.fixture()
+        path = root / ADR_REL
+        path.write_text(path.read_text(encoding="utf-8").replace(
+            "  - tower-dsh/tools/towerctl.py",
+            '  - "C:/Windows/win.ini"'), encoding="utf-8")
+        self.assert_arch_failure(root, "ADR_RELATED")
+
+    def test_adr_related_file_rejects_parent_escape(self) -> None:
+        root = self.fixture()
+        path = root / ADR_REL
+        path.write_text(path.read_text(encoding="utf-8").replace(
+            "  - tower-dsh/tools/towerctl.py",
+            "  - ../outside-the-tower.md"), encoding="utf-8")
+        self.assert_arch_failure(root, "ADR_RELATED")
+
+    def test_duplicate_tool_stem_is_rejected(self) -> None:
+        root = self.fixture()
+        source = root / "tools" / "towerctl.py"
+        duplicate = root / "tools" / "zzz" / "towerctl.py"
+        duplicate.parent.mkdir()
+        duplicate.write_text(source.read_text(encoding="utf-8"),
+                             encoding="utf-8")
+        self.assert_arch_failure(root, "GRAPH_STEM_DUPLICATE")
+        cp = run_cli(root, "arch-graph", "--json")
+        self.assertEqual(cp.returncode, 2, cp.stdout + cp.stderr)
+        self.assertNotIn("Traceback", cp.stderr)
+        self.assertFalse(json.loads(cp.stdout)["ok"])
+
     def test_missing_architecture_section_is_rejected(self) -> None:
         root = self.fixture()
         path = root / "ARCHITECTURE.md"

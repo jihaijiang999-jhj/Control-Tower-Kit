@@ -94,7 +94,7 @@
         "kind": "command",
         "ref": "merge"
       },
-      "text": "禁止读取或回显凭据（token/私钥/密码/cookie）；review-check 的最近执行点是 merge 的出网路径（凭据零回显）。"
+      "text": "禁止读取或回显凭据（token/私钥/密码/cookie）；review-check 的最近执行点是 merge 的出网路径（无自动化 proof，仅 review 执行点）。"
     },
     {
       "id": "C-13",
@@ -118,7 +118,7 @@
         "kind": "command",
         "ref": "merge"
       },
-      "text": "触碰红线后必须停止、记录并报告 owner 等待口令；owner-gate 的执行点是 merge/accept 的 owner 决定记录。"
+      "text": "触碰红线后必须停止、记录并报告 owner 等待口令；owner-gate 的执行点是 merge/accept 的 owner 决定记录（无自动化 proof，仅 owner 执行点）。"
     },
     {
       "id": "C-16",
