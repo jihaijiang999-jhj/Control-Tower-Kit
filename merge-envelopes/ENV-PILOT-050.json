@@ -1,0 +1,81 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-050",
+  "task": "PILOT-050",
+  "repository": "..",
+  "branch": "pilot/PILOT-050",
+  "base": "main",
+  "implementation_head_sha": "96d35326af7d9d779d8339dd51a7b2fc98c3b785",
+  "envelope_path": "merge-envelopes/ENV-PILOT-050.json",
+  "created_at": "2026-10-30T16:10:00+08:00",
+  "scope": "PILOT-050: command wiring (dispatch campaign, W1/W2, post-merge/CI gates, legacy backfill)",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 552,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-050/evidence/towerctl.py",
+      "sha256": "0af67b9de093e88f5c8f04c68d6421561633c9438dd9b76b9b6c2dbb0c823aa4"
+    },
+    {
+      "path": "tasks/PILOT-050/evidence/test_wiring.py",
+      "sha256": "3f10fe34a69fd941c76e7eee1618d54aadbf5075a24e8d7961e762ae7821b108"
+    },
+    {
+      "path": "tasks/PILOT-050/evidence/C-2026-Q4-01.md",
+      "sha256": "d53f298a4acbed172050aacc0e14c3bc01dd482263a110f600859afbac4a9448"
+    },
+    {
+      "path": "tasks/PILOT-050/evidence/ARCHITECTURE.md",
+      "sha256": "6b6617efb0f785c0f0aa8019a92c3eba3673989c9b191a821b10f45d77ebea1f"
+    },
+    {
+      "path": "tasks/PILOT-050/evidence/test_status_history.py",
+      "sha256": "4a4b270b61fedf069d4f51f4e53659fa4ceba4327afc7ad13a7cc4aeb0f360c4"
+    },
+    {
+      "path": "tasks/PILOT-050/evidence/test-output.txt",
+      "sha256": "79cce4925fb61f03dcc84a319f20fd1ad8cffe544b9a7804afe056e75b492627"
+    },
+    {
+      "path": "tasks/PILOT-050/evidence/wiring_probe.py",
+      "sha256": "27294abc63c90aef335a76425ee69482939a2d4dd678ff852f48198e3f2796d0"
+    },
+    {
+      "path": "tasks/PILOT-050/evidence/probe.txt",
+      "sha256": "971b2a5ae62fb31ec83904d7bf6e0289010f2ff1676e557967ee9f9821c45e7d"
+    },
+    {
+      "path": "tasks/PILOT-050/evidence/probe-old-code.txt",
+      "sha256": "2be212e862b67ce3f1b9c517ec4a3288b996a8d5d4827bce32a70c4aaaab906a"
+    },
+    {
+      "path": "tasks/PILOT-050/evidence/commit.txt",
+      "sha256": "183c7539a6ee6d6462a8881fb89cad3d9c3dbb7a7a5020aa2cd1aa54e815f520"
+    },
+    {
+      "path": "tasks/PILOT-050/evidence/diff.txt",
+      "sha256": "514bee6d55326ae367399ffc50c1767258d6d56614f204564a0ef6e72328f213"
+    },
+    {
+      "path": "tasks/PILOT-050/evidence/diff-names.txt",
+      "sha256": "b23c290e5ee983e23570ec1cee8e9be2de4d3f4162db7d7d3602471b71ec7887"
+    },
+    {
+      "path": "tasks/PILOT-050/evidence/campaign-check.txt",
+      "sha256": "ce54939d274b03492125d25a92cc883b55f1ed229db88d3578fa444c70abc894"
+    },
+    {
+      "path": "tasks/PILOT-050/evidence/ci-workflow.txt",
+      "sha256": "96f4ffedb62644de5bc87e8604708c63f570e2d0a0eb4335b76edc5e0f392482"
+    },
+    {
+      "path": "tasks/PILOT-050/evidence/arch-check.txt",
+      "sha256": "37ef63a993c4b173a4b46fd41cd2c91307033c900f9fb0987d592cd2ba4c80a9"
+    }
+  ]
+}
