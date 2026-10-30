@@ -85,6 +85,14 @@ ledger writer 的字面 type）：代码有而目录无、目录有而代码无�
 **命令**：`python tools/towerctl.py <cmd>` 是唯一入口；argparse 的子命令名是
 命令名的权威，`arch/GATES.json.gates[].command` 必须命中它。
 
+**卡依赖**：`depends_on` 有三处校验点——`task-new` 查结构（字符串列表、非自依赖、
+无重复、目标存在于 board 或 `tasks/<id>/`），`check --phase ready` 与 `dispatch`
+查调度（每个目标 `closed`，并对全部 live record 做 DFS 环检测；`dispatch` 不信任
+ready 时的状态）。失败一律 exit 2 单 JSON、零状态变更，错误码
+`depends_on.self` / `depends_on.duplicate` / `depends_on.missing` /
+`depends_on.invalid` / `depends_on.cycle` 与 `depends_on.<id>: <status>`。
+`task-new` 不要求依赖已闭合（允许先建卡后等依赖）；语义见 `specs/WF-TASK.md` §9。
+
 **证据**：所有完成声明必须有 sha256 证据（`tasks/<ID>/evidence/`）、ledger 事件
 与 `check_evidence` 复核；`MERGED` 不等于完成，只有 `POST_MERGE_VERIFIED` 是。
 

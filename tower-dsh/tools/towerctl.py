@@ -524,6 +524,132 @@ def spec_gate_errors(root: Path, rec: dict) -> list[str]:
     return errors
 
 
+# PILOT-051: ``depends_on`` is a three-layer prerequisite, not a copied field.
+# task-new validates structure (list/shape, no self-dependency, no duplicate,
+# every target present); check --phase ready and dispatch validate scheduling
+# (every target closed) plus acyclicity over the whole live card graph.
+DEPENDS_ON_CLOSED = "closed"
+
+
+def dependency_status_text(value) -> str | None:
+    """A non-empty status string, or ``None`` for anything else."""
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def dependency_target_status(root: Path, dep: str) -> str | None:
+    """Status of one dependency target, or ``None`` when no card records it.
+
+    The live ``record.json`` wins over a ``TASK_BOARD.json`` row (the board is a
+    working copy, the record is the card).  A bare ``tasks/<id>/`` directory is
+    still a target at ``task-new`` time, but it carries no trustworthy status
+    yet, so it reports ``unknown`` rather than a fabricated ``ready``.
+    """
+    if not is_safe_id(dep, TASK_ID_RE):
+        return None
+    record = _optional_task_record(root, dep)
+    if record and record.get("id") == dep:
+        status = dependency_status_text(record.get("status"))
+        if status:
+            return status
+    for entry in load_board(root).get("tasks") or []:
+        if isinstance(entry, dict) and entry.get("id") == dep:
+            return dependency_status_text(entry.get("status")) or "unknown"
+    return "unknown" if (root / "tasks" / dep).is_dir() else None
+
+
+def dependency_closure_errors(root: Path, rec: dict) -> list[str]:
+    """Scheduling gate: every recorded dependency must already be ``closed``.
+
+    A missing target is reported as ``depends_on.<id>: missing``; every other
+    unmet state keeps its own name, so an operator can tell "not merged yet"
+    from "card was voided".
+    """
+    errors: list[str] = []
+    for raw in rec.get("depends_on") or []:
+        dep = raw.strip() if isinstance(raw, str) else ""
+        status = dependency_target_status(root, dep)
+        if status is None:
+            errors.append(f"depends_on.{dep}: missing")
+        elif status != DEPENDS_ON_CLOSED:
+            errors.append(f"depends_on.{dep}: {status} (unmet)")
+    return errors
+
+
+def dependency_cycle_errors(root: Path) -> list[str]:
+    """DFS every live card's ``depends_on``; a cycle (self included) is fatal.
+
+    The graph is read from records, never from the board: a board-only target
+    has no outgoing edges.  The message names the cycle in visit order
+    (``A -> B -> A``), which is enough to locate the loop without a graph dump.
+    """
+    graph: dict[str, list[str]] = {}
+    for record in read_task_records(root):
+        deps = [item.strip() for item in (record.get("depends_on") or [])
+                if isinstance(item, str) and item.strip()]
+        graph[str(record.get("id"))] = deps
+    visiting: set[str] = set()
+    done: set[str] = set()
+    path: list[str] = []
+
+    def walk(node: str) -> list[str] | None:
+        if node in done:
+            return None
+        if node in visiting:
+            return path[path.index(node):] + [node]
+        visiting.add(node)
+        path.append(node)
+        for dep in graph.get(node, []):
+            cycle = walk(dep)
+            if cycle:
+                return cycle
+        path.pop()
+        visiting.discard(node)
+        done.add(node)
+        return None
+
+    for node in sorted(graph):
+        cycle = walk(node)
+        if cycle:
+            return [f"depends_on.cycle: {' -> '.join(cycle)}"]
+    return []
+
+
+def depends_on_structure_errors(root: Path, spec: dict, tid: str) -> list[str]:
+    """Structural gate for ``spec.depends_on`` at ``task-new``; never writes.
+
+    The list itself may be empty (most legacy cards are), but every element
+    must be a non-empty string naming a card that already exists in the board
+    or under ``tasks/<id>/``.  Closure is *not* required here: a card may be
+    created before its dependency closes.
+    """
+    raw = spec.get("depends_on", [])
+    if not isinstance(raw, list):
+        return ["depends_on.invalid: depends_on must be a list of task ids"]
+    errors: list[str] = []
+    seen: set[str] = set()
+    for value in raw:
+        if not isinstance(value, str) or not value.strip():
+            errors.append("depends_on.invalid: depends_on items must be non-empty strings")
+            continue
+        dep = value.strip()
+        if dep in seen:
+            errors.append(f"depends_on.duplicate: {dep} listed more than once")
+            continue
+        seen.add(dep)
+        if dep == tid:
+            errors.append(f"depends_on.self: {dep} cannot depend on itself")
+        elif dependency_target_status(root, dep) is None:
+            errors.append(f"depends_on.missing: no task card for {dep}")
+    return errors
+
+
+def scheduling_dependency_errors(root: Path, rec: dict) -> list[str]:
+    """Ready/dispatch gate: dependencies closed and the whole graph acyclic."""
+    return dependency_closure_errors(root, rec) + dependency_cycle_errors(root)
+
+
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["git", "-C", str(repo), *args],
@@ -1891,6 +2017,7 @@ def task_new_errors(root: Path, spec: dict, tid: str) -> list[str]:
     if not errors:
         errors += validate_spec(spec)
     errors += spec_lint.objective_errors(spec)
+    errors += depends_on_structure_errors(root, spec, tid)
     worktree = spec.get("worktree")
     if not worktree:
         errors.append("spec.worktree required")
@@ -2020,7 +2147,7 @@ def cmd_check(root: Path, args) -> None:
             errors.append("TASK.md missing")
         if not (root / rec.get("worktree", "")).exists():
             errors.append("worktree missing")
-        errors += spec_gate_errors(root, rec)
+        errors += spec_gate_errors(root, rec) + scheduling_dependency_errors(root, rec)
     elif phase == "dispatch":
         if rec.get("status") != "dispatched":
             errors.append(f"status is {rec.get('status')}, expected dispatched")
@@ -2704,7 +2831,7 @@ def cmd_dispatch(root: Path, args) -> None:
     task_md = task_dir(root, args.task) / "TASK.md"
     if not task_md.exists():
         fail([f"TASK.md missing: {rel(root, task_md)}; cannot dispatch without a task card"])
-    gate_errors = spec_gate_errors(root, rec)
+    gate_errors = spec_gate_errors(root, rec) + scheduling_dependency_errors(root, rec)
     if gate_errors:
         fail(gate_errors)
     kind = dispatch_provenance_field(args.kind, "kind")

@@ -3,7 +3,7 @@ schema: tower/workflow@1
 id: WF-TASK
 title: 任务流 — 任务卡从创建到收口
 owner: mac
-version: 2
+version: 3
 enforcement_legend: tool-check | review-check | owner-gate
 ---
 
@@ -80,6 +80,7 @@ enforcement_legend: tool-check | review-check | owner-gate
 |---|---|---|---|
 | 1 | 2026-10-19 | 初版，按 PILOT-002/003/006 后的实际行为编写 | owner |
 | 2 | 2026-10-29 | 增加第 8 节“施工目标前置不变量”（spec@2 objective 门） | owner |
+| 3 | 2026-10-30 | 增加第 9 节“卡依赖前置不变量”（`depends_on` 结构/闭合/无环三层） | owner |
 
 ## 8. 施工目标前置不变量
 
@@ -95,3 +96,20 @@ enforcement_legend: tool-check | review-check | owner-gate
 - `task-new` 对**所有**新 spec 校验 objective：必须是对象、四字段齐全、每个值 `strip()` 后至少 8 字符、不是裸 `__FILL__` 占位、不是整体 `<...>` 占位；校验发生在创建 `tasks/<id>/`、写 record/TASK、append `TASK_NEW` 之前，失败 `exit 2` 单 JSON 且**零写入**。`__FILL__` 只在作为整个字段值时拒绝（正文提及该标记是允许的，049 bootstrap 即如此），否则“卡自身 must pass”与“不得含”互相矛盾。
 - `spec-lint` 只对顶层 `pilot/*.spec.json` 中声明 `tower/spec@2` 的卡强制同一规则；`tower/spec@1` 跳过（冻结旧卡）；`pilot/worktrees/**` 的嵌套副本不在扫描范围。
 - 机器检查只证结构与最低内容量，不证目标真实性与 AC 对齐；reviewer 仍须独立审 objective 是否描述真实问题、approach 是否避免单点补丁、`non_goals_and_done` 是否与 acceptance 一致。
+
+## 9. 卡依赖前置不变量
+
+`depends_on`（`tower/spec@2` 字段，旧卡可为空或缺省）从 051 起是三层前置，不只是被复制进 record 的字段：
+
+| 层 | 校验点 | 规则 | 错误码（exit 2） |
+|---|---|---|---|
+| 结构 | `task-new` | 必须是字符串列表（可为空 `[]`）；元素 `strip()` 后非空；不得自依赖；重复 id 报错；每个 id 必须能在 `primary/TASK_BOARD.json` 或 `tasks/<id>/` 找到 | `depends_on.invalid` / `depends_on.self` / `depends_on.duplicate` / `depends_on.missing` |
+| 闭合 | `check --phase ready` 与 `dispatch` | `record.depends_on` 的每个目标状态必须是 `closed`；`dispatch` 不信任 ready 时的状态，重新校验 | `depends_on.<id>: <status>`（目标不存在时为 `depends_on.<id>: missing`） |
+| 无环 | `check --phase ready` 与 `dispatch` | 沿全部 live task record 的 `depends_on` 做 DFS（含自依赖）；发现环即拒绝 | `depends_on.cycle: A -> B -> A` |
+
+- 结构校验在写 `tasks/<id>/`、record/TASK 与 `TASK_NEW` 之前完成；失败 exit 2 单 JSON、零写入。
+- `dispatch` 的闭合与无环校验在写 record/board 与 `DISPATCH` 之前完成；失败零状态变更。
+- **允许先建卡后等依赖**：`task-new` 只要求目标卡存在，不要求目标 `closed`；否则“排期”与“可派发”会被混为一谈。
+- `check --phase spec` 不查闭合：spec 获批时依赖可能仍在 ready / dispatched / merged 流程中。
+- 旧卡 `depends_on` 为空或缺省视为无依赖，ready / dispatch 行为不变。
+- `task-new` 不做全图 DFS：新卡尚未写入，环只能由后续卡形成，故环检测放在调度与执行入口。

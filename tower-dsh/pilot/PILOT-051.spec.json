@@ -1,0 +1,56 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-051",
+  "title": "depends_on 硬校验：存在、闭合、无环",
+  "objective": {
+    "problem": "tower/spec@2 有 depends_on，但 task-new 只把它当字段复制进 record；check --phase ready 与 dispatch 都不验证。一张卡可以在依赖未合并时进入 ready/被派发，依赖链只存在于人的脑子里。049 依赖 048、050 依赖 049，但即使 049 没合并，050 也能 ready——写了不生效。",
+    "outcome": "task-new 拒绝自依赖/重复/指向不存在卡的 depends_on；check --phase ready 与 dispatch 对未闭合依赖 exit 2 并点名 id；全塔依赖图出现环时 exit 2 并列出环；合法依赖正常通过，零状态变更。",
+    "approach": "在 task-new 做结构校验（字符串列表、无自依赖、目标存在、无重复），在 check ready 与 dispatch 做调度校验（每个目标 status=closed），另加 DFS 环检测；不新增事件类型、不改 spec 字段、不做契约级 spec-graph（留给 052/053）；错误码 depends_on.self/missing/duplicate/unmet/cycle，全部 exit 2 单 JSON。",
+    "non_goals_and_done": "不做 contracts/spec-graph/版本漂移，不要求 task-new 时依赖已闭合（允许先建卡后等依赖），不改四闸/状态机/spec@2/事件目录；结构校验、ready/dispatch 硬门、环检测、正反例测试与独立复核完成、合并后 state-verify drift [] 才算完成。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0004 / depends_on 字段现状",
+  "why_now": "050 已把 dispatch 接进 campaign，但卡级依赖仍不生效；051 是对象层/契约图之前最小的一步：先让 depends_on 真正拦人，再谈 contracts/spec-graph。",
+  "scope": [
+    "task-new：depends_on 必须是非空字符串列表（可为空列表）；不得自依赖；重复 id 去重后报 duplicate；每个 id 必须能在 board 或 tasks/ 找到；结构校验在写 record/TASK/ledger 之前，失败 exit 2 零写入",
+    "check --phase ready：读取 record.depends_on，每个目标 status 必须为 closed；否则 exit 2，错误点名 depends_on.<id>: <status>（或 missing）",
+    "dispatch：再次校验依赖闭合（不信任 ready 时的状态，可能在等待期间被 VOID/重开）；失败 exit 2 且不写 record/ledger",
+    "环检测：沿所有 task record 的 depends_on 做 DFS；发现环（含自依赖）→ exit 2，列出环上的 id；无环通过",
+    "specs/WF-TASK.md 增加“卡依赖前置不变量”：结构/闭合/无环三层、错误码、允许先建卡后等依赖",
+    "ARCHITECTURE.md 的契约节补“卡依赖”一行（task-new/ready/dispatch 三处校验点）",
+    "新增 tools/tests/test_dependencies.py：缺目标/自依赖/重复/未闭合/环/合法 ready/dispatch 零写入/旧卡空 depends_on 通过；全部干净 exit 2 无 Traceback",
+    "不改 036–050 的信任边界/授权/前置链/范围门/completion/shape/objective/campaign 语义；不新增事件类型；不改 spec@2 字段；不写 primary/supervision/ledger"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-051/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-051/tower-dsh/tools/tests/test_dependencies.py",
+    "pilot/worktrees/PILOT-051/tower-dsh/specs/WF-TASK.md",
+    "pilot/worktrees/PILOT-051/tower-dsh/ARCHITECTURE.md"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening existing gates",
+    "new ledger event types",
+    "changing tower/spec@2 fields",
+    "requiring dependencies to be closed at task-new time",
+    "touching TOWER.md (L0)"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-051/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 569 + 新增用例数（main 基线 569）",
+    "task-new：自依赖/重复/指向不存在卡 → exit 2 单 JSON，tasks/<id>/ 与 ledger 不变；空 depends_on 与合法依赖通过；依赖目标处于 ready 时允许多建卡（不要求闭合）",
+    "check --phase ready：依赖未闭合 → exit 2 点名 depends_on.<id>；全部 closed → exit 0；缺失目标 → exit 2",
+    "dispatch：依赖未闭合 → exit 2 且 record/ledger 零写入；闭合 → 正常派发",
+    "环：A→B→A（或自依赖）→ exit 2 列出环；无环通过；错误无 Traceback",
+    "specs/WF-TASK.md 含依赖不变量节且 spec-lint 6/6；ARCHITECTURE.md 契约节含卡依赖一行；arch-check exit 0",
+    "旧码对照：main 对未闭合依赖 ready/dispatch 均放行；新码 ready/dispatch 拒绝。证据写进 scratch/probe-old-code.txt",
+    "shape-check 在 worktree exit 0（新增函数 ≤80 行/≤12 分支；既有函数不增长）",
+    "真实塔：worktree 新工具 campaign-check/arch-check/authority-check exit 0、state-verify drift []；建信封前 tasks=51/envelopes=49，建信封后 51/50；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-051 diff --name-only main..HEAD 恰四个 allowed_paths"
+  ],
+  "depends_on": ["PILOT-050"],
+  "worktree": "pilot/worktrees/PILOT-051"
+}
