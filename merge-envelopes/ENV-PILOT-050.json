@@ -5,7 +5,7 @@
   "repository": "..",
   "branch": "pilot/PILOT-050",
   "base": "main",
-  "implementation_head_sha": "96d35326af7d9d779d8339dd51a7b2fc98c3b785",
+  "implementation_head_sha": "12912b0a5b326e6db7292916065182e4a2b3bf2f",
   "envelope_path": "merge-envelopes/ENV-PILOT-050.json",
   "created_at": "2026-10-30T16:10:00+08:00",
   "scope": "PILOT-050: command wiring (dispatch campaign, W1/W2, post-merge/CI gates, legacy backfill)",
