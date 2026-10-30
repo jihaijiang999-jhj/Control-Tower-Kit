@@ -141,6 +141,11 @@ class ObjectiveCase(unittest.TestCase):
             json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         (self.root / "pilot" / "worktrees" / "PILOT-049").mkdir(
             parents=True, exist_ok=True)
+        # PILOT-051 (D-PILOT-051): the real 049 spec depends on PILOT-048;
+        # seed that card as closed instead of weakening the depends_on gate.
+        (self.root / "tasks" / "PILOT-048").mkdir(parents=True, exist_ok=True)
+        (self.root / "tasks" / "PILOT-048" / "record.json").write_text(
+            json.dumps({"id": "PILOT-048", "status": "closed"}), encoding="utf-8")
         cp = self.run_cli("task-new", "--spec", "pilot/PILOT-049.spec.json")
         self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
 
