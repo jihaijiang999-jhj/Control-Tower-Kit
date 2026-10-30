@@ -1,0 +1,669 @@
+diff --git a/tower-dsh/ARCHITECTURE.md b/tower-dsh/ARCHITECTURE.md
+index b5649d3..3c6aba0 100644
+--- a/tower-dsh/ARCHITECTURE.md
++++ b/tower-dsh/ARCHITECTURE.md
+@@ -96,10 +96,28 @@ ready 时的状态）。失败一律 exit 2 单 JSON、零状态变更，错误
+ **证据**：所有完成声明必须有 sha256 证据（`tasks/<ID>/evidence/`）、ledger 事件
+ 与 `check_evidence` 复核；`MERGED` 不等于完成，只有 `POST_MERGE_VERIFIED` 是。
+ 
+-**门表**：`arch/GATES.json`（15 道门，含 spec/ready/dispatch/deliver 三闸/review/
+-accept/close/envelope/queue/merge-check/merge 前置/post-merge/CI）。每道门优先指向
++**门表**：`arch/GATES.json`（17 道门，含 spec/ready/dispatch/deliver 三闸/review/
++accept/close/envelope/queue/merge-check/merge 前置/post-merge/CI/对象层）。每道门优先指向
+ **拒绝路径**测试（负例）；`weak: true` 表示该门当前只有正例测试，只证“能过”、
+-不证“会拒”。本卡 15 道门均为负例（或无 `weak` 字段）。
++不证“会拒”。本卡 17 道门均为负例（或无 `weak` 字段）。
++
++**对象层**：`state/PROFILE-<OBJECT>.md` 是对象事实的可执行契约（schema
++`tower/profile@1`）。front-matter 固定 `schema/object/version/updated/owner/status`
++（status ∈ `active|template`），正文是固定列序的表格
++`id | fact | probe | expect | why`；`id` 唯一且匹配 `^[A-Z0-9-]+$`。
++`probe` 只允许**只读** towerctl 子命令（`startup`、`wiring`、`status`、
++`state-verify`、`authority-check`、`verify-ledger`、`arch-check`、`campaign-check`、
++`shape-check`、`spec-lint --strict`、`spec-coverage`、`where --json`、`brief`），
++不得内含 `--root`（由 `profile-check` 注入），禁止递归 `profile-check` 与
++`deliver/merge/close/accept/dispatch/checkback/task-new/envelope-new/post-merge`
++等写命令；`expect` 只支持 `exit=<N>` 与可选 `; stdout=<子串>`，`why` 必须非空。
++`towerctl profile-check --file <path>|--object <id>` 解析并校验结构，对 `status:
++active` 的每条事实以子进程运行 probe（cwd=塔根，60s 超时），比对 exit 与 stdout
++子串；全部通过 exit 0，任一失败 exit 2 单 JSON（`findings: id/expected/actual`）。
++它**只读**：不写 primary/supervision/ledger/tasks，也不写任何其它状态。
++**对象 0 限制**：第一个对象只能是塔自身（`PROFILE-TOWER-DSH.md`）；模板
++`PROFILE-TEMPLATE.md` 为 `status: template`，只解析结构、不运行 probe。外部对象
++必须先由 owner 提供脱敏事实再建 PROFILE，禁止凭空画像或从凭据推断。
+ **红线 probe**：`arch/INVARIANTS.json`（C-01..C-16，每条一个真实测试或真实命令）。
+ **决策**：`adr/`（`tower/adr@1`，status ∈ proposed|accepted|superseded|archived）。
+ 
+diff --git a/tower-dsh/arch/GATES.json b/tower-dsh/arch/GATES.json
+index 5c6a4b3..4809852 100644
+--- a/tower-dsh/arch/GATES.json
++++ b/tower-dsh/arch/GATES.json
+@@ -111,6 +111,13 @@
+       "id": "GATE-CI",
+       "phase": "ci",
+       "test": "test_failing_checks_block_with_correction_required"
++    },
++    {
++      "blocks": "PROFILE with missing fields, an unknown/write probe, a bad expect or a failing assertion",
++      "command": "profile-check",
++      "id": "GATE-PROFILE",
++      "phase": "objects",
++      "test": "test_unknown_probe_is_rejected"
+     }
+   ],
+   "schema": "tower/gates@1"
+diff --git a/tower-dsh/state/PROFILE-TEMPLATE.md b/tower-dsh/state/PROFILE-TEMPLATE.md
+new file mode 100644
+index 0000000..420c5eb
+--- /dev/null
++++ b/tower-dsh/state/PROFILE-TEMPLATE.md
+@@ -0,0 +1,24 @@
++---
++schema: tower/profile@1
++object: OBJECT-ID
++version: 1
++updated: 2026-10-30
++owner: mac
++status: template
++---
++
++# PROFILE — OBJECT-ID（模板）
++
++对象层把“这个系统是什么、哪些不变量不能碰”写成可执行事实：每条事实一个只读
++probe，`towerctl profile-check` 逐条运行并比对 `expect`。模板只用于复制结构，
++`status: template` 时 `profile-check` 解析并校验结构但**不运行 probe**。
++
++使用时：把 `object` 改成真实对象 id，`status` 改成 `active`，`updated` 改成当天
++日期，再用真实事实替换示例行。`probe` 只能取 `profile-check` 白名单里的只读
++towerctl 子命令（见 `ARCHITECTURE.md` §4）；`expect` 只支持 `exit=N` 与可选的
++`; stdout=子串`；`why` 写“为什么这是对象不变量”，不要写“测试通过”。
++
++| id | fact | probe | expect | why |
++|---|---|---|---|---|
++| SAMPLE-AUTH | 权威态已配置且标记为 required | authority-check | exit=0; stdout=configured | 没有登记的合并权威时，任何“谁可以合并”的判断都退化为字符串，合并门失去意义。 |
++| SAMPLE-WHERE | 当前位置图可渲染 | where --json | exit=0 | 位置是 “现在打到哪” 的唯一机读答案；渲染不出来时，路由只能靠人记忆。 |
+diff --git a/tower-dsh/state/PROFILE-TOWER-DSH.md b/tower-dsh/state/PROFILE-TOWER-DSH.md
+new file mode 100644
+index 0000000..354d6a3
+--- /dev/null
++++ b/tower-dsh/state/PROFILE-TOWER-DSH.md
+@@ -0,0 +1,31 @@
++---
++schema: tower/profile@1
++object: TOWER-DSH
++version: 1
++updated: 2026-10-30
++owner: mac
++status: active
++---
++
++# PROFILE — TOWER-DSH（对象 0：塔自身）
++
++这是对象层的第一个 PROFILE：对象不是外部产品，而是这座塔自己。它只声明**对象
++不变量**——这些事实一旦不成立，塔给出的“完成/可信/可合并”结论就不再成立。
++每条事实的 `probe` 都是只读 towerctl 子命令，`profile-check` 在子进程里逐条运行；
++任何一条失败即 exit 2，不允许“文档说得好听、代码已经变了”。`expect` 只支持一个
++stdout 子串，所以 AUTH 拆成两条：`AUTH` 锁 `required=true`（可选化即失败），
++`AUTH-CONF` 锁 `status=configured`。
++
++| id | fact | probe | expect | why |
++|---|---|---|---|---|
++| AUTH | 合并权威被标记为 required（policy + AUTHORITY_REQUIRED 双半） | authority-check | exit=0; stdout="required": true | required 是“授权不可被静默降级”的开关：一旦变成 optional，删掉标记就能退回 legacy，合并门重新变成字符串。 |
++| AUTH-CONF | 合并权威已登记，且与 primary 身份分离 | authority-check | exit=0; stdout="status": "configured" | 只有 configured 才存在可核对的合并权威身份；legacy/required_unconfigured 都意味着“谁可以合并”没有落盘事实。 |
++| LEDGER | primary/supervision 账本哈希链完整且可验证 | verify-ledger | exit=0 | 账本是权威事件链；链断则所有完成声明、证据与合并记录都可被静默改写。 |
++| STATE | 工作副本与账本重放一致（drift 为空） | state-verify | exit=0 | record/board/queue/envelope 只是账本的工作副本；副本与账本分叉即意味着塔在报告一个不存在的状态。 |
++| ARCH | ARCHITECTURE/GATES/INVARIANTS/EVENT_CATALOG 与代码逐条对账 | arch-check | exit=0 | 架构描述必须可证伪；门表或事件目录与代码脱节时，“结构是什么”就变成散文。 |
++| CAMPAIGN | 战役目标、在飞卡数与 review_by 合法 | campaign-check | exit=0 | 战役是“为什么做这张卡”的锚；目标失联或 WIP 超限时，卡序不再服务战略。 |
++| SHAPE | 相对冻结基线没有新增形状债务 | shape-check | exit=0 | 形状棘轮保证复杂度只降不升；基线漂移会让“小步交付”退化为持续膨胀。 |
++| SPEC | 冻结 spec 与工作流文档结构合法（严格模式） | spec-lint --strict | exit=0 | spec 是任务边界的唯一契约；结构不合法时，allowed_paths/验收条件都可被误读。 |
++| WHERE | 位置图可由 campaign 与 board 机读渲染 | where --json | exit=0 | 位置是“现在打到哪”的机读答案；不可渲染时路由只能靠人回忆，交接必然失真。 |
++| STARTUP | 启动自检可完成并报告塔的真实阶段 | startup | exit=0 | 启动自检是每个会话进入塔的入口；它失败时后续所有命令都建立在未校验的前提上。 |
++| WIRING | 接线完整：关键目录、状态与命令入口都存在 | wiring | exit=0 | 接线是把组件变成塔的连接关系；缺线时命令仍能跑，但门禁与证据会落空。 |
+diff --git a/tower-dsh/tools/tests/test_arch.py b/tower-dsh/tools/tests/test_arch.py
+index 6a76c5c..2f0d6a6 100644
+--- a/tower-dsh/tools/tests/test_arch.py
++++ b/tower-dsh/tools/tests/test_arch.py
+@@ -88,7 +88,7 @@ class ArchCheckPositiveCase(unittest.TestCase):
+         self.assertTrue(payload["ok"])
+         self.assertEqual(payload["errors"], [])
+         counts = payload["counts"]
+-        self.assertEqual(counts["gates"], 16)
++        self.assertEqual(counts["gates"], 17)
+         self.assertEqual(counts["invariants"], 16)
+         self.assertEqual(counts["sections"], 6)
+         self.assertEqual(counts["events"], counts["event_types_in_code"])
+diff --git a/tower-dsh/tools/tests/test_profile.py b/tower-dsh/tools/tests/test_profile.py
+new file mode 100644
+index 0000000..9067511
+--- /dev/null
++++ b/tower-dsh/tools/tests/test_profile.py
+@@ -0,0 +1,254 @@
++"""Tests for the PILOT-052 object layer: ``towerctl profile-check``.
++
++Positive cases run against the real worktree.  Every negative case builds a
++throw-away copy of the tower (``tools/``, ``state/``, ``arch/``, ``adr/``,
++``ARCHITECTURE.md``, ``EVENT_CATALOG.json``) under the runner's ``TMP``
++sandbox, writes exactly one broken PROFILE there and drives the real CLI, so
++exit codes and the single-JSON error contract are asserted as a caller
++observes them::
++
++    python -B tools/run_tests.py --pattern test_profile.py
++"""
++from __future__ import annotations
++
++import hashlib
++import json
++import shutil
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++TOOLS_DIR = Path(__file__).resolve().parents[1]
++TOWER_ROOT = TOOLS_DIR.parent
++TCLI = TOOLS_DIR / "towerctl.py"
++COPIED = ("tools", "state", "arch", "adr", "ARCHITECTURE.md",
++          "EVENT_CATALOG.json", "specs", "templates", "command")
++TREE_DIRS = ("primary", "supervision", "ledger", "tasks", "state")
++FACT_IDS = ("AUTH", "AUTH-CONF", "LEDGER", "STATE", "ARCH", "CAMPAIGN",
++            "SHAPE", "SPEC", "WHERE", "STARTUP", "WIRING")
++HEAD = """---
++schema: tower/profile@1
++object: FIXTURE
++version: 1
++updated: 2026-10-30
++owner: mac
++status: active
++---
++
++| id | fact | probe | expect | why |
++|---|---|---|---|---|
++"""
++
++
++def tower_cli(root: Path, *args: str) -> subprocess.CompletedProcess:
++    return subprocess.run(
++        [sys.executable, "-B", str(TCLI), "--root", str(root), *args],
++        capture_output=True, text=True, encoding="utf-8")
++
++
++def tower_copy() -> Path:
++    """A writable copy of the tower laid out as ``<tmp>/tower-dsh``."""
++    target = Path(tempfile.mkdtemp(prefix="pilot052-")) / "tower-dsh"
++    target.mkdir()
++    for name in COPIED:
++        source = TOWER_ROOT / name
++        if source.is_dir():
++            shutil.copytree(source, target / name,
++                            ignore=shutil.ignore_patterns("__pycache__"))
++        else:
++            shutil.copy2(source, target / name)
++    return target
++
++
++def digest_tree(relatives: tuple[str, ...]) -> str:
++    """One digest over every file under the given tower-relative directories."""
++    digest = hashlib.sha256()
++    for name in relatives:
++        base = TOWER_ROOT / name
++        for profile in sorted(base.rglob("*")):
++            if profile.is_file():
++                digest.update(
++                    profile.relative_to(TOWER_ROOT).as_posix().encode("utf-8"))
++                digest.update(profile.read_bytes())
++    return digest.hexdigest()
++
++
++def profile_doc(*rows: str) -> str:
++    return HEAD + "".join(rows)
++
++
++def fact(ident: str = "AUTH", probe: str = "arch-check",
++         expect: str = "exit=0", why: str = "invariant") -> str:
++    return f"| {ident} | fact | {probe} | {expect} | {why} |\n"
++
++
++def write_json(path: Path, data) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
++                    encoding="utf-8")
++
++
++def authority_fixture() -> Path:
++    """A tower whose authority is configured but not marked required (optional)."""
++    root = Path(tempfile.mkdtemp(prefix="pilot052-optional-")) / "tower-dsh"
++    for directory in ("primary", "supervision", "ledger", "state"):
++        (root / directory).mkdir(parents=True)
++    (root / "ledger" / "primary.jsonl").touch()
++    (root / "ledger" / "supervision.jsonl").touch()
++    write_json(root / "primary" / "CURRENT_STATE.json", {
++        "schema": "tower/current-state@1", "tower_id": "tower-dsh",
++        "role": "primary", "phase": "TEST", "primary": {"id": "ctl-primary"},
++        "owner": {"name": "mac"}, "next_action": "test"})
++    write_json(root / "primary" / "TASK_BOARD.json",
++               {"schema": "tower/task-board@1", "tasks": []})
++    write_json(root / "supervision" / "CURRENT_STATE.json", {
++        "schema": "tower/supervision-state@1", "role": "supervision",
++        "phase": "TEST", "supervisor": {"id": "sup-A"}})
++    write_json(root / "supervision" / "MERGE_QUEUE.json",
++               {"schema": "tower/merge-queue@1", "entries": []})
++    return root
++
++
++class ProfileCheckPositiveCase(unittest.TestCase):
++    def test_template_is_parseable_without_running_probes(self) -> None:
++        cp = tower_cli(TOWER_ROOT, "profile-check", "--file",
++                       "state/PROFILE-TEMPLATE.md")
++        self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)
++        payload = json.loads(cp.stdout)
++        self.assertTrue(payload["ok"])
++        self.assertEqual(payload["object"], "OBJECT-ID")
++        self.assertEqual(payload["checked"], 0)
++        self.assertEqual(payload["findings"], [])
++
++    def test_real_profile_runs_all_facts(self) -> None:
++        cp = tower_cli(TOWER_ROOT, "profile-check")
++        self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)
++        payload = json.loads(cp.stdout)
++        self.assertTrue(payload["ok"])
++        self.assertEqual(payload["object"], "TOWER-DSH")
++        self.assertEqual(payload["checked"], 11)
++        self.assertEqual(payload["findings"], [])
++        text = (TOWER_ROOT / "state" / "PROFILE-TOWER-DSH.md").read_text(
++            encoding="utf-8")
++        for ident in FACT_IDS:
++            self.assertIn(f"| {ident} |", text)
++
++    def test_object_selector_matches_default(self) -> None:
++        default = tower_cli(TOWER_ROOT, "profile-check")
++        by_object = tower_cli(TOWER_ROOT, "profile-check", "--object",
++                              "TOWER-DSH")
++        self.assertEqual(default.returncode, 0, default.stdout + default.stderr)
++        self.assertEqual(by_object.returncode, 0, by_object.stdout + by_object.stderr)
++        self.assertEqual(json.loads(default.stdout), json.loads(by_object.stdout))
++
++    def test_profile_check_writes_no_tower_state(self) -> None:
++        before = digest_tree(TREE_DIRS)
++        cp = tower_cli(TOWER_ROOT, "profile-check")
++        self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)
++        self.assertEqual(before, digest_tree(TREE_DIRS))
++
++
++class ProfileCheckNegativeCase(unittest.TestCase):
++    def fixture(self) -> Path:
++        root = tower_copy()
++        self.addCleanup(shutil.rmtree, root.parent, ignore_errors=True)
++        return root
++
++    def run_profile(self, root: Path, text: str) -> subprocess.CompletedProcess:
++        (root / "state" / "FIXTURE.md").write_text(text, encoding="utf-8")
++        return tower_cli(root, "profile-check", "--file", "state/FIXTURE.md")
++
++    def assert_rejected(self, cp: subprocess.CompletedProcess, ident: str) -> None:
++        self.assertEqual(cp.returncode, 2, cp.stdout + cp.stderr)
++        self.assertNotIn("Traceback", cp.stderr)
++        self.assertTrue(cp.stdout.strip().startswith("{"))
++        payload = json.loads(cp.stdout)
++        self.assertFalse(payload["ok"])
++        self.assertEqual(sorted(set(payload) - {"checked"}),
++                         ["findings", "object", "ok"])
++        for item in payload["findings"]:
++            self.assertEqual(sorted(item), ["actual", "expected", "id"])
++        self.assertIn(ident, {item["id"] for item in payload["findings"]})
++
++    def test_missing_front_matter_is_rejected(self) -> None:
++        root = self.fixture()
++        cp = self.run_profile(root, "# no front-matter\n")
++        self.assert_rejected(cp, "state/FIXTURE.md")
++
++    def test_missing_column_is_rejected(self) -> None:
++        root = self.fixture()
++        text = HEAD.replace("| id | fact | probe | expect | why |",
++                            "| id | fact | probe | why |")
++        self.assert_rejected(self.run_profile(root, text), "state/FIXTURE.md")
++
++    def test_duplicate_id_is_rejected(self) -> None:
++        root = self.fixture()
++        cp = self.run_profile(root, profile_doc(fact(), fact()))
++        self.assert_rejected(cp, "AUTH")
++
++    def test_unknown_probe_is_rejected(self) -> None:
++        root = self.fixture()
++        cp = self.run_profile(root, profile_doc(fact(probe="no-such-probe")))
++        self.assert_rejected(cp, "AUTH")
++
++    def test_write_probe_is_rejected(self) -> None:
++        root = self.fixture()
++        cp = self.run_profile(root, profile_doc(fact(probe="merge")))
++        self.assert_rejected(cp, "AUTH")
++
++    def test_recursive_probe_is_rejected(self) -> None:
++        root = self.fixture()
++        cp = self.run_profile(root, profile_doc(fact(probe="profile-check")))
++        self.assert_rejected(cp, "AUTH")
++
++    def test_bad_expect_is_rejected(self) -> None:
++        root = self.fixture()
++        cp = self.run_profile(root, profile_doc(fact(expect="exit=zero")))
++        self.assert_rejected(cp, "AUTH")
++
++    def test_bad_table_is_rejected(self) -> None:
++        root = self.fixture()
++        text = HEAD.replace("|---|---|---|---|---|\n", "")
++        self.assert_rejected(self.run_profile(root, text), "state/FIXTURE.md")
++
++    def test_missing_file_is_rejected(self) -> None:
++        root = self.fixture()
++        cp = tower_cli(root, "profile-check", "--file", "state/MISSING.md")
++        self.assert_rejected(cp, "state/MISSING.md")
++
++    def test_exit_mismatch_is_rejected(self) -> None:
++        root = self.fixture()
++        cp = self.run_profile(root, profile_doc(fact(expect="exit=1")))
++        self.assert_rejected(cp, "AUTH")
++        findings = json.loads(cp.stdout)["findings"]
++        self.assertEqual(findings[0]["actual"], "exit=0")
++
++    def test_stdout_mismatch_is_rejected(self) -> None:
++        root = self.fixture()
++        cp = self.run_profile(
++            root, profile_doc(fact(expect="exit=0; stdout=__absent__")))
++        self.assert_rejected(cp, "AUTH")
++        findings = json.loads(cp.stdout)["findings"]
++        self.assertIn("stdout has no", findings[0]["actual"])
++
++    def test_optional_authority_breaks_required_fact(self) -> None:
++        root = authority_fixture()
++        self.addCleanup(shutil.rmtree, root.parent, ignore_errors=True)
++        setup = tower_cli(root, "authority-set", "--supervisor", "sup-A",
++                          "--decision", "D-FIX", "--by", "mac")
++        self.assertEqual(setup.returncode, 0, setup.stdout + setup.stderr)
++        text = profile_doc(
++            fact(ident="AUTH", probe="authority-check",
++                 expect='exit=0; stdout="required": true'),
++            fact(ident="AUTH-CONF", probe="authority-check",
++                 expect='exit=0; stdout="status": "configured"'))
++        cp = self.run_profile(root, text)
++        self.assert_rejected(cp, "AUTH")
++        findings = json.loads(cp.stdout)["findings"]
++        self.assertEqual([item["id"] for item in findings], ["AUTH"])
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tower-dsh/tools/towerctl.py b/tower-dsh/tools/towerctl.py
+index f21379d..74c7a95 100644
+--- a/tower-dsh/tools/towerctl.py
++++ b/tower-dsh/tools/towerctl.py
+@@ -7425,7 +7425,8 @@ ARCH_GATE_IDS = (
+     "GATE-DELIVER-SCOPE",
+     "GATE-DELIVER-BASE-SHA", "GATE-DELIVER-SHAPE", "GATE-REVIEW",
+     "GATE-ACCEPT", "GATE-CLOSE", "GATE-ENVELOPE", "GATE-QUEUE",
+-    "GATE-MERGE-CHECK", "GATE-MERGE-PREFLIGHT", "GATE-POST-MERGE", "GATE-CI")
++    "GATE-MERGE-CHECK", "GATE-MERGE-PREFLIGHT", "GATE-POST-MERGE", "GATE-CI",
++    "GATE-PROFILE")
+ ARCH_INVARIANT_IDS = tuple(f"C-{index:02d}" for index in range(1, 17))
+ # writer -> (event_type argument index, ledger or None for the low-level writer)
+ ARCH_LEDGER_WRITERS = {
+@@ -7986,13 +7987,249 @@ def arch_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentPars
+     return parser
+ 
+ 
++# ---------------------------------------------------------------------------
++# PILOT-052 object layer: ``profile-check`` parses a ``tower/profile@1``
++# document and runs each fact's probe.  Probes are towerctl subcommands only
++# (never a shell), they are read-only, and this command writes no state.
++# ---------------------------------------------------------------------------
++PROFILE_SCHEMA = "tower/profile@1"
++PROFILE_REL = "state/PROFILE-TOWER-DSH.md"
++PROFILE_STATUSES = ("active", "template")
++PROFILE_COLUMNS = ("id", "fact", "probe", "expect", "why")
++PROFILE_ID_RE = re.compile(r"^[A-Z0-9-]+$")
++PROFILE_SEPARATOR_RE = re.compile(r"^:?-+:?$")
++PROFILE_EXPECT_RE = re.compile(r"^exit=(\d+)(?:; stdout=(.+))?$")
++PROFILE_PROBE_TIMEOUT = 60
++# Exact command lines, not prefixes: ``--root`` is injected by profile-check
++# and ``profile-check`` itself is absent so a probe cannot recurse.
++PROFILE_PROBES = (
++    "startup", "wiring", "status", "state-verify", "authority-check",
++    "verify-ledger", "arch-check", "campaign-check", "shape-check",
++    "spec-lint --strict", "spec-coverage", "where --json", "brief")
++
++
++class ProfileDocError(ValueError):
++    """A PROFILE document that cannot be parsed into front-matter plus rows."""
++
++
++def profile_finding(ident: str, expected: str, actual: str) -> dict:
++    return {"id": ident, "expected": expected, "actual": actual}
++
++
++def profile_meta_value(raw: str) -> str:
++    """A front-matter value without its trailing ``# comment``."""
++    return raw.split("#", 1)[0].strip()
++
++
++def profile_front_matter(text: str) -> tuple[dict, list[str]]:
++    """Split ``---`` front-matter from the body; every line is ``key: value``."""
++    lines = text.splitlines()
++    if not lines or lines[0].strip() != "---":
++        raise ProfileDocError("missing front-matter opening '---'")
++    for index, line in enumerate(lines[1:], start=1):
++        if line.strip() != "---":
++            continue
++        meta: dict[str, str] = {}
++        for offset, raw in enumerate(lines[1:index], start=2):
++            stripped = raw.strip()
++            if not stripped or stripped.startswith("#"):
++                continue
++            key, separator, value = stripped.partition(":")
++            if not separator or not key.strip():
++                raise ProfileDocError(f"bad front-matter line {offset}: {raw!r}")
++            meta[key.strip()] = profile_meta_value(value)
++        return meta, lines[index + 1:]
++    raise ProfileDocError("missing front-matter closing '---'")
++
++
++def profile_cells(line: str) -> list[str]:
++    """The cells of one Markdown table line, outer pipes removed."""
++    return [cell.strip() for cell in line.strip().strip("|").split("|")]
++
++
++def profile_table_rows(lines: list[str]) -> list[dict]:
++    """The fixed ``id | fact | probe | expect | why`` table, in file order."""
++    table = [line.strip() for line in lines if line.strip().startswith("|")]
++    if len(table) < 2:
++        raise ProfileDocError("PROFILE table is missing (header + separator + rows)")
++    if profile_cells(table[0]) != list(PROFILE_COLUMNS):
++        raise ProfileDocError(f"table columns must be {list(PROFILE_COLUMNS)}, "
++                              f"got {profile_cells(table[0])}")
++    if not all(PROFILE_SEPARATOR_RE.match(cell) for cell in profile_cells(table[1])):
++        raise ProfileDocError("table separator row is malformed")
++    rows: list[dict] = []
++    for offset, line in enumerate(table[2:], start=3):
++        cells = profile_cells(line)
++        if len(cells) != len(PROFILE_COLUMNS):
++            raise ProfileDocError(f"table row {offset} must have "
++                                  f"{len(PROFILE_COLUMNS)} cells, got {len(cells)}")
++        rows.append(dict(zip(PROFILE_COLUMNS, cells), line=offset))
++    return rows
++
++
++def profile_expect(value: str):
++    """``(exit_code, stdout_substring|None)`` or ``None`` for bad syntax."""
++    match = PROFILE_EXPECT_RE.match(value.strip())
++    if match is None:
++        return None
++    substring = match.group(2)
++    if substring is not None and not substring.strip():
++        return None
++    return int(match.group(1)), substring
++
++
++def profile_row_findings(row: dict, seen: set[str]) -> list[dict]:
++    """One fact row: id, fact, probe whitelist, expect grammar and why."""
++    ident = row["id"]
++    findings: list[dict] = []
++    if not PROFILE_ID_RE.match(ident):
++        findings.append(profile_finding(ident or f"line {row['line']}",
++                                        "id matches ^[A-Z0-9-]+$", ident))
++    elif ident in seen:
++        findings.append(profile_finding(ident, "unique id", ident))
++    else:
++        seen.add(ident)
++    for field in ("fact", "why"):
++        if not row[field].strip():
++            findings.append(profile_finding(ident, f"non-empty {field}", ""))
++    if row["probe"] not in PROFILE_PROBES:
++        findings.append(profile_finding(ident, "whitelisted read-only probe",
++                                        row["probe"]))
++    if profile_expect(row["expect"]) is None:
++        findings.append(profile_finding(
++            ident, "expect: exit=N[; stdout=substring]", row["expect"]))
++    return findings
++
++
++def profile_meta_findings(meta: dict) -> list[dict]:
++    """Front-matter schema, required fields, status and updated date."""
++    findings: list[dict] = []
++    if meta.get("schema") != PROFILE_SCHEMA:
++        findings.append(profile_finding("schema", PROFILE_SCHEMA,
++                                        str(meta.get("schema"))))
++    for field in ("object", "version", "updated", "owner"):
++        if not (isinstance(meta.get(field), str) and meta[field].strip()):
++            findings.append(profile_finding(field, "non-empty string",
++                                            str(meta.get(field))))
++    if meta.get("status") not in PROFILE_STATUSES:
++        findings.append(profile_finding("status", "|".join(PROFILE_STATUSES),
++                                        str(meta.get("status"))))
++    if command_date(meta.get("updated")) is None:
++        findings.append(profile_finding("updated", "YYYY-MM-DD",
++                                        str(meta.get("updated"))))
++    return findings
++
++
++def profile_document_findings(meta: dict, rows: list[dict],
++                              requested: str | None) -> list[dict]:
++    """Whole-document structure: front-matter, object identity and every row."""
++    findings = profile_meta_findings(meta)
++    if requested is not None and meta.get("object") != requested:
++        findings.append(profile_finding("object", requested,
++                                        str(meta.get("object"))))
++    seen: set[str] = set()
++    for row in rows:
++        findings += profile_row_findings(row, seen)
++    if meta.get("status") == "active" and not rows:
++        findings.append(profile_finding("facts", "at least one fact", "0"))
++    return findings
++
++
++def profile_load(path: Path) -> tuple[dict, list[dict]]:
++    """Read and parse one PROFILE; a malformed document raises ProfileDocError."""
++    try:
++        text = path.read_text(encoding="utf-8-sig")
++    except (OSError, UnicodeError) as exc:
++        raise ProfileDocError(f"cannot read {path}: {exc}") from exc
++    meta, body = profile_front_matter(text)
++    return meta, profile_table_rows(body)
++
++
++def profile_select(root: Path, args):
++    """``(path, requested_object)`` from ``--file`` / ``--object`` / the default."""
++    if args.file and args.object:
++        fail(["profile-check: use either --file or --object, not both"])
++    if args.object:
++        if not PROFILE_ID_RE.match(args.object):
++            fail([f"invalid object id: {args.object!r} "
++                  f"(must match {PROFILE_ID_RE.pattern})"])
++        return root / "state" / f"PROFILE-{args.object}.md", args.object
++    if args.file:
++        return resolve_input_within(root, args.file, "profile"), None
++    return root / PROFILE_REL, None
++
++
++def profile_run_probe(root: Path, probe: str):
++    """Run one whitelisted probe as a child towerctl; ``(exit_code, stdout)``."""
++    argv = [sys.executable, "-B", str(Path(__file__).resolve()),
++            "--root", str(root), *shlex.split(probe)]
++    try:
++        completed = subprocess.run(argv, cwd=str(root), capture_output=True,
++                                   text=True, encoding="utf-8", errors="replace",
++                                   timeout=PROFILE_PROBE_TIMEOUT)
++    except (OSError, subprocess.TimeoutExpired) as exc:
++        return None, f"probe did not run: {exc}"
++    return completed.returncode, completed.stdout or ""
++
++
++def profile_execute(root: Path, row: dict):
++    """Run one fact and return a finding, or ``None`` when it holds."""
++    code, output = profile_run_probe(root, row["probe"])
++    expected_code, substring = profile_expect(row["expect"])
++    if code is None:
++        return profile_finding(row["id"], row["expect"], output)
++    if code != expected_code:
++        return profile_finding(row["id"], row["expect"], f"exit={code}")
++    if substring is not None and substring not in output:
++        return profile_finding(row["id"], row["expect"],
++                               f"exit={code}; stdout has no {substring!r}")
++    return None
++
++
++def cmd_profile_check(root: Path, args) -> None:
++    """Read-only: parse a PROFILE and run each fact's whitelisted probe."""
++    path, requested = profile_select(root, args)
++    try:
++        meta, rows = profile_load(path)
++    except ProfileDocError as exc:
++        emit({"ok": False, "object": requested,
++              "findings": [profile_finding(rel(root, path), "parseable PROFILE",
++                                           str(exc))]}, 2)
++    findings = profile_document_findings(meta, rows, requested)
++    if findings:
++        emit({"ok": False, "object": meta.get("object"), "findings": findings}, 2)
++    if meta.get("status") != "active":
++        emit({"ok": True, "object": meta.get("object"), "checked": 0,
++              "findings": []})
++    failures = [item for item in (profile_execute(root, row) for row in rows)
++                if item is not None]
++    if failures:
++        emit({"ok": False, "object": meta.get("object"),
++              "checked": len(rows) - len(failures), "findings": failures}, 2)
++    emit({"ok": True, "object": meta.get("object"), "checked": len(rows),
++          "findings": []})
++
++
++def profile_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
++    """Register the PILOT-052 ``profile-check`` subcommand."""
++    for action in parser._actions:
++        if not isinstance(action, argparse._SubParsersAction):
++            continue
++        check = action.add_parser("profile-check")
++        check.add_argument("--file", default=None,
++                           help="PROFILE path (default: state/PROFILE-TOWER-DSH.md)")
++        check.add_argument("--object", default=None,
++                           help="object id, read as state/PROFILE-<id>.md")
++    return parser
++
++
+ # Merged into ``main``'s handler table so the command layer owns its own wiring.
+ COMMAND_LAYER_HANDLERS = {
+     "campaign-check": cmd_campaign_check, "brief": cmd_brief,
+     "status-snapshot": cmd_status_snapshot, "status-index": cmd_status_index,
+     "status-rollup": cmd_status_rollup, "status-archive": cmd_status_archive,
+     "where": cmd_where, "arch-check": cmd_arch_check,
+-    "arch-graph": cmd_arch_graph}
++    "arch-graph": cmd_arch_graph, "profile-check": cmd_profile_check}
+ 
+ 
+ 
+@@ -8202,7 +8439,8 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
+                         help="treat warnings (W1/W2) as errors")
+         action.add_parser("brief")
+     dispatch_campaign_parser(parser)
+-    return arch_layer_parsers(position_layer_parsers(status_layer_parsers(parser)))
++    return profile_layer_parsers(
++        arch_layer_parsers(position_layer_parsers(status_layer_parsers(parser))))
+ 
+ 
+ def cli_commands() -> list[str]:

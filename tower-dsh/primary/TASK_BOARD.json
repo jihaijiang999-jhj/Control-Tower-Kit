@@ -511,7 +511,17 @@
       "reviewer": "subagent:3de51ba3-63bb-4df7-81de-031fc5b21368",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-051/MERGE.md",
       "updated_at": "2026-10-30T19:43:11+08:00"
+    },
+    {
+      "id": "PILOT-052",
+      "title": "对象层：PROFILE v1 + profile-check（∅5）",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:e670b2b0-4946-409c-a1d2-847823f8739a",
+      "reviewer": "subagent:97ccf947-1d19-43b7-930b-1ae23ed8b575",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-052/MERGE.md",
+      "updated_at": "2026-10-30T23:57:05+08:00"
     }
   ],
-  "updated_at": "2026-10-30T19:43:11+08:00"
+  "updated_at": "2026-10-30T23:57:05+08:00"
 }

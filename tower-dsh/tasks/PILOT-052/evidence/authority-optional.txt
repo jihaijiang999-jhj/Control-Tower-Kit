@@ -1,0 +1,24 @@
+authority-set exit=0
+authority-check exit=0 status=configured requirement=optional required=False
+
+[before fix] expect=exit=0; stdout=configured
+exit=0 payload={
+  "ok": true,
+  "object": "FIXTURE",
+  "checked": 1,
+  "findings": []
+}
+
+[after fix] expect=exit=0; stdout="required": true
+exit=2 payload={
+  "ok": false,
+  "object": "FIXTURE",
+  "checked": 0,
+  "findings": [
+    {
+      "id": "AUTH",
+      "expected": "exit=0; stdout=\"required\": true",
+      "actual": "exit=0; stdout has no '\"required\": true'"
+    }
+  ]
+}

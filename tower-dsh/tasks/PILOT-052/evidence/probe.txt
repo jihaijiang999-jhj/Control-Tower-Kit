@@ -1,0 +1,15 @@
+tower=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-052\tower-dsh
+profile=state/PROFILE-TOWER-DSH.md
+id            probe                    exit  expect
+AUTH          authority-check          0     exit=0; stdout="required": true  OK
+AUTH-CONF     authority-check          0     exit=0; stdout="status": "configured"  OK
+LEDGER        verify-ledger            0     exit=0  OK
+STATE         state-verify             0     exit=0  OK
+ARCH          arch-check               0     exit=0  OK
+CAMPAIGN      campaign-check           0     exit=0  OK
+SHAPE         shape-check              0     exit=0  OK
+SPEC          spec-lint --strict       0     exit=0  OK
+WHERE         where --json             0     exit=0  OK
+STARTUP       startup                  0     exit=0  OK
+WIRING        wiring                   0     exit=0  OK
+profile-check exit=0 ok=True object=TOWER-DSH checked=11 findings=[]
