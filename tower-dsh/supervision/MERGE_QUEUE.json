@@ -441,7 +441,16 @@
       "status": "POST_MERGE_VERIFIED",
       "added_at": "2026-10-30T16:07:31+08:00",
       "merge_commit": "694f592e27efbf36d11e7297fb992b1044388d80"
+    },
+    {
+      "envelope_id": "ENV-PILOT-051",
+      "task": "PILOT-051",
+      "branch": "pilot/PILOT-051",
+      "base": "main",
+      "status": "MERGED",
+      "added_at": "2026-10-30T19:43:56+08:00",
+      "merge_commit": "b37450b37989de0d9ae6c079ebf4ca00406c135f"
     }
   ],
-  "updated_at": "2026-10-30T16:27:46+08:00"
+  "updated_at": "2026-10-30T19:51:20+08:00"
 }

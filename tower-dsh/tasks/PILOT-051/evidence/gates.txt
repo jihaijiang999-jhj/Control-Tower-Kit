@@ -1,0 +1,65 @@
+== arch-check exit=0
+{
+  "ok": true,
+  "counts": {
+    "gates": 16,
+    "invariants": 16,
+    "events": 29,
+    "event_types_in_code": 29,
+    "unresolved_event_calls": 1,
+    "adrs": 4,
+    "sections": 6,
+    "nodes": 38,
+    "edges": 21
+  },
+  "errors": []
+}
+
+== campaign-check exit=0
+{
+  "ok": true,
+  "strict": false,
+  "strategy": "S-2026-Q4",
+  "goals": [
+    "G1",
+    "G2",
+    "G3",
+    "G4"
+  ],
+  "campaigns": 1,
+  "campaign_ids": [
+    "C-2026-Q4-01"
+  ],
+  "wip": {
+    "in_flight": 0,
+    "limit": 1,
+    "campaigns": {
+      "C-2026-Q4-01": 0
+    }
+  },
+  "errors": [],
+  "warnings": [
+    {
+      "code": "W4",
+      "target": "C-2026-Q4-01",
+      "detail": "roadmap node not created yet: PILOT-052"
+    },
+    {
+      "code": "W4",
+      "target": "C-2026-Q4-01",
+      "detail": "roadmap node not created yet: PILOT-053"
+    }
+  ]
+}
+
+== shape-check exit=0
+{
+  "ok": true,
+  "shape_check": "checked",
+  "shape_checked": true,
+  "files": 38,
+  "functions": 1603,
+  "duplicate_blocks": 169,
+  "unused_imports": 1
+}
+

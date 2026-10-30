@@ -501,7 +501,17 @@
       "reviewer": "subagent:c27e8cf0-2109-4114-b3b1-a016ddfb5de6",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-050/MERGE.md",
       "updated_at": "2026-10-30T16:06:25+08:00"
+    },
+    {
+      "id": "PILOT-051",
+      "title": "depends_on 硬校验：存在、闭合、无环",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:23ab9302-2fa7-490f-9bd1-95290a0c46a7",
+      "reviewer": "subagent:3de51ba3-63bb-4df7-81de-031fc5b21368",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-051/MERGE.md",
+      "updated_at": "2026-10-30T19:43:11+08:00"
     }
   ],
-  "updated_at": "2026-10-30T16:06:25+08:00"
+  "updated_at": "2026-10-30T19:43:11+08:00"
 }

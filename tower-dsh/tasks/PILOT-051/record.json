@@ -1,0 +1,197 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-051",
+  "title": "depends_on 硬校验：存在、闭合、无环",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "task-new：depends_on 必须是非空字符串列表（可为空列表）；不得自依赖；重复 id 去重后报 duplicate；每个 id 必须能在 board 或 tasks/ 找到；结构校验在写 record/TASK/ledger 之前，失败 exit 2 零写入",
+    "check --phase ready：读取 record.depends_on，每个目标 status 必须为 closed；否则 exit 2，错误点名 depends_on.<id>: <status>（或 missing）",
+    "dispatch：再次校验依赖闭合（不信任 ready 时的状态，可能在等待期间被 VOID/重开）；失败 exit 2 且不写 record/ledger",
+    "环检测：沿所有 task record 的 depends_on 做 DFS；发现环（含自依赖）→ exit 2，列出环上的 id；无环通过",
+    "specs/WF-TASK.md 增加“卡依赖前置不变量”：结构/闭合/无环三层、错误码、允许先建卡后等依赖",
+    "ARCHITECTURE.md 的契约节补“卡依赖”一行（task-new/ready/dispatch 三处校验点）",
+    "新增 tools/tests/test_dependencies.py：缺目标/自依赖/重复/未闭合/环/合法 ready/dispatch 零写入/旧卡空 depends_on 通过；全部干净 exit 2 无 Traceback",
+    "不改 036–050 的信任边界/授权/前置链/范围门/completion/shape/objective/campaign 语义；不新增事件类型；不改 spec@2 字段；不写 primary/supervision/ledger"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-051/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-051/tower-dsh/tools/tests/test_dependencies.py",
+    "pilot/worktrees/PILOT-051/tower-dsh/specs/WF-TASK.md",
+    "pilot/worktrees/PILOT-051/tower-dsh/ARCHITECTURE.md"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening existing gates",
+    "new ledger event types",
+    "changing tower/spec@2 fields",
+    "requiring dependencies to be closed at task-new time",
+    "touching TOWER.md (L0)"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-051/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 569 + 新增用例数（main 基线 569）",
+    "task-new：自依赖/重复/指向不存在卡 → exit 2 单 JSON，tasks/<id>/ 与 ledger 不变；空 depends_on 与合法依赖通过；依赖目标处于 ready 时允许多建卡（不要求闭合）",
+    "check --phase ready：依赖未闭合 → exit 2 点名 depends_on.<id>；全部 closed → exit 0；缺失目标 → exit 2",
+    "dispatch：依赖未闭合 → exit 2 且 record/ledger 零写入；闭合 → 正常派发",
+    "环：A→B→A（或自依赖）→ exit 2 列出环；无环通过；错误无 Traceback",
+    "specs/WF-TASK.md 含依赖不变量节且 spec-lint 6/6；ARCHITECTURE.md 契约节含卡依赖一行；arch-check exit 0",
+    "旧码对照：main 对未闭合依赖 ready/dispatch 均放行；新码 ready/dispatch 拒绝。证据写进 scratch/probe-old-code.txt",
+    "shape-check 在 worktree exit 0（新增函数 ≤80 行/≤12 分支；既有函数不增长）",
+    "真实塔：worktree 新工具 campaign-check/arch-check/authority-check exit 0、state-verify drift []；建信封前 tasks=51/envelopes=49，建信封后 51/50；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-051 diff --name-only main..HEAD 恰四个 allowed_paths"
+  ],
+  "depends_on": [
+    "PILOT-050"
+  ],
+  "worktree": "pilot/worktrees/PILOT-051",
+  "spec_path": "pilot/PILOT-051.spec.json",
+  "spec_sha256": "2f8a021990165a9ca97b2a069bba1a28fb954cfd182031031612bcf81c258273",
+  "spec_gate": "PASS",
+  "executor": "subagent:23ab9302-2fa7-490f-9bd1-95290a0c46a7",
+  "dispatch": {
+    "executor": "subagent:23ab9302-2fa7-490f-9bd1-95290a0c46a7",
+    "worktree": "pilot/worktrees/PILOT-051",
+    "at": "2026-10-30T17:48:22+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "8a766ec972d57d2717f940c8855e37f7b1e49987",
+    "campaign": "C-2026-Q4-01"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-051/evidence/towerctl.py",
+      "sha256": "da7f937d81208e1b8a23db08a7068de052dd7352bd19ba6a7976014ced5b1c8f",
+      "bytes": 367096,
+      "at": "2026-10-30T19:21:58+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-051/evidence/test_dependencies.py",
+      "sha256": "bb75b290edda02c4ab07b17bd03bb7663abfbf0c2d46dddc842e18584471ffd4",
+      "bytes": 12847,
+      "at": "2026-10-30T19:21:58+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-051/evidence/WF-TASK.md",
+      "sha256": "85fd477815366193450291f32b9729be7e893867ff3d06f3a863ed0731e93066",
+      "bytes": 7605,
+      "at": "2026-10-30T19:21:58+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-051/evidence/ARCHITECTURE.md",
+      "sha256": "83b3a9079dccbb7e7cb6e5f3f3f20f83e95c27cf3d3dc09bf092a710366068e8",
+      "bytes": 10270,
+      "at": "2026-10-30T19:21:58+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-051/evidence/test_objective.py",
+      "sha256": "29d60e4283adad6d247b524a315d79bde1631b570d820d76bc16126caecc880f",
+      "bytes": 11109,
+      "at": "2026-10-30T19:21:58+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-051/evidence/test-output.txt",
+      "sha256": "07345f20de24834bc1842f7b6fc2682fac1f8bfd8c76bcf7a3f0d7d512bc82eb",
+      "bytes": 81371,
+      "at": "2026-10-30T19:21:58+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-051/evidence/dependency_probe.py",
+      "sha256": "d4be8b943951220fa630d2a1a519542ddc1a93dc5e96d0e9e78c8505fef67202",
+      "bytes": 5071,
+      "at": "2026-10-30T19:21:58+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-051/evidence/probe.txt",
+      "sha256": "e61ef008dff1f56d0b3a500fe0ce7278ed7dfeb0a9666bd782122d716f577896",
+      "bytes": 1030,
+      "at": "2026-10-30T19:21:58+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-051/evidence/probe-old-code.txt",
+      "sha256": "0aaee1c4b1ab9bfbbc5a29b17455407f96955dad3b73fdd2946f21ab699c87cf",
+      "bytes": 1138,
+      "at": "2026-10-30T19:21:58+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-051/evidence/commit.txt",
+      "sha256": "fd5e0945870f69a42e8289a14dcb8d52b59eff0c21b5679ef0ae72adcb677088",
+      "bytes": 986,
+      "at": "2026-10-30T19:21:58+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-051/evidence/diff.txt",
+      "sha256": "6577194f143cbebe0e0d5af3ce671ce4e62e71b846ead4c3cfa76c113f6a3896",
+      "bytes": 26126,
+      "at": "2026-10-30T19:21:58+08:00",
+      "id": "E-011"
+    },
+    {
+      "path": "tasks/PILOT-051/evidence/diff-names.txt",
+      "sha256": "71f136f8b8fc631c88e87eec7172aa6d0acc882a5aadc5c364a662ae118bff27",
+      "bytes": 169,
+      "at": "2026-10-30T19:21:58+08:00",
+      "id": "E-012"
+    },
+    {
+      "path": "tasks/PILOT-051/evidence/gates.txt",
+      "sha256": "4eb0a31595c16b1653f2494ac8b4c9542ce42d575defb1830d2940e1bf6edbe8",
+      "bytes": 1097,
+      "at": "2026-10-30T19:21:58+08:00",
+      "id": "E-013"
+    },
+    {
+      "path": "tasks/PILOT-051/evidence/spec-lint.txt",
+      "sha256": "a2ef8e8d21fafe14710bf5080cc5a4a9cf285585d2cf07c08498b3b36238f9e1",
+      "bytes": 3992,
+      "at": "2026-10-30T19:21:58+08:00",
+      "id": "E-014"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:3de51ba3-63bb-4df7-81de-031fc5b21368",
+    "verdict": "PASS",
+    "note": "051 PASS（独立亲跑）。14/14 证据哈希+字节数；5 路径 = 4 allowed + 1 completion（test_objective.py 种 048 closed record，D-PILOT-051 / ledger seq 464）；spec 哈希 2f8a0219…；亲跑 Ran 585 OK(skipped=1)；arch-check exit 0（gates 16 / adrs 4）、campaign-check exit 0、shape-check exit 0、spec-lint 6/6；task-new 空/依赖 ready 通过，self/duplicate/missing/invalid 全部 exit 2 单 JSON 零写入；check ready 与 dispatch 对未闭合依赖 exit 2 点名 `depends_on.<id>: <status>`、失败 record/board/ledger 字节不变、closed 通过；A→B→A 与自环 exit 2 列出环（全塔环会冻结所有卡，已记录）；旧码 ready/dispatch/环/task-new 非法全放行，新码全拒；test_objective 仅 +5 行种 048 closed，其他既有测试未动；真实塔只读 51/49 drift []、authority configured+required、verify-ledger 0（465/257）、coverage 27/27、lint 6/6、where 6/9。残余（非阻塞）：spec acceptance 仍写“恰四个 allowed_paths”（实际 5=4+1）；closure 在 record 缺失时回退 board（board-only closed 可放行，state-verify 不报）；只查直接依赖（A→B closed→C open 可通过）；手改 record 成 string 时报错可读性差；check --phase dispatch 不复查依赖；全塔环爆炸半径大。",
+    "structure": "",
+    "at": "2026-10-30T19:43:10+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-051",
+    "actor": "owner",
+    "text": "independent PASS (585, 14/14, 5=4+1; depends_on true gate)",
+    "at": "2026-10-30T19:43:10+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-051/CLOSEOUT.md",
+    "at": "2026-10-30T19:43:11+08:00"
+  },
+  "created_at": "2026-10-30T16:59:28+08:00",
+  "updated_at": "2026-10-30T19:43:11+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-051/MERGE.md",
+  "completions": [
+    {
+      "task": "PILOT-051",
+      "path": "pilot/worktrees/PILOT-051/tower-dsh/tools/tests/test_objective.py",
+      "by": "mac",
+      "reason": "new depends_on gate correctly rejects real 049 spec's missing PILOT-048 target; fixture predates the gate; seed 048 closed record instead of weakening the gate",
+      "decision": "D-PILOT-051",
+      "at": "2026-10-30T19:13:58+08:00"
+    }
+  ],
+  "delivered_at": "2026-10-30T19:21:58+08:00",
+  "accepted_at": "2026-10-30T19:43:10+08:00"
+}

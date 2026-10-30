@@ -1,0 +1,519 @@
+diff --git a/tower-dsh/ARCHITECTURE.md b/tower-dsh/ARCHITECTURE.md
+index 4ea6355..b5649d3 100644
+--- a/tower-dsh/ARCHITECTURE.md
++++ b/tower-dsh/ARCHITECTURE.md
+@@ -85,6 +85,14 @@ ledger writer 的字面 type）：代码有而目录无、目录有而代码无
+ **命令**：`python tools/towerctl.py <cmd>` 是唯一入口；argparse 的子命令名是
+ 命令名的权威，`arch/GATES.json.gates[].command` 必须命中它。
+ 
++**卡依赖**：`depends_on` 有三处校验点——`task-new` 查结构（字符串列表、非自依赖、
++无重复、目标存在于 board 或 `tasks/<id>/`），`check --phase ready` 与 `dispatch`
++查调度（每个目标 `closed`，并对全部 live record 做 DFS 环检测；`dispatch` 不信任
++ready 时的状态）。失败一律 exit 2 单 JSON、零状态变更，错误码
++`depends_on.self` / `depends_on.duplicate` / `depends_on.missing` /
++`depends_on.invalid` / `depends_on.cycle` 与 `depends_on.<id>: <status>`。
++`task-new` 不要求依赖已闭合（允许先建卡后等依赖）；语义见 `specs/WF-TASK.md` §9。
++
+ **证据**：所有完成声明必须有 sha256 证据（`tasks/<ID>/evidence/`）、ledger 事件
+ 与 `check_evidence` 复核；`MERGED` 不等于完成，只有 `POST_MERGE_VERIFIED` 是。
+ 
+diff --git a/tower-dsh/specs/WF-TASK.md b/tower-dsh/specs/WF-TASK.md
+index b94caa2..35d6694 100644
+--- a/tower-dsh/specs/WF-TASK.md
++++ b/tower-dsh/specs/WF-TASK.md
+@@ -3,7 +3,7 @@ schema: tower/workflow@1
+ id: WF-TASK
+ title: 任务流 — 任务卡从创建到收口
+ owner: mac
+-version: 2
++version: 3
+ enforcement_legend: tool-check | review-check | owner-gate
+ ---
+ 
+@@ -80,6 +80,7 @@ enforcement_legend: tool-check | review-check | owner-gate
+ |---|---|---|---|
+ | 1 | 2026-10-19 | 初版，按 PILOT-002/003/006 后的实际行为编写 | owner |
+ | 2 | 2026-10-29 | 增加第 8 节“施工目标前置不变量”（spec@2 objective 门） | owner |
++| 3 | 2026-10-30 | 增加第 9 节“卡依赖前置不变量”（`depends_on` 结构/闭合/无环三层） | owner |
+ 
+ ## 8. 施工目标前置不变量
+ 
+@@ -95,3 +96,20 @@ enforcement_legend: tool-check | review-check | owner-gate
+ - `task-new` 对**所有**新 spec 校验 objective：必须是对象、四字段齐全、每个值 `strip()` 后至少 8 字符、不是裸 `__FILL__` 占位、不是整体 `<...>` 占位；校验发生在创建 `tasks/<id>/`、写 record/TASK、append `TASK_NEW` 之前，失败 `exit 2` 单 JSON 且**零写入**。`__FILL__` 只在作为整个字段值时拒绝（正文提及该标记是允许的，049 bootstrap 即如此），否则“卡自身 must pass”与“不得含”互相矛盾。
+ - `spec-lint` 只对顶层 `pilot/*.spec.json` 中声明 `tower/spec@2` 的卡强制同一规则；`tower/spec@1` 跳过（冻结旧卡）；`pilot/worktrees/**` 的嵌套副本不在扫描范围。
+ - 机器检查只证结构与最低内容量，不证目标真实性与 AC 对齐；reviewer 仍须独立审 objective 是否描述真实问题、approach 是否避免单点补丁、`non_goals_and_done` 是否与 acceptance 一致。
++
++## 9. 卡依赖前置不变量
++
++`depends_on`（`tower/spec@2` 字段，旧卡可为空或缺省）从 051 起是三层前置，不只是被复制进 record 的字段：
++
++| 层 | 校验点 | 规则 | 错误码（exit 2） |
++|---|---|---|---|
++| 结构 | `task-new` | 必须是字符串列表（可为空 `[]`）；元素 `strip()` 后非空；不得自依赖；重复 id 报错；每个 id 必须能在 `primary/TASK_BOARD.json` 或 `tasks/<id>/` 找到 | `depends_on.invalid` / `depends_on.self` / `depends_on.duplicate` / `depends_on.missing` |
++| 闭合 | `check --phase ready` 与 `dispatch` | `record.depends_on` 的每个目标状态必须是 `closed`；`dispatch` 不信任 ready 时的状态，重新校验 | `depends_on.<id>: <status>`（目标不存在时为 `depends_on.<id>: missing`） |
++| 无环 | `check --phase ready` 与 `dispatch` | 沿全部 live task record 的 `depends_on` 做 DFS（含自依赖）；发现环即拒绝 | `depends_on.cycle: A -> B -> A` |
++
++- 结构校验在写 `tasks/<id>/`、record/TASK 与 `TASK_NEW` 之前完成；失败 exit 2 单 JSON、零写入。
++- `dispatch` 的闭合与无环校验在写 record/board 与 `DISPATCH` 之前完成；失败零状态变更。
++- **允许先建卡后等依赖**：`task-new` 只要求目标卡存在，不要求目标 `closed`；否则“排期”与“可派发”会被混为一谈。
++- `check --phase spec` 不查闭合：spec 获批时依赖可能仍在 ready / dispatched / merged 流程中。
++- 旧卡 `depends_on` 为空或缺省视为无依赖，ready / dispatch 行为不变。
++- `task-new` 不做全图 DFS：新卡尚未写入，环只能由后续卡形成，故环检测放在调度与执行入口。
+diff --git a/tower-dsh/tools/tests/test_dependencies.py b/tower-dsh/tools/tests/test_dependencies.py
+new file mode 100644
+index 0000000..248f2d5
+--- /dev/null
++++ b/tower-dsh/tools/tests/test_dependencies.py
+@@ -0,0 +1,273 @@
++"""PILOT-051: ``depends_on`` hard gate (structure / closure / acyclicity).
++
++Every test builds a throw-away tower root and drives the real CLI through
++``subprocess``, so exit codes and single-JSON payloads are asserted exactly as
++an operator sees them.  Nothing here reads or writes the real tower.
++"""
++from __future__ import annotations
++
++import hashlib
++import json
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++TOOLS_DIR = Path(__file__).resolve().parents[1]
++TCLI = TOOLS_DIR / "towerctl.py"
++FIXED_TIME = "2026-10-30T00:00:00+08:00"
++DEP = "TEST-DEP"
++NEW = "TEST-NEW"
++
++
++def sha256(path: Path) -> str:
++    return hashlib.sha256(path.read_bytes()).hexdigest()
++
++
++class DependencyGateCase(unittest.TestCase):
++    def setUp(self) -> None:
++        self._tmp = tempfile.TemporaryDirectory(
++            prefix="towerctl-deps-", ignore_cleanup_errors=True)
++        self.root = Path(self._tmp.name)
++        for directory in ("primary", "ledger", "specs"):
++            (self.root / directory).mkdir(parents=True, exist_ok=True)
++        self.write_board()
++        self.write_spec(NEW)
++        self.make_worktree(NEW)
++
++    def tearDown(self) -> None:
++        self._tmp.cleanup()
++
++    # -- fixture ----------------------------------------------------------
++    def make_worktree(self, task_id: str) -> None:
++        (self.root / "pilot" / "worktrees" / task_id).mkdir(parents=True, exist_ok=True)
++
++    def write_board(self, *entries) -> None:
++        data = {"schema": "tower/task-board@1", "tower_id": "tower-dsh",
++                "tasks": list(entries)}
++        (self.root / "primary" / "TASK_BOARD.json").write_text(
++            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
++
++    def spec_data(self, task_id: str, depends_on=None) -> dict:
++        data = {
++            "schema": "tower/spec@2",
++            "id": task_id,
++            "title": f"{task_id} dependency fixture",
++            "authority": "workspace_write",
++            "scope": ["exercise depends_on gates"],
++            "worktree": f"pilot/worktrees/{task_id}",
++            "allowed_paths": ["tools/example.py"],
++            "forbidden": ["merge", "production access"],
++            "acceptance": ["tests pass"],
++            "objective": {
++                "problem": "depends_on is copied but never enforced",
++                "outcome": "open dependencies block ready and dispatch",
++                "approach": "structure, closure and acyclicity gates",
++                "non_goals_and_done": "no spec graph; done when tests are green",
++            },
++        }
++        if depends_on is not None:
++            data["depends_on"] = depends_on
++        return data
++
++    def write_spec(self, task_id: str, depends_on=None) -> Path:
++        path = self.root / "specs" / f"{task_id}.spec.json"
++        path.write_text(
++            json.dumps(self.spec_data(task_id, depends_on), ensure_ascii=False, indent=2),
++            encoding="utf-8")
++        return path
++
++    def write_record(self, task_id: str, status: str = "ready",
++                     depends_on=None) -> dict:
++        self.make_worktree(task_id)
++        spec_path = self.write_spec(task_id, depends_on)
++        record = {
++            "schema": "tower/task@1", "id": task_id, "title": f"{task_id} fixture",
++            "status": status, "authority": "workspace_write",
++            "scope": ["scope"], "allowed_paths": ["tools/example.py"],
++            "forbidden": ["merge", "production access"], "acceptance": ["tests pass"],
++            "depends_on": list(depends_on or []),
++            "worktree": f"pilot/worktrees/{task_id}",
++            "spec_path": spec_path.relative_to(self.root).as_posix(),
++            "spec_sha256": sha256(spec_path), "spec_gate": "PASS",
++            "executor": None, "dispatch": None, "evidence": [], "review": None,
++            "decision": None, "closeout": None,
++            "created_at": FIXED_TIME, "updated_at": FIXED_TIME, "next": "",
++        }
++        self.record_path(task_id).parent.mkdir(parents=True, exist_ok=True)
++        self.record_path(task_id).write_text(
++            json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
++        return record
++
++    def prepare(self, task_id: str, status: str = "ready", depends_on=None) -> None:
++        self.write_record(task_id, status, depends_on)
++        self.write_task_md(task_id)
++
++    def write_task_md(self, task_id: str) -> None:
++        path = self.root / "tasks" / task_id / "TASK.md"
++        path.parent.mkdir(parents=True, exist_ok=True)
++        path.write_text(f"# {task_id} fixture\n", encoding="utf-8")
++
++    def record_path(self, task_id: str) -> Path:
++        return self.root / "tasks" / task_id / "record.json"
++
++    def record(self, task_id: str) -> dict:
++        return json.loads(self.record_path(task_id).read_text(encoding="utf-8"))
++
++    def board_bytes(self) -> bytes:
++        return (self.root / "primary" / "TASK_BOARD.json").read_bytes()
++
++    def ledger_bytes(self) -> bytes:
++        path = self.root / "ledger" / "primary.jsonl"
++        return path.read_bytes() if path.exists() else b""
++
++    def run_cli(self, *args: str) -> subprocess.CompletedProcess:
++        return subprocess.run(
++            [sys.executable, "-B", str(TCLI), "--root", str(self.root), *args],
++            capture_output=True, text=True, encoding="utf-8")
++
++    def assert_fails(self, cp: subprocess.CompletedProcess, *keywords: str) -> dict:
++        self.assertEqual(cp.returncode, 2, msg=f"stdout={cp.stdout}\nstderr={cp.stderr}")
++        self.assertNotIn("Traceback", cp.stdout + cp.stderr)
++        payload = json.loads(cp.stdout)
++        self.assertFalse(payload["ok"])
++        blob = " ".join(payload["errors"]).lower()
++        for keyword in keywords:
++            self.assertIn(keyword.lower(), blob,
++                          msg=f"missing {keyword!r} in {payload['errors']}")
++        return payload
++
++    def assert_zero_write(self, task_id: str, ledger_before: bytes) -> None:
++        self.assertFalse((self.root / "tasks" / task_id).exists())
++        self.assertEqual(self.ledger_bytes(), ledger_before)
++
++    # -- semantic A: task-new structure -----------------------------------
++    def test_task_new_accepts_empty_depends_on(self) -> None:
++        cp = self.run_cli("task-new", "--spec", f"specs/{NEW}.spec.json")
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        record = self.record(NEW)
++        self.assertEqual(record["depends_on"], [])
++        self.assertEqual(record["status"], "ready")
++
++    def test_task_new_accepts_dependency_on_ready_card(self) -> None:
++        self.write_record(DEP, status="ready")
++        self.write_spec(NEW, depends_on=[DEP])
++        cp = self.run_cli("task-new", "--spec", f"specs/{NEW}.spec.json")
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.record(NEW)["depends_on"], [DEP])
++
++    def test_task_new_rejects_self_dependency(self) -> None:
++        self.write_spec(NEW, depends_on=[NEW])
++        ledger_before = self.ledger_bytes()
++        cp = self.run_cli("task-new", "--spec", f"specs/{NEW}.spec.json")
++        self.assert_fails(cp, "depends_on.self", NEW)
++        self.assert_zero_write(NEW, ledger_before)
++
++    def test_task_new_rejects_duplicate_dependency(self) -> None:
++        self.write_record(DEP, status="ready")
++        self.write_spec(NEW, depends_on=[DEP, DEP])
++        ledger_before = self.ledger_bytes()
++        cp = self.run_cli("task-new", "--spec", f"specs/{NEW}.spec.json")
++        self.assert_fails(cp, "depends_on.duplicate", DEP)
++        self.assert_zero_write(NEW, ledger_before)
++
++    def test_task_new_rejects_missing_dependency(self) -> None:
++        self.write_spec(NEW, depends_on=["TEST-999"])
++        ledger_before = self.ledger_bytes()
++        cp = self.run_cli("task-new", "--spec", f"specs/{NEW}.spec.json")
++        self.assert_fails(cp, "depends_on.missing", "TEST-999")
++        self.assert_zero_write(NEW, ledger_before)
++
++    def test_task_new_rejects_non_list_depends_on(self) -> None:
++        self.write_spec(NEW, depends_on=DEP)
++        ledger_before = self.ledger_bytes()
++        cp = self.run_cli("task-new", "--spec", f"specs/{NEW}.spec.json")
++        self.assert_fails(cp, "depends_on.invalid")
++        self.assert_zero_write(NEW, ledger_before)
++
++    # -- semantic B: check --phase ready closure ---------------------------
++    def test_check_ready_rejects_open_dependency(self) -> None:
++        self.prepare(DEP, status="ready")
++        self.prepare(NEW, depends_on=[DEP])
++        cp = self.run_cli("check", "--task", NEW, "--phase", "ready")
++        self.assert_fails(cp, f"depends_on.{DEP}", "ready")
++
++    def test_check_ready_accepts_closed_dependency(self) -> None:
++        self.prepare(DEP, status="closed")
++        self.prepare(NEW, depends_on=[DEP])
++        cp = self.run_cli("check", "--task", NEW, "--phase", "ready")
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertTrue(json.loads(cp.stdout)["ok"])
++
++    def test_check_ready_reports_missing_dependency_target(self) -> None:
++        self.prepare(NEW, depends_on=["TEST-999"])
++        cp = self.run_cli("check", "--task", NEW, "--phase", "ready")
++        self.assert_fails(cp, "depends_on.test-999", "missing")
++
++    # -- semantic C: dispatch closure --------------------------------------
++    def test_dispatch_rejects_open_dependency_without_writes(self) -> None:
++        self.prepare(DEP, status="ready")
++        self.prepare(NEW, depends_on=[DEP])
++        record_before = self.record_path(NEW).read_bytes()
++        ledger_before = self.ledger_bytes()
++        board_before = self.board_bytes()
++        cp = self.run_cli("dispatch", "--task", NEW, "--executor", "exec-a")
++        self.assert_fails(cp, f"depends_on.{DEP}")
++        self.assertEqual(self.record_path(NEW).read_bytes(), record_before)
++        self.assertEqual(self.ledger_bytes(), ledger_before)
++        self.assertEqual(self.board_bytes(), board_before)
++
++    def test_dispatch_accepts_closed_dependency(self) -> None:
++        self.prepare(DEP, status="closed")
++        self.prepare(NEW, depends_on=[DEP])
++        cp = self.run_cli("dispatch", "--task", NEW, "--executor", "exec-a")
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.record(NEW)["status"], "dispatched")
++        self.assertIn("DISPATCH", (self.root / "ledger" / "primary.jsonl")
++                      .read_text(encoding="utf-8"))
++
++    # -- semantic D: acyclicity --------------------------------------------
++    def test_check_ready_rejects_cycle(self) -> None:
++        self.prepare("TEST-A", status="ready", depends_on=["TEST-B"])
++        self.prepare("TEST-B", status="closed", depends_on=["TEST-A"])
++        cp = self.run_cli("check", "--task", "TEST-A", "--phase", "ready")
++        payload = self.assert_fails(cp, "depends_on.cycle",
++                                    "TEST-A -> TEST-B -> TEST-A")
++        self.assertEqual(len(payload["errors"]), 1)
++
++    def test_check_ready_rejects_self_cycle(self) -> None:
++        self.prepare("TEST-SELF", status="ready", depends_on=["TEST-SELF"])
++        cp = self.run_cli("check", "--task", "TEST-SELF", "--phase", "ready")
++        self.assert_fails(cp, "depends_on.cycle", "TEST-SELF -> TEST-SELF")
++
++    def test_dispatch_rejects_cycle_without_writes(self) -> None:
++        self.prepare("TEST-A", status="ready", depends_on=["TEST-B"])
++        self.prepare("TEST-B", status="closed", depends_on=["TEST-A"])
++        record_before = self.record_path("TEST-A").read_bytes()
++        ledger_before = self.ledger_bytes()
++        cp = self.run_cli("dispatch", "--task", "TEST-A", "--executor", "exec-a")
++        self.assert_fails(cp, "depends_on.cycle", "TEST-A -> TEST-B -> TEST-A")
++        self.assertEqual(self.record_path("TEST-A").read_bytes(), record_before)
++        self.assertEqual(self.ledger_bytes(), ledger_before)
++
++    # -- legacy cards ------------------------------------------------------
++    def test_legacy_empty_depends_on_passes_ready_and_dispatch(self) -> None:
++        self.prepare(NEW, depends_on=[])
++        cp = self.run_cli("check", "--task", NEW, "--phase", "ready")
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        cp = self.run_cli("dispatch", "--task", NEW, "--executor", "exec-a")
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++
++    def test_legacy_missing_depends_on_key_passes(self) -> None:
++        self.prepare(NEW, depends_on=[])
++        record = self.record(NEW)
++        record.pop("depends_on")
++        self.record_path(NEW).write_text(
++            json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
++        cp = self.run_cli("check", "--task", NEW, "--phase", "ready")
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tower-dsh/tools/tests/test_objective.py b/tower-dsh/tools/tests/test_objective.py
+index 296d4c0..fbd80b4 100644
+--- a/tower-dsh/tools/tests/test_objective.py
++++ b/tower-dsh/tools/tests/test_objective.py
+@@ -141,6 +141,11 @@ class ObjectiveCase(unittest.TestCase):
+             json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+         (self.root / "pilot" / "worktrees" / "PILOT-049").mkdir(
+             parents=True, exist_ok=True)
++        # PILOT-051 (D-PILOT-051): the real 049 spec depends on PILOT-048;
++        # seed that card as closed instead of weakening the depends_on gate.
++        (self.root / "tasks" / "PILOT-048").mkdir(parents=True, exist_ok=True)
++        (self.root / "tasks" / "PILOT-048" / "record.json").write_text(
++            json.dumps({"id": "PILOT-048", "status": "closed"}), encoding="utf-8")
+         cp = self.run_cli("task-new", "--spec", "pilot/PILOT-049.spec.json")
+         self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+ 
+diff --git a/tower-dsh/tools/towerctl.py b/tower-dsh/tools/towerctl.py
+index 10fc77b..f21379d 100644
+--- a/tower-dsh/tools/towerctl.py
++++ b/tower-dsh/tools/towerctl.py
+@@ -524,6 +524,132 @@ def spec_gate_errors(root: Path, rec: dict) -> list[str]:
+     return errors
+ 
+ 
++# PILOT-051: ``depends_on`` is a three-layer prerequisite, not a copied field.
++# task-new validates structure (list/shape, no self-dependency, no duplicate,
++# every target present); check --phase ready and dispatch validate scheduling
++# (every target closed) plus acyclicity over the whole live card graph.
++DEPENDS_ON_CLOSED = "closed"
++
++
++def dependency_status_text(value) -> str | None:
++    """A non-empty status string, or ``None`` for anything else."""
++    if isinstance(value, str) and value.strip():
++        return value.strip()
++    return None
++
++
++def dependency_target_status(root: Path, dep: str) -> str | None:
++    """Status of one dependency target, or ``None`` when no card records it.
++
++    The live ``record.json`` wins over a ``TASK_BOARD.json`` row (the board is a
++    working copy, the record is the card).  A bare ``tasks/<id>/`` directory is
++    still a target at ``task-new`` time, but it carries no trustworthy status
++    yet, so it reports ``unknown`` rather than a fabricated ``ready``.
++    """
++    if not is_safe_id(dep, TASK_ID_RE):
++        return None
++    record = _optional_task_record(root, dep)
++    if record and record.get("id") == dep:
++        status = dependency_status_text(record.get("status"))
++        if status:
++            return status
++    for entry in load_board(root).get("tasks") or []:
++        if isinstance(entry, dict) and entry.get("id") == dep:
++            return dependency_status_text(entry.get("status")) or "unknown"
++    return "unknown" if (root / "tasks" / dep).is_dir() else None
++
++
++def dependency_closure_errors(root: Path, rec: dict) -> list[str]:
++    """Scheduling gate: every recorded dependency must already be ``closed``.
++
++    A missing target is reported as ``depends_on.<id>: missing``; every other
++    unmet state keeps its own name, so an operator can tell "not merged yet"
++    from "card was voided".
++    """
++    errors: list[str] = []
++    for raw in rec.get("depends_on") or []:
++        dep = raw.strip() if isinstance(raw, str) else ""
++        status = dependency_target_status(root, dep)
++        if status is None:
++            errors.append(f"depends_on.{dep}: missing")
++        elif status != DEPENDS_ON_CLOSED:
++            errors.append(f"depends_on.{dep}: {status} (unmet)")
++    return errors
++
++
++def dependency_cycle_errors(root: Path) -> list[str]:
++    """DFS every live card's ``depends_on``; a cycle (self included) is fatal.
++
++    The graph is read from records, never from the board: a board-only target
++    has no outgoing edges.  The message names the cycle in visit order
++    (``A -> B -> A``), which is enough to locate the loop without a graph dump.
++    """
++    graph: dict[str, list[str]] = {}
++    for record in read_task_records(root):
++        deps = [item.strip() for item in (record.get("depends_on") or [])
++                if isinstance(item, str) and item.strip()]
++        graph[str(record.get("id"))] = deps
++    visiting: set[str] = set()
++    done: set[str] = set()
++    path: list[str] = []
++
++    def walk(node: str) -> list[str] | None:
++        if node in done:
++            return None
++        if node in visiting:
++            return path[path.index(node):] + [node]
++        visiting.add(node)
++        path.append(node)
++        for dep in graph.get(node, []):
++            cycle = walk(dep)
++            if cycle:
++                return cycle
++        path.pop()
++        visiting.discard(node)
++        done.add(node)
++        return None
++
++    for node in sorted(graph):
++        cycle = walk(node)
++        if cycle:
++            return [f"depends_on.cycle: {' -> '.join(cycle)}"]
++    return []
++
++
++def depends_on_structure_errors(root: Path, spec: dict, tid: str) -> list[str]:
++    """Structural gate for ``spec.depends_on`` at ``task-new``; never writes.
++
++    The list itself may be empty (most legacy cards are), but every element
++    must be a non-empty string naming a card that already exists in the board
++    or under ``tasks/<id>/``.  Closure is *not* required here: a card may be
++    created before its dependency closes.
++    """
++    raw = spec.get("depends_on", [])
++    if not isinstance(raw, list):
++        return ["depends_on.invalid: depends_on must be a list of task ids"]
++    errors: list[str] = []
++    seen: set[str] = set()
++    for value in raw:
++        if not isinstance(value, str) or not value.strip():
++            errors.append("depends_on.invalid: depends_on items must be non-empty strings")
++            continue
++        dep = value.strip()
++        if dep in seen:
++            errors.append(f"depends_on.duplicate: {dep} listed more than once")
++            continue
++        seen.add(dep)
++        if dep == tid:
++            errors.append(f"depends_on.self: {dep} cannot depend on itself")
++        elif dependency_target_status(root, dep) is None:
++            errors.append(f"depends_on.missing: no task card for {dep}")
++    return errors
++
++
++def scheduling_dependency_errors(root: Path, rec: dict) -> list[str]:
++    """Ready/dispatch gate: dependencies closed and the whole graph acyclic."""
++    return dependency_closure_errors(root, rec) + dependency_cycle_errors(root)
++
++
+ def git(repo: Path, *args: str) -> subprocess.CompletedProcess:
+     return subprocess.run(
+         ["git", "-C", str(repo), *args],
+@@ -1891,6 +2017,7 @@ def task_new_errors(root: Path, spec: dict, tid: str) -> list[str]:
+     if not errors:
+         errors += validate_spec(spec)
+     errors += spec_lint.objective_errors(spec)
++    errors += depends_on_structure_errors(root, spec, tid)
+     worktree = spec.get("worktree")
+     if not worktree:
+         errors.append("spec.worktree required")
+@@ -2020,7 +2147,7 @@ def cmd_check(root: Path, args) -> None:
+             errors.append("TASK.md missing")
+         if not (root / rec.get("worktree", "")).exists():
+             errors.append("worktree missing")
+-        errors += spec_gate_errors(root, rec)
++        errors += spec_gate_errors(root, rec) + scheduling_dependency_errors(root, rec)
+     elif phase == "dispatch":
+         if rec.get("status") != "dispatched":
+             errors.append(f"status is {rec.get('status')}, expected dispatched")
+@@ -2704,7 +2831,7 @@ def cmd_dispatch(root: Path, args) -> None:
+     task_md = task_dir(root, args.task) / "TASK.md"
+     if not task_md.exists():
+         fail([f"TASK.md missing: {rel(root, task_md)}; cannot dispatch without a task card"])
+-    gate_errors = spec_gate_errors(root, rec)
++    gate_errors = spec_gate_errors(root, rec) + scheduling_dependency_errors(root, rec)
+     if gate_errors:
+         fail(gate_errors)
+     kind = dispatch_provenance_field(args.kind, "kind")

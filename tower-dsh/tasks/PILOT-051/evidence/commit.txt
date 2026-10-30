@@ -1,0 +1,23 @@
+task: PILOT-051
+branch: pilot/PILOT-051
+head: a726b99b7fa86ce6f4e2381c865435573ad850b8
+short: a726b99
+subject: PILOT-051: depends_on hard gate (exists/closed/acyclic)
+author: mac <mac@local>
+committer: mac <mac@local>
+
+files (git diff --name-only --no-renames main..HEAD):
+tower-dsh/ARCHITECTURE.md
+tower-dsh/specs/WF-TASK.md
+tower-dsh/tools/tests/test_dependencies.py
+tower-dsh/tools/tests/test_objective.py
+tower-dsh/tools/towerctl.py
+
+diff: 5 files = 4 allowed_paths + 1 authorised completion (D-PILOT-051)
+
+suite: Ran 585 tests in 374.270s / OK (skipped=1)
+  (569 main baseline + 16 new test_dependencies cases)
+gates: arch-check exit 0 | campaign-check exit 0 | shape-check exit 0 | spec-lint --strict exit 0
+completion: COMPLETION_ADDED seq 464, decision D-PILOT-051
+  path: pilot/worktrees/PILOT-051/tower-dsh/tools/tests/test_objective.py
+  seed: tasks/PILOT-048/record.json {"id": "PILOT-048", "status": "closed"} in test_accepts_real_049_bootstrap_spec

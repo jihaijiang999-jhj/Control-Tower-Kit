@@ -1,0 +1,5 @@
+tower-dsh/ARCHITECTURE.md
+tower-dsh/specs/WF-TASK.md
+tower-dsh/tools/tests/test_dependencies.py
+tower-dsh/tools/tests/test_objective.py
+tower-dsh/tools/towerctl.py
