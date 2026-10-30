@@ -1,16 +1,16 @@
 # ENV-PILOT-052 post-merge verification
 
 - base: main
-- implementation: 0a8bf3125413799e1cfdc795fe09eea245123482
-- merge_commit: 27c18728f47f4529752f31327b91d748e813698c
+- implementation: 456f2c25f096d3d60fed4e24153eae80479c433d
+- merge_commit: None
 - result: PASS
 - working_tree_clean: False
-- tool_owned_paths_ignored: ['tower-dsh/supervision/reviews/ENV-PILOT-053-post-merge.txt']
+- tool_owned_paths_ignored: []
 - test_exit: 0
 - tests_count: 2
 - tests_baseline: 2
 - tower_tests_count: 609
-- tower_tests_baseline: 585
+- tower_tests_baseline: 609
 
 ## Test output
 
@@ -19,7 +19,7 @@ test_non_utf8_child_output_is_replaced_not_raised (test_tower_gates.NonUtf8Child
 test_tower_gate_suite (test_tower_gates.TowerGateSuite.test_tower_gate_suite) ... ok
 
 ----------------------------------------------------------------------
-Ran 2 tests in 373.750s
+Ran 2 tests in 376.424s
 
 OK
 
