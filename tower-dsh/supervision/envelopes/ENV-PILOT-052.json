@@ -87,7 +87,9 @@
     }
   ],
   "envelope_head_sha": "6c8ff22e29b2b451ef6d5afe46395d38f3c7b6f3",
-  "status": "CORRECTION_REQUIRED",
+  "status": "POST_MERGE_VERIFIED",
   "tests_count": 2,
-  "tower_tests_count": 609
+  "tower_tests_count": 609,
+  "post_merge_at": "2026-10-31T03:03:05+08:00",
+  "post_merge_note": "retry on clean tree; baseline 609"
 }

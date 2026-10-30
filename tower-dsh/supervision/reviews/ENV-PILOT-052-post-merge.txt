@@ -4,7 +4,7 @@
 - implementation: 456f2c25f096d3d60fed4e24153eae80479c433d
 - merge_commit: None
 - result: PASS
-- working_tree_clean: False
+- working_tree_clean: True
 - tool_owned_paths_ignored: []
 - test_exit: 0
 - tests_count: 2
@@ -19,7 +19,7 @@ test_non_utf8_child_output_is_replaced_not_raised (test_tower_gates.NonUtf8Child
 test_tower_gate_suite (test_tower_gates.TowerGateSuite.test_tower_gate_suite) ... ok
 
 ----------------------------------------------------------------------
-Ran 2 tests in 376.424s
+Ran 2 tests in 377.413s
 
 OK
 
