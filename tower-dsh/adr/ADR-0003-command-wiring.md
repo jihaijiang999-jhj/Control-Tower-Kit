@@ -23,9 +23,9 @@ related_files:
 ## 决策
 
 1. **dispatch 必填 campaign**：当塔存在 active campaign 时，`dispatch --campaign <id>` 必填；校验 campaign 存在且 active、任务在 roadmap 中；写入 `record.dispatch.campaign` 与 `DISPATCH` payload。缺省/无效 → exit 2，零状态变更。没有 campaign 的夹具塔保持旧行为（legacy）。
-2. **W1 的覆盖来源**：`task_forces` ∪ `record.dispatch.campaign` ∪ campaign 的 `legacy_cards`。`legacy_cards` 是 001–044 的**历史记账**（campaign 之前已闭环），不是追溯会员。
+2. **W1 的覆盖来源**：`task_forces` ∪ `record.dispatch.campaign` ∪ campaign 的 `legacy_cards` ∪ `campaign.current`。`current` 是“本战役正在进行的那张卡”，天然属于 campaign；否则每张 current 卡合并后都会变成 W1 孤儿。`legacy_cards` 是 001–044 的**历史记账**（campaign 之前已闭环），不是追溯会员。
 3. **W2 只数 open 卡**：`task_forces` 里已 closed 的卡不再占 WIP 预算；否则回填会制造假超限。
-4. **post-merge 接线**：存在 `command/campaigns/*.md` / `arch/GATES.json` 时，post-merge 追加 `campaign-check` / `arch-check`；失败 → `CORRECTION_REQUIRED`；不存在 → 记 `skipped`/ok，不影响旧夹具。
+4. **post-merge 接线**：存在 `command/campaigns/*.md` / `arch/GATES.json` 时，post-merge 追加 `campaign-check` / `arch-check`；失败 → `CORRECTION_REQUIRED`；**不存在 → 不追加（not applicable），不合成 skipped 项**——旧夹具的 checks 列表逐项不变。
 5. **CI 接线**：`.github/workflows/tower-gate.yml` 在 `status` 之前增加 `arch-check` 与 `campaign-check`（非 strict），不加 `continue-on-error`。
 6. **`--strict` 不在本卡开启**：W1 回填后 W1=0，但 W4 仍有 051/052 未建档；等 051 spec 落地后再决定。
 
@@ -39,7 +39,7 @@ related_files:
 
 正面：新卡必须挂战役才能派发；post-merge/CI 自动跑设计与战役门；W1 清零、W2 只数 open；历史卡诚实标为 legacy。
 
-负面：dispatch 多一个参数（脚本/夹具需要适配）；`legacy_cards` 是手工维护的名单（本卡一次性回填 001–044）；`--strict` 仍红（W4），CI 只跑非 strict 版本；post-merge 对旧夹具是 opt-in，不能保证所有塔都接线。
+负面：dispatch 多一个参数（脚本/夹具需要适配）；`legacy_cards` 是手工维护的名单（本卡一次性回填 001–044）；`--strict` 仍红（W4），CI 只跑非 strict 版本；post-merge 对旧夹具是 opt-in（文件不存在时不追加检查），不能保证所有塔都接线。
 
 ## 关联卡
 
