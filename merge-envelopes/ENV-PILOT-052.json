@@ -5,7 +5,7 @@
   "repository": "..",
   "branch": "pilot/PILOT-052",
   "base": "main",
-  "implementation_head_sha": "07efc9c5d5559c37b5c3461b6d157956ec8601f5",
+  "implementation_head_sha": "0a8bf3125413799e1cfdc795fe09eea245123482",
   "envelope_path": "merge-envelopes/ENV-PILOT-052.json",
   "created_at": "2026-10-31T00:05:00+08:00",
   "scope": "PILOT-052: object layer (PROFILE v1 template + TOWER-DSH profile + profile-check + GATE-PROFILE)",
@@ -17,22 +17,73 @@
     "deploy"
   ],
   "evidence": [
-    {"path": "tasks/PILOT-052/evidence/towerctl.py", "sha256": "8d5cf5e99bf4f438911f8cb8cf7fc0015fb2d2f0171804b2d706ac8d7551ed12"},
-    {"path": "tasks/PILOT-052/evidence/test_profile.py", "sha256": "9f8e2fb5235fe887f8fd5450e623044c55b2859241ed6ab89f8b387d6ebd04fc"},
-    {"path": "tasks/PILOT-052/evidence/test_arch.py", "sha256": "435ea7f40730ae5b45104b19269f1f3d7dc0ba4baec4ef70b208f9d836dacefe"},
-    {"path": "tasks/PILOT-052/evidence/PROFILE-TEMPLATE.md", "sha256": "5504963129edd75db539d4527539066aa3ea825f0c8e90fb40e30047cd054613"},
-    {"path": "tasks/PILOT-052/evidence/PROFILE-TOWER-DSH.md", "sha256": "d4ce79e87aa5bfc4135c5981d8e7ae97037da211507854b875a89a6d035e9a83"},
-    {"path": "tasks/PILOT-052/evidence/GATES.json", "sha256": "a9007708c444cf3845b486e4d47b5d723dc3c08b5c3caa0d95ab007410824ce1"},
-    {"path": "tasks/PILOT-052/evidence/ARCHITECTURE.md", "sha256": "279f9cb8c9d5af61b3b79e6f9d54ee941da9bd8697c3782a2091764f54844e35"},
-    {"path": "tasks/PILOT-052/evidence/test-output.txt", "sha256": "80f7c5ffec1053c1ac7f2175f4937ee466218eb63c02d0b403959042f3fbb2ec"},
-    {"path": "tasks/PILOT-052/evidence/profile_probe.py", "sha256": "697d5d2bbe4a9a31cce13338686667f567e8cacdd822b058f6cfd083831d5ce9"},
-    {"path": "tasks/PILOT-052/evidence/probe.txt", "sha256": "037606521e594ec84c1b44841cdc152107a5599fac327a7d1d1f67bf0f54de09"},
-    {"path": "tasks/PILOT-052/evidence/probe-old-code.txt", "sha256": "4da45d95d4aca60b8e9f861e2837c098a38f11bcaa869afe38a9504e158f0be1"},
-    {"path": "tasks/PILOT-052/evidence/commit.txt", "sha256": "4fba2979690099ae259cafc04ea61168f0f677cd246a17d2a85086af5d90491a"},
-    {"path": "tasks/PILOT-052/evidence/diff.txt", "sha256": "da4361027def00c139a89e35a6b3995e6f4c77c108781839d4d151083ec2ca01"},
-    {"path": "tasks/PILOT-052/evidence/profile-check.json", "sha256": "8ccc47f5e8e0dee1b84e63142cb92aab71cb1fa0568d21a951fcd41428fca623"},
-    {"path": "tasks/PILOT-052/evidence/spec-lint.txt", "sha256": "ce9a3a16be726ef1b225936872451702b3fd4599c384ed296f6f12fba59c36a8"},
-    {"path": "tasks/PILOT-052/evidence/readonly.txt", "sha256": "5c4980d6559c8fce6d6efe03082bd4d9ba3c7329ec2f4e19ad200b6635c6a484"},
-    {"path": "tasks/PILOT-052/evidence/authority-optional.txt", "sha256": "54b4dfa0a4ab12174fd8088c94703a33d2b4c41bc13429b9d2fd17983dff7725"}
+    {
+      "path": "tasks/PILOT-052/evidence/towerctl.py",
+      "sha256": "8d5cf5e99bf4f438911f8cb8cf7fc0015fb2d2f0171804b2d706ac8d7551ed12"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/test_profile.py",
+      "sha256": "9f8e2fb5235fe887f8fd5450e623044c55b2859241ed6ab89f8b387d6ebd04fc"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/test_arch.py",
+      "sha256": "435ea7f40730ae5b45104b19269f1f3d7dc0ba4baec4ef70b208f9d836dacefe"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/PROFILE-TEMPLATE.md",
+      "sha256": "5504963129edd75db539d4527539066aa3ea825f0c8e90fb40e30047cd054613"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/PROFILE-TOWER-DSH.md",
+      "sha256": "d4ce79e87aa5bfc4135c5981d8e7ae97037da211507854b875a89a6d035e9a83"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/GATES.json",
+      "sha256": "a9007708c444cf3845b486e4d47b5d723dc3c08b5c3caa0d95ab007410824ce1"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/ARCHITECTURE.md",
+      "sha256": "279f9cb8c9d5af61b3b79e6f9d54ee941da9bd8697c3782a2091764f54844e35"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/test-output.txt",
+      "sha256": "80f7c5ffec1053c1ac7f2175f4937ee466218eb63c02d0b403959042f3fbb2ec"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/profile_probe.py",
+      "sha256": "697d5d2bbe4a9a31cce13338686667f567e8cacdd822b058f6cfd083831d5ce9"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/probe.txt",
+      "sha256": "037606521e594ec84c1b44841cdc152107a5599fac327a7d1d1f67bf0f54de09"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/probe-old-code.txt",
+      "sha256": "4da45d95d4aca60b8e9f861e2837c098a38f11bcaa869afe38a9504e158f0be1"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/commit.txt",
+      "sha256": "4fba2979690099ae259cafc04ea61168f0f677cd246a17d2a85086af5d90491a"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/diff.txt",
+      "sha256": "da4361027def00c139a89e35a6b3995e6f4c77c108781839d4d151083ec2ca01"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/profile-check.json",
+      "sha256": "8ccc47f5e8e0dee1b84e63142cb92aab71cb1fa0568d21a951fcd41428fca623"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/spec-lint.txt",
+      "sha256": "ce9a3a16be726ef1b225936872451702b3fd4599c384ed296f6f12fba59c36a8"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/readonly.txt",
+      "sha256": "5c4980d6559c8fce6d6efe03082bd4d9ba3c7329ec2f4e19ad200b6635c6a484"
+    },
+    {
+      "path": "tasks/PILOT-052/evidence/authority-optional.txt",
+      "sha256": "54b4dfa0a4ab12174fd8088c94703a33d2b4c41bc13429b9d2fd17983dff7725"
+    }
   ]
 }
