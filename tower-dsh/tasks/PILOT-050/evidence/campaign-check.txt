@@ -1,0 +1,36 @@
+{
+  "ok": true,
+  "strict": false,
+  "strategy": "S-2026-Q4",
+  "goals": [
+    "G1",
+    "G2",
+    "G3",
+    "G4"
+  ],
+  "campaigns": 1,
+  "campaign_ids": [
+    "C-2026-Q4-01"
+  ],
+  "wip": {
+    "in_flight": 0,
+    "limit": 1,
+    "campaigns": {
+      "C-2026-Q4-01": 0
+    }
+  },
+  "errors": [],
+  "warnings": [
+    {
+      "code": "W4",
+      "target": "C-2026-Q4-01",
+      "detail": "roadmap node not created yet: PILOT-051"
+    },
+    {
+      "code": "W4",
+      "target": "C-2026-Q4-01",
+      "detail": "roadmap node not created yet: PILOT-052"
+    }
+  ]
+}
+EXIT=0

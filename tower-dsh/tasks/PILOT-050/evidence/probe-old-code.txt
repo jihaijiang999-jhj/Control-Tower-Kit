@@ -1,0 +1,20 @@
+﻿# PILOT-050 old-code vs new-code probe (main baseline vs worktree)
+#
+# fixture: one active campaign (C-PROBE, roadmap/current TEST-PROBE-001,
+#          task_forces TEST-PROBE-001, legacy_cards PILOT-001..044),
+#          board = PILOT-001..044 + TEST-PROBE-001, spec gate PASS.
+# command: scratch/old/towerctl.py = git show main:tower-dsh/tools/towerctl.py
+#          new = tower-dsh/tools/towerctl.py (worktree)
+# renderer: python -B scratch/wiring_probe.py  (full output: probe.txt)
+
+== old code (main) ==
+dispatch without --campaign [old main]: exit=0, status=dispatched, dispatch_campaign=<absent>, ledger_campaign=<absent>
+campaign-check [old main]: exit=0, W1=44, W4=0, errors=0
+
+== new code (worktree) ==
+dispatch without --campaign [new]: exit=2, status=ready, dispatch_campaign=<absent>, ledger_campaign=<absent>
+dispatch --campaign C-PROBE [new]: exit=0, record_campaign=C-PROBE, ledger_campaign=C-PROBE
+campaign-check [new]: exit=0, W1=0, W4=0, errors=0
+
+verdict: old dispatch without --campaign succeeds (exit 0, dispatched); new refuses (exit 2, no write).
+verdict: old campaign-check reports W1=44 (every historical board card orphaned); new reports W1=0 (legacy_cards covers PILOT-001..044).

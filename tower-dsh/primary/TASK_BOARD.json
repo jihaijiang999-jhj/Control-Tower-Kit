@@ -491,7 +491,17 @@
       "reviewer": "subagent:b45e8bd9-f024-4cb0-bc60-adb5837c9da5",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-049/MERGE.md",
       "updated_at": "2026-10-30T00:45:28+08:00"
+    },
+    {
+      "id": "PILOT-050",
+      "title": "命令层接线：dispatch 必填 campaign、post-merge/CI 跑 campaign+arch、W1 回填",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:93bbf7ad-dba7-4d8d-922f-c028407eb467",
+      "reviewer": "subagent:c27e8cf0-2109-4114-b3b1-a016ddfb5de6",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-050/MERGE.md",
+      "updated_at": "2026-10-30T16:06:25+08:00"
     }
   ],
-  "updated_at": "2026-10-30T00:45:28+08:00"
+  "updated_at": "2026-10-30T16:06:25+08:00"
 }

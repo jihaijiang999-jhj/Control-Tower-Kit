@@ -1,0 +1,18 @@
+PILOT-050 W1 probe evidence: 50-card post-merge fixture
+fixture: board PILOT-001..050; campaign task_forces 045..049 + legacy_cards 001..044 + current 050
+sensitivity control: same fixture, HEAD f206d2d (no current coverage) vs this worktree
+
+PILOT-050 W1 probe: 50-card post-merge fixture
+new towerctl (worktree): C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-050\tower-dsh\tools\towerctl.py
+baseline HEAD f206d2d: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-050\scratch\old\head_towerctl.py
+baseline main 3597202: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-050\scratch\old\main_towerctl.py
+board:    PILOT-001..PILOT-050 (50 cards)
+campaign: task_forces PILOT-045..PILOT-049 (5), legacy_cards PILOT-001..PILOT-044 (44), current PILOT-050
+[new worktree] exit=0 ok=True errors=0 W1=0 warning_codes=[]
+[HEAD f206d2d] exit=0 ok=True errors=0 W1=1 warning_codes=['W1']
+[HEAD f206d2d] W1 targets: ['PILOT-050']
+[main 3597202] exit=0 ok=True errors=0 W1=45 warning_codes=['W1']
+[main 3597202] W1 targets: ['PILOT-001', 'PILOT-002', 'PILOT-003', 'PILOT-004', 'PILOT-005', 'PILOT-006', 'PILOT-007', 'PILOT-008', 'PILOT-009', 'PILOT-010', 'PILOT-011', 'PILOT-012', 'PILOT-013', 'PILOT-014', 'PILOT-015', 'PILOT-016', 'PILOT-017', 'PILOT-018', 'PILOT-019', 'PILOT-020', 'PILOT-021', 'PILOT-022', 'PILOT-023', 'PILOT-024', 'PILOT-025', 'PILOT-026', 'PILOT-027', 'PILOT-028', 'PILOT-029', 'PILOT-030', 'PILOT-031', 'PILOT-032', 'PILOT-033', 'PILOT-034', 'PILOT-035', 'PILOT-036', 'PILOT-037', 'PILOT-038', 'PILOT-039', 'PILOT-040', 'PILOT-041', 'PILOT-042', 'PILOT-043', 'PILOT-044', 'PILOT-050']
+VERDICT: new W1=0 (expected 0), exit=0
+
+PROBE_EXIT=0

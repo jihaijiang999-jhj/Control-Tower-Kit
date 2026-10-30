@@ -1,0 +1,69 @@
+# PILOT-050 CI workflow evidence (.github/workflows/tower-gate.yml)
+
+```yaml
+name: tower-gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: tower gate
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: tower-dsh
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Unit tests
+        run: python -B -m unittest discover -s tools/tests -v
+
+      - name: Spec lint (strict)
+        run: python tools/towerctl.py spec-lint --strict
+
+      - name: Spec coverage
+        run: python tools/towerctl.py spec-coverage
+
+      - name: Verify ledger chain
+        run: python tools/towerctl.py verify-ledger
+
+      - name: Arch check
+        run: python tools/towerctl.py arch-check
+
+      - name: Campaign check
+        run: python tools/towerctl.py campaign-check
+
+      - name: Status
+        run: python tools/towerctl.py status
+```
+
+## Derived run steps (in order)
+
+1. python -B -m unittest discover -s tools/tests -v
+2. python tools/towerctl.py spec-lint --strict
+3. python tools/towerctl.py spec-coverage
+4. python tools/towerctl.py verify-ledger
+5. python tools/towerctl.py arch-check
+6. python tools/towerctl.py campaign-check
+7. python tools/towerctl.py status
+
+## Assertions
+
+- status is the last step: True
+- arch-check precedes status: True
+- campaign-check precedes status: True
+- no continue-on-error: True
+- runner / Python / permissions unchanged: windows-latest / 3.12 / contents: read
