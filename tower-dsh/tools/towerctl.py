@@ -2653,16 +2653,54 @@ def dispatch_base_sha(root: Path, worktree: Path) -> str | None:
     return None
 
 
+def resolve_dispatch_worktree(root: Path, args, rec: dict) -> tuple[str, Path]:
+    """Resolve the dispatch worktree before any state is written."""
+    worktree = args.worktree or rec.get("worktree")
+    if not worktree:
+        fail(["worktree missing: (empty)"])
+    path = ensure_within(root, root / worktree, label="worktree")
+    if not path.exists():
+        fail([f"worktree missing: {worktree}"])
+    return worktree, path
+
+
+def dispatch_campaign(root: Path, requested: str | None, task_id: str) -> str | None:
+    """The campaign a dispatch joins; every check runs before any write.
+
+    A tower with no active campaign keeps the legacy behaviour: the flag stays
+    optional, but when it is given it must still name an active campaign whose
+    roadmap contains the card.  Exactly one active campaign makes the flag
+    mandatory; more than one is ambiguous and no dispatch may proceed.
+    """
+    docs, errors = load_campaign_docs(root)
+    if errors:
+        fail([f"campaign unreadable: {item['target']}: {item['detail']}"
+              for item in errors])
+    active = [doc for doc in docs if doc.get("status") == "active"]
+    if len(active) > 1:
+        ids = ", ".join(str(doc.get("id") or doc["_path"]) for doc in active)
+        fail([f"ambiguous campaign: {len(active)} active campaigns ({ids}); "
+              "retire all but one before dispatch"])
+    chosen = (requested or "").strip() or None
+    if chosen is None:
+        if not active:
+            return None
+        fail([f"--campaign is required: {active[0].get('id')} is active"])
+    doc = next((item for item in docs if str(item.get("id") or "") == chosen), None)
+    if doc is None:
+        fail([f"unknown campaign: {chosen}"])
+    if doc.get("status") != "active":
+        fail([f"campaign is not active: {chosen} ({doc.get('status')})"])
+    if task_id not in scalar_items(doc.get("roadmap")):
+        fail([f"task {task_id} is not in the roadmap of campaign {chosen}"])
+    return chosen
+
+
 def cmd_dispatch(root: Path, args) -> None:
     rec = load_record(root, args.task)
     if rec.get("status") not in ("ready", "rework"):
         fail([f"task status {rec.get('status')} cannot dispatch"])
-    worktree = args.worktree or rec.get("worktree")
-    if not worktree:
-        fail(["worktree missing: (empty)"])
-    worktree_path = ensure_within(root, root / worktree, label="worktree")
-    if not worktree_path.exists():
-        fail([f"worktree missing: {worktree}"])
+    worktree, worktree_path = resolve_dispatch_worktree(root, args, rec)
     task_md = task_dir(root, args.task) / "TASK.md"
     if not task_md.exists():
         fail([f"TASK.md missing: {rel(root, task_md)}; cannot dispatch without a task card"])
@@ -2674,9 +2712,12 @@ def cmd_dispatch(root: Path, args) -> None:
         fail(["kind must be a non-empty string"])
     model = dispatch_provenance_field(args.model, "model")
     parent = dispatch_provenance_field(args.parent, "parent")
+    campaign = dispatch_campaign(root, args.campaign, args.task)
     dispatch = {"executor": args.executor, "worktree": worktree, "at": now(),
                 "kind": kind, "model": model, "parent": parent,
                 "base_sha": dispatch_base_sha(root, worktree_path)}
+    if campaign:
+        dispatch["campaign"] = campaign
     rec["executor"] = args.executor
     rec["dispatch"] = dispatch
     rec["status"] = "dispatched"
@@ -4453,6 +4494,30 @@ def max_verified_tower_tests(root: Path) -> int | None:
     return highest
 
 
+def valid_baseline(value) -> bool:
+    """True for a positive integer count baseline (``bool`` is not a count)."""
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 1
+
+
+def wiring_checks(root: Path) -> list[dict]:
+    """PILOT-050 post-merge gates, added only when their input exists.
+
+    A legacy tower without ``command/campaigns/*.md`` or ``arch/GATES.json``
+    keeps the pre-050 check list untouched; a tower that has them cannot reach
+    ``POST_MERGE_VERIFIED`` while campaign-check or arch-check is red.
+    """
+    checks: list[dict] = []
+    if campaign_relpaths(root):
+        report = campaign_check_report(root, False)
+        detail = f"{len(report['errors'])} errors, {len(report['warnings'])} warnings"
+        checks.append({"name": "campaign-check", "ok": report["ok"], "detail": detail})
+    if (root / ARCH_GATES_REL).is_file():
+        report = arch_check_payload(root)
+        checks.append({"name": "arch-check", "ok": report["ok"],
+                       "detail": f"{len(report['errors'])} findings"})
+    return checks
+
+
 def cmd_post_merge(root: Path, args) -> None:
     envelope_id = check_package_id(args.envelope, "envelope")
     env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
@@ -4478,8 +4543,7 @@ def cmd_post_merge(root: Path, args) -> None:
         repo)
     tests_count = parse_test_count(tests.stdout, tests.stderr)
     baseline = env.get("tests_baseline")
-    baseline_ok = (isinstance(baseline, int) and not isinstance(baseline, bool)
-                   and baseline >= 1)
+    baseline_ok = valid_baseline(baseline)
     count_label = tests_count if tests_count is not None else "unknown"
     if baseline_ok:
         count_check = {
@@ -4501,9 +4565,7 @@ def cmd_post_merge(root: Path, args) -> None:
     # runner points TMP/TEMP/TMPDIR at a repo-local sandbox so this gate also
     # works in a restricted sandbox where ``%TEMP%`` ACLs are unusable.
     tower_baseline = env.get("tower_tests_baseline")
-    tower_baseline_ok = (isinstance(tower_baseline, int)
-                         and not isinstance(tower_baseline, bool)
-                         and tower_baseline >= 1)
+    tower_baseline_ok = valid_baseline(tower_baseline)
     # Opt-in monotonic-count gate: compare the declared baseline with the
     # highest count the append-only ledger already verified.  A legacy tower
     # (no verified event yet) has no anchor and keeps the old behaviour.
@@ -4580,6 +4642,7 @@ def cmd_post_merge(root: Path, args) -> None:
          "detail": (f"dirty={dirty}" if dirty else "clean")
          + (f"; ignored tool-owned: {tool_owned}" if tool_owned else "")},
     ]
+    checks += wiring_checks(root)
     ok = args.result == "PASS" and all(c["ok"] for c in checks)
     env["tests_count"] = tests_count
     if tower_baseline_ok:
@@ -6147,7 +6210,7 @@ def spec_only_warnings(root: Path, campaigns: list[dict]) -> list[dict]:
 
 def command_warnings(root: Path, campaigns: list[dict], today: date) -> list[dict]:
     """Every warning family the report renders: W2 dates/budget plus W3."""
-    warnings = review_warnings(campaigns, today)
+    warnings = review_warnings(root, campaigns, today)
     warnings += budget_window_warnings(campaigns, today)
     return warnings + spec_only_warnings(root, campaigns) + roadmap_gap_warnings(root, campaigns)
 
@@ -6311,16 +6374,50 @@ def board_shape_errors(root: Path) -> list[dict]:
     return board_rows(root)[1]
 
 
+def legacy_card_ids(meta: dict) -> list[str]:
+    """Card ids a campaign records as legacy history (never membership)."""
+    return scalar_items(meta.get("legacy_cards"))
+
+
+def campaign_coverage_ids(root: Path, campaigns: list[dict]) -> set[str]:
+    """W1 coverage: task_forces ∪ legacy_cards ∪ record.dispatch.campaign.
+
+    ``legacy_cards`` bookkeeps cards closed before the campaign existed; it is
+    not retroactive membership.  A dispatch covers a card only when it names a
+    campaign the tower still has, so a stale id cannot silence the warning.
+    """
+    covered = {task_id for doc in campaigns
+               for task_id in task_force_ids(doc) + legacy_card_ids(doc)}
+    known = {str(doc.get("id")) for doc in campaigns if doc.get("id")}
+    for entry in board_rows(root)[0]:
+        record = _optional_task_record(root, str(entry["id"])) or {}
+        dispatch = record.get("dispatch")
+        chosen = dispatch.get("campaign") if isinstance(dispatch, dict) else None
+        if isinstance(chosen, str) and chosen in known:
+            covered.add(str(entry["id"]))
+    return covered
+
+
 def board_orphan_warnings(root: Path, campaigns: list[dict]) -> list[dict]:
-    """W1: board cards no campaign lists in ``task_forces`` (backfill pending)."""
-    referenced = {task_id for doc in campaigns for task_id in task_force_ids(doc)}
+    """W1: board cards no campaign covers (task_forces ∪ legacy ∪ dispatch)."""
+    referenced = campaign_coverage_ids(root, campaigns)
     return [command_finding("W1", str(entry["id"]),
                             f"board card not referenced by any campaign: {entry['id']}")
             for entry in board_rows(root)[0] if entry["id"] not in referenced]
 
 
-def review_warnings(campaigns: list[dict], today: date) -> list[dict]:
-    """W2: ``review_by`` within a week, or more forced cards than the budget."""
+def open_task_force_ids(root: Path, meta: dict) -> list[str]:
+    """The campaign's forced cards that are not closed yet (open WIP)."""
+    open_ids: list[str] = []
+    for task_id in task_force_ids(meta):
+        record = _optional_task_record(root, task_id)
+        if record is None or record.get("status") != "closed":
+            open_ids.append(task_id)
+    return open_ids
+
+
+def review_warnings(root: Path, campaigns: list[dict], today: date) -> list[dict]:
+    """W2: ``review_by`` within a week, or more open forced cards than budget."""
     warnings: list[dict] = []
     horizon = today + timedelta(days=COMMAND_REVIEW_WINDOW_DAYS)
     for doc in campaigns:
@@ -6332,9 +6429,9 @@ def review_warnings(campaigns: list[dict], today: date) -> list[dict]:
             warnings.append(command_finding(
                 "W2", target, f"review_by {deadline.isoformat()} is within 7 days"))
         budget = budget_card_limit(doc.get("budget"))
-        if budget is not None and len(task_force_ids(doc)) > budget:
+        if budget is not None and len(open_task_force_ids(root, doc)) > budget:
             warnings.append(command_finding(
-                "W2", target, f"task_forces exceed the budget of {budget} cards"))
+                "W2", target, f"open task_forces exceed the budget of {budget} cards"))
     return warnings
 
 
@@ -7938,6 +8035,25 @@ def build_parser() -> argparse.ArgumentParser:
     return command_layer_parsers(p)
 
 
+def dispatch_campaign_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """PILOT-050: add ``--campaign`` to the existing ``dispatch`` subparser.
+
+    The argument is registered here, not in ``build_parser``, so the frozen
+    PILOT-044 parser keeps its shape while the command layer grows the
+    dispatch surface.  Returns ``parser`` so the caller can keep chaining.
+    """
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        dispatch = action.choices.get("dispatch")
+        if dispatch is not None:
+            dispatch.add_argument(
+                "--campaign", default=None,
+                help="campaign id this dispatch belongs to (required while a "
+                     "single campaign is active)")
+    return parser
+
+
 def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Register the PILOT-045 commands on the parser built by ``build_parser``.
 
@@ -7953,6 +8069,7 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         cc.add_argument("--strict", action="store_true",
                         help="treat warnings (W1/W2) as errors")
         action.add_parser("brief")
+    dispatch_campaign_parser(parser)
     return arch_layer_parsers(position_layer_parsers(status_layer_parsers(parser)))
 
 

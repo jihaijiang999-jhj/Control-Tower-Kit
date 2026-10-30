@@ -37,5 +37,11 @@ jobs:
       - name: Verify ledger chain
         run: python tools/towerctl.py verify-ledger
 
+      - name: Arch check
+        run: python tools/towerctl.py arch-check
+
+      - name: Campaign check
+        run: python tools/towerctl.py campaign-check
+
       - name: Status
         run: python tools/towerctl.py status
