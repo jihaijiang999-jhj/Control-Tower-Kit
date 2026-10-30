@@ -98,5 +98,5 @@
   "merge_mode": "pr",
   "check_conclusion": "success",
   "tests_count": 2,
-  "tower_tests_count": 601
+  "tower_tests_count": 609
 }
