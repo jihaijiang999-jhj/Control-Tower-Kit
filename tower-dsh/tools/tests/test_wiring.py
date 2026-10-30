@@ -89,6 +89,7 @@ class WiringCase(unittest.TestCase):
 
     def write_campaign(self, campaign_id: str = "C-WIRE", *, status: str = "active",
                        roadmap=None, forces=(), legacy=None,
+                       current: str | None = None,
                        budget: str = "9 张卡 / 8 周") -> None:
         lines = [
             "---", "schema: tower/campaign@1", f"id: {campaign_id}",
@@ -96,6 +97,8 @@ class WiringCase(unittest.TestCase):
             'objective: "wiring fixture"', f'budget: "{budget}"',
             "wip_limit: 9", "review_by: 2026-12-31",
         ]
+        if current is not None:
+            lines.append(f"current: {current}")
         for key, values in (("roadmap", roadmap), ("task_forces", forces),
                             ("legacy_cards", legacy)):
             if values is None:
@@ -256,6 +259,32 @@ class CampaignCoverageCase(WiringCase):
         self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
         self.assertEqual([item["target"] for item in codes(payload, "W1")],
                          ["PILOT-004"])
+
+    def test_w1_covers_the_current_card(self) -> None:
+        """The post-merge shape: legacy + forces + current, all on the board."""
+        self.write_strategy()
+        ids = [f"PILOT-{number:03d}" for number in range(1, 51)]
+        self.write_campaign(forces=tuple(ids[44:49]), legacy=tuple(ids[:44]),
+                            current="PILOT-050")
+        for task_id in ids[44:49]:
+            self.write_card(task_id, "closed")
+        self.write_card("PILOT-050", "dispatched")
+        self.write_board(ids)
+        cp, payload = self.report()
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        self.assertEqual(codes(payload, "W1"), [])
+
+    def test_w1_ignores_a_current_card_the_board_does_not_have(self) -> None:
+        """A current id outside the board is a miss, not a crash."""
+        self.write_strategy()
+        self.write_campaign(forces=("PILOT-045",), current="PILOT-999")
+        self.write_card("PILOT-045", "closed")
+        self.write_board(["PILOT-045", "PILOT-050"])
+        cp, payload = self.report()
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        self.assertNotIn("Traceback", cp.stdout + cp.stderr)
+        self.assertEqual([item["target"] for item in codes(payload, "W1")],
+                         ["PILOT-050"])
 
     def test_w2_does_not_charge_closed_cards_to_the_budget(self) -> None:
         self.write_strategy()

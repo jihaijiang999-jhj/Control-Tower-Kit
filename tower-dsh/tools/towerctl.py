@@ -6380,14 +6380,19 @@ def legacy_card_ids(meta: dict) -> list[str]:
 
 
 def campaign_coverage_ids(root: Path, campaigns: list[dict]) -> set[str]:
-    """W1 coverage: task_forces ∪ legacy_cards ∪ record.dispatch.campaign.
+    """W1 coverage: task_forces ∪ legacy_cards ∪ current ∪ dispatch.campaign.
 
     ``legacy_cards`` bookkeeps cards closed before the campaign existed; it is
-    not retroactive membership.  A dispatch covers a card only when it names a
+    not retroactive membership.  ``current`` is the card the campaign is doing
+    right now, so it belongs to the campaign by definition -- once it merges it
+    reaches the board without a ``dispatch.campaign`` of its own, and it must
+    not turn into an orphan.  A dispatch covers a card only when it names a
     campaign the tower still has, so a stale id cannot silence the warning.
     """
     covered = {task_id for doc in campaigns
                for task_id in task_force_ids(doc) + legacy_card_ids(doc)}
+    currents = {str(doc.get("current") or "").strip() for doc in campaigns}
+    covered |= {task_id for task_id in currents if task_id}
     known = {str(doc.get("id")) for doc in campaigns if doc.get("id")}
     for entry in board_rows(root)[0]:
         record = _optional_task_record(root, str(entry["id"])) or {}
