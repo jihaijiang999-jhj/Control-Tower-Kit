@@ -22,9 +22,9 @@ related_files:
 ## 决策
 
 1. **重放**：`ENVELOPE_NEW` 命中已有信封时**保留已有状态**（`WAITING`/`CORRECTION_REQUIRED`/`MERGED`），只有全新信封才置 `DRAFT`。
-2. **重信命令**：`envelope-new` 对 `MERGED` 信封 exit 2（不能重开已合并）；对已有 `WAITING`/`CORRECTION_REQUIRED` 保留状态并更新 head；新信封写 `DRAFT`。
-3. **入队命令**：`queue-add` 首次入队或修复半写时，把 envelope 文件状态从 `DRAFT` 置 `WAITING`；正常首次 merge 走 `DRAFT → queue-add WAITING → merge`。
-4. **merge 入口**：在读队列之后、写 `MERGE_START` 之前，要求信封文件状态 ∈ {`WAITING`, `CORRECTION_REQUIRED`}，且队列条目 WAITING；`DRAFT`/`MERGED` → exit 2，零 ledger 写入。
+2. **重信命令**：`envelope-new` 对 `MERGED`/`POST_MERGE_VERIFIED` 信封 exit 2（不能重开已合并）；对已有 `WAITING`/`CORRECTION_REQUIRED` 保留状态并更新 head；新信封写 `DRAFT`。
+3. **入队命令（C：限时不做）**：本卡**未**让 `queue-add` 改写信封状态。原因：15+ 既有 merge 夹具依赖“queue-add 后信封仍 DRAFT”，全局改会破测试。正常首封仍是 `DRAFT + 队列 WAITING → merge`；恢复由第 4 条的窄守卫兜底。完整 C（`queue-add` 把 DRAFT 置 WAITING）留给后续卡。
+4. **merge 入口（D：收窄）**：只拦“信封 `status=DRAFT` **且** 同一信封已有 ≥2 条 `ENVELOPE_NEW`（即重信后仍 DRAFT）”；首封 DRAFT、手写 legacy DRAFT 保持旧行为。队列条目允许 `WAITING`/`CORRECTION_REQUIRED`（失败重试复用同一条目）。
 5. **不加事件类型、不改 ledger**：修复的是折叠/入口语义，不重写历史。
 
 ## 替代方案
@@ -35,9 +35,9 @@ related_files:
 
 ## 后果
 
-正面：失败→修复→重封信封→再 merge 的恢复路径可走通；state-verify 不再误报；merge 不会从 DRAFT 开始。
+正面：失败→修复→重封信封→再 merge 的恢复路径可走通；state-verify 不再误报。
 
-负面：重封信封必须保留状态，`envelope-new` 的“重写”语义变复杂；`MERGED` 信封不能重开（只能新卡）。
+负面：`envelope-new` 的“重写”语义变复杂；`MERGED` 信封不能重开（只能新卡）；C 未做，意味着“入队后重信”若把状态弄成 DRAFT，会被窄守卫拦住且无 CLI 出口——后续卡需补 C 或收敛该路径。
 
 ## 关联卡
 
