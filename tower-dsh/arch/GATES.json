@@ -111,6 +111,13 @@
       "id": "GATE-CI",
       "phase": "ci",
       "test": "test_failing_checks_block_with_correction_required"
+    },
+    {
+      "blocks": "PROFILE with missing fields, an unknown/write probe, a bad expect or a failing assertion",
+      "command": "profile-check",
+      "id": "GATE-PROFILE",
+      "phase": "objects",
+      "test": "test_unknown_probe_is_rejected"
     }
   ],
   "schema": "tower/gates@1"

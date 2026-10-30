@@ -96,10 +96,28 @@ ready 时的状态）。失败一律 exit 2 单 JSON、零状态变更，错误�
 **证据**：所有完成声明必须有 sha256 证据（`tasks/<ID>/evidence/`）、ledger 事件
 与 `check_evidence` 复核；`MERGED` 不等于完成，只有 `POST_MERGE_VERIFIED` 是。
 
-**门表**：`arch/GATES.json`（15 道门，含 spec/ready/dispatch/deliver 三闸/review/
-accept/close/envelope/queue/merge-check/merge 前置/post-merge/CI）。每道门优先指向
+**门表**：`arch/GATES.json`（17 道门，含 spec/ready/dispatch/deliver 三闸/review/
+accept/close/envelope/queue/merge-check/merge 前置/post-merge/CI/对象层）。每道门优先指向
 **拒绝路径**测试（负例）；`weak: true` 表示该门当前只有正例测试，只证“能过”、
-不证“会拒”。本卡 15 道门均为负例（或无 `weak` 字段）。
+不证“会拒”。本卡 17 道门均为负例（或无 `weak` 字段）。
+
+**对象层**：`state/PROFILE-<OBJECT>.md` 是对象事实的可执行契约（schema
+`tower/profile@1`）。front-matter 固定 `schema/object/version/updated/owner/status`
+（status ∈ `active|template`），正文是固定列序的表格
+`id | fact | probe | expect | why`；`id` 唯一且匹配 `^[A-Z0-9-]+$`。
+`probe` 只允许**只读** towerctl 子命令（`startup`、`wiring`、`status`、
+`state-verify`、`authority-check`、`verify-ledger`、`arch-check`、`campaign-check`、
+`shape-check`、`spec-lint --strict`、`spec-coverage`、`where --json`、`brief`），
+不得内含 `--root`（由 `profile-check` 注入），禁止递归 `profile-check` 与
+`deliver/merge/close/accept/dispatch/checkback/task-new/envelope-new/post-merge`
+等写命令；`expect` 只支持 `exit=<N>` 与可选 `; stdout=<子串>`，`why` 必须非空。
+`towerctl profile-check --file <path>|--object <id>` 解析并校验结构，对 `status:
+active` 的每条事实以子进程运行 probe（cwd=塔根，60s 超时），比对 exit 与 stdout
+子串；全部通过 exit 0，任一失败 exit 2 单 JSON（`findings: id/expected/actual`）。
+它**只读**：不写 primary/supervision/ledger/tasks，也不写任何其它状态。
+**对象 0 限制**：第一个对象只能是塔自身（`PROFILE-TOWER-DSH.md`）；模板
+`PROFILE-TEMPLATE.md` 为 `status: template`，只解析结构、不运行 probe。外部对象
+必须先由 owner 提供脱敏事实再建 PROFILE，禁止凭空画像或从凭据推断。
 **红线 probe**：`arch/INVARIANTS.json`（C-01..C-16，每条一个真实测试或真实命令）。
 **决策**：`adr/`（`tower/adr@1`，status ∈ proposed|accepted|superseded|archived）。
 
