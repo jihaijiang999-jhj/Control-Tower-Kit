@@ -1,0 +1,55 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-053",
+  "title": "re-envelope 热修：ENVELOPE_NEW 保留已有状态 + merge 校验信封",
+  "objective": {
+    "problem": "052 首轮 merge 在 CI 失败后重封信封：新 ENVELOPE_NEW 把信封折成 DRAFT；队列已有 QUEUE_ADD，queue-add 拒绝重加；第二次 MERGE_START 从 DRAFT 开始，merge 只看队列 WAITING 就放行；state-verify 重放报 illegal_transition，PROFILE 的 STATE probe 连带失败，052 post-merge 红。",
+    "outcome": "ENVELOPE_NEW 命中已有信封时保留 WAITING/CORRECTION_REQUIRED/MERGED；envelope-new 拒绝重开 MERGED；merge 在读队列后、写 MERGE_START 前要求信封状态为 WAITING/CORRECTION_REQUIRED，DRAFT/MERGED exit 2 零写入；失败→重信→再 merge 后 state-verify drift 0。",
+    "approach": "修 replay_envelope_statuses 的 ENVELOPE_NEW 折叠语义（只有全新信封置 DRAFT）；修 cmd_envelope_new 的已有信封状态保留与 MERGED 拒绝；在 merge 入口加信封状态断言；新增 test_envelope_recovery.py 覆盖失败→重信→二次 merge、DRAFT merge 拒绝、MERGED 重信拒绝；不动 ledger、不加事件类型。",
+    "non_goals_and_done": "不重写历史 ledger、不重建 052 卡、不放开 DRAFT、不改 spec@2/四闸；修复、测试、ARCHITECTURE、独立复核完成，052 post-merge 重跑 9/9、state-verify drift [] 才算完成。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0005 / 052 post-merge 失败现场",
+  "why_now": "052 代码已在 main，但 post-merge 因重放 drift 失败；不修这条恢复路径，后续任何 CI 失败后的重试都会再次把信封折成 DRAFT。053 是批次继续前的硬前置。",
+  "scope": [
+    "replay_envelope_statuses：ENVELOPE_NEW 命中已有状态时保留原状态（WAITING/CORRECTION_REQUIRED/MERGED），只有全新信封置 DRAFT；不改其他事件的折叠表",
+    "cmd_envelope_new：已存在且 status=MERGED → exit 2（不能重开已合并）；已有 WAITING/CORRECTION_REQUIRED → 保留状态并更新 head/implementation；新信封 → DRAFT；仍 append ENVELOPE_NEW，不手改 ledger",
+    "merge 入口：在队列/信封读取之后、写 MERGE_START 之前，要求信封 status ∈ {WAITING, CORRECTION_REQUIRED}；DRAFT/MERGED → exit 2 单 JSON，零 MERGE_START/零 ledger 写入",
+    "新增 tools/tests/test_envelope_recovery.py：失败 merge→MERGE_BLOCKED→重信→状态保留→state-verify drift 0→二次 merge 成功；DRAFT 信封 merge exit 2；MERGED 重信 exit 2；WAITING 重信保留；replay 单元（ENVELOPE_NEW 两次不重置状态）",
+    "ARCHITECTURE.md §4 增加“信封恢复”契约：ENVELOPE_NEW 保留状态、merge 入口断言、MERGED 不可重开",
+    "不改 036–052 的信任边界/授权/前置链/范围门/completion/shape/objective/campaign/depends_on 语义；不新增事件类型；不改 spec@2；不写 primary/supervision/ledger"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-053/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-053/tower-dsh/tools/tests/test_envelope_recovery.py",
+    "pilot/worktrees/PILOT-053/tower-dsh/ARCHITECTURE.md"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening existing gates",
+    "rewriting the supervision ledger",
+    "reopening a MERGED envelope",
+    "allowing MERGE_START from DRAFT",
+    "new ledger event types",
+    "changing tower/spec@2 fields",
+    "touching TOWER.md (L0)"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-053/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 601 + 新增用例数（main 基线 601）",
+    "失败夹具：首轮 MERGE_BLOCKED → envelope CORRECTION_REQUIRED；envelope-new 重写后状态仍 CORRECTION_REQUIRED；再 merge 成功；state-verify drift []",
+    "DRAFT 信封直接 merge → exit 2 单 JSON、无 MERGE_START、ledger 不变；MERGED 信封 envelope-new → exit 2",
+    "WAITING 信封重写保留 WAITING；新信封仍 DRAFT；正常首次 merge 不回归",
+    "replay 单元：ENVELOPE_NEW 两次不把 WAITING/CORRECTION_REQUIRED/MERGED 重置为 DRAFT；未知状态不崩",
+    "ARCHITECTURE.md 含信封恢复契约且 arch-check exit 0；shape-check exit 0；spec-lint 6/6",
+    "旧码对照：main 对 DRAFT 信封 merge 放行、重信把状态折成 DRAFT；新码拒绝/保留。证据写进 scratch/probe-old-code.txt",
+    "真实塔：053 合并后重跑 `post-merge --envelope ENV-PILOT-052 --result PASS` → 9/9、state-verify drift []、profile-check exit 0",
+    "真实塔：建信封前 tasks=53/envelopes=51，建信封后 53/52；verify-ledger 0 error；coverage 27/27",
+    "git -C pilot/worktrees/PILOT-053 diff --name-only main..HEAD 恰三个 allowed_paths"
+  ],
+  "depends_on": ["PILOT-052"],
+  "worktree": "pilot/worktrees/PILOT-053"
+}
