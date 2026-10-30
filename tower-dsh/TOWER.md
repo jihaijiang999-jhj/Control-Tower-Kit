@@ -21,7 +21,8 @@
 
 spec 是任务卡的来源，也是闭环的第一道闸。规则：
 
-- spec 必须声明 `"schema": "tower/spec@1"`，格式见 `templates/task.spec.json`；
+- spec 必须声明 `"schema": "tower/spec@1"`（旧卡冻结）或 `"tower/spec@2"`（新卡），格式见 `templates/task.spec.json`；
+- 所有新建 spec（@1/@2）必须含 `objective` 四要素（`problem/outcome/approach/non_goals_and_done`）；缺项、占位或内容过短时 `task-new` 零写入拒绝，`spec-lint` 对 @2 强制；见 `adr/ADR-0002-spec-objective.md`；
 - `acceptance` 每条必须可执行（能跑、能测、能核哈希），禁止不可测表述；
 - `forbidden` 必须含 `merge` 与 `production access`；
 - 流程：`task-new` → owner 或独立 reviewer 运行 `spec-approve --task <id> --by <name>` 在 ledger 留下 `SPEC_APPROVED` → `check --task <id> --phase spec` 通过后才允许 `check --phase ready`；

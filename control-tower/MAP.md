@@ -21,6 +21,8 @@
 > 修订：2026-10-28T18:3x —— PILOT-045 落地（命令层 v1：STRATEGY + campaigns + campaign-check + brief；VOID 归档修复；§6.24）；∅10/∅11、§5、§7、新增 §6.24。
 > 修订：2026-10-29T13:0x —— PILOT-046 落地（状态历史：snapshot/index/rollup/archive；E7/R3–R5/W3 硬化；§6.25）。
 > 修订：2026-10-29T13:1x —— PILOT-047 落地（双视图位置图：roadmap/current + where --json|--md + 注入；§6.26）。
+> 修订：2026-10-29T15:5x —— PILOT-048 落地（架构脊柱：ARCHITECTURE + ADR-0001 + GATES/INVARIANTS + EVENT_CATALOG + arch-check/arch-graph；§6.27）。
+> 修订：2026-10-30T01:0x —— PILOT-049 落地（objective 硬门：spec@2 + task-new 零写入 + spec-lint @2 + ADR-0002；§6.28）。
 > 依据：`startup` / `wiring` / `status` / `handoff-check` / `spec-coverage` / `verify-ledger` 实跑输出 + 代码通读 + git 实值 + 一次测试复跑。
 > 标注约定：`[证]` 有可执行证据 / `[声]` 仅文档或口头声明 / `[无]` 未做 / `⊙` 单点 / `∅` 空白。
 
@@ -139,8 +141,8 @@
 | ∅7 | **授权态单写者** | `SeeMake-Control-Tower-Authority-State.md`：Active Tower / Single Writer / 保留闸 / repo+queue 锚点 | **已实现并收尾**（PILOT-037/038/039/040）：`state/AUTHORITY.json` 与 primary ledger 最后一条 `AUTHORITY_SET` 互为锚（9 字段 + `tower_id` + 严格类型），`merge --supervisor` 必须等于登记 `merge_authority`；038 加必需标记（`AUTHORITY_POLICY` + `AUTHORITY_REQUIRED` 双侧互锚）；039 加 policy⇄event 逐字段同构、`authority-set/require` 跨锁、`merge` 前置链（缺失/不可读/坏行一律致命）；040 再补**空账本守卫**：configured/required 塔上 supervision ledger 为 0 事件且有 envelopes/queue/merge-ledger 工件时拒绝 merge（legacy 塔保持旧行为），并修正 `authority-require` 的 already/repaired 回显（输出真实 decision + `requested_decision`）。真实塔 armed：`revision=2`、pin `sup-phase2-pilot`、`requirement=required` | 仍窄：守卫按“可解析 JSON 对象”计事件，截成 `{"seq": 1}`（11 字节）可绕过（需写 ledger，本质仍是 036 无密钥链残余）；legacy 塔清空 primary ledger 仍按 036 放行；`--by` 是字符串非认证；policy+event 双写并重算整链是 TOFU 残余（policy 的 git 追踪是外部锚） |
 | ∅8 | **判例集** | `rules-ref/治理判例集.md`：一次裁决 → 以后可引用的规则 | 5 条散在 `HANDOFF.md §6` | ledger 增加 `PRECEDENT` 事件 + `towerctl precedent --list` |
 | ∅9 | **包号防呆** | `_k3-ops/CURRENT`：包号比你所持新即停手 | `handoff-check` 只在 claim 时跑一次 §0 漂移 | 根目录 `CURRENT` + `startup` 强制比对 |
-| ∅10 | **状态重放** | （K3 也没有） | **已实现并持续收紧**（PILOT-021/022/023/028/032/033）：ledger 折叠状态并与 record/board/queue/envelope 比对；坏文件算 drift，合法跳过显式 `skipped`，board 取重放值；证据逐条校验 SHA-256/字节数，spec 校验冻结哈希；状态迁移按真实历史表校验；`TASK_NEW` 只允许未完成状态重建；无事件的信封/队列条目记 `envelope_unbacked`/`queue_unbacked`，不再隐形。真实塔 47 任务/46 信封、388 条证据、drift 0（skipped 4 个 VOID 归档） | 仍窄：`ready→TASK_NEW` 仍合法；未来新增生命周期事件若漏表会默认放行；关闭卡无正式 reopen 流程；TOCTOU/hardlink 不在范围 |
-| ∅11 | **测试计数门** | （K3 也没有） | **已实现并合围**（PILOT-025/026/029/030/031/033/034/035/036）：`post-merge` 解析 `Ran N tests`；根/塔套件按 baseline 设门；`envelope-new`/`queue-add` 都强制 baseline；baseline 不得低于 ledger 已验证最大值；merge-check/merge 对新式信封自验 `ledger chain intact` + `ENVELOPE_NEW` + `QUEUE_ADD` + 身份绑定；`queue-add` 可修复半写条目；036 让链检查对缺失/不可读 **fatal**（缺失=错、不可读=干净 exit 2，不 traceback）、命令级 identity 精确到类型、`ENVELOPE_NEW` 同一条事件绑 `envelope+task+head`。真实塔：根 `2/2`、塔 `518/487`、anchor `487`，7/7 | 仍窄：legacy（无 baseline）信封仍可降级绕过新检查；哈希链无密钥，可被“追加一行正确 prev_hash/hash”伪造（tamper-evident 非防篡改）；`envelope_head_sha` 两边同时缺失时 `None==None` 可过绑定检查（git 检查仍拦 merge）；任意坏行会阻塞全部新式合并；链校验 O(ledger)；验证与读取之间的 TOCTOU 未吞 OSError（有意“宁可红”） |
+| ∅10 | **状态重放** | （K3 也没有） | **已实现并持续收紧**（PILOT-021/022/023/028/032/033）：ledger 折叠状态并与 record/board/queue/envelope 比对；坏文件算 drift，合法跳过显式 `skipped`，board 取重放值；证据逐条校验 SHA-256/字节数，spec 校验冻结哈希；状态迁移按真实历史表校验；`TASK_NEW` 只允许未完成状态重建；无事件的信封/队列条目记 `envelope_unbacked`/`queue_unbacked`，不再隐形。真实塔 49 任务/48 信封、420 条证据、drift 0（skipped 4 个 VOID 归档） | 仍窄：`ready→TASK_NEW` 仍合法；未来新增生命周期事件若漏表会默认放行；关闭卡无正式 reopen 流程；TOCTOU/hardlink 不在范围 |
+| ∅11 | **测试计数门** | （K3 也没有） | **已实现并合围**（PILOT-025/026/029/030/031/033/034/035/036）：`post-merge` 解析 `Ran N tests`；根/塔套件按 baseline 设门；`envelope-new`/`queue-add` 都强制 baseline；baseline 不得低于 ledger 已验证最大值；merge-check/merge 对新式信封自验 `ledger chain intact` + `ENVELOPE_NEW` + `QUEUE_ADD` + 身份绑定；`queue-add` 可修复半写条目；036 让链检查对缺失/不可读 **fatal**（缺失=错、不可读=干净 exit 2，不 traceback）、命令级 identity 精确到类型、`ENVELOPE_NEW` 同一条事件绑 `envelope+task+head`。真实塔：根 `2/2`、塔 `552/536`、anchor `536`，7/7 | 仍窄：legacy（无 baseline）信封仍可降级绕过新检查；哈希链无密钥，可被“追加一行正确 prev_hash/hash”伪造（tamper-evident 非防篡改）；`envelope_head_sha` 两边同时缺失时 `None==None` 可过绑定检查（git 检查仍拦 merge）；任意坏行会阻塞全部新式合并；链校验 O(ledger)；验证与读取之间的 TOCTOU 未吞 OSError（有意“宁可红”） |
 | ∅12 | **证据可复现** | — | **已实现切片**（PILOT-027）：`tools/run_tests.py` 把 `TMP/TEMP/TMPDIR` 指向仓内 `.test-tmp/run-*`，post-merge 与根门禁都走 runner；`REPRODUCE.md` 给出干净环境复跑清单；全套件 287 绿 | 仍窄：`.test-tmp` 不自动清理；运行器依赖 Windows 下的 core.longpaths 注入；直接 discovery 不走沙箱 |
 
 ---
@@ -160,15 +162,17 @@
 | 命令层（战略/战役/简报） | `[证]` | PILOT-045：`command/STRATEGY.md` + `command/campaigns/*.md` 为 front-matter 可机读的地图；`campaign-check` 校验 E1–E6（缺失/goal 不存在/过期/WIP 超限/卡不存在/id 重复）与 W1/W2（孤儿卡/临近预算），错误 exit 2、`--strict` 升级；`brief` 只读生成 23 行七节（战略/战役/WIP/阻塞/下一步/待决/约束）。修掉 VOID 归档被当活卡的 bug（`read_task_records` 只收规范目录且 `record.id == 目录名`）；真实塔根 exit 0、wip 0/1、W1 44（048 回填前 `--strict` 必红）。旧码无两命令 |
 | 状态历史（追加/重算） | `[证]` | PILOT-046：`status-snapshot` 同日多次**只追加**；`status-index` 生成 `status/index.json`（days.entries + sha256），删掉可重算、两次字节相同；`status-rollup --week` 字节稳定；`status-archive` 只压缩不删原件。复核在 868 个非 status 文件上零改动；E7（board 形状）、R3（空 task_forces）、R4（单引号）、R5（budget 中英文/周数）、W3（spec-only）全部硬化。残余：写失败仍是 Traceback（R-1）、损坏快照被静默跳过（R-2） |
 | 位置图（双视图） | `[证]` | PILOT-047：campaign `roadmap/current` + `where --json`（schema `tower/position@1`、枚举 done/active/blocked/planned/skipped、顺序=roadmap、无时间戳）与人视图（7 行，位置条 + 位置 x/y + 下一站 + 为什么/交付/风险/建议）；E8（roadmap 缺失/空/重复/current 不在）与 E9（无 active campaign）干净 exit 2；注入 checkback/close/post-merge/status-snapshot/brief。index 语义=done 计数（spec 文字“第一个非 done”属笔误，需 errata）；campaign-check 对缺 roadmap 保持 legacy 绿、where 严格 E8 |
+| 架构脊柱（可证伪） | `[证]` | PILOT-048：`ARCHITECTURE.md` 六节 + `arch/GATES.json`（16 门，command/test 全存在）+ `arch/INVARIANTS.json`（C-01..C-16 → 真实 probe）+ `EVENT_CATALOG.json`（29 事件 ↔ 代码字面 type 双向）+ `adr/ADR-0001`（DESIGN 归档，正文逐字节不变）；`arch-check` 六项对账、`arch-graph` 35 nodes/21 edges 字节稳定；`related_files` 盘符/`..`/出塔根拒绝、duplicate stem 拒绝；旧码无两命令。首轮/二轮 FAIL（文档不实、CI 归属错、证据 UTF-16）→ 修复后 PASS；DESIGN 路径笔误用 completion `D-PILOT-048` 兜底 |
+| objective 硬门 | `[证]` | PILOT-049：`tower/spec@2` + `objective.problem/outcome/approach/non_goals_and_done`；`task-new` 对所有新 spec 在写 record/TASK/ledger **之前**校验，缺项/非字符串/空串/<8/整值 `__FILL__`/整值 `<...>` → exit 2 零写入（64 夹具 + 已有卡不覆盖）；`spec-lint` 只扫顶层 `pilot/*.spec.json`，@2 强制、@1 冻结跳过、6/6 文档校验不变；`GATE-SPEC-OBJECTIVE`（gates 16）+ `ADR-0002`；旧码接受无 objective 并建卡、不扫 pilot，新码均拒。残余：`TODO __FILL__`、`补充 <待填写>` 可过；长度按 code point；模板测试用子串而门口用整值 |
 | merge 前置链（缺失=致命） | `[证]` | PILOT-039/040：`merge` 在 authority 之后、读信封/队列/git 之前对 primary+supervision **无条件** `verify_ledger_file`；缺失/不可读/坏行一律 `exit 2`（`merge precondition: <name> ledger chain missing/broken`），队列 WAITING、无 MERGE_START、ledger 不重建；040 再加空账本守卫：configured/required 塔 supervision 0 事件 + 有 envelopes/queue/merge-ledger 工件 → `ledger history present` 失败（legacy 塔保持旧行为）。旧码删 supervision+legacy 信封 MERGED 并重建 ledger、0 字节截断也 MERGED，新码均拒绝 |
 | post-merge 七检 | `[证]` | 测试 / 根套件计数 / 塔套件计数 / baseline 不回退 / 实现是祖先 / 信封在 base / 工作树干净（RUN-C 后；count 检查对旧信封 opt-in） |
 | 路径越界防护 | `[证]` | `ensure_within` 覆盖 evidence / worktree / package / envelope / repository |
-| ledger 哈希链 | `[证]` | `verify-ledger` → primary 428 事件、supervision 240，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判）；缺失/不可读现为验证失败（PILOT-036/039）；`AUTHORITY_SET`/`AUTHORITY_REQUIRED`/`COMPLETION_ADDED` 也在链上（PILOT-037/038/042） |
+| ledger 哈希链 | `[证]` | `verify-ledger` → primary 448 事件、supervision 250，0 error；legacy 未哈希 53 / 26（按 INV-05 只计不判）；缺失/不可读现为验证失败（PILOT-036/039）；`AUTHORITY_SET`/`AUTHORITY_REQUIRED`/`COMPLETION_ADDED` 也在链上（PILOT-037/038/042） |
 | 条款→测试绑定 | `[证]` | `spec-coverage`：6 份规范 / 56 条款 / tool-check 27 / covered **27** / gaps 0 |
-| 测试全绿 | `[证]`（有条件） | `Ran 518 tests / OK（skipped=1）`（本地 2026-10-29，PILOT-047 后）；GitHub Actions 在 PR #18–#31 上绿，v7 后零注解。**建议跑法**：`python -B tools/run_tests.py`（TMP 在仓内，避受限沙箱 ACL）；直接 discovery 仍可用，但受限模式下 `%TEMP%` 仍会让 134/134 在 0.05 s 内全 ERROR |
+| 测试全绿 | `[证]`（有条件） | `Ran 552 tests / OK（skipped=1）`（本地 2026-10-30，PILOT-049 后）；GitHub Actions 在 PR #18–#33 上绿，v7 后零注解。**建议跑法**：`python -B tools/run_tests.py`（TMP 在仓内，避受限沙箱 ACL）；直接 discovery 仍可用，但受限模式下 `%TEMP%` 仍会让 134/134 在 0.05 s 内全 ERROR |
 | 29 条条款靠人 | `[声]` | 12 `review-check` + 17 `owner-gate`（`spec-coverage.manual` / `.owner`） |
 | "每次迭代全局正确" | `[无]` | 无对象层不变量、无趋势锚点、无状态重放 |
-| 47 个任务 / 46 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`；021 PR #6 `10fae79`；022 PR #7 `6a920a5`；023 PR #8 `a88388b`；024 PR #9 `c4fb58f`；025 PR #10 `f265847`；026 PR #11 `e73f1f5`；027 PR #12 `223b10b`；028 PR #13 `188f122`；029 PR #14 `ef72400`；030 PR #15 `aa88f76`；031 PR #16 `c9a7da6`；032 PR #17 `da5a25c`；033 PR #18 `eb8f03b`；034 PR #19 `7f122b8`（7/7，塔 `291/287`）；035 PR #20 `a7e429d`（7/7，塔 `293/291`，anchor `291>=291`）；036 PR #21 `d8ef20f`（7/7，塔 `305/293`，anchor `293`）；037 PR #22 `895141c`（7/7，塔 `328/305`，anchor `305`）；038 PR #23 `7cb9e0b`（7/7，塔 `341/328`，anchor `328`）；039 PR #24 `c4efe6d`（7/7，塔 `363/341`，anchor `341`；v1 FAIL → VOID 后 v2）；040 PR #25 `2bd870f`（7/7，塔 `371/363`，anchor `363`；0 字节截断守卫 + §6.11 夹具播种）；041 PR #26 `cc7c55a`（7/7，塔 `387/371`，anchor `371`；v1 映射措辞错误 VOID 后 v2，首轮 FAIL 后返工 `fa84fbe`；bootstrap 交付）；042 PR #27 `01213ce`（7/7，塔 `419/387`，anchor `387`；completion list + base_sha）；044 PR #28 `129dd4e`（7/7，塔 `441/419`，anchor `419`；shape-check ratchet + REVIEW 五问；v1 文字重建、首轮 FAIL 后返工 `5cc933e`；门引入 bootstrap；043 暂缓 ready 未派）；045 PR #29 `99b61a1`（7/7，塔 `467/441`，anchor `441`；命令层 v1 + brief VOID 修复；R1 真实根 campaign-check/brief 已闭合）；046 PR #30 `63d7b47`（7/7，塔 `487/467`，anchor `467`；状态历史 + E7/R3–R5/W3）；047 PR #31 `b4c7859`（7/7，塔 `518/487`，anchor `487`；双视图位置图；首轮 merge GitHub GraphQL EOF → MERGE_BLOCKED → 重试成功），其余 post-merge 均 4/4） |
+| 49 个任务 / 48 个信封 | `[证]` | 全部 `closed` + `POST_MERGE_VERIFIED`（011 `6a849b9`；012 `bc4be88`；013 `10bf606`；014 `4ef0695`；015 `ae4eb4f`；016 PR #1 `29d8ec6`；017 PR #2 `6796d1d`；018 PR #3 `46e946c`；019 PR #4 `474cfb3`；020 PR #5 `63aa31d`；021 PR #6 `10fae79`；022 PR #7 `6a920a5`；023 PR #8 `a88388b`；024 PR #9 `c4fb58f`；025 PR #10 `f265847`；026 PR #11 `e73f1f5`；027 PR #12 `223b10b`；028 PR #13 `188f122`；029 PR #14 `ef72400`；030 PR #15 `aa88f76`；031 PR #16 `c9a7da6`；032 PR #17 `da5a25c`；033 PR #18 `eb8f03b`；034 PR #19 `7f122b8`（7/7，塔 `291/287`）；035 PR #20 `a7e429d`（7/7，塔 `293/291`，anchor `291>=291`）；036 PR #21 `d8ef20f`（7/7，塔 `305/293`，anchor `293`）；037 PR #22 `895141c`（7/7，塔 `328/305`，anchor `305`）；038 PR #23 `7cb9e0b`（7/7，塔 `341/328`，anchor `328`）；039 PR #24 `c4efe6d`（7/7，塔 `363/341`，anchor `341`；v1 FAIL → VOID 后 v2）；040 PR #25 `2bd870f`（7/7，塔 `371/363`，anchor `363`；0 字节截断守卫 + §6.11 夹具播种）；041 PR #26 `cc7c55a`（7/7，塔 `387/371`，anchor `371`；v1 映射措辞错误 VOID 后 v2，首轮 FAIL 后返工 `fa84fbe`；bootstrap 交付）；042 PR #27 `01213ce`（7/7，塔 `419/387`，anchor `387`；completion list + base_sha）；044 PR #28 `129dd4e`（7/7，塔 `441/419`，anchor `419`；shape-check ratchet + REVIEW 五问；v1 文字重建、首轮 FAIL 后返工 `5cc933e`；门引入 bootstrap；043 暂缓 ready 未派）；045 PR #29 `99b61a1`（7/7，塔 `467/441`，anchor `441`；命令层 v1 + brief VOID 修复；R1 真实根 campaign-check/brief 已闭合）；046 PR #30 `63d7b47`（7/7，塔 `487/467`，anchor `467`；状态历史 + E7/R3–R5/W3）；047 PR #31 `b4c7859`（7/7，塔 `518/487`，anchor `487`；双视图位置图；首轮 merge GitHub GraphQL EOF → MERGE_BLOCKED → 重试成功）；048 PR #32 `aaa4dfe`（7/7，塔 `536/518`，anchor `518`；架构脊柱 + ADR-0001 + arch-check；首轮/二轮 FAIL 后修 3 处文档事实 + CI 归属 + 证据编码；DESIGN 路径笔误用 completion）；049 PR #33 `7d8ca4a`（7/7，塔 `552/536`，anchor `536`；spec@2 + objective 零写入门 + ADR-0002；test_arch 计数字面量用 completion），其余 post-merge 均 4/4） |
 
 ---
 
@@ -558,6 +562,36 @@ TypeError: can only concatenate str (not "NoneType") to str
 
 **判例**：地图不标“你在这”是海报；标了但分母算错是误导。
 
+### 6.27 判例：架构文档必须能被代码证伪（PILOT-048）
+
+`PILOT-048` 建架构脊柱：`ARCHITECTURE.md` 六节（上下文/组件/数据流/契约/扩展点/不变量）；`arch/GATES.json` 把每道门绑到真实 command 与**拒绝路径**测试；`arch/INVARIANTS.json` 把 RED-LINES C-01..C-16 绑到真实 probe；`EVENT_CATALOG.json` 与代码字面事件 type 双向一致（29 条）；`adr/ADR-0001` 归档 DESIGN（正文逐字节不变）；`arch-check` 六项对账、`arch-graph` 35 nodes/21 edges 字节稳定。048 自身经历首轮/二轮 FAIL：ARCHITECTURE 的 CI 行、C-12 分类、行数三处当天就与 workflow/RED-LINES/HEAD 不符；修完才 PASS。
+
+可复用判据：
+
+- **每条声明要有执行点**：门 → command+test，不变量 → probe，事件 → 代码 type，ADR → related_files；找不到执行点的句子是散文，不是架构。
+- **文档不实就是缺陷**：reviewer 要拿 CI workflow、RED-LINES、`HEAD` 行数逐条对照，不能只看六节标题在不在。
+- **门表的 test 必须指向拒绝路径**：正例只能证明“能过”，不能证明“会拦”。
+- **冻结 spec 的笔误用 completion 兜底**：DESIGN 实际在 `control-tower/` 而 spec 写成 `tower-dsh/`；owner 签名 `D-PILOT-048` 授权移动，不重开卡、正文不改。
+- **路径围栏 fail-closed**：绝对路径、盘符、`..`、出塔根、duplicate stem 一律拒绝；`related_files` 只接受塔内真实文件。
+- **边界要写全**：事件只扫字面量（变量/f-string 会逃逸）、arch-check 只证引用存在、C-12/C-15 无自动化 proof——不藏。
+
+**判例**：架构文档不是“写给人看的”，是“写给门核对的”。
+
+### 6.28 判例：目标门要拦在写卡之前（PILOT-049）
+
+`PILOT-049` 落 objective 硬门：`tower/spec@2` + `objective.problem/outcome/approach/non_goals_and_done`；`task-new` 对**所有新 spec** 在创建 `tasks/<id>/`、写 record/TASK、append `TASK_NEW` **之前**校验，缺项/占位/过短 → exit 2 且零写入；`spec-lint` 只扫顶层 `pilot/*.spec.json`，@2 强制、@1 冻结跳过；`GATE-SPEC-OBJECTIVE` 进门表；`ADR-0002` 记录决策。测试 552、PR #33 `7d8ca4a`。
+
+可复用判据：
+
+- **校验在写之前**：零写入要能被证明——无 tasks 目录、无 ledger 事件、board 不变；已有卡不覆盖。
+- **旧卡冻结**：@1 跳过，不回溯、不改哈希；新卡 @2。
+- **双层必须是两层真实执行点**：task-new（创建入口）+ spec-lint（@2 扫描）；只写一层是假双层。
+- **机器检查只证结构与最低内容量**：8 字符、整值占位都能被空洞文本绕过；目标真实性仍靠 reviewer。
+- **占位规则要防“前缀占位”**：049 实现为整值 `__FILL__`，因此 `TODO __FILL__`、`__FILL__x`、`补充 <待填写>` 仍能过——这是已记录残余，下一卡可加“前缀 marker + 混合占位”规则。
+- **卡面自相矛盾时停下报告**：GATES 加门会打破 `test_arch` 的 `gates=15` 字面量，用 completion `D-PILOT-049` 授权改一行；`__FILL__` 子串语义会让 049 自己过不了门，reviewer 裁决为整值。
+
+**判例**：目标门不是“多一个字段”，是“没有目标就不许建卡”。
+
 ---
 
 ## 7. 与 K3 塔的能力对照（一页）
@@ -572,7 +606,7 @@ TypeError: can only concatenate str (not "NoneType") to str
 | 独立性 | 四重**同身份**评审 | 独立 subagent reviewer，`reviewer != executor` 硬断言；037 首轮 FAIL 抓到 3 个契约缺陷 | **木塔** |
 | 决策证据 | owner 向量 + 题包 SHA-256 | 证据 SHA-256 + ledger 哈希链 | 平（木塔链更强，K3 题包公理化更强） |
 | 交接 | v37 包 + CURRENT 防呆 | v2.1 五步状态机 + 21 项 check | 木塔流程更严，K3 防呆更实用 |
-| 判例 | `治理判例集.md` | 26 条在 `MAP.md` §6.1–§6.26 | 平（K3 更成体系，木塔已可引用） |
+| 判例 | `治理判例集.md` | 28 条在 `MAP.md` §6.1–§6.28 | 平（K3 更成体系，木塔已可引用） |
 
 ---
 
