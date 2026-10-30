@@ -3909,6 +3909,28 @@ def cmd_supervision_init(root: Path, args) -> None:
           "ledger": rel(root, ledger)})
 
 
+def envelope_new_status(env_path: Path) -> str:
+    """Status ``envelope-new`` writes for a first or repeated envelope record.
+
+    A first envelope starts ``DRAFT``.  Re-enveloping after a failed merge
+    keeps ``WAITING``/``CORRECTION_REQUIRED`` so the file, the replay fold and
+    the merge gate agree; a terminal envelope cannot be reopened (only a new
+    card can), so it is refused before any file or ledger write.
+    """
+    if not env_path.exists():
+        return "DRAFT"
+    try:
+        existing = jload(env_path)
+    except (OSError, ValueError):
+        return "DRAFT"
+    status = existing.get("status") if isinstance(existing, dict) else None
+    if status in ENVELOPE_TERMINAL_STATUSES:
+        fail([f"envelope already {status}; a merged envelope cannot be reopened"])
+    if status in ENVELOPE_REOPEN_STATUSES:
+        return status
+    return "DRAFT"
+
+
 def cmd_envelope_new(root: Path, args) -> None:
     task_id = check_task_id(args.task, "task")
     file = resolve_input_within(root, args.file, "envelope file")
@@ -3923,19 +3945,17 @@ def cmd_envelope_new(root: Path, args) -> None:
     task = check_task_id(task, "task")
     if task != task_id:
         fail([f"envelope task {task} != --task {task_id}"])
+    # Resolve the status before any git/record work: reopening a merged
+    # envelope is a semantic refusal, not a repository-shape failure.
+    env_path = root / "supervision" / "envelopes" / f"{env_id}.json"
+    status = envelope_new_status(env_path)
     # Both count baselines are mandatory for a *new* envelope.  The post-merge
     # gates treat them as opt-in, so an envelope that simply omitted them used
     # to downgrade its own count checks silently; requiring them here (before
     # any file, ledger or record write) closes that hole.  Legacy envelopes
     # already on disk keep the old opt-in semantics in ``merge-check`` and
     # ``post-merge``.
-    tests_baseline = env.get("tests_baseline")
-    tower_tests_baseline = env.get("tower_tests_baseline")
-    if not (isinstance(tests_baseline, int) and not isinstance(tests_baseline, bool)
-            and tests_baseline >= 1
-            and isinstance(tower_tests_baseline, int)
-            and not isinstance(tower_tests_baseline, bool)
-            and tower_tests_baseline >= 1):
+    if not envelope_has_baselines(env):
         fail(["envelope tests_baseline and tower_tests_baseline must be positive "
               "integers (int >= 1)"])
     rec = load_record(root, task_id)
@@ -3970,8 +3990,8 @@ def cmd_envelope_new(root: Path, args) -> None:
     if not all(c["ok"] for c in checks):
         emit({"ok": False, "errors": [c for c in checks if not c["ok"]]}, 2)
     record = dict(env)
-    record.update({"envelope_head_sha": b, "status": "DRAFT", "created_at": now()})
-    jdump(root / "supervision" / "envelopes" / f"{env_id}.json", record)
+    record.update({"envelope_head_sha": b, "status": status, "created_at": now()})
+    jdump(env_path, record)
     append_supervision_ledger(root, "ENVELOPE_NEW", "primary",
                               {"envelope": env_id, "task": task, "head": b})
     emit({"ok": True, "envelope": env_id, "head": b, "checks": checks})
@@ -4332,6 +4352,48 @@ def block_pr_merge(root: Path, args, env: dict, env_path: Path, queue: dict,
     })
 
 
+def envelope_remerge_errors(root: Path, env: dict, envelope_id: str) -> list[str]:
+    """Refuse a ``DRAFT`` envelope that a re-envelope reset (the 052 drift).
+
+    ``envelope-new`` writes the first ``ENVELOPE_NEW`` and is also the
+    re-envelope path.  A first envelope is legitimately ``DRAFT`` until it
+    merges, so the file status alone cannot be the gate: only an envelope whose
+    ledger already holds a previous ``ENVELOPE_NEW`` (a re-envelope) must still
+    be ``WAITING``/``CORRECTION_REQUIRED``.  An envelope with no re-envelope
+    history (hand-written legacy fixtures, one-shot envelopes) keeps the old
+    behaviour, and a non-``DRAFT`` status is handled by the caller.
+    """
+    if env.get("status") != "DRAFT":
+        return []
+    events = ledger_events_naming(root, "supervision", "ENVELOPE_NEW",
+                                  envelope_id)
+    if len(events) >= 2:
+        return ["envelope status DRAFT after a re-envelope "
+                f"(ENVELOPE_NEW x{len(events)}); expected "
+                "WAITING/CORRECTION_REQUIRED"]
+    return []
+
+
+def merge_queue_errors(root: Path, env: dict, envelope_id: str,
+                       entry: dict | None) -> list[str]:
+    """Envelope/queue preconditions checked after both files are read.
+
+    The entry must be queued and still ``WAITING``/``CORRECTION_REQUIRED`` (a
+    failed merge marks it for correction and the retry reuses the same entry).
+    The envelope file must not be a ``DRAFT`` that a re-envelope reset; see
+    :func:`envelope_remerge_errors` for why the first envelope stays exempt.
+    """
+    if entry is None:
+        return [f"envelope not queued: {envelope_id}"]
+    if entry.get("status") not in ENVELOPE_MERGEABLE_STATUSES:
+        return [
+            f"queue entry status {entry.get('status')} is not "
+            "WAITING/CORRECTION_REQUIRED; only a waiting or corrected entry "
+            "may merge"
+        ]
+    return envelope_remerge_errors(root, env, envelope_id)
+
+
 def cmd_merge(root: Path, args) -> None:
     if args.role != "supervisor":
         fail(["merge requires --role supervisor"])
@@ -4387,18 +4449,14 @@ def cmd_merge(root: Path, args) -> None:
         fail([f"envelope identity matches request: file declares "
               f"{declared if declared is not None else '(missing)'!r}, "
               f"request {envelope_id!r}"])
-    if env.get("status") in ("MERGED", "POST_MERGE_VERIFIED"):
+    if env.get("status") in ENVELOPE_TERMINAL_STATUSES:
         fail([f"envelope already {env.get('status')}"])
     queue = load_queue(root)
     entry = next((e for e in queue.get("entries", [])
                   if e.get("envelope_id") == envelope_id), None)
-    if entry is None:
-        fail([f"envelope not queued: {args.envelope}"])
-    if entry.get("status") not in ("WAITING", "CORRECTION_REQUIRED"):
-        fail([
-            f"queue entry status {entry.get('status')} is not WAITING/CORRECTION_REQUIRED; "
-            "only a waiting or corrected entry may merge"
-        ])
+    queue_errors = merge_queue_errors(root, env, envelope_id, entry)
+    if queue_errors:
+        fail(queue_errors)
     base = env.get("base", "main")
     repo = resolve_repository(root, env.get("repository"))
     try:
@@ -5106,6 +5164,24 @@ ENVELOPE_CORRECTION_EVENTS = {"MERGE_BLOCKED", "POST_MERGE_FAILED"}
 # event that enters it and, like the live queue, it does not change the folded
 # status: the next MERGE / correction event settles the envelope again.
 ENVELOPE_MERGING_STATUS = "MERGING"
+# ``ENVELOPE_NEW`` is both the first and the *re-envelope* event.  A re-envelope
+# re-records an existing envelope (head, implementation, timestamp); it must
+# never reopen it, so the fold keeps the status it already reached instead of
+# falling back to ``DRAFT`` (the 052 drift: a failed merge was re-enveloped and
+# the next ``MERGE_START`` replayed from ``DRAFT``).  ``WAITING`` is the only
+# extra *legal* source of the event: ``envelope-new`` deliberately allows
+# re-enveloping a queued envelope.  ``MERGED``/``POST_MERGE_VERIFIED`` also
+# keep their status when a legacy ledger re-envelopes them, but the command
+# refuses to write that event, so the replay still flags the source as illegal.
+ENVELOPE_REOPEN_STATUSES = frozenset({"WAITING", "CORRECTION_REQUIRED",
+                                      "MERGED", "POST_MERGE_VERIFIED"})
+# A queue entry a merge may start from.  ``CORRECTION_REQUIRED`` is a real
+# retry shape: every failed merge leaves the entry there and the corrected
+# envelope is retried through the same entry.
+ENVELOPE_MERGEABLE_STATUSES = frozenset({"WAITING", "CORRECTION_REQUIRED"})
+# Terminal envelope states.  Only a new card may replace them; the command
+# refuses to reopen an envelope that already merged (or was verified).
+ENVELOPE_TERMINAL_STATUSES = frozenset({"MERGED", "POST_MERGE_VERIFIED"})
 # Legal source states per lifecycle event, derived from a read-only probe of
 # the real ledgers (``evidence/real-transitions.txt``) rather than invented
 # rules.  They are deliberately permissive where the tower has precedent:
@@ -5126,7 +5202,8 @@ TASK_TRANSITIONS = {
     "CLOSEOUT": frozenset({"accepted"}),
 }
 ENVELOPE_TRANSITIONS = {
-    "ENVELOPE_NEW": frozenset({None, "DRAFT", "CORRECTION_REQUIRED"}),
+    "ENVELOPE_NEW": frozenset({None, "DRAFT", "WAITING",
+                               "CORRECTION_REQUIRED"}),
     "QUEUE_ADD": frozenset({"DRAFT"}),
     "MERGE_START": frozenset({"WAITING", "CORRECTION_REQUIRED"}),
     "MERGE": frozenset({ENVELOPE_MERGING_STATUS}),
@@ -5510,6 +5587,26 @@ def replay_task_statuses(root: Path,
     return states
 
 
+def _fold_envelope_state(states: dict[str, str], internal: dict[str, str],
+                         envelope: str, event_type: str, next_state: str) -> None:
+    """Fold one envelope lifecycle event without resetting a live envelope.
+
+    ``states`` is the folded status, ``internal`` the last event's state used
+    for the transition table (``MERGE_START`` pins ``MERGING`` without settling
+    the status).  A re-envelope ``ENVELOPE_NEW`` on an envelope that already
+    reached a status in :data:`ENVELOPE_REOPEN_STATUSES` only re-records its
+    head: the folded status and the transition source stay where they were, so
+    a corrected envelope still replays to ``CORRECTION_REQUIRED``.  A brand-new
+    envelope (no previous status) still folds to ``DRAFT``.
+    """
+    if (event_type == "ENVELOPE_NEW"
+            and states.get(envelope) in ENVELOPE_REOPEN_STATUSES):
+        return
+    internal[envelope] = next_state
+    if event_type != "MERGE_START":
+        states[envelope] = next_state
+
+
 def replay_envelope_statuses(root: Path,
                              transitions: list[dict] | None = None) -> dict[str, str]:
     """Fold ``ledger/supervision.jsonl`` by envelope into expected status.
@@ -5546,9 +5643,7 @@ def replay_envelope_statuses(root: Path,
             if allowed is not None and previous not in allowed:
                 transitions.append(
                     _illegal_transition(envelope, event_type, allowed, previous))
-        internal[envelope] = next_state
-        if event_type != "MERGE_START":
-            states[envelope] = next_state
+        _fold_envelope_state(states, internal, envelope, event_type, next_state)
     return states
 
 

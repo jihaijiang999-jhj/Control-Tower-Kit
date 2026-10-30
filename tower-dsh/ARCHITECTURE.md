@@ -82,6 +82,20 @@ ledger writer 的字面 type）：代码有而目录无、目录有而代码无�
 `supervision/envelopes/*.json`、`state/AUTHORITY.json`、`shared/AUTHORITY_POLICY.json`。
 状态文件只能由 `towerctl` 写；手改会被 `state-verify` / `authority-check` 报 drift。
 
+**信封恢复**：`ENVELOPE_NEW` 既是首封也是重信事件。首封信封写 `DRAFT`；
+已有 `WAITING`/`CORRECTION_REQUIRED` 时重信保留原状态并刷新
+`envelope_head_sha`/`implementation_head_sha`/`created_at`；
+`MERGED`/`POST_MERGE_VERIFIED` 拒绝重开（exit 2 单 JSON，只能新卡替代）。
+`replay_envelope_statuses` 折叠重复 `ENVELOPE_NEW` 时同样保留
+`WAITING`/`CORRECTION_REQUIRED`/`MERGED`/`POST_MERGE_VERIFIED`，只有全新信封
+折成 `DRAFT`——因此“失败 → 重信 → 再 merge”不会重放出 `MERGE_START from DRAFT`
+（052 的 `illegal_transition`）。`queue-add` **不改写**信封状态：首封信封保持
+`DRAFT`，正常首次 merge 走 `DRAFT + 队列 WAITING`。`merge` 在写 `MERGE_START`
+之前拒绝“重信后仍为 `DRAFT`”的信封（同一信封已有 ≥2 条 `ENVELOPE_NEW`），
+exit 2 单 JSON、零 `MERGE_START`/零 ledger 写入；无重信历史的手写信封（legacy）
+保留旧行为。队列条目可为 `WAITING`/`CORRECTION_REQUIRED`：失败后重试复用同一
+条目，纠正后的信封重新入队不是必需步骤。
+
 **命令**：`python tools/towerctl.py <cmd>` 是唯一入口；argparse 的子命令名是
 命令名的权威，`arch/GATES.json.gates[].command` 必须命中它。
 
@@ -150,7 +164,7 @@ active` 的每条事实以子进程运行 probe（cwd=塔根，60s 超时），�
 
 **已知边界（Known limits）**：
 
-1. **单文件**：`tools/towerctl.py` 7,981 行（约 8k；本卡 HEAD 实测）；模块化
+1. **单文件**：`tools/towerctl.py` 8,587 行（约 8.6k；本卡 HEAD 实测）；模块化
    （PILOT-051）之前，所有命令共享一个进程与一个 parser。
 2. **无密钥链**：owner 四闸依赖人工决定与记录，没有密码学签名；信任是 TOFU
    （首次设置即信任，之后靠 revision 与事件复核）。

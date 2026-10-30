@@ -1,0 +1,21 @@
+HEAD: 07efc9c5d5559c37b5c3461b6d157956ec8601f5
+SUBJECT: PILOT-052: require required=true in AUTH probe (review fix)
+
+commits main..HEAD:
+07efc9c PILOT-052: require required=true in AUTH probe (review fix)
+46eb520 PILOT-052: object layer (PROFILE v1 + profile-check)
+
+latest commit:
+07efc9c PILOT-052: require required=true in AUTH probe (review fix)
+ tower-dsh/state/PROFILE-TOWER-DSH.md  |  7 +++--
+ tower-dsh/tools/tests/test_profile.py | 51 ++++++++++++++++++++++++++++++++---
+ 2 files changed, 52 insertions(+), 6 deletions(-)
+
+name-only --no-renames main..HEAD:
+tower-dsh/ARCHITECTURE.md
+tower-dsh/arch/GATES.json
+tower-dsh/state/PROFILE-TEMPLATE.md
+tower-dsh/state/PROFILE-TOWER-DSH.md
+tower-dsh/tools/tests/test_arch.py
+tower-dsh/tools/tests/test_profile.py
+tower-dsh/tools/towerctl.py
