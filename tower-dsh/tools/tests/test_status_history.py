@@ -364,7 +364,7 @@ class R5BudgetCase(StatusTowerCase):
 
     def test_card_budget_units_are_parsed(self) -> None:
         for task_id in ("PILOT-101", "PILOT-102", "PILOT-103"):
-            self.write_record(task_id, "closed", "PASS")
+            self.write_record(task_id, "dispatched")
         forces = (CLOSED, "PILOT-101", "PILOT-102", "PILOT-103")
         for budget in ("2 cards", "2 card", "2 张卡"):
             with self.subTest(budget=budget):
