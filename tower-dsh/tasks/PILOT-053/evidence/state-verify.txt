@@ -1,0 +1,32 @@
+{
+  "ok": true,
+  "tasks": 52,
+  "envelopes": 51,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-039-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-041-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-044-VOID",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 4,
+  "evidence_checked": 466
+}
+
+exit=0

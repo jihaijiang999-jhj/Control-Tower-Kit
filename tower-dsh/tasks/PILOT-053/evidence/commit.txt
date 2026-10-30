@@ -1,0 +1,32 @@
+branch: pilot/PILOT-053
+HEAD: f8067615af20f633947c6e1dcb5a1cf99eb049d6
+subject: PILOT-053: envelope recovery (preserve status, merge guard)
+
+git show --stat:
+f806761 PILOT-053: envelope recovery (preserve status, merge guard)
+ tower-dsh/ARCHITECTURE.md                       |  16 +-
+ tower-dsh/tools/tests/test_envelope_recovery.py | 446 ++++++++++++++++++++++++
+ tower-dsh/tools/towerctl.py                     | 137 ++++++--
+ 3 files changed, 577 insertions(+), 22 deletions(-)
+
+git diff --name-only main..HEAD:
+tower-dsh/ARCHITECTURE.md
+tower-dsh/tools/tests/test_envelope_recovery.py
+tower-dsh/tools/towerctl.py
+
+git show --numstat HEAD:
+commit f8067615af20f633947c6e1dcb5a1cf99eb049d6
+Author: mac <mac@local>
+Date:   Sat Oct 31 01:35:04 2026 +0800
+
+    PILOT-053: envelope recovery (preserve status, merge guard)
+
+15	1	tower-dsh/ARCHITECTURE.md
+446	0	tower-dsh/tools/tests/test_envelope_recovery.py
+116	21	tower-dsh/tools/towerctl.py
+
+git status --short:
+?? scratch/
+
+test suite: Ran 609 tests, OK (skipped=1)  [scratch/test-output.txt]
+gates: state-verify/profile-check/arch-check/shape-check/spec-lint/verify-ledger/spec-coverage all exit 0

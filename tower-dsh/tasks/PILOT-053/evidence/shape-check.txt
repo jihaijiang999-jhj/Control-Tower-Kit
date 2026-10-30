@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "shape_check": "checked",
+  "shape_checked": true,
+  "files": 40,
+  "functions": 1676,
+  "duplicate_blocks": 169,
+  "unused_imports": 1
+}
+
+exit=0

@@ -1,0 +1,27 @@
+PILOT-053 envelope probe [old] towerctl=scratch\old\towerctl.py
+A. normal first envelope (DRAFT -> queue-add -> merge)
+    envelope-new exit=0 status=DRAFT
+    queue-add exit=0 envelope=DRAFT queue=WAITING
+    merge exit=0 envelope=MERGED queue=MERGED
+
+B. failed PR merge -> re-envelope -> second merge
+    first merge exit=2 envelope=CORRECTION_REQUIRED queue=CORRECTION_REQUIRED MERGE_BLOCKED=1
+    re-envelope exit=0 status=DRAFT ENVELOPE_NEW=2
+    second merge exit=0 envelope=MERGED
+    state-verify drift=['illegal_transition']
+
+C. re-envelope of a still-DRAFT envelope -> merge
+    after re-envelope status=DRAFT ENVELOPE_NEW=2
+    merge exit=0 MERGE_START delta=1
+    state-verify drift=['illegal_transition', 'illegal_transition']
+
+D. re-envelope of a MERGED envelope
+    merged status=MERGED
+    re-envelope exit=2 status=MERGED
+    re-envelope error: main..31cf1a7ff23fae47e935f050c1ffb86d96ea0a76
+
+E. replay unit (repeated ENVELOPE_NEW)
+    folded={"ENV-CORR": "DRAFT", "ENV-MERGED": "DRAFT", "ENV-NEW": "DRAFT", "ENV-WAIT": "DRAFT"}
+    illegal=[('ENV-WAIT', 'ENVELOPE_NEW', 'WAITING'), ('ENV-MERGED', 'ENVELOPE_NEW', 'MERGED')]
+
+probe workspace: C:\Users\mac\AppData\Local\Temp\pilot053-old-vco10rvg

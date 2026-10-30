@@ -1,0 +1,45 @@
+{
+  "ok": true,
+  "specs": 6,
+  "clauses": 56,
+  "tool_check": 27,
+  "covered": 27,
+  "tool_gaps": [],
+  "manual": [
+    "POL-CHANGE-LEVELS/C-04",
+    "POL-CHANGE-LEVELS/C-05",
+    "POL-CHANGE-LEVELS/C-06",
+    "POL-CHANGE-LEVELS/C-09",
+    "POL-RED-LINES/C-08",
+    "POL-RED-LINES/C-10",
+    "POL-RED-LINES/C-12",
+    "POL-RED-LINES/C-13",
+    "WF-HANDOFF/INV-06",
+    "WF-HANDOFF/INV-07",
+    "WF-LEDGER/INV-06",
+    "WF-TASK/INV-04"
+  ],
+  "owner": [
+    "POL-CHANGE-LEVELS/C-01",
+    "POL-CHANGE-LEVELS/C-07",
+    "POL-CHANGE-LEVELS/C-10",
+    "POL-RED-LINES/C-01",
+    "POL-RED-LINES/C-02",
+    "POL-RED-LINES/C-03",
+    "POL-RED-LINES/C-04",
+    "POL-RED-LINES/C-05",
+    "POL-RED-LINES/C-06",
+    "POL-RED-LINES/C-07",
+    "POL-RED-LINES/C-15",
+    "POL-RED-LINES/C-16",
+    "WF-HANDOFF/INV-05",
+    "WF-LEDGER/INV-07",
+    "WF-MERGE/INV-08",
+    "WF-MERGE/INV-09",
+    "WF-TASK/INV-05"
+  ],
+  "unknown": [],
+  "errors": []
+}
+
+exit=0

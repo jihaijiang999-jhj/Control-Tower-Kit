@@ -1,0 +1,698 @@
+diff --git a/tower-dsh/ARCHITECTURE.md b/tower-dsh/ARCHITECTURE.md
+index 3c6aba0..09df2ad 100644
+--- a/tower-dsh/ARCHITECTURE.md
++++ b/tower-dsh/ARCHITECTURE.md
+@@ -82,6 +82,20 @@ ledger writer 的字面 type）：代码有而目录无、目录有而代码无
+ `supervision/envelopes/*.json`、`state/AUTHORITY.json`、`shared/AUTHORITY_POLICY.json`。
+ 状态文件只能由 `towerctl` 写；手改会被 `state-verify` / `authority-check` 报 drift。
+ 
++**信封恢复**：`ENVELOPE_NEW` 既是首封也是重信事件。首封信封写 `DRAFT`；
++已有 `WAITING`/`CORRECTION_REQUIRED` 时重信保留原状态并刷新
++`envelope_head_sha`/`implementation_head_sha`/`created_at`；
++`MERGED`/`POST_MERGE_VERIFIED` 拒绝重开（exit 2 单 JSON，只能新卡替代）。
++`replay_envelope_statuses` 折叠重复 `ENVELOPE_NEW` 时同样保留
++`WAITING`/`CORRECTION_REQUIRED`/`MERGED`/`POST_MERGE_VERIFIED`，只有全新信封
++折成 `DRAFT`——因此“失败 → 重信 → 再 merge”不会重放出 `MERGE_START from DRAFT`
++（052 的 `illegal_transition`）。`queue-add` **不改写**信封状态：首封信封保持
++`DRAFT`，正常首次 merge 走 `DRAFT + 队列 WAITING`。`merge` 在写 `MERGE_START`
++之前拒绝“重信后仍为 `DRAFT`”的信封（同一信封已有 ≥2 条 `ENVELOPE_NEW`），
++exit 2 单 JSON、零 `MERGE_START`/零 ledger 写入；无重信历史的手写信封（legacy）
++保留旧行为。队列条目可为 `WAITING`/`CORRECTION_REQUIRED`：失败后重试复用同一
++条目，纠正后的信封重新入队不是必需步骤。
++
+ **命令**：`python tools/towerctl.py <cmd>` 是唯一入口；argparse 的子命令名是
+ 命令名的权威，`arch/GATES.json.gates[].command` 必须命中它。
+ 
+@@ -150,7 +164,7 @@ active` 的每条事实以子进程运行 probe（cwd=塔根，60s 超时），
+ 
+ **已知边界（Known limits）**：
+ 
+-1. **单文件**：`tools/towerctl.py` 7,981 行（约 8k；本卡 HEAD 实测）；模块化
++1. **单文件**：`tools/towerctl.py` 8,587 行（约 8.6k；本卡 HEAD 实测）；模块化
+    （PILOT-051）之前，所有命令共享一个进程与一个 parser。
+ 2. **无密钥链**：owner 四闸依赖人工决定与记录，没有密码学签名；信任是 TOFU
+    （首次设置即信任，之后靠 revision 与事件复核）。
+diff --git a/tower-dsh/tools/tests/test_envelope_recovery.py b/tower-dsh/tools/tests/test_envelope_recovery.py
+new file mode 100644
+index 0000000..2802158
+--- /dev/null
++++ b/tower-dsh/tools/tests/test_envelope_recovery.py
+@@ -0,0 +1,446 @@
++"""Regression tests for the PILOT-053 envelope-recovery contract.
++
++The 052 failure: a PR merge was blocked on CI, leaving the envelope
++``CORRECTION_REQUIRED``.  Re-running ``envelope-new`` folded the envelope back
++to ``DRAFT``; the queue already held its ``QUEUE_ADD`` so ``queue-add`` refused
++a retry; the second ``MERGE_START`` therefore replayed from ``DRAFT`` and
++``state-verify`` reported ``illegal_transition`` (which also failed the
++``PROFILE-TOWER-DSH`` STATE probe).
++
++These tests pin the three halves of the fix:
++
++* replay: a repeated ``ENVELOPE_NEW`` keeps ``WAITING`` / ``CORRECTION_REQUIRED``
++  / ``MERGED`` instead of resetting to ``DRAFT``;
++* ``envelope-new``: preserves an in-flight status and refuses to reopen a
++  merged envelope (``queue-add`` deliberately leaves the file status alone, so
++  the normal first merge still starts from ``DRAFT`` + ``WAITING``);
++* ``merge``: refuses a ``DRAFT`` that a *re-envelope* reset, before any
++  ``MERGE_START`` and before any ledger write, while the first ``DRAFT``
++  envelope with a ``WAITING`` queue keeps merging.
++
++Each test builds an isolated tower root with a real throw-away git repository
++under the runner sandbox (see ``tools/run_tests.py``) and drives the CLI through
++``subprocess``, exactly as a supervisor session would.  The PR-mode failure uses
++an offline ``gh`` stub, so no network or real GitHub CLI is involved.
++
++Run from the tower root (``tower-dsh``)::
++
++    python -B tools/run_tests.py
++"""
++from __future__ import annotations
++
++import json
++import hashlib
++import os
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++TOOLS_DIR = Path(__file__).resolve().parents[1]
++TOWER_ROOT = Path(__file__).resolve().parents[2]
++if str(TOOLS_DIR) not in sys.path:
++    sys.path.insert(0, str(TOOLS_DIR))
++
++import towerctl  # noqa: E402  (needs TOOLS_DIR on sys.path)
++
++TCLI = TOOLS_DIR / "towerctl.py"
++TOWER_NAME = "tower-dsh"
++TASK = "TEST-ENV-001"
++ENVELOPE = "ENV-TEST-ENV-001"
++ENVELOPE_PATH = f"merge-envelopes/{ENVELOPE}.json"
++BASE = "main"
++BRANCH = "feature/envelope-recovery"
++
++GIT_IDENTITY = {
++    "GIT_AUTHOR_NAME": "Tower Test",
++    "GIT_AUTHOR_EMAIL": "tower@example.invalid",
++    "GIT_COMMITTER_NAME": "Tower Test",
++    "GIT_COMMITTER_EMAIL": "tower@example.invalid",
++}
++
++# Offline ``gh`` stub for the failing-PR half of the recovery test: auth is
++# green, a PR can be opened, and the CI checks fail.  ``pr merge`` is never
++# reached, so it must not be stubbed as green.
++GH_STUB = '''"""Offline ``gh`` stub for test_envelope_recovery.py."""
++import sys
++
++argv = sys.argv[1:]
++if argv[:2] == ["auth", "status"]:
++    raise SystemExit(0)
++if argv[:2] == ["pr", "create"]:
++    print("https://example.invalid/pull/7")
++    raise SystemExit(0)
++if argv[:2] == ["pr", "checks"]:
++    print("tower gate\\tfail\\t1\\thttps://example.invalid/run/1")
++    raise SystemExit(1)
++raise SystemExit(0)
++'''
++
++
++def write_json(path: Path, data: dict) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
++                    encoding="utf-8")
++
++
++def read_json(path: Path) -> dict:
++    return json.loads(path.read_text(encoding="utf-8"))
++
++
++class EnvelopeRecoveryTestCase(unittest.TestCase):
++    """Fixture: bare origin + kit repo (tower root nested) + envelope source."""
++
++    def setUp(self) -> None:
++        self._tmp = tempfile.TemporaryDirectory(
++            prefix="towerctl-envelope-recovery-", ignore_cleanup_errors=True)
++        self.tmp = Path(self._tmp.name)
++        self.kit = self.tmp / "kit"
++        self.root = self.kit / TOWER_NAME
++        self.origin = self.tmp / "origin.git"
++        self.stub = self.tmp / "gh_stub.py"
++        self.gh_log = self.tmp / "gh-argv.jsonl"
++        self.stub.write_text(GH_STUB, encoding="utf-8")
++        for directory in ("primary", "supervision/envelopes", "ledger",
++                          f"tasks/{TASK}", "incoming"):
++            (self.root / directory).mkdir(parents=True, exist_ok=True)
++        self.write_static_tower_files()
++        self.init_repo()
++        self.write_envelope_source()
++
++    def tearDown(self) -> None:
++        self._tmp.cleanup()
++
++    # -- fixture helpers --------------------------------------------------
++    def git(self, *args: str) -> subprocess.CompletedProcess:
++        env = dict(os.environ)
++        env.update(GIT_IDENTITY)
++        return subprocess.run(
++            ["git", "-C", str(self.kit), *args],
++            capture_output=True, text=True, encoding="utf-8", env=env,
++        )
++
++    def commit(self, message: str) -> str:
++        cp = self.git("-c", "commit.gpgsign=false", "commit", "-m", message)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        return self.git("rev-parse", "HEAD").stdout.strip()
++
++    def write_static_tower_files(self) -> None:
++        write_json(self.root / "primary" / "CURRENT_STATE.json", {
++            "schema": "tower/current-state@1",
++            "tower_id": TOWER_NAME,
++            "role": "primary",
++            "phase": "TEST",
++            "primary": {"id": "ctl-test"},
++            "owner": {"name": "mac"},
++            "next_action": "test",
++        })
++        write_json(self.root / "supervision" / "CURRENT_STATE.json", {
++            "schema": "tower/supervision-state@1",
++            "tower_id": TOWER_NAME,
++            "role": "supervision",
++            "phase": "TEST",
++            "supervisor": {"id": "sup-test"},
++        })
++        write_json(self.root / "primary" / "TASK_BOARD.json", {
++            "schema": "tower/task-board@1",
++            "tasks": [],
++        })
++        proof = self.root / "tasks" / TASK / "evidence" / "proof.txt"
++        proof.parent.mkdir(parents=True, exist_ok=True)
++        proof.write_text("envelope recovery proof\n", encoding="utf-8")
++        write_json(self.root / "tasks" / TASK / "record.json", {
++            "schema": "tower/task@1",
++            "id": TASK,
++            "title": "envelope recovery regression",
++            "status": "closed",
++            "executor": "exec-a",
++            "review": {"reviewer": "rev-a", "verdict": "PASS"},
++            "evidence": [{
++                "id": "E-001",
++                "path": f"tasks/{TASK}/evidence/proof.txt",
++                "sha256": hashlib.sha256(proof.read_bytes()).hexdigest(),
++                "bytes": proof.stat().st_size,
++            }],
++        })
++        (self.root / "ledger" / "primary.jsonl").write_text("", encoding="utf-8")
++        (self.root / "ledger" / "supervision.jsonl").write_text("", encoding="utf-8")
++
++    def init_repo(self) -> None:
++        self.kit.mkdir(parents=True, exist_ok=True)
++        self.assertEqual(self.git("init").returncode, 0)
++        self.assertEqual(
++            self.git("symbolic-ref", "HEAD", "refs/heads/main").returncode, 0)
++        (self.kit / "README.md").write_text("base\n", encoding="utf-8")
++        self.assertEqual(self.git("add", "README.md").returncode, 0)
++        self.commit("base")
++        self.assertEqual(self.git("checkout", "-b", BRANCH).returncode, 0)
++        (self.kit / "feature.txt").write_text("implementation\n", encoding="utf-8")
++        self.assertEqual(self.git("add", "feature.txt").returncode, 0)
++        self.implementation_head = self.commit("implementation")
++        write_json(self.kit / ENVELOPE_PATH, {"envelope_id": ENVELOPE})
++        self.assertEqual(self.git("add", ENVELOPE_PATH).returncode, 0)
++        self.envelope_head = self.commit("envelope")
++        self.assertEqual(self.git("checkout", BASE).returncode, 0)
++        bare = subprocess.run(["git", "init", "--bare", str(self.origin)],
++                              capture_output=True, text=True, encoding="utf-8")
++        self.assertEqual(bare.returncode, 0, msg=bare.stderr)
++        remote = str(self.origin).replace("\\", "/")
++        self.assertEqual(
++            self.git("remote", "add", "origin", remote).returncode, 0)
++
++    def write_envelope_source(self) -> None:
++        write_json(self.root / "incoming" / f"{ENVELOPE}.json", {
++            "schema": "tower/merge-envelope@1",
++            "envelope_id": ENVELOPE,
++            "task": TASK,
++            "repository": "..",  # the verified kit repo is the tower root's parent
++            "branch": BRANCH,
++            "base": BASE,
++            "envelope_path": ENVELOPE_PATH,
++            "implementation_head_sha": self.implementation_head,
++            "tests_baseline": 1,
++            "tower_tests_baseline": 1,
++        })
++
++    # -- CLI / state accessors -------------------------------------------
++    def run_cli(self, *args: str, timeout: float = 120) -> subprocess.CompletedProcess:
++        env = dict(os.environ)
++        env.update(GIT_IDENTITY)
++        env["PYTHONIOENCODING"] = "utf-8"
++        env["PYTHONUTF8"] = "1"
++        env["TOWERCTL_GH"] = f"{sys.executable} {self.stub}"
++        env["GH_LOG"] = str(self.gh_log)
++        return subprocess.run(
++            [sys.executable, "-B", str(TCLI), "--root", str(self.root), *args],
++            capture_output=True, text=True, encoding="utf-8", env=env,
++            timeout=timeout,
++        )
++
++    def envelope_new(self) -> subprocess.CompletedProcess:
++        return self.run_cli("envelope-new", "--task", TASK,
++                            "--file", str(self.root / "incoming"
++                                          / f"{ENVELOPE}.json"))
++
++    def queue_add(self) -> subprocess.CompletedProcess:
++        return self.run_cli("queue-add", "--envelope", ENVELOPE)
++
++    def merge(self, *args: str) -> subprocess.CompletedProcess:
++        return self.run_cli("merge", "--envelope", ENVELOPE,
++                            "--role", "supervisor", "--supervisor", "sup-test",
++                            *args)
++
++    def state_verify(self) -> tuple[subprocess.CompletedProcess, dict]:
++        cp = self.run_cli("state-verify")
++        return cp, json.loads(cp.stdout)
++
++    def envelope_path(self) -> Path:
++        return self.root / "supervision" / "envelopes" / f"{ENVELOPE}.json"
++
++    def envelope(self) -> dict:
++        return read_json(self.envelope_path())
++
++    def queue_entry(self) -> dict:
++        queue = read_json(self.root / "supervision" / "MERGE_QUEUE.json")
++        return next(e for e in queue["entries"] if e["envelope_id"] == ENVELOPE)
++
++    def ledger_text(self) -> str:
++        return (self.root / "ledger" / "supervision.jsonl").read_text(
++            encoding="utf-8")
++
++    def ledger_events(self, event_type: str | None = None) -> list[dict]:
++        events = [json.loads(line) for line in self.ledger_text().splitlines()
++                  if line.strip()]
++        if event_type is not None:
++            events = [e for e in events if e.get("type") == event_type]
++        return events
++
++    def write_envelope_status(self, status: str) -> None:
++        envelope = self.envelope()
++        envelope["status"] = status
++        write_json(self.envelope_path(), envelope)
++
++    # -- 1. normal first merge must not regress ---------------------------
++    def test_first_envelope_merges_from_draft_and_waiting_queue(self) -> None:
++        cp = self.envelope_new()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.envelope()["status"], "DRAFT")
++
++        cp = self.queue_add()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.queue_entry()["status"], "WAITING")
++        # PILOT-053 deviation: ``queue-add`` does not rewrite the envelope
++        # status; the first envelope stays DRAFT until it merges.
++        self.assertEqual(self.envelope()["status"], "DRAFT")
++
++        cp = self.merge()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.envelope()["status"], "MERGED")
++        self.assertEqual(self.queue_entry()["status"], "MERGED")
++
++        cp, payload = self.state_verify()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(payload["drift"], [])
++
++    # -- 2. failure -> re-envelope -> second merge ------------------------
++    def test_failed_merge_keeps_correction_after_reenvelope_and_merges(self) -> None:
++        self.assertEqual(self.envelope_new().returncode, 0)
++        self.assertEqual(self.queue_add().returncode, 0)
++
++        failed = self.merge("--mode", "pr", "--check-timeout", "10",
++                            "--check-interval", "1")
++        self.assertEqual(failed.returncode, 2,
++                         msg=failed.stdout + failed.stderr)
++        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
++        self.assertEqual(self.queue_entry()["status"], "CORRECTION_REQUIRED")
++        self.assertEqual(len(self.ledger_events("MERGE_BLOCKED")), 1)
++        self.assertEqual(self.ledger_events("MERGE"), [])
++
++        cp, payload = self.state_verify()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(payload["drift"], [])
++
++        # Re-envelope after the correction: the status must be preserved.
++        cp = self.envelope_new()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.envelope()["status"], "CORRECTION_REQUIRED")
++        self.assertEqual(len(self.ledger_events("ENVELOPE_NEW")), 2)
++
++        # The corrected envelope retries through the same queue entry.
++        cp = self.merge()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.envelope()["status"], "MERGED")
++        self.assertEqual(self.queue_entry()["status"], "MERGED")
++
++        cp, payload = self.state_verify()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(payload["drift"], [])
++
++    # -- 3. a DRAFT lost by a re-envelope is refused before MERGE_START ---
++    def test_reenvelope_draft_is_refused_before_merge_start(self) -> None:
++        self.assertEqual(self.envelope_new().returncode, 0)
++        self.assertEqual(self.queue_add().returncode, 0)
++        failed = self.merge("--mode", "pr", "--check-timeout", "10",
++                            "--check-interval", "1")
++        self.assertEqual(failed.returncode, 2, msg=failed.stdout + failed.stderr)
++        self.assertEqual(self.envelope_new().returncode, 0)
++        # Construct the old-code failure: the re-envelope wrote DRAFT again.
++        self.write_envelope_status("DRAFT")
++        ledger_before = self.ledger_text()
++        starts_before = len(self.ledger_events("MERGE_START"))
++
++        cp = self.merge()
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        payload = json.loads(cp.stdout)
++        self.assertFalse(payload["ok"])
++        self.assertIn("DRAFT", json.dumps(payload))
++        self.assertIn("re-envelope", json.dumps(payload))
++        self.assertEqual(len(self.ledger_events("MERGE_START")), starts_before)
++        self.assertEqual(self.ledger_text(), ledger_before)
++        self.assertEqual(self.envelope()["status"], "DRAFT")
++
++    def test_first_draft_envelope_without_queue_is_refused(self) -> None:
++        self.assertEqual(self.envelope_new().returncode, 0)
++        cp = self.merge()
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        self.assertIn("not queued", cp.stdout)
++        self.assertEqual(self.ledger_events("MERGE_START"), [])
++
++    # -- 4. a merged envelope cannot be reopened --------------------------
++    def test_merged_envelope_cannot_be_reenveloped(self) -> None:
++        self.assertEqual(self.envelope_new().returncode, 0)
++        self.assertEqual(self.queue_add().returncode, 0)
++        self.assertEqual(self.merge().returncode, 0)
++        self.assertEqual(self.envelope()["status"], "MERGED")
++        ledger_before = self.ledger_text()
++        envelope_before = self.envelope()
++
++        cp = self.envelope_new()
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        self.assertIn("cannot be reopened", cp.stdout)
++        self.assertEqual(self.ledger_text(), ledger_before)
++        self.assertEqual(self.envelope(), envelope_before)
++        self.assertEqual(len(self.ledger_events("ENVELOPE_NEW")), 1)
++
++    # -- 5. a WAITING envelope keeps WAITING across a re-envelope ---------
++    def test_waiting_envelope_keeps_waiting_across_reenvelope(self) -> None:
++        self.assertEqual(self.envelope_new().returncode, 0)
++        self.assertEqual(self.queue_add().returncode, 0)
++        # Construct the queued status a tower may already hold (052's fold
++        # reaches it before the failed merge).
++        self.write_envelope_status("WAITING")
++
++        cp = self.envelope_new()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.envelope()["status"], "WAITING")
++        self.assertEqual(len(self.ledger_events("ENVELOPE_NEW")), 2)
++
++        cp = self.merge()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.envelope()["status"], "MERGED")
++        cp, payload = self.state_verify()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(payload["drift"], [])
++
++    # -- 6. replay unit: repeated ENVELOPE_NEW preserves the fold ---------
++    def test_replay_preserves_statuses_across_repeated_envelope_new(self) -> None:
++        rows = [
++            ("ENV-WAIT", "ENVELOPE_NEW"),
++            ("ENV-WAIT", "QUEUE_ADD"),
++            ("ENV-WAIT", "ENVELOPE_NEW"),
++            ("ENV-CORR", "ENVELOPE_NEW"),
++            ("ENV-CORR", "QUEUE_ADD"),
++            ("ENV-CORR", "MERGE_START"),
++            ("ENV-CORR", "MERGE_BLOCKED"),
++            ("ENV-CORR", "ENVELOPE_NEW"),
++            ("ENV-MERGED", "ENVELOPE_NEW"),
++            ("ENV-MERGED", "QUEUE_ADD"),
++            ("ENV-MERGED", "MERGE_START"),
++            ("ENV-MERGED", "MERGE"),
++            ("ENV-MERGED", "ENVELOPE_NEW"),
++            ("ENV-NEW", "ENVELOPE_NEW"),
++            ("ENV-UNKNOWN", "ENVELOPE_NEW"),
++            ("ENV-UNKNOWN", "NOT_A_LIFECYCLE_EVENT"),
++        ]
++        ledger = self.root / "ledger" / "supervision.jsonl"
++        ledger.write_text("".join(
++            json.dumps({"seq": index, "type": event_type,
++                        "payload": {"envelope": envelope}})
++            + "\n"
++            for index, (envelope, event_type) in enumerate(rows, 1)),
++            encoding="utf-8")
++
++        states = towerctl.replay_envelope_statuses(self.root)
++        self.assertEqual(states, {
++            "ENV-WAIT": "WAITING",
++            "ENV-CORR": "CORRECTION_REQUIRED",
++            "ENV-MERGED": "MERGED",
++            "ENV-NEW": "DRAFT",
++            "ENV-UNKNOWN": "DRAFT",
++        })
++
++        transitions: list[dict] = []
++        towerctl.replay_envelope_statuses(self.root, transitions)
++        illegal = [row for row in transitions if row["kind"] == "illegal_transition"]
++        self.assertEqual([row["target"] for row in illegal], ["ENV-MERGED"])
++        self.assertEqual(illegal[0]["event"], "ENVELOPE_NEW")
++
++    # -- 7. the real tower history must replay clean ----------------------
++    def test_real_tower_history_has_no_envelope_drift(self) -> None:
++        cp = subprocess.run(
++            [sys.executable, "-B", str(TCLI), "state-verify"],
++            cwd=str(TOWER_ROOT), capture_output=True, text=True,
++            encoding="utf-8",
++        )
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        payload = json.loads(cp.stdout)
++        self.assertEqual(payload["drift"], [])
++        # 052's second MERGE_START used to replay from DRAFT.
++        illegal = [row for row in payload["drift"]
++                   if row.get("kind") == "illegal_transition"]
++        self.assertEqual(illegal, [])
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tower-dsh/tools/towerctl.py b/tower-dsh/tools/towerctl.py
+index 74c7a95..58ca8f8 100644
+--- a/tower-dsh/tools/towerctl.py
++++ b/tower-dsh/tools/towerctl.py
+@@ -3909,6 +3909,28 @@ def cmd_supervision_init(root: Path, args) -> None:
+           "ledger": rel(root, ledger)})
+ 
+ 
++def envelope_new_status(env_path: Path) -> str:
++    """Status ``envelope-new`` writes for a first or repeated envelope record.
++
++    A first envelope starts ``DRAFT``.  Re-enveloping after a failed merge
++    keeps ``WAITING``/``CORRECTION_REQUIRED`` so the file, the replay fold and
++    the merge gate agree; a terminal envelope cannot be reopened (only a new
++    card can), so it is refused before any file or ledger write.
++    """
++    if not env_path.exists():
++        return "DRAFT"
++    try:
++        existing = jload(env_path)
++    except (OSError, ValueError):
++        return "DRAFT"
++    status = existing.get("status") if isinstance(existing, dict) else None
++    if status in ENVELOPE_TERMINAL_STATUSES:
++        fail([f"envelope already {status}; a merged envelope cannot be reopened"])
++    if status in ENVELOPE_REOPEN_STATUSES:
++        return status
++    return "DRAFT"
++
++
+ def cmd_envelope_new(root: Path, args) -> None:
+     task_id = check_task_id(args.task, "task")
+     file = resolve_input_within(root, args.file, "envelope file")
+@@ -3923,19 +3945,17 @@ def cmd_envelope_new(root: Path, args) -> None:
+     task = check_task_id(task, "task")
+     if task != task_id:
+         fail([f"envelope task {task} != --task {task_id}"])
++    # Resolve the status before any git/record work: reopening a merged
++    # envelope is a semantic refusal, not a repository-shape failure.
++    env_path = root / "supervision" / "envelopes" / f"{env_id}.json"
++    status = envelope_new_status(env_path)
+     # Both count baselines are mandatory for a *new* envelope.  The post-merge
+     # gates treat them as opt-in, so an envelope that simply omitted them used
+     # to downgrade its own count checks silently; requiring them here (before
+     # any file, ledger or record write) closes that hole.  Legacy envelopes
+     # already on disk keep the old opt-in semantics in ``merge-check`` and
+     # ``post-merge``.
+-    tests_baseline = env.get("tests_baseline")
+-    tower_tests_baseline = env.get("tower_tests_baseline")
+-    if not (isinstance(tests_baseline, int) and not isinstance(tests_baseline, bool)
+-            and tests_baseline >= 1
+-            and isinstance(tower_tests_baseline, int)
+-            and not isinstance(tower_tests_baseline, bool)
+-            and tower_tests_baseline >= 1):
++    if not envelope_has_baselines(env):
+         fail(["envelope tests_baseline and tower_tests_baseline must be positive "
+               "integers (int >= 1)"])
+     rec = load_record(root, task_id)
+@@ -3970,8 +3990,8 @@ def cmd_envelope_new(root: Path, args) -> None:
+     if not all(c["ok"] for c in checks):
+         emit({"ok": False, "errors": [c for c in checks if not c["ok"]]}, 2)
+     record = dict(env)
+-    record.update({"envelope_head_sha": b, "status": "DRAFT", "created_at": now()})
+-    jdump(root / "supervision" / "envelopes" / f"{env_id}.json", record)
++    record.update({"envelope_head_sha": b, "status": status, "created_at": now()})
++    jdump(env_path, record)
+     append_supervision_ledger(root, "ENVELOPE_NEW", "primary",
+                               {"envelope": env_id, "task": task, "head": b})
+     emit({"ok": True, "envelope": env_id, "head": b, "checks": checks})
+@@ -4332,6 +4352,48 @@ def block_pr_merge(root: Path, args, env: dict, env_path: Path, queue: dict,
+     })
+ 
+ 
++def envelope_remerge_errors(root: Path, env: dict, envelope_id: str) -> list[str]:
++    """Refuse a ``DRAFT`` envelope that a re-envelope reset (the 052 drift).
++
++    ``envelope-new`` writes the first ``ENVELOPE_NEW`` and is also the
++    re-envelope path.  A first envelope is legitimately ``DRAFT`` until it
++    merges, so the file status alone cannot be the gate: only an envelope whose
++    ledger already holds a previous ``ENVELOPE_NEW`` (a re-envelope) must still
++    be ``WAITING``/``CORRECTION_REQUIRED``.  An envelope with no re-envelope
++    history (hand-written legacy fixtures, one-shot envelopes) keeps the old
++    behaviour, and a non-``DRAFT`` status is handled by the caller.
++    """
++    if env.get("status") != "DRAFT":
++        return []
++    events = ledger_events_naming(root, "supervision", "ENVELOPE_NEW",
++                                  envelope_id)
++    if len(events) >= 2:
++        return ["envelope status DRAFT after a re-envelope "
++                f"(ENVELOPE_NEW x{len(events)}); expected "
++                "WAITING/CORRECTION_REQUIRED"]
++    return []
++
++
++def merge_queue_errors(root: Path, env: dict, envelope_id: str,
++                       entry: dict | None) -> list[str]:
++    """Envelope/queue preconditions checked after both files are read.
++
++    The entry must be queued and still ``WAITING``/``CORRECTION_REQUIRED`` (a
++    failed merge marks it for correction and the retry reuses the same entry).
++    The envelope file must not be a ``DRAFT`` that a re-envelope reset; see
++    :func:`envelope_remerge_errors` for why the first envelope stays exempt.
++    """
++    if entry is None:
++        return [f"envelope not queued: {envelope_id}"]
++    if entry.get("status") not in ENVELOPE_MERGEABLE_STATUSES:
++        return [
++            f"queue entry status {entry.get('status')} is not "
++            "WAITING/CORRECTION_REQUIRED; only a waiting or corrected entry "
++            "may merge"
++        ]
++    return envelope_remerge_errors(root, env, envelope_id)
++
++
+ def cmd_merge(root: Path, args) -> None:
+     if args.role != "supervisor":
+         fail(["merge requires --role supervisor"])
+@@ -4387,18 +4449,14 @@ def cmd_merge(root: Path, args) -> None:
+         fail([f"envelope identity matches request: file declares "
+               f"{declared if declared is not None else '(missing)'!r}, "
+               f"request {envelope_id!r}"])
+-    if env.get("status") in ("MERGED", "POST_MERGE_VERIFIED"):
++    if env.get("status") in ENVELOPE_TERMINAL_STATUSES:
+         fail([f"envelope already {env.get('status')}"])
+     queue = load_queue(root)
+     entry = next((e for e in queue.get("entries", [])
+                   if e.get("envelope_id") == envelope_id), None)
+-    if entry is None:
+-        fail([f"envelope not queued: {args.envelope}"])
+-    if entry.get("status") not in ("WAITING", "CORRECTION_REQUIRED"):
+-        fail([
+-            f"queue entry status {entry.get('status')} is not WAITING/CORRECTION_REQUIRED; "
+-            "only a waiting or corrected entry may merge"
+-        ])
++    queue_errors = merge_queue_errors(root, env, envelope_id, entry)
++    if queue_errors:
++        fail(queue_errors)
+     base = env.get("base", "main")
+     repo = resolve_repository(root, env.get("repository"))
+     try:
+@@ -5106,6 +5164,24 @@ ENVELOPE_CORRECTION_EVENTS = {"MERGE_BLOCKED", "POST_MERGE_FAILED"}
+ # event that enters it and, like the live queue, it does not change the folded
+ # status: the next MERGE / correction event settles the envelope again.
+ ENVELOPE_MERGING_STATUS = "MERGING"
++# ``ENVELOPE_NEW`` is both the first and the *re-envelope* event.  A re-envelope
++# re-records an existing envelope (head, implementation, timestamp); it must
++# never reopen it, so the fold keeps the status it already reached instead of
++# falling back to ``DRAFT`` (the 052 drift: a failed merge was re-enveloped and
++# the next ``MERGE_START`` replayed from ``DRAFT``).  ``WAITING`` is the only
++# extra *legal* source of the event: ``envelope-new`` deliberately allows
++# re-enveloping a queued envelope.  ``MERGED``/``POST_MERGE_VERIFIED`` also
++# keep their status when a legacy ledger re-envelopes them, but the command
++# refuses to write that event, so the replay still flags the source as illegal.
++ENVELOPE_REOPEN_STATUSES = frozenset({"WAITING", "CORRECTION_REQUIRED",
++                                      "MERGED", "POST_MERGE_VERIFIED"})
++# A queue entry a merge may start from.  ``CORRECTION_REQUIRED`` is a real
++# retry shape: every failed merge leaves the entry there and the corrected
++# envelope is retried through the same entry.
++ENVELOPE_MERGEABLE_STATUSES = frozenset({"WAITING", "CORRECTION_REQUIRED"})
++# Terminal envelope states.  Only a new card may replace them; the command
++# refuses to reopen an envelope that already merged (or was verified).
++ENVELOPE_TERMINAL_STATUSES = frozenset({"MERGED", "POST_MERGE_VERIFIED"})
+ # Legal source states per lifecycle event, derived from a read-only probe of
+ # the real ledgers (``evidence/real-transitions.txt``) rather than invented
+ # rules.  They are deliberately permissive where the tower has precedent:
+@@ -5126,7 +5202,8 @@ TASK_TRANSITIONS = {
+     "CLOSEOUT": frozenset({"accepted"}),
+ }
+ ENVELOPE_TRANSITIONS = {
+-    "ENVELOPE_NEW": frozenset({None, "DRAFT", "CORRECTION_REQUIRED"}),
++    "ENVELOPE_NEW": frozenset({None, "DRAFT", "WAITING",
++                               "CORRECTION_REQUIRED"}),
+     "QUEUE_ADD": frozenset({"DRAFT"}),
+     "MERGE_START": frozenset({"WAITING", "CORRECTION_REQUIRED"}),
+     "MERGE": frozenset({ENVELOPE_MERGING_STATUS}),
+@@ -5510,6 +5587,26 @@ def replay_task_statuses(root: Path,
+     return states
+ 
+ 
++def _fold_envelope_state(states: dict[str, str], internal: dict[str, str],
++                         envelope: str, event_type: str, next_state: str) -> None:
++    """Fold one envelope lifecycle event without resetting a live envelope.
++
++    ``states`` is the folded status, ``internal`` the last event's state used
++    for the transition table (``MERGE_START`` pins ``MERGING`` without settling
++    the status).  A re-envelope ``ENVELOPE_NEW`` on an envelope that already
++    reached a status in :data:`ENVELOPE_REOPEN_STATUSES` only re-records its
++    head: the folded status and the transition source stay where they were, so
++    a corrected envelope still replays to ``CORRECTION_REQUIRED``.  A brand-new
++    envelope (no previous status) still folds to ``DRAFT``.
++    """
++    if (event_type == "ENVELOPE_NEW"
++            and states.get(envelope) in ENVELOPE_REOPEN_STATUSES):
++        return
++    internal[envelope] = next_state
++    if event_type != "MERGE_START":
++        states[envelope] = next_state
++
++
+ def replay_envelope_statuses(root: Path,
+                              transitions: list[dict] | None = None) -> dict[str, str]:
+     """Fold ``ledger/supervision.jsonl`` by envelope into expected status.
+@@ -5546,9 +5643,7 @@ def replay_envelope_statuses(root: Path,
+             if allowed is not None and previous not in allowed:
+                 transitions.append(
+                     _illegal_transition(envelope, event_type, allowed, previous))
+-        internal[envelope] = next_state
+-        if event_type != "MERGE_START":
+-            states[envelope] = next_state
++        _fold_envelope_state(states, internal, envelope, event_type, next_state)
+     return states

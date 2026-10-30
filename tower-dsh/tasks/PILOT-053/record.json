@@ -1,0 +1,201 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-053",
+  "title": "re-envelope 热修：ENVELOPE_NEW 保留已有状态 + merge 校验信封",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "replay_envelope_statuses：ENVELOPE_NEW 命中已有状态时保留原状态（WAITING/CORRECTION_REQUIRED/MERGED），只有全新信封置 DRAFT；不改其他事件的折叠表",
+    "cmd_envelope_new：已存在且 status=MERGED → exit 2（不能重开已合并）；已有队列条目且 status 为 WAITING/CORRECTION_REQUIRED → 保留状态并更新 head/implementation；新信封 → DRAFT；仍 append ENVELOPE_NEW，不手改 ledger",
+    "queue-add：首次入队或修复半写时，把 envelope 文件 status 从 DRAFT 置 WAITING（已在 WAITING/CORRECTION 则不改）；保证正常首次 merge 的“DRAFT→入队→WAITING”路径成立",
+    "merge 入口：在队列/信封读取之后、写 MERGE_START 之前，要求信封文件 status ∈ {WAITING, CORRECTION_REQUIRED}，且队列条目 WAITING；DRAFT/MERGED → exit 2 单 JSON，零 MERGE_START/零 ledger 写入",
+    "新增 tools/tests/test_envelope_recovery.py：失败 merge→MERGE_BLOCKED→重信→状态保留→state-verify drift 0→二次 merge 成功；DRAFT 信封（无队列）merge exit 2；MERGED 重信 exit 2；WAITING 重信保留；正常首次 DRAFT→queue-add WAITING→merge 成功；replay 单元（ENVELOPE_NEW 两次不重置状态）",
+    "ARCHITECTURE.md §4 增加“信封恢复”契约：ENVELOPE_NEW 保留状态、queue-add DRAFT→WAITING、merge 入口断言、MERGED 不可重开",
+    "不改 036–052 的信任边界/授权/前置链/范围门/completion/shape/objective/campaign/depends_on 语义；不新增事件类型；不改 spec@2；不写 primary/supervision/ledger"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-053/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-053/tower-dsh/tools/tests/test_envelope_recovery.py",
+    "pilot/worktrees/PILOT-053/tower-dsh/ARCHITECTURE.md"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening existing gates",
+    "rewriting the supervision ledger",
+    "reopening a MERGED envelope",
+    "allowing MERGE_START from DRAFT",
+    "new ledger event types",
+    "changing tower/spec@2 fields",
+    "touching TOWER.md (L0)"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-053/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 601 + 新增用例数（main 基线 601）",
+    "失败夹具：首轮 MERGE_BLOCKED → envelope CORRECTION_REQUIRED；envelope-new 重写后状态仍 CORRECTION_REQUIRED；再 merge 成功；state-verify drift []",
+    "DRAFT 信封直接 merge → exit 2 单 JSON、无 MERGE_START、ledger 不变；MERGED 信封 envelope-new → exit 2",
+    "WAITING 信封重写保留 WAITING；新信封仍 DRAFT；正常首次 merge 路径（envelope-new DRAFT → queue-add WAITING → merge 成功）不回归",
+    "replay 单元：ENVELOPE_NEW 两次不把 WAITING/CORRECTION_REQUIRED/MERGED 重置为 DRAFT；未知状态不崩",
+    "ARCHITECTURE.md 含信封恢复契约且 arch-check exit 0；shape-check exit 0；spec-lint 6/6",
+    "旧码对照：main 对 DRAFT 信封 merge 放行、重信把状态折成 DRAFT；新码拒绝/保留。证据写进 scratch/probe-old-code.txt",
+    "真实塔：053 合并后重跑 `post-merge --envelope ENV-PILOT-052 --result PASS` → 9/9、state-verify drift []、profile-check exit 0",
+    "真实塔：建信封前 tasks=53/envelopes=51，建信封后 53/52；verify-ledger 0 error；coverage 27/27",
+    "git -C pilot/worktrees/PILOT-053 diff --name-only main..HEAD 恰三个 allowed_paths"
+  ],
+  "depends_on": [
+    "PILOT-052"
+  ],
+  "worktree": "pilot/worktrees/PILOT-053",
+  "spec_path": "pilot/PILOT-053.spec.json",
+  "spec_sha256": "7302afae3308e641fde5498d4358ae6bc7486e939f41e81dd0cbe0fb42d5f85d",
+  "spec_gate": "PASS",
+  "executor": "subagent:5b847429-1fcf-4d8e-aa8d-f18b2ba0fef6",
+  "dispatch": {
+    "executor": "subagent:5b847429-1fcf-4d8e-aa8d-f18b2ba0fef6",
+    "worktree": "pilot/worktrees/PILOT-053",
+    "at": "2026-10-31T01:10:50+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "0f9b9d9259e06ce70810a4786306b7c0fd5a182a",
+    "campaign": "C-2026-Q4-01"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-053/evidence/towerctl.py",
+      "sha256": "ee0feac860054220becde5303a19ca9f3e0ef4257cb6baf749ad1171c8d5299f",
+      "bytes": 382866,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-053/evidence/test_envelope_recovery.py",
+      "sha256": "0718389d65eca3d467f2001c210eb4e67943dd5db0ad1ea49d99088d885b2871",
+      "bytes": 19605,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-053/evidence/ARCHITECTURE.md",
+      "sha256": "707a66af93762eec4c80d1dbca3783642feef2d70cf99d8871c70e6495dae934",
+      "bytes": 12920,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-053/evidence/test-output.txt",
+      "sha256": "e9d1ebbf2a0a63f485a5fa10c0909a1148e4cbec855791484d4eea3b45181d1b",
+      "bytes": 86947,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-053/evidence/envelope_probe.py",
+      "sha256": "e38324878f4cf88ada18a1a08bddbad7c35a1f17e4401feabe4f40c4e72f9751",
+      "bytes": 13840,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-053/evidence/probe.txt",
+      "sha256": "03f72c9dd03d984271f2857b5eee34e329c1f15f656f06e31d895441279b227b",
+      "bytes": 1349,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-053/evidence/probe-old-code.txt",
+      "sha256": "f1d39796f02de98476aaa79b41164b175aadd320ec360342a0322234efe43164",
+      "bytes": 1268,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-053/evidence/commit.txt",
+      "sha256": "de07a87cf98fc4d7301e0dc985b50181597a648a6d0fef599f5ae6ce0c08405b",
+      "bytes": 1181,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-053/evidence/diff.txt",
+      "sha256": "e4ec5686c1a9725ff68afd85952fb6a2a2a7fbc412d0f128bf654216ae0f97b5",
+      "bytes": 34377,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-053/evidence/state-verify.txt",
+      "sha256": "3945d649730d71f9e3501ec1f91511de99efe909fc8ba73eaacb8de9464a22cb",
+      "bytes": 602,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-053/evidence/profile-check.txt",
+      "sha256": "59a88bd2db5cd76f737a8d0ea4233c7d730a1cce5063334c37663da6a11d013e",
+      "bytes": 93,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-011"
+    },
+    {
+      "path": "tasks/PILOT-053/evidence/arch-check.txt",
+      "sha256": "9b55934644ce5defbc749cf13cb0a7f8da6630d944f5ebf77fd30954106af3c7",
+      "bytes": 265,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-012"
+    },
+    {
+      "path": "tasks/PILOT-053/evidence/shape-check.txt",
+      "sha256": "bcafa95df1eb3dc2793e1506d9be2bf978e999203cc73b93d6a9e13853e624b2",
+      "bytes": 175,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-013"
+    },
+    {
+      "path": "tasks/PILOT-053/evidence/verify-ledger.txt",
+      "sha256": "a89b116aac440e942301c3f64767942d8370ad0d8d20fa711e03990aa4ff3a04",
+      "bytes": 394,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-014"
+    },
+    {
+      "path": "tasks/PILOT-053/evidence/spec-coverage.txt",
+      "sha256": "56f82201b193cbb64d245a987ba3a92cbd052de8a2b2a4c98fc7cf5f6980380c",
+      "bytes": 986,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-015"
+    },
+    {
+      "path": "tasks/PILOT-053/evidence/spec-lint.txt",
+      "sha256": "3908c24ecd628705bff39eb62ea3740dd46c1337839fccca4b564041d75a437d",
+      "bytes": 4002,
+      "at": "2026-10-31T01:41:32+08:00",
+      "id": "E-016"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:45a48c46-014e-4a8d-ac69-64657684df01",
+    "verdict": "PASS",
+    "note": "053 PASS（独立复核，按 owner 裁决 A/B + D 收窄口径）。16/16 证据；3 路径；spec 7302afae…；亲跑 Ran 609 OK(skipped=1)；真实塔 state-verify drift []（同一账本 main 旧码仍报 052 illegal_transition，证明确实修好而非改数据）；profile-check 11/0；arch/shape/verify/coverage/lint 全 0；A 正常首封 DRAFT→queue WAITING→merge 成功；B 失败→重信保留 CORRECTION→二次 merge 成功 drift []；MERGED 重信 exit 2 零写；D 只拦“重信后的 DRAFT”；既有测试零改动。已裁决 deviation：C 未实现（queue-add 不改 DRAFT，否则破 15+ 既有夹具），D 从“所有 DRAFT”收窄为“重信后的 DRAFT”；残余：ADR-0005 决策 3 需补 superseding 记录；D 守卫使“入队后重信”路径无 CLI 出口（可后续卡实现窄 C/调整守卫）；新测试 test_real_tower_history 非 hermetic；E-010 快照 52/51 已过时。",
+    "structure": "",
+    "at": "2026-10-31T02:02:06+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-053",
+    "actor": "owner",
+    "text": "PASS under A/B + D-narrow; C deferred (fixture compatibility); ADR superseding note required",
+    "at": "2026-10-31T02:02:06+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-053/CLOSEOUT.md",
+    "at": "2026-10-31T02:02:06+08:00"
+  },
+  "created_at": "2026-10-31T01:10:35+08:00",
+  "updated_at": "2026-10-31T02:02:06+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-053/MERGE.md",
+  "delivered_at": "2026-10-31T01:41:32+08:00",
+  "accepted_at": "2026-10-31T02:02:06+08:00"
+}

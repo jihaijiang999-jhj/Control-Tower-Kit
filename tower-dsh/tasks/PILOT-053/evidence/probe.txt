@@ -1,0 +1,28 @@
+PILOT-053 envelope probe [new] towerctl=tower-dsh\tools\towerctl.py
+A. normal first envelope (DRAFT -> queue-add -> merge)
+    envelope-new exit=0 status=DRAFT
+    queue-add exit=0 envelope=DRAFT queue=WAITING
+    merge exit=0 envelope=MERGED queue=MERGED
+
+B. failed PR merge -> re-envelope -> second merge
+    first merge exit=2 envelope=CORRECTION_REQUIRED queue=CORRECTION_REQUIRED MERGE_BLOCKED=1
+    re-envelope exit=0 status=CORRECTION_REQUIRED ENVELOPE_NEW=2
+    second merge exit=0 envelope=MERGED
+    state-verify drift=[]
+
+C. re-envelope of a still-DRAFT envelope -> merge
+    after re-envelope status=DRAFT ENVELOPE_NEW=2
+    merge exit=2 MERGE_START delta=0
+    merge error: envelope status DRAFT after a re-envelope (ENVELOPE_NEW x2); expected WAITING/CORRECTION_REQUIRED
+    state-verify drift=['envelope_status']
+
+D. re-envelope of a MERGED envelope
+    merged status=MERGED
+    re-envelope exit=2 status=MERGED
+    re-envelope error: envelope already MERGED; a merged envelope cannot be reopened
+
+E. replay unit (repeated ENVELOPE_NEW)
+    folded={"ENV-CORR": "CORRECTION_REQUIRED", "ENV-MERGED": "MERGED", "ENV-NEW": "DRAFT", "ENV-WAIT": "WAITING"}
+    illegal=[('ENV-MERGED', 'ENVELOPE_NEW', 'MERGED')]
+
+probe workspace: C:\Users\mac\AppData\Local\Temp\pilot053-new-pz6k06o9

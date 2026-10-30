@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "files": {
+    "primary": {
+      "path": "ledger/primary.jsonl",
+      "exists": true,
+      "events": 477,
+      "legacy_unhashed": 53,
+      "errors": []
+    },
+    "supervision": {
+      "path": "ledger/supervision.jsonl",
+      "exists": true,
+      "events": 270,
+      "legacy_unhashed": 26,
+      "errors": []
+    }
+  },
+  "errors": []
+}
+
+exit=0
