@@ -26,8 +26,8 @@ TCLI = TOOLS_DIR / "towerctl.py"
 COPIED = ("tools", "state", "arch", "adr", "ARCHITECTURE.md",
           "EVENT_CATALOG.json", "specs", "templates", "command")
 TREE_DIRS = ("primary", "supervision", "ledger", "tasks", "state")
-FACT_IDS = ("AUTH", "LEDGER", "STATE", "ARCH", "CAMPAIGN", "SHAPE",
-            "SPEC", "WHERE", "STARTUP", "WIRING")
+FACT_IDS = ("AUTH", "AUTH-CONF", "LEDGER", "STATE", "ARCH", "CAMPAIGN",
+            "SHAPE", "SPEC", "WHERE", "STARTUP", "WIRING")
 HEAD = """---
 schema: tower/profile@1
 object: FIXTURE
@@ -84,6 +84,33 @@ def fact(ident: str = "AUTH", probe: str = "arch-check",
     return f"| {ident} | fact | {probe} | {expect} | {why} |\n"
 
 
+def write_json(path: Path, data) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8")
+
+
+def authority_fixture() -> Path:
+    """A tower whose authority is configured but not marked required (optional)."""
+    root = Path(tempfile.mkdtemp(prefix="pilot052-optional-")) / "tower-dsh"
+    for directory in ("primary", "supervision", "ledger", "state"):
+        (root / directory).mkdir(parents=True)
+    (root / "ledger" / "primary.jsonl").touch()
+    (root / "ledger" / "supervision.jsonl").touch()
+    write_json(root / "primary" / "CURRENT_STATE.json", {
+        "schema": "tower/current-state@1", "tower_id": "tower-dsh",
+        "role": "primary", "phase": "TEST", "primary": {"id": "ctl-primary"},
+        "owner": {"name": "mac"}, "next_action": "test"})
+    write_json(root / "primary" / "TASK_BOARD.json",
+               {"schema": "tower/task-board@1", "tasks": []})
+    write_json(root / "supervision" / "CURRENT_STATE.json", {
+        "schema": "tower/supervision-state@1", "role": "supervision",
+        "phase": "TEST", "supervisor": {"id": "sup-A"}})
+    write_json(root / "supervision" / "MERGE_QUEUE.json",
+               {"schema": "tower/merge-queue@1", "entries": []})
+    return root
+
+
 class ProfileCheckPositiveCase(unittest.TestCase):
     def test_template_is_parseable_without_running_probes(self) -> None:
         cp = tower_cli(TOWER_ROOT, "profile-check", "--file",
@@ -95,13 +122,13 @@ class ProfileCheckPositiveCase(unittest.TestCase):
         self.assertEqual(payload["checked"], 0)
         self.assertEqual(payload["findings"], [])
 
-    def test_real_profile_runs_all_ten_facts(self) -> None:
+    def test_real_profile_runs_all_facts(self) -> None:
         cp = tower_cli(TOWER_ROOT, "profile-check")
         self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)
         payload = json.loads(cp.stdout)
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["object"], "TOWER-DSH")
-        self.assertEqual(payload["checked"], 10)
+        self.assertEqual(payload["checked"], 11)
         self.assertEqual(payload["findings"], [])
         text = (TOWER_ROOT / "state" / "PROFILE-TOWER-DSH.md").read_text(
             encoding="utf-8")
@@ -205,6 +232,22 @@ class ProfileCheckNegativeCase(unittest.TestCase):
         self.assert_rejected(cp, "AUTH")
         findings = json.loads(cp.stdout)["findings"]
         self.assertIn("stdout has no", findings[0]["actual"])
+
+    def test_optional_authority_breaks_required_fact(self) -> None:
+        root = authority_fixture()
+        self.addCleanup(shutil.rmtree, root.parent, ignore_errors=True)
+        setup = tower_cli(root, "authority-set", "--supervisor", "sup-A",
+                          "--decision", "D-FIX", "--by", "mac")
+        self.assertEqual(setup.returncode, 0, setup.stdout + setup.stderr)
+        text = profile_doc(
+            fact(ident="AUTH", probe="authority-check",
+                 expect='exit=0; stdout="required": true'),
+            fact(ident="AUTH-CONF", probe="authority-check",
+                 expect='exit=0; stdout="status": "configured"'))
+        cp = self.run_profile(root, text)
+        self.assert_rejected(cp, "AUTH")
+        findings = json.loads(cp.stdout)["findings"]
+        self.assertEqual([item["id"] for item in findings], ["AUTH"])
 
 
 if __name__ == "__main__":

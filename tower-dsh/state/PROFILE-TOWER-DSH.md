@@ -12,11 +12,14 @@ status: active
 这是对象层的第一个 PROFILE：对象不是外部产品，而是这座塔自己。它只声明**对象
 不变量**——这些事实一旦不成立，塔给出的“完成/可信/可合并”结论就不再成立。
 每条事实的 `probe` 都是只读 towerctl 子命令，`profile-check` 在子进程里逐条运行；
-任何一条失败即 exit 2，不允许“文档说得好听、代码已经变了”。
+任何一条失败即 exit 2，不允许“文档说得好听、代码已经变了”。`expect` 只支持一个
+stdout 子串，所以 AUTH 拆成两条：`AUTH` 锁 `required=true`（可选化即失败），
+`AUTH-CONF` 锁 `status=configured`。
 
 | id | fact | probe | expect | why |
 |---|---|---|---|---|
-| AUTH | 合并权威已登记、与 primary 分离且被标记为 required | authority-check | exit=0; stdout=configured | 权威态是“谁能合并”的唯一事实来源；它一旦缺失或退化为 legacy，owner 四闸就只剩口头约定。 |
+| AUTH | 合并权威被标记为 required（policy + AUTHORITY_REQUIRED 双半） | authority-check | exit=0; stdout="required": true | required 是“授权不可被静默降级”的开关：一旦变成 optional，删掉标记就能退回 legacy，合并门重新变成字符串。 |
+| AUTH-CONF | 合并权威已登记，且与 primary 身份分离 | authority-check | exit=0; stdout="status": "configured" | 只有 configured 才存在可核对的合并权威身份；legacy/required_unconfigured 都意味着“谁可以合并”没有落盘事实。 |
 | LEDGER | primary/supervision 账本哈希链完整且可验证 | verify-ledger | exit=0 | 账本是权威事件链；链断则所有完成声明、证据与合并记录都可被静默改写。 |
 | STATE | 工作副本与账本重放一致（drift 为空） | state-verify | exit=0 | record/board/queue/envelope 只是账本的工作副本；副本与账本分叉即意味着塔在报告一个不存在的状态。 |
 | ARCH | ARCHITECTURE/GATES/INVARIANTS/EVENT_CATALOG 与代码逐条对账 | arch-check | exit=0 | 架构描述必须可证伪；门表或事件目录与代码脱节时，“结构是什么”就变成散文。 |
