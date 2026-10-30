@@ -27,7 +27,7 @@ COPIED = ("tools", "state", "arch", "adr", "ARCHITECTURE.md",
           "EVENT_CATALOG.json", "specs", "templates", "command")
 TREE_DIRS = ("primary", "supervision", "ledger", "tasks", "state")
 FACT_IDS = ("AUTH", "AUTH-CONF", "LEDGER", "STATE", "ARCH", "CAMPAIGN",
-            "SHAPE", "SPEC", "WHERE", "STARTUP", "WIRING")
+            "SHAPE", "SPEC", "WHERE", "STARTUP", "SPEC-COVERAGE")
 HEAD = """---
 schema: tower/profile@1
 object: FIXTURE

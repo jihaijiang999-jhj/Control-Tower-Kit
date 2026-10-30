@@ -28,4 +28,4 @@ stdout 子串，所以 AUTH 拆成两条：`AUTH` 锁 `required=true`（可选�
 | SPEC | 冻结 spec 与工作流文档结构合法（严格模式） | spec-lint --strict | exit=0 | spec 是任务边界的唯一契约；结构不合法时，allowed_paths/验收条件都可被误读。 |
 | WHERE | 位置图可由 campaign 与 board 机读渲染 | where --json | exit=0 | 位置是“现在打到哪”的机读答案；不可渲染时路由只能靠人回忆，交接必然失真。 |
 | STARTUP | 启动自检可完成并报告塔的真实阶段 | startup | exit=0 | 启动自检是每个会话进入塔的入口；它失败时后续所有命令都建立在未校验的前提上。 |
-| WIRING | 接线完整：关键目录、状态与命令入口都存在 | wiring | exit=0 | 接线是把组件变成塔的连接关系；缺线时命令仍能跑，但门禁与证据会落空。 |
+| SPEC-COVERAGE | spec 条款覆盖可复算 | spec-coverage | exit=0 | 条款覆盖是 spec 契约的机读证据；覆盖计算失败时，“每条规范都有测试/门”不再可核对。 |
