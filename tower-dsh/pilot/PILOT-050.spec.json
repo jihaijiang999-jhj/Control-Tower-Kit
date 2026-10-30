@@ -1,0 +1,59 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-050",
+  "title": "命令层接线：dispatch 必填 campaign、post-merge/CI 跑 campaign+arch、W1 回填",
+  "objective": {
+    "problem": "045–049 建了命令层与架构脊柱，但没有接进执行路径：dispatch 不要求 campaign，卡可以脱离战役被派发；campaign-check/arch-check 只在人手动跑；W1 把 44 张 campaign 之前的历史卡全报成孤儿，--strict 永远红。地图存在，施工不受地图约束。",
+    "outcome": "当塔有 active campaign 时，dispatch 缺 campaign 直接 exit 2 且零状态变更；合法 campaign 写入 record 与 DISPATCH payload；post-merge 与 CI 自动跑 campaign-check/arch-check；真实塔 W1=0、W2 只数 open，W4 仍有 051/052（strict 暂不开启）。",
+    "approach": "dispatch 增加 --campaign（active campaign 塔必填，校验存在/active/在 roadmap），campaign-check 的 W1 覆盖 task_forces ∪ dispatch.campaign ∪ legacy_cards，W2 改为只数非 closed 卡；campaign 文件一次性回填 PILOT-001..044 到 legacy_cards；post-merge 在文件存在时追加两门（不存在则 skipped），CI 在 status 前加两门；不新增事件类型、不改 spec schema。",
+    "non_goals_and_done": "不把 44 张历史卡塞进 task_forces（不伪造会员），不改四闸/状态机/spec@2/事件目录，不开启 --strict（W4 未清）；dispatch 适配、W1=0、post-merge/CI 接线、正反例测试与独立复核完成、合并后 post-merge 7/7 才算完成。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0003 / 045–049 命令层与架构脊柱",
+  "why_now": "049 objective 门已把“卡要说清楚”前置；现在要让“卡必须挂战役、门必须自动跑”落地，否则 W1 44 与 --strict 永红，050 回填是 051 对象层/052 shape 的前置。",
+  "scope": [
+    "dispatch：新增 --campaign <id>；当塔存在 active campaign 时必填；校验 campaign 存在、status=active、任务 id 在 roadmap 中；写入 record.dispatch.campaign 与 DISPATCH payload.campaign；缺失/无效 → exit 2 且不写 record/ledger；没有 campaign 的夹具塔保持旧行为",
+    "campaign-check W1：覆盖来源改为 task_forces ∪ record.dispatch.campaign ∪ campaign.legacy_cards；legacy_cards 是 001–044 的历史记账（campaign 之前已闭环），不是追溯会员",
+    "campaign-check W2：只统计 task_forces 中非 closed 的卡（open WIP），closed 卡不占预算；W4 不变",
+    "command/campaigns/C-2026-Q4-01.md：新增 legacy_cards: [PILOT-001 … PILOT-044]（44 条，含 043 ready）；task_forces 保持 045–049；current 保持 050；正文注明 legacy 含义",
+    "post-merge：存在 command/campaigns/*.md 与 arch/GATES.json 时，追加 campaign-check 与 arch-check 两项检查；失败 → CORRECTION_REQUIRED；文件不存在 → 该检查 ok=true + skipped/not-applicable，不改变旧夹具行为",
+    "CI：.github/workflows/tower-gate.yml 在 status 之前增加 arch-check 与 campaign-check（非 --strict），不加 continue-on-error，保持 status 最后一步",
+    "ARCHITECTURE.md：同步 CI 实际步骤（7 步：unit/spec-lint/spec-coverage/verify-ledger/arch-check/campaign-check/status）与 post-merge 的 campaign/arch 两检",
+    "新增 tools/tests/test_wiring.py：dispatch 必填/无效/合法/无 campaign 夹具；W1 legacy/dispatch.campaign/task_forces 三来源；W2 只数 open；post-merge 有/无文件与失败；CI 步骤顺序；全部干净 exit 2 无 Traceback",
+    "不改 036–049 的信任边界/授权/前置链/范围门/completion/shape/objective 语义；不新增事件类型；不改 spec@2；不写 primary/supervision/ledger"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-050/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-050/tower-dsh/tools/tests/test_wiring.py",
+    "pilot/worktrees/PILOT-050/tower-dsh/command/campaigns/C-2026-Q4-01.md",
+    "pilot/worktrees/PILOT-050/tower-dsh/.github/workflows/tower-gate.yml",
+    "pilot/worktrees/PILOT-050/tower-dsh/ARCHITECTURE.md"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening existing gates",
+    "adding PILOT-001..044 to task_forces (fake membership)",
+    "enabling campaign-check --strict in CI",
+    "new ledger event types",
+    "changing tower/spec@2 or objective semantics",
+    "touching TOWER.md (L0)"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-050/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 552 + 新增用例数（main 基线 552）",
+    "dispatch：有 active campaign 的夹具缺 --campaign → exit 2 单 JSON，record/ledger 不变；无效 campaign/任务不在 roadmap → exit 2；合法 → record.dispatch.campaign 与 DISPATCH payload.campaign 一致；无 campaign 夹具旧行为不变",
+    "campaign-check：真实塔 W1=0（legacy_cards 覆盖 001–044）、W4=3、exit 0；新增未挂 campaign 的 open 卡 → W1；closed 卡不计 W2；legacy_cards 缺失时 W1 恢复报孤儿",
+    "post-merge：有 campaign/arch 文件的夹具出现 campaign-check/arch-check 两项；让 campaign-check 失败 → exit 2 + CORRECTION_REQUIRED；无文件夹具 → 两项 ok=true 且 detail 标记 skipped/not-applicable，7/7 旧检查不回归",
+    "CI：workflow 在 status 前含 arch-check 与 campaign-check，status 仍最后，无 continue-on-error；test_ci_gate 不回归",
+    "ARCHITECTURE.md 的 CI 步骤与 post-merge 描述与 workflow/代码一致（7 步 + 两检）",
+    "旧码对照：main dispatch 无 --campaign 仍可派发、campaign-check W1=44；新码缺 campaign 拒绝、W1=0。证据写进 scratch/probe-old-code.txt",
+    "shape-check 在 worktree exit 0（新增函数 ≤80 行/≤12 分支；既有函数不增长）",
+    "真实塔：worktree 新工具 arch-check/campaign-check/authority-check exit 0、state-verify drift []；建信封前 tasks=50/envelopes=48，建信封后 50/49；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-050 diff --name-only main..HEAD 恰五个 allowed_paths"
+  ],
+  "depends_on": ["PILOT-049"],
+  "worktree": "pilot/worktrees/PILOT-050"
+}
