@@ -23,8 +23,9 @@ related_files:
 
 1. **重放**：`ENVELOPE_NEW` 命中已有信封时**保留已有状态**（`WAITING`/`CORRECTION_REQUIRED`/`MERGED`），只有全新信封才置 `DRAFT`。
 2. **重信命令**：`envelope-new` 对 `MERGED` 信封 exit 2（不能重开已合并）；对已有 `WAITING`/`CORRECTION_REQUIRED` 保留状态并更新 head；新信封写 `DRAFT`。
-3. **merge 入口**：在读队列之后、写 `MERGE_START` 之前，要求信封状态 ∈ {`WAITING`, `CORRECTION_REQUIRED`}；`DRAFT`/`MERGED` → exit 2，零 ledger 写入。
-4. **不加事件类型、不改 ledger**：修复的是折叠/入口语义，不重写历史。
+3. **入队命令**：`queue-add` 首次入队或修复半写时，把 envelope 文件状态从 `DRAFT` 置 `WAITING`；正常首次 merge 走 `DRAFT → queue-add WAITING → merge`。
+4. **merge 入口**：在读队列之后、写 `MERGE_START` 之前，要求信封文件状态 ∈ {`WAITING`, `CORRECTION_REQUIRED`}，且队列条目 WAITING；`DRAFT`/`MERGED` → exit 2，零 ledger 写入。
+5. **不加事件类型、不改 ledger**：修复的是折叠/入口语义，不重写历史。
 
 ## 替代方案
 
