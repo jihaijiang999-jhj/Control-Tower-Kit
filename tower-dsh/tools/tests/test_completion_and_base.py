@@ -1,4 +1,4 @@
-﻿"""Tests for PILOT-042: authorized completions and the dispatch base_sha anchor.
+"""Tests for PILOT-042: authorized completions and the dispatch base_sha anchor.
 
 ``completion-add`` records an owner-signed completion twice -- one
 ``COMPLETION_ADDED`` event in ``ledger/primary.jsonl`` and one isomorphic
@@ -709,13 +709,13 @@ class BaseShaTestCase(GitWorktreeFixture):
 
     # -- 3. base_sha must be an ancestor of HEAD ---------------------------
     def test_base_sha_not_ancestor_is_rejected(self) -> None:
-        self.require_dispatch()
+        # PILOT-043 R1: move main before dispatch so the event itself carries
+        # a non-ancestor sha (record-only tampering is caught by the sha gate).
         run_git(self.kit, "commit", "--allow-empty", "-m", "divergent main")
         divergent = run_git(self.kit, "rev-parse", "main").stdout.strip()
+        self.require_dispatch()
+        self.assertEqual(self.load_record()["dispatch"]["base_sha"], divergent)
 
-        record = self.load_record()
-        record["dispatch"]["base_sha"] = divergent
-        self.save_record(record)
         self.write_worktree("tower-dsh/tools/x.py", "x = 2\n")
         self.commit_worktree("in scope change")
 

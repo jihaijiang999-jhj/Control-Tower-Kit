@@ -2724,6 +2724,40 @@ def _dispatch_base_sha(rec: dict) -> str | None:
     return None
 
 
+def _payload_base_sha(payload: dict | None) -> str | None:
+    """The non-empty ``base_sha`` of one DISPATCH payload, or None."""
+    raw = payload.get("base_sha") if isinstance(payload, dict) else None
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return None
+
+
+def deliver_dispatch_base_sha(root: Path, rec: dict) -> str | None:
+    """PILOT-043 R1: the latest DISPATCH payload is the only diff baseline.
+
+    ``record.dispatch.base_sha`` is a working copy, so an attacker could set it
+    to ``HEAD`` (emptying the deliver diff) and restore it afterwards.  The
+    ledger event is the authority: a record value that disagrees with (or is
+    unbacked by) the latest ``DISPATCH`` payload aborts before any diff or
+    write.  Two empty halves stay legacy (the ``merge-base main HEAD`` path in
+    :func:`deliver_scope`); when the event has a value it is returned so the
+    caller can pass the *event* value, not the record value, to the diff.
+    """
+    events = ledger_payloads_by_task(root, "DISPATCH").get(
+        str(rec.get("id") or ""), [])
+    event_sha = _payload_base_sha(events[-1] if events else None)
+    recorded = _dispatch_base_sha(rec)
+    if event_sha is None:
+        if recorded is not None:
+            fail([f"dispatch base_sha does not match DISPATCH event: record "
+                  f"{recorded!r} is not backed by a DISPATCH event"])
+        return None
+    if recorded != event_sha:
+        fail([f"dispatch base_sha does not match DISPATCH event: record "
+              f"{recorded!r} != event {event_sha!r}"])
+    return event_sha
+
+
 def completion_paths(rec: dict) -> list[str]:
     """Well-formed ``record.completions`` paths, in recorded order."""
     values: list[str] = []
@@ -3064,6 +3098,12 @@ def cmd_deliver(root: Path, args) -> None:
     # evidence is copied, so a rejected delivery leaves the record and the
     # evidence directory untouched.  PILOT-042 lets recorded completions join
     # that allow-list and reports the ones the diff actually used.
+    # PILOT-043 R1: the DISPATCH ledger event, not the mutable record, fixes the
+    # diff base.  A record value changed to HEAD (and later restored) cannot
+    # empty the diff; a disagreement aborts before the diff is computed.
+    event_base_sha = deliver_dispatch_base_sha(root, rec)
+    if event_base_sha is not None and isinstance(rec.get("dispatch"), dict):
+        rec["dispatch"]["base_sha"] = event_base_sha
     scope_errors, scope_files, scope_skipped, scope_completions = deliver_scope(root, rec)
     if scope_errors:
         fail(scope_errors)
@@ -5938,10 +5978,7 @@ def _dispatch_base_sha_drift(task_id: str, record: dict,
     halves are a legacy record and yield no row, so old towers verify clean.
     """
     recorded = _dispatch_base_sha(record)
-    event = events[-1] if events else None
-    raw_event = event.get("base_sha") if isinstance(event, dict) else None
-    event_sha = (raw_event.strip() if isinstance(raw_event, str)
-                 and raw_event.strip() else None)
+    event_sha = _payload_base_sha(events[-1] if events else None)
     if recorded is None and event_sha is None:
         return []
     if recorded is None:
