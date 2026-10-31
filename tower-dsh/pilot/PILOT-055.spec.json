@@ -35,7 +35,7 @@
     "production access",
     "changing shape baseline",
     "weakening CI (continue-on-error, removing steps, moving status earlier)",
-    "modifying other tests or ARCHITECTURE sections beyond the CI step list",
+    "modifying other tests or ARCHITECTURE sections beyond the CI step list and the re-dispatch note",
     "blanket dispatch from delivered/reviewed/accepted/closed"
   ],
   "acceptance": [
