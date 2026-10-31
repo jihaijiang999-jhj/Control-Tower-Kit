@@ -160,6 +160,29 @@ class RecordLayerGitFixture(unittest.TestCase):
     def append_completion_event(self, payload: dict) -> None:
         towerctl.append_ledger(self.tower, "COMPLETION_ADDED", "primary", payload)
 
+    def append_dispatch_event(self, base_sha: str) -> None:
+        towerctl.append_ledger(self.tower, "DISPATCH", "primary",
+                               {"task": TASK_ID, "base_sha": base_sha})
+
+    def git_sha(self, cwd: Path, *args: str) -> str:
+        cp = run_git(cwd, *args)
+        self.assertEqual(cp.returncode, 0, msg=cp.stderr + cp.stdout)
+        return cp.stdout.strip()
+
+    def kit_main_sha(self) -> str:
+        return self.git_sha(self.kit, "rev-parse", "main")
+
+    def worktree_head_sha(self) -> str:
+        return self.git_sha(self.worktree, "rev-parse", "HEAD")
+
+    def set_record_base_sha(self, base_sha: str | None) -> None:
+        record = self.load_record()
+        if base_sha is None:
+            record["dispatch"].pop("base_sha", None)
+        else:
+            record["dispatch"]["base_sha"] = base_sha
+        self.save_record(record)
+
     def evidence_dir(self) -> Path:
         return self.tower / "tasks" / TASK_ID / "evidence"
 
@@ -274,6 +297,62 @@ class DeliverBackingTestCase(RecordLayerGitFixture):
                 self.assertIn(f"ledger {field} is empty",
                               "\n".join(json.loads(deliver.stdout)["errors"]))
                 self.assert_delivery_wrote_nothing()
+
+
+class DispatchBaseAuthorityTestCase(RecordLayerGitFixture):
+    """``deliver`` takes its diff base from the DISPATCH event, not the record."""
+
+    def test_record_and_event_base_sha_match_delivers(self) -> None:
+        base = self.kit_main_sha()
+        self.append_dispatch_event(base)
+        self.set_record_base_sha(base)
+
+        self.write_worktree("tower-dsh/tools/x.py", "x = 2\n")
+        self.commit_worktree("in scope change")
+
+        deliver = self.deliver()
+        self.assertEqual(deliver.returncode, 0, msg=deliver.stdout + deliver.stderr)
+        out = json.loads(deliver.stdout)
+        self.assertEqual(out["scope_files"], ["tower-dsh/tools/x.py"])
+        self.assertEqual(self.load_record()["status"], "delivered")
+
+    def test_record_base_sha_rewritten_to_head_is_rejected(self) -> None:
+        base = self.kit_main_sha()
+        self.append_dispatch_event(base)
+        self.set_record_base_sha(base)
+
+        # The attack: move the record baseline to HEAD so the diff looks empty,
+        # while the out-of-scope change stays on the branch.  The DISPATCH event
+        # still points at the branch base, so deliver must reject before the
+        # diff is computed.
+        self.write_worktree("tower-dsh/pilot/other.json", '{"v": 2}\n')
+        self.commit_worktree("out of scope change")
+        head = self.worktree_head_sha()
+        self.set_record_base_sha(head)
+
+        deliver = self.deliver()
+        self.assert_failed_with(
+            deliver, "dispatch base_sha does not match DISPATCH event")
+        self.assertIn(head, "\n".join(json.loads(deliver.stdout)["errors"]))
+        self.assert_delivery_wrote_nothing()
+
+    def test_record_base_sha_without_dispatch_event_is_rejected(self) -> None:
+        self.set_record_base_sha(self.kit_main_sha())
+
+        deliver = self.deliver()
+        self.assert_failed_with(
+            deliver, "is not backed by a DISPATCH event")
+        self.assert_delivery_wrote_nothing()
+
+    def test_event_base_sha_missing_from_record_is_rejected(self) -> None:
+        base = self.kit_main_sha()
+        self.append_dispatch_event(base)
+        self.set_record_base_sha(None)
+
+        deliver = self.deliver()
+        self.assert_failed_with(
+            deliver, "dispatch base_sha does not match DISPATCH event")
+        self.assert_delivery_wrote_nothing()
 
 
 def build_verify_tower(root: Path, task: str, *, base_sha: str | None) -> None:
