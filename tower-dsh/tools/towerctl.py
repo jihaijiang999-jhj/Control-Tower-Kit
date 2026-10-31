@@ -2535,6 +2535,150 @@ def completion_events(root: Path, task_id: str) -> list[dict]:
     return payloads
 
 
+def ledger_payloads_by_task(root: Path, event_type: str) -> dict[str, list[dict]]:
+    """Payloads of ``event_type`` events in the primary ledger, keyed by task.
+
+    PILOT-043 reads the same projection twice (``COMPLETION_ADDED`` for the
+    deliver/completion audit and ``DISPATCH`` for the ``base_sha`` audit), so
+    the grouping lives in one read-only helper.
+    """
+    grouped: dict[str, list[dict]] = {}
+    for event in ledger_events_in_seq_order(root, "primary"):
+        if event.get("type") != event_type:
+            continue
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        task = payload.get("task")
+        if isinstance(task, str) and task:
+            grouped.setdefault(task, []).append(payload)
+    return grouped
+
+
+def _completion_at_second(value):
+    """An ISO timestamp truncated to whole seconds, else the raw string."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).replace(
+            microsecond=0)
+    except ValueError:
+        return text
+
+
+def _completion_field_differences(entry: dict, payload: dict,
+                                  owner: str | None = None) -> list[str]:
+    """Fields where a record completion entry disagrees with its event payload.
+
+    ``path`` was already compared after :func:`_norm_tower_rel` normalisation
+    by the caller, so only the textual/identity fields and ``at`` (same second)
+    are compared here.  An empty half is a difference too: the delivery gate
+    must reject a completion whose authority cannot be read back.
+    """
+    diffs: list[str] = []
+    for field in COMPLETION_ENTRY_FIELDS + ("at",):
+        value = entry.get(field)
+        event_value = payload.get(field)
+        if not isinstance(value, str) or not value.strip():
+            diffs.append(f"record {field} is empty")
+        elif not isinstance(event_value, str) or not event_value.strip():
+            diffs.append(f"ledger {field} is empty")
+        elif field == "at":
+            if _completion_at_second(value) != _completion_at_second(event_value):
+                diffs.append("at")
+        elif field != "path" and value != event_value:
+            diffs.append(field)
+    if owner is not None and payload.get("by") != owner:
+        diffs.append(f"by {payload.get('by')!r} is not owner {owner!r}")
+    return diffs
+
+
+def _completion_backing_entry_errors(entry: dict, path: str | None,
+                                     path_error: str | None,
+                                     event_paths: dict[str, list[dict]],
+                                     owner: str | None) -> list[str]:
+    """Errors for one diff-hit record entry against its ledger events."""
+    if path_error:
+        return [f"completion record does not match ledger event: {path_error}"]
+    if not owner:
+        return ["completion owner unknown: primary/CURRENT_STATE.json has no "
+                "owner.name"]
+    payloads = event_paths.get(path or "")
+    if not payloads:
+        return [f"completion not backed by {COMPLETION_ADDED}: {path}"]
+    diffs: list[str] = []
+    for payload in payloads:
+        diffs = _completion_field_differences(entry, payload, owner)
+        if not diffs:
+            return []
+    return [f"completion record does not match ledger event: {path} "
+            f"({'; '.join(diffs)})"]
+
+
+def _completion_event_paths(root: Path,
+                            task_id: str) -> dict[str, list[dict]]:
+    """``COMPLETION_ADDED`` payloads for one task, normalised-path keyed."""
+    event_paths: dict[str, list[dict]] = {}
+    for payload in ledger_payloads_by_task(root, COMPLETION_ADDED).get(task_id, []):
+        path, error = _norm_tower_rel(root, payload.get("path"))
+        if not error:
+            event_paths.setdefault(path, []).append(payload)
+    return event_paths
+
+
+def _completion_entries_by_target(root: Path, rec: dict, used: list[str],
+                                  worktree_rel: str,
+                                  tower_rel: str) -> dict[str, list[dict]]:
+    """Record completion entries keyed by the worktree path the diff uses."""
+    entries_by_target: dict[str, list[dict]] = {}
+    for entry in rec.get("completions") or []:
+        if not isinstance(entry, dict):
+            continue
+        path, error = _norm_tower_rel(root, entry.get("path"))
+        if error:
+            continue
+        target = allowed_repo_path(path, worktree_rel, tower_rel)
+        if target in used:
+            entries_by_target.setdefault(target, []).append(entry)
+    return entries_by_target
+
+
+def completion_backing_errors(root: Path, rec: dict,
+                              used: list[str]) -> list[str]:
+    """PILOT-043: every completion the diff actually hit must be backed.
+
+    A ``record.completions`` entry alone grants nothing: for each mapped path
+    in ``used`` (the worktree-relative completions the deliver diff touched)
+    the primary ledger must hold a matching ``COMPLETION_ADDED`` for the same
+    task+path, its ``by`` must be the registered owner, ``path``/``by``/
+    ``reason``/``decision`` must be non-empty, and every field must agree with
+    the record entry (``at`` at whole-second precision).  Read-only; any error
+    is returned before ``deliver`` writes evidence or a DELIVER event.
+    """
+    if not used:
+        return []
+    worktree_rel = str(rec.get("worktree") or "").strip()
+    repo = authority_repo(root)
+    tower_rel = (repo_relative(repo, root) or "") if repo is not None else ""
+    _, state = _read_json_object(root / "primary" / "CURRENT_STATE.json")
+    owner = _state_owner_name(state) if isinstance(state, dict) else None
+    event_paths = _completion_event_paths(root, str(rec.get("id") or ""))
+    entries_by_target = _completion_entries_by_target(
+        root, rec, used, worktree_rel, tower_rel)
+    errors: list[str] = []
+    for target in used:
+        entries = entries_by_target.get(target)
+        if not entries:
+            errors.append(f"completion not backed by {COMPLETION_ADDED}: {target}")
+            continue
+        for entry in entries:
+            path, error = _norm_tower_rel(root, entry.get("path"))
+            errors += _completion_backing_entry_errors(
+                entry, path, error, event_paths, owner)
+    return errors
+
+
 def allowed_repo_path(allowed: str, worktree_rel: str, tower_rel: str) -> str | None:
     """Map one tower-relative ``allowed_paths`` entry to a worktree-relative path.
 
@@ -2923,6 +3067,12 @@ def cmd_deliver(root: Path, args) -> None:
     scope_errors, scope_files, scope_skipped, scope_completions = deliver_scope(root, rec)
     if scope_errors:
         fail(scope_errors)
+    # PILOT-043: the record half is not authority.  Each completion the diff
+    # actually used must be backed by a matching COMPLETION_ADDED event, signed
+    # by the owner, before a single evidence byte or DELIVER event is written.
+    completion_errors = completion_backing_errors(root, rec, scope_completions)
+    if completion_errors:
+        fail(completion_errors)
     # PILOT-044: the same no-writes-before-the-gate rule now covers shape -- the
     # worktree's own ratchet runs before the first evidence copy.
     shape_errors, shape_skipped = deliver_shape_gate(root, rec)
@@ -5778,6 +5928,66 @@ def _authority_state_drift(root: Path, skip) -> list[dict]:
     return rows
 
 
+def _dispatch_base_sha_drift(task_id: str, record: dict,
+                             events: list[dict]) -> list[dict]:
+    """PILOT-043: compare ``record.dispatch.base_sha`` with its DISPATCH event.
+
+    The event half is the authority: a non-empty record value must equal the
+    latest ``DISPATCH`` payload's ``base_sha`` (``dispatch_base_mismatch``), and
+    an event value the record dropped is ``dispatch_base_missing``.  Two empty
+    halves are a legacy record and yield no row, so old towers verify clean.
+    """
+    recorded = _dispatch_base_sha(record)
+    event = events[-1] if events else None
+    raw_event = event.get("base_sha") if isinstance(event, dict) else None
+    event_sha = (raw_event.strip() if isinstance(raw_event, str)
+                 and raw_event.strip() else None)
+    if recorded is None and event_sha is None:
+        return []
+    if recorded is None:
+        return [{"kind": "dispatch_base_missing", "target": task_id,
+                 "expected": event_sha, "actual": None}]
+    if event_sha != recorded:
+        return [{"kind": "dispatch_base_mismatch", "target": task_id,
+                 "expected": event_sha, "actual": recorded}]
+    return []
+
+
+def _completion_mismatch_drift(root: Path, task_id: str, record: dict,
+                               events: list[dict]) -> list[dict]:
+    """PILOT-043: record entries that disagree with their backing event.
+
+    Only entries whose path has a backing event are compared here; a missing
+    event stays ``completion_unbacked`` (PILOT-042's :func:`_completion_drift`),
+    so one forged pair is not reported twice.
+    """
+    by_path: dict[str, dict] = {}
+    for payload in events:
+        path, error = _norm_tower_rel(root, payload.get("path"))
+        if not error:
+            by_path.setdefault(path, payload)
+    rows: list[dict] = []
+    completions = record.get("completions")
+    for entry in completions if isinstance(completions, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        path, error = _norm_tower_rel(root, entry.get("path"))
+        payload = by_path.get(path) if not error else None
+        if payload is None:
+            continue
+        diffs = _completion_field_differences(entry, payload)
+        if not diffs:
+            continue
+        fields = COMPLETION_ENTRY_FIELDS + ("at",)
+        rows.append({
+            "kind": "completion_mismatch", "target": task_id, "path": path,
+            "expected": {field: payload.get(field) for field in fields},
+            "actual": {field: entry.get(field) for field in fields},
+            "differences": diffs,
+        })
+    return rows
+
+
 def _completion_drift(root: Path, task_id: str, record: dict,
                       events: list[dict]) -> list[dict]:
     """PILOT-042: audit ``record.completions`` against COMPLETION_ADDED events.
@@ -5859,6 +6069,35 @@ def _completion_drift(root: Path, task_id: str, record: dict,
     return drift
 
 
+def _skipped_completion_drift(root: Path, task_id: str,
+                              events: list[dict]) -> list[dict]:
+    """PILOT-043: audit completions of a ``no_lifecycle_events`` task.
+
+    A record whose replay is skipped is still a record someone could have
+    written by hand.  When it claims completions, both halves are audited
+    exactly like a replayed task; a legacy record without completions yields
+    no row and no extra skip, so old towers verify as before.
+    """
+    if not is_safe_id(task_id, TASK_ID_RE):
+        return []
+    _, record = _read_json_object(root / "tasks" / task_id / "record.json")
+    if record is None:
+        return []
+    completions = record.get("completions")
+    if not isinstance(completions, list) or not completions:
+        return []
+    return (_completion_drift(root, task_id, record, events)
+            + _completion_mismatch_drift(root, task_id, record, events))
+
+
+def _record_layer_drift(root: Path, task_id: str, record: dict,
+                        completion_events: list[dict],
+                        dispatch_events: list[dict]) -> list[dict]:
+    """PILOT-043: field and base_sha audits for one replayed task record."""
+    return (_completion_mismatch_drift(root, task_id, record, completion_events)
+            + _dispatch_base_sha_drift(task_id, record, dispatch_events))
+
+
 def state_verify_drift(root: Path) -> dict:
     """Compare replayed state with records, board, queue and envelopes.
 
@@ -5901,16 +6140,8 @@ def state_verify_drift(root: Path) -> dict:
     drift: list[dict] = list(transitions)
     skipped: list[dict] = []
     evidence_checked = 0
-    completion_events_by_task: dict[str, list[dict]] = {}
-    for event in ledger_events_in_seq_order(root, "primary"):
-        if event.get("type") != COMPLETION_ADDED:
-            continue
-        payload = event.get("payload")
-        if not isinstance(payload, dict):
-            continue
-        owner_task = payload.get("task")
-        if isinstance(owner_task, str) and owner_task:
-            completion_events_by_task.setdefault(owner_task, []).append(payload)
+    completion_events_by_task = ledger_payloads_by_task(root, COMPLETION_ADDED)
+    dispatch_events_by_task = ledger_payloads_by_task(root, "DISPATCH")
 
     def skip(kind: str, target: str, reason: str) -> None:
         skipped.append({"kind": kind, "target": target, "reason": reason})
@@ -5951,6 +6182,9 @@ def state_verify_drift(root: Path) -> dict:
         for child in tasks_dir.iterdir():
             if child.is_dir() and (child / "record.json").is_file():
                 task_ids.add(child.name)
+    for task_id in sorted(set(completion_events_by_task) - task_ids):
+        drift.append({"kind": "completion_orphan", "target": task_id,
+                      "expected": "existing task record", "actual": "none"})
     envelope_ids = set(envelope_states)
     envelope_file_ids: set[str] = set()
     envelopes_dir = root / "supervision" / "envelopes"
@@ -5976,6 +6210,8 @@ def state_verify_drift(root: Path) -> dict:
         expected = task_states.get(task_id)
         if expected is None:
             skip("task", task_id, "no_lifecycle_events")
+            drift.extend(_skipped_completion_drift(
+                root, task_id, completion_events_by_task.get(task_id, [])))
             continue
         state, record = ("missing", None)
         if is_safe_id(task_id, TASK_ID_RE):
@@ -6001,6 +6237,9 @@ def state_verify_drift(root: Path) -> dict:
             drift.extend(_completion_drift(
                 root, task_id, record,
                 completion_events_by_task.get(task_id, [])))
+            drift.extend(_record_layer_drift(root, task_id, record,
+                                             completion_events_by_task.get(task_id, []),
+                                             dispatch_events_by_task.get(task_id, [])))
         if board is None:
             continue
         board_entry = board_tasks.get(task_id)
