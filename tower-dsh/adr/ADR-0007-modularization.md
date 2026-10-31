@@ -11,7 +11,6 @@ related_cards:
 related_files:
   - tower-dsh/tools/towerctl.py
   - tower-dsh/ARCHITECTURE.md
-  - tower-dsh/.github/workflows/tower-gate.yml
 ---
 
 # ADR-0007 — towerctl 模块化 + shape 接 CI
