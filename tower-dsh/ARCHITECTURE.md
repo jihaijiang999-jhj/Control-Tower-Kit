@@ -37,7 +37,7 @@ owner: mac
 | Tasks | `tasks/<ID>/{TASK.md,record.json,evidence/,DELIVERY.md,REVIEW.md}` | 任务卡与证据 | 绕过 `towerctl` 写 |
 | Pilot | `pilot/<ID>.spec.json` + `pilot/worktrees/<ID>/` | 冻结 spec、隔离执行区 | merge |
 | Tools | `tools/towerctl.py`、`tools/run_tests.py`、`tools/spec_lint.py`、`tools/spec_coverage.py` | 唯一状态/门禁 CLI 与静态检查 | 联网、写塔外路径 |
-| CI | `.github/workflows/tower-gate.yml` | 只读复跑 7 步：unit tests / spec-lint --strict / spec-coverage / verify-ledger / arch-check / campaign-check / status（status 仍是最后一步，无 continue-on-error）；shape-check 于 051 接入，state-verify/authority-check 待明确 | 改状态、merge |
+| CI | `.github/workflows/tower-gate.yml` | 只读复跑 8 步：unit tests / spec-lint --strict / spec-coverage / verify-ledger / arch-check / campaign-check / shape-check / status（status 仍是最后一步，无 continue-on-error）；shape-check 于 055 接入 CI（ADR-0007），state-verify/authority-check 待明确 | 改状态、merge |
 | Docs | `ARCHITECTURE.md`、`arch/`、`adr/`、`EVENT_CATALOG.json` | WHY/HOW 的可证伪描述 | 冒充权威（代码与 ledger 才是） |
 
 ## 3. 数据流
@@ -59,10 +59,10 @@ spec (pilot/<ID>.spec.json)
                    存在 command/campaigns/*.md 时追加 campaign-check，存在
                    arch/GATES.json 时追加 arch-check（失败即 CORRECTION_REQUIRED，
                    文件不存在则该门不追加，旧塔行为不变）
-  → CI             只跑 7 步：unit tests / spec-lint --strict / spec-coverage /
-                   verify-ledger / arch-check / campaign-check / status（GATE-CI，
-                   status 最后；shape-check 于 051 接入，state-verify/authority-check
-                   待明确）
+  → CI             只跑 8 步：unit tests / spec-lint --strict / spec-coverage /
+                   verify-ledger / arch-check / campaign-check / shape-check /
+                   status（GATE-CI，status 最后；shape-check 于 055 接入，
+                   state-verify/authority-check 待明确）
 ```
 
 每一步的输入/输出都是文件：ledger 事件是权威，record/board/queue/envelope 是
@@ -97,7 +97,10 @@ exit 2 单 JSON、零 `MERGE_START`/零 ledger 写入；无重信历史的手写
 条目，纠正后的信封重新入队不是必需步骤。
 
 **命令**：`python tools/towerctl.py <cmd>` 是唯一入口；argparse 的子命令名是
-命令名的权威，`arch/GATES.json.gates[].command` 必须命中它。
+命令名的权威，`arch/GATES.json.gates[].command` 必须命中它。`dispatch` 的状态机
+只放开窄语义：`DISPATCH` 的合法源状态为 `ready/rework/dispatched`；`dispatched`
+仅用于**替换 executor** 的 re-dispatch，`delivered`/`reviewed`/`accepted`/`closed`
+仍拒绝，`state-verify` 的 `illegal_transition` 不再报。
 
 **卡依赖**：`depends_on` 有三处校验点——`task-new` 查结构（字符串列表、非自依赖、
 无重复、目标存在于 board 或 `tasks/<id>/`），`check --phase ready` 与 `dispatch`

@@ -12,6 +12,10 @@ green while the command crashed.  ``towerctl`` now pins stdio to UTF-8 and the
 workflow must not carry ``continue-on-error`` at all - a real failure turns the
 build red.
 
+``PILOT-055`` grows the gate from seven to eight steps: ``shape-check`` runs
+after ``campaign-check`` and before ``status``, which stays last.  The step
+table and the step count below pin that order.
+
 These tests only read files inside the repository.  They never touch the
 network, never call ``gh`` and never depend on the live working-tree state, so
 they run unchanged locally and in CI.
@@ -42,10 +46,16 @@ COMMANDS = {
     "spec lint": "python tools/towerctl.py spec-lint --strict",
     "spec coverage": "python tools/towerctl.py spec-coverage",
     "verify ledger": "python tools/towerctl.py verify-ledger",
+    "arch check": "python tools/towerctl.py arch-check",
+    "campaign check": "python tools/towerctl.py campaign-check",
+    "shape check": "python tools/towerctl.py shape-check",
     "status": "python tools/towerctl.py status",
 }
+# PILOT-055: seven gates plus the informational status step.
+GATE_STEP_COUNT = 8
 HARD_GATE_COMMANDS = [COMMANDS[name] for name in
-                      ("unit tests", "spec lint", "spec coverage", "verify ledger")]
+                      ("unit tests", "spec lint", "spec coverage", "verify ledger",
+                       "arch check", "campaign check", "shape check")]
 
 STEP_RE = re.compile(r"(?m)^\s*-\s+name:")
 
@@ -110,6 +120,27 @@ class CiGateWorkflowTestCase(unittest.TestCase):
             positions, sorted(positions),
             msg="workflow steps are out of order; commands found at "
                 f"{dict(zip(COMMANDS, positions))}:\n{self.workflow}")
+
+    def test_gate_runs_eight_steps_with_shape_after_campaign(self) -> None:
+        """PILOT-055: seven gates + status = eight steps; shape before status."""
+        run_steps = [block for block in self.steps
+                     if re.search(r"(?m)^\s+run:\s", block)]
+        self.assertEqual(
+            len(run_steps), GATE_STEP_COUNT,
+            msg=f"expected {GATE_STEP_COUNT} steps that run a command, found "
+                f"{len(run_steps)}:\n{self.workflow}")
+        self.assertEqual(
+            len(COMMANDS), GATE_STEP_COUNT,
+            msg=f"COMMANDS must describe all {GATE_STEP_COUNT} steps, "
+                f"found {len(COMMANDS)}")
+
+        campaign = self.workflow.index(COMMANDS["campaign check"])
+        shape = self.workflow.index(COMMANDS["shape check"])
+        status = self.workflow.index(COMMANDS["status"])
+        self.assertLess(campaign, shape,
+                        msg=f"shape check must follow campaign check:\n{self.workflow}")
+        self.assertLess(shape, status,
+                        msg=f"shape check must precede status:\n{self.workflow}")
 
     # -- 5. every command runs inside tower-dsh ---------------------------
     def test_workflow_uses_tower_dsh_working_directory(self) -> None:
