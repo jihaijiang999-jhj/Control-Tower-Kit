@@ -7,7 +7,7 @@ date: 2026-10-31
 deciders:
   - mac
 related_cards:
-  - PILOT-043
+  - PILOT-054
 related_files:
   - tower-dsh/tools/towerctl.py
   - tower-dsh/tools/tests/test_record_layer.py

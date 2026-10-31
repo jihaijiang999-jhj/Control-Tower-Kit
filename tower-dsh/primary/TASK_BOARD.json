@@ -423,16 +423,6 @@
       "updated_at": "2026-10-26T22:41:55+08:00"
     },
     {
-      "id": "PILOT-043",
-      "title": "记录层纵深：deliver 反查 completion 事件、state-verify 审计 base_sha 与孤悬 completion",
-      "status": "ready",
-      "authority": "workspace_write",
-      "executor": null,
-      "reviewer": null,
-      "next": "spec 审批：owner 或独立 reviewer 运行 spec-approve，然后 check --phase spec",
-      "updated_at": "2026-10-27T11:27:24+08:00"
-    },
-    {
       "id": "PILOT-044",
       "title": "形状预算 ratchet：shape-check（只判新增债务）+ REVIEW Structure 五问",
       "status": "closed",
@@ -531,7 +521,17 @@
       "reviewer": "subagent:45a48c46-014e-4a8d-ac69-64657684df01",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-053/MERGE.md",
       "updated_at": "2026-10-31T02:02:06+08:00"
+    },
+    {
+      "id": "PILOT-043",
+      "title": "记录层纵深：deliver 反查 completion、state-verify 审计 base_sha 与孤悬 completion",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:1f5074d9-400f-40e9-b713-50c910475816",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-043/MERGE.md",
+      "updated_at": "2026-10-31T13:47:19+08:00"
     }
   ],
-  "updated_at": "2026-10-31T02:02:06+08:00"
+  "updated_at": "2026-10-31T13:47:19+08:00"
 }
