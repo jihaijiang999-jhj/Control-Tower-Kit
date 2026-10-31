@@ -1,4 +1,4 @@
-# NEXT WINDOW — tower-dsh（2026-10-31：036 → 053）
+# NEXT WINDOW — tower-dsh（2026-10-31：036 → 054）
 
 > 给新窗口的第一条消息用。**本文件不是权威状态**；权威在 `primary/CURRENT_STATE.json`、
 > `primary/TASK_BOARD.json`、`supervision/MERGE_QUEUE.json`、`state/AUTHORITY.json`、
@@ -8,29 +8,29 @@
 > `040`（空账本守卫）、`041`（deliver 范围门）、`042`（授权完成清单 + base_sha）、
 > `044`（shape-check 形状门）、`045`（命令层 v1）、`046`（状态历史）、`047`（双视图位置图）、
 > `048`（架构脊柱）、`049`（objective 硬门）、`050`（命令层接线）、`051`（依赖门）、
-> `052`（对象层）、`053`（信封恢复）是收官后的十八张卡；`043` 暂缓 ready（未派）。
+> `052`（对象层）、`053`（信封恢复）、`054`（记录层）是收官后的十九张卡；`043` 已 superseded（closed、无 envelope）。
 > 判例与残余见 `control-tower/MAP.md` §6.16–§6.32；蓝图见 `control-tower/COMMAND-LAYER.md`；
 > 批次章程见 `control-tower/RUN-2026-10-30-E.md`。
 
-## 当前状态（2026-10-31 PILOT-053 闭环后）
+## 当前状态（2026-10-31 PILOT-054 闭环后）
 
 | 项 | 值 |
 |---|---|
 | 代号 | **应县木塔 / Yingxian**（`YX-001`） |
-| 任务 | `PILOT-001` … `PILOT-053`：52 张 closed + `PILOT-043` ready 暂缓（未派）；52 个信封 `POST_MERGE_VERIFIED` |
-| 测试 | `Ran 609 tests / OK（skipped=1）`（601 + 053 新增 8；skip 为平台 symlink） |
-| 状态自洽 | `state-verify` → 53 任务 / 52 信封 / 482 条证据 / drift 0；skipped 5（`025/039/041/044/053-VOID`） |
-| 账本 | primary 488 / supervision 279 事件，0 error（legacy 未哈希 53/26，按 INV-05 只计不判） |
+| 任务 | `PILOT-001` … `PILOT-054`：53 张 closed + `PILOT-043` superseded（closed、无 envelope）；54 个信封 `POST_MERGE_VERIFIED` |
+| 测试 | `Ran 630 tests / OK（skipped=1）`（609 + 054 新增 21；skip 为平台 symlink） |
+| 状态自洽 | `state-verify` → 54 任务 / 54 信封 / 504 条证据 / drift 0；skipped 5（`025/039/041/044/053-VOID`） |
+| 账本 | primary 505 / supervision 288 事件，0 error（legacy 未哈希 53/26，按 INV-05 只计不判） |
 | 权威态 | `authority-check` → **configured + requirement=required**（13 checks；`revision=2`、pin `sup-phase2-pilot`） |
 | 形状门 | `shape-check` → exit 0（38+ 文件 / 1,600+ 函数；基线 1,114 条） |
-| 架构门 | `arch-check` → exit 0（gates 17 / invariants 16 / events 29 / adrs 5 / sections 6；graph 40 nodes / 22 edges） |
+| 架构门 | `arch-check` → exit 0（gates 17 / invariants 16 / events 29 / adrs 6 / sections 6；graph 41 nodes / 24 edges） |
 | 目标门 | `tower/spec@2` + `objective` 四要素；`task-new` 零写入；`spec-lint` 只对 @2 强制；旧 @1 冻结 |
 | 命令层 | `campaign-check` → exit 0（W1 0 + W4 1；`--strict` 仍红，strict 未开启）；`brief` → 23 行七节 |
 | 依赖门 | `depends_on` 在 task-new（结构）、ready（闭合）、dispatch（闭合）三处硬校验；全塔 DFS 环检测 |
 | 对象层 | `state/PROFILE-TEMPLATE.md` + `state/PROFILE-TOWER-DSH.md`（11 行 / 10 逻辑事实）；`profile-check` 11/0 |
 | 信封恢复 | `ENVELOPE_NEW` 保留已有状态；`envelope-new` 拒绝重开 MERGED；`merge` 只拦“重信后 DRAFT” |
-| 位置图 | `where --json` → **9/10**、current `PILOT-054`、next `PILOT-054`；位置条 `[✅045]…[✅053][▶054]` |
-| CI | PR #7…#37 全绿；main 最近 run `41112033923` success（8m13s，head `af2ff30`） |
+| 位置图 | `where --json` → **10/11**、current `PILOT-055`、next `PILOT-055`；位置条 `[✅045]…[✅054][▶055]` |
+| CI | PR #7…#39 全绿；main 最近 run `41187643170` success（5m39s，head `e488609`） |
 | 阶段 | `HANDOFF_ACTIVE`；`authority_dirty_count=0`；工作树干净；`HEAD=origin/main=af2ff30` |
 | 036–042 | PR #21–#27；7/7；塔 `305/293`→`419/387` |
 | 044 | PR #28 `129dd4e`；7/7（塔 `441/419`）；shape ratchet + REVIEW 五问 |
@@ -43,7 +43,8 @@
 | 051 | PR #35 `b37450b`；9/9（塔 `585/569`）；depends_on 结构/闭合/无环 + ADR-0004；test_objective 夹具用 completion |
 | 052 | PR #36 `27c1872`；post-merge **9/9 重跑**（塔 `609/609`）；对象层 + profile-check；AUTH required 修复；CI probe 可移植性修复；baseline 585→609 |
 | 053 | PR #37 `e8d69f3`；9/9（塔 `609/601`）；re-envelope 恢复 + ADR-0005；052 post-merge 随之重跑通过 |
-| 043 | **ready 暂缓**（spec `8a28c80`，**@1/基线 419 已过期**）：记录层纵深；批次要求 VOID 后按 `@2 + objective` 重建 |
+| 054 | PR #39 `bc823b1`；9/9（塔 `630/609`）；记录层：completion 反查 + DISPATCH base_sha 权威 + 孤悬 drift；043 v2 改号；R1 关闭 |
+| 043 | **superseded**：v1/v2 均归档；保留一条 closed、无 envelope 的记录满足旧 `TASK_NEW`；`ENV-PILOT-043` 仍 CORRECTION 但 branch 已删、不可 merge，待 abandon/tombstone 卡 |
 
 ## 新窗口读序
 
@@ -55,7 +56,7 @@
 6. `primary/TASK_BOARD.json`
 7. `supervision/MERGE_QUEUE.json`
 8. `command/STRATEGY.md` + `command/campaigns/*.md`
-9. `towerctl where --json`（当前位置，9/10）
+9. `towerctl where --json`（当前位置，10/11）
 10. `ARCHITECTURE.md`（六节）+ `adr/ADR-0002/0003/0004/0005`
 11. `state/PROFILE-TEMPLATE.md` + `state/PROFILE-TOWER-DSH.md`（对象层）
 12. `arch/GATES.json`、`arch/INVARIANTS.json`、`EVENT_CATALOG.json`
@@ -72,14 +73,14 @@ python tools/towerctl.py wiring
 python tools/towerctl.py status
 python tools/towerctl.py state-verify
 python tools/towerctl.py authority-check      # 必须 exit 0 / configured / requirement=required
-python tools/towerctl.py arch-check           # gates 17 / invariants 16 / events 29 / adrs 5
+python tools/towerctl.py arch-check           # gates 17 / invariants 16 / events 29 / adrs 6
 python tools/towerctl.py profile-check        # 11/0
-python tools/towerctl.py where --json         # 9/10；next PILOT-054
+python tools/towerctl.py where --json         # 10/11；next PILOT-055
 python tools/towerctl.py campaign-check       # exit 0；W1=0；--strict 仍因 W4 红
 python tools/towerctl.py brief                # ≤60 行；七节
 python tools/towerctl.py shape-check          # exit 0
 python tools/towerctl.py spec-lint --strict   # 6/6；pilot @2 另由 spec-lint 扫
-python -B tools/run_tests.py                  # 609 / OK (skipped=1)
+python -B tools/run_tests.py                  # 630 / OK (skipped=1)
 ```
 
 `wiring` 不通过 = `ORPHANED`。`state-verify` drift = 先停。`authority-check` 失败 = 不能 merge。
@@ -93,8 +94,8 @@ python -B tools/run_tests.py                  # 609 / OK (skipped=1)
 
 ## 下一张卡（候选，需 owner 拍板）
 
-1. **`PILOT-043` v2 记录层**：旧 spec `@1`/基线 419 已过期，需 VOID 后按 `@2 + objective` 重建；再做 deliver 反查 `COMPLETION_ADDED`、state-verify 审计 `base_sha`、孤悬 completion。
-2. **`PILOT-054` shape 接 CI + `towerctl` 模块化**（原 053 顺延；单文件 8k+ 行 → <3000）。
+1. **`PILOT-055` shape 接 CI + `towerctl` 模块化**（原 053/054 顺延；单文件 8k+ 行 → <3000）。
+2. **043 cleanup 卡**：`envelope-abandon`/tombstone 命令，清掉 stale `ENV-PILOT-043` 与 queue 条目；顺带修 054 evidence 文案与 spec 计数。
 3. **052 evidence refresh**：052 的 evidence 快照早于 CI 修复（`07efc9c` vs `0a8bf31`），建议补一次受控刷新或记录为永久残余。
 4. **C 补齐**：`queue-add` DRAFT→WAITING（会破 15+ 既有夹具，需同步改夹具/夹具 helper）或收敛“入队后重信”路径。
 5. **GameCS 外部评审**：§四 6 问已作答；是否走正式 handoff/开卡由 owner 决定（当前未建包）。
@@ -154,7 +155,9 @@ python -B tools/run_tests.py                  # 609 / OK (skipped=1)
 - **053 测试非 hermetic**：`test_real_tower_history_has_no_envelope_drift` 直读塔账本，瞬时 drift 会拖红套件。
 - **053 D 守卫窄**：只拦“重信后 DRAFT”；非 DRAFT 垃圾状态与首封 DRAFT 不拦；真正保护在 replay。
 - **W1×0 / W4×1**：054 未建档；`--strict` 仍红（预期）。
-- **记录层残余（043 未做）**：deliver 不反查 completion 备份事件；state-verify 不审计 base_sha；孤悬 completion 被忽略。
+- **记录层（054 已做）**：deliver 反查 completion、DISPATCH base_sha 权威、state-verify 审计 base_sha/孤悬；残余 R3（skipped 空 completions + dangling event 不报）、R4（同 path 多事件只比第一条）。
+- **043 stale envelope**：`ENV-PILOT-043` CORRECTION_REQUIRED + queue 条目；branch 已删，merge-check 失败，但 commit 可复活；需 abandon/tombstone 卡。
+- **054 evidence 文案**：commit.txt 仍写“043 no envelope”，事实是 stale CORRECTION + 分支删除；spec 计数 53/52 实际 54/53。
 - **11 字节重开空账本守卫**：`{"seq": 1}` 仍可绕过。
 - **legacy 塔 primary 清 0 字节**仍按 036 放行；**TOFU** 靠 git 追踪做外部锚。
 - **无密钥链**可重算伪造；`--by` 是字符串不是认证。
