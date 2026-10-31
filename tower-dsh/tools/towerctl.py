@@ -3001,9 +3001,13 @@ def dispatch_campaign(root: Path, requested: str | None, task_id: str) -> str | 
     return chosen
 
 
+# PILOT-055: ``dispatched`` is a legal source so a card whose placeholder
+# executor was replaced by the real one can be dispatched again.  Only the
+# status gate widens; worktree / campaign / depends_on still run before any
+# write, and every other status still refuses.
 def cmd_dispatch(root: Path, args) -> None:
     rec = load_record(root, args.task)
-    if rec.get("status") not in ("ready", "rework"):
+    if rec.get("status") not in ("ready", "rework", "dispatched"):
         fail([f"task status {rec.get('status')} cannot dispatch"])
     worktree, worktree_path = resolve_dispatch_worktree(root, args, rec)
     task_md = task_dir(root, args.task) / "TASK.md"
@@ -5385,7 +5389,13 @@ ENVELOPE_TERMINAL_STATUSES = frozenset({"MERGED", "POST_MERGE_VERIFIED"})
 TASK_TRANSITIONS = {
     "TASK_NEW": frozenset({None, "ready", "dispatched", "delivered",
                            "reviewed", "rework"}),
-    "DISPATCH": frozenset({"ready", "rework"}),
+    # PILOT-055 (owner choice A): a second DISPATCH replaces the executor of a
+    # card that is already ``dispatched``.  The real ledger re-dispatched
+    # PILOT-055 from its placeholder executor to the real one, which is a
+    # replacement, not a new lifecycle step.  Only ``dispatched`` joins the
+    # table: a ``delivered``/``reviewed``/``closed`` card still cannot be
+    # re-dispatched, so the table is not a blanket ``any -> dispatched``.
+    "DISPATCH": frozenset({"ready", "rework", "dispatched"}),
     "DELIVER": frozenset({"dispatched", "delivered", "rework"}),
     "CHECKBACK": frozenset({"delivered", "reviewed", "rework"}),
     "ACCEPT": frozenset({"reviewed"}),
