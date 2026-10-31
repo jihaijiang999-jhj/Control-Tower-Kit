@@ -97,7 +97,10 @@ exit 2 单 JSON、零 `MERGE_START`/零 ledger 写入；无重信历史的手写
 条目，纠正后的信封重新入队不是必需步骤。
 
 **命令**：`python tools/towerctl.py <cmd>` 是唯一入口；argparse 的子命令名是
-命令名的权威，`arch/GATES.json.gates[].command` 必须命中它。
+命令名的权威，`arch/GATES.json.gates[].command` 必须命中它。`dispatch` 的状态机
+只放开窄语义：`DISPATCH` 的合法源状态为 `ready/rework/dispatched`；`dispatched`
+仅用于**替换 executor** 的 re-dispatch，`delivered`/`reviewed`/`accepted`/`closed`
+仍拒绝，`state-verify` 的 `illegal_transition` 不再报。
 
 **卡依赖**：`depends_on` 有三处校验点——`task-new` 查结构（字符串列表、非自依赖、
 无重复、目标存在于 board 或 `tasks/<id>/`），`check --phase ready` 与 `dispatch`

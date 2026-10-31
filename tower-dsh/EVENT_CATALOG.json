@@ -166,7 +166,7 @@
         "illegal_transition"
       ],
       "ledger": "primary",
-      "note": "ready/rework -> dispatched; base_sha is the immutable deliver baseline",
+      "note": "ready/rework/dispatched -> dispatched; dispatched source means re-dispatch replacing executor; base_sha is the immutable deliver baseline",
       "payload_required": [
         "task",
         "executor",
