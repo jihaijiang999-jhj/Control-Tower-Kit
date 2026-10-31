@@ -531,7 +531,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-043/MERGE.md",
       "updated_at": "2026-10-31T13:47:19+08:00"
+    },
+    {
+      "id": "PILOT-054",
+      "title": "记录层纵深：deliver 反查 completion、state-verify 审计 base_sha 与孤悬 completion",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:7e5c828f-e90c-4c2a-93f6-d54aa2844f2f",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-054/MERGE.md",
+      "updated_at": "2026-10-31T16:47:47+08:00"
     }
   ],
-  "updated_at": "2026-10-31T13:47:19+08:00"
+  "updated_at": "2026-10-31T16:47:47+08:00"
 }

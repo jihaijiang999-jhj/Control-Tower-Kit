@@ -1,0 +1,12 @@
+[deliver:deliver_matched] exit=0 errors=[] scope_completions=[] status=delivered evidence=True deliver_events=1
+[deliver:deliver_completion_backed] exit=0 errors=[] scope_completions=['tower-dsh/tools/helper.py'] status=delivered evidence=True deliver_events=1
+[deliver:deliver_out_of_scope_head] exit=2 errors=["dispatch base_sha does not match DISPATCH event: record '151ff28265d60d651eabe4f0c4dcbea29af73086' != event 'af10fde8298c10bbaa0c8d6c3afc01aa9c8620d4'"] scope_completions=None status=dispatched evidence=False deliver_events=0
+[deliver:deliver_record_sha_without_event] exit=2 errors=["dispatch base_sha does not match DISPATCH event: record 'af10fde8298c10bbaa0c8d6c3afc01aa9c8620d4' is not backed by a DISPATCH event"] scope_completions=None status=dispatched evidence=False deliver_events=0
+[deliver:deliver_forged_completion] exit=2 errors=['completion not backed by COMPLETION_ADDED: pilot/worktrees/PROBE-054/tower-dsh/tools/helper.py'] scope_completions=None status=dispatched evidence=False deliver_events=0
+[verify:verify_tampered_base_sha] exit=2 drift=['dispatch_base_mismatch'] errors=[] stderr=''
+[verify:verify_orphan_completion] exit=2 drift=['completion_orphan'] errors=[] stderr=''
+
+tool=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-054\tower-dsh\tools\towerctl.py
+label=new
+deviation in tower counts: spec says 53/52, real tower is 54/53; numbering only (PILOT-043 kept closed without an envelope).
+RESULT: OK (7 probes matched the 'new' expectations)

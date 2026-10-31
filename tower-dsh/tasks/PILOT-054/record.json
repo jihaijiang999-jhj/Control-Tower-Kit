@@ -1,0 +1,167 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-054",
+  "title": "记录层纵深：deliver 反查 completion、state-verify 审计 base_sha 与孤悬 completion",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "deliver：对 diff 实际命中的每条 completion，在 primary ledger 反查匹配的 COMPLETION_ADDED（task+path）；无事件 → exit 2（completion not backed by COMPLETION_ADDED），零写入",
+    "deliver：事件必须与 record.completions 条目逐字段一致（path/by/reason/decision/at；at 同秒可比较或用事件 at），不一致 → exit 2（completion record does not match ledger event），零写入",
+    "deliver：事件 by 必须等于 owner.name；path/by/reason/decision 非空；否则 exit 2（与 completion-add 同信任模型，纵深防御）",
+    "state-verify 新增 dispatch base_sha 审计：record.dispatch.base_sha 非空时必须与对应 DISPATCH payload.base_sha 完全一致，否则 drift dispatch_base_mismatch；事件有 base_sha 而 record 为 null → dispatch_base_missing；两者都空 → 不报（legacy）",
+    "state-verify 新增 completion_orphan：primary ledger 中 COMPLETION_ADDED 的 task 在 replay 与 record 中都不存在 → drift completion_orphan；新增 completion_mismatch：record.completions 条目与对应事件 payload 不一致 → drift completion_mismatch",
+    "state-verify：因 no_lifecycle_events 被 skip 的任务，若 record 有 completions，仍要审计（不得因 skip 而跳过 completion 检查）；无 completions 的 legacy 任务不新增 drift/skip",
+    "新增 tools/tests/test_record_layer.py：deliver 对 forged record（无事件）→ exit 2 零写入；record 与事件字段不一致 → exit 2；事件 by 非 owner → exit 2；匹配 → 0；state-verify 的 dispatch_base_mismatch/missing、completion_orphan、completion_mismatch；skip 任务的 completions 仍被审计；legacy 无 completions/base_sha 无新增 drift",
+    "tools/tests/test_completion_and_base.py 仅做与新语义冲突的最小调整（042 的“手写 record 无事件 deliver 0”用例必须改为 exit 2）；不得放宽其它断言",
+    "真实塔验证：worktree 新工具 authority-check/state-verify（configured+required、drift []）；建信封前 tasks=53/envelopes=52，建信封后 53/53；merge 前置链与空账本守卫仍通过",
+    "不改 036–053 的信任边界/授权/前置链/空账本/范围门/completion 语义（除本条明确收紧）；不手写 ledger；completion 仍不得绕过 merge/authority 等其它门"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-054/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-054/tower-dsh/tools/tests/test_record_layer.py",
+    "pilot/worktrees/PILOT-054/tower-dsh/tools/tests/test_completion_and_base.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening or deleting existing test coverage",
+    "hand-editing state/AUTHORITY.json, shared/AUTHORITY_POLICY.json or ledger/*.jsonl",
+    "accepting a completion whose backing event is missing or mismatched",
+    "letting a skipped task bypass completion audit",
+    "using base_sha from anywhere other than the matching DISPATCH event"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-054/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 609 + 新增用例数（main 基线 609）",
+    "deliver：completion 路径已被 completion-add 正常记录 → exit 0、scope_completions 正确；手写 record.completions（无事件）→ exit 2、零写入、无 DELIVER 事件",
+    "deliver：record 条目与事件字段不一致（改 by/reason/decision/at 任一）→ exit 2；事件 by 非 owner → exit 2；path/by/reason/decision 空 → exit 2",
+    "state-verify：record base_sha 被改（与 DISPATCH payload 不一致）→ drift dispatch_base_mismatch；事件有 base_sha 而 record null → dispatch_base_missing；两者一致 → 无 drift",
+    "state-verify：COMPLETION_ADDED 指向不存在的 task → drift completion_orphan；record 条目与事件不一致 → drift completion_mismatch；被 skip(no_lifecycle_events) 的任务有 completions 时仍报 completion_unbacked/mismatch",
+    "legacy：无 completions、无 base_sha 的旧任务不新增 drift/skip；既有 state-verify 用例全绿",
+    "旧码对照：main 版工具对 forged record delivery exit 0、对篡改 base_sha 的塔 state-verify 0 drift；新码分别 exit 2 与报 drift。证据写进 scratch/probe-old-code.txt",
+    "shape-check 在 worktree exit 0（新增函数 ≤80 行/≤12 分支；既有函数不增长）",
+    "真实塔：worktree 新工具 authority-check exit 0（configured+required）、state-verify drift []；建信封前 tasks=53/envelopes=52，建信封后 53/53；verify-ledger 0 error；spec-coverage 27/27；spec-lint --strict 6/6",
+    "git -C pilot/worktrees/PILOT-054 diff --name-only main..HEAD 恰三个 allowed_paths"
+  ],
+  "depends_on": [
+    "PILOT-042"
+  ],
+  "worktree": "pilot/worktrees/PILOT-054",
+  "spec_path": "pilot/PILOT-054.spec.json",
+  "spec_sha256": "da33d019d562152c82644ef77fb83e2ac0ee6f4d7e78a5207f70984e8deacc82",
+  "spec_gate": "PASS",
+  "executor": "subagent:7e5c828f-e90c-4c2a-93f6-d54aa2844f2f",
+  "dispatch": {
+    "executor": "subagent:7e5c828f-e90c-4c2a-93f6-d54aa2844f2f",
+    "worktree": "pilot/worktrees/PILOT-054",
+    "at": "2026-10-31T16:08:25+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "504b35bd3cc05ad015f3686de33cefe2e46302d3",
+    "campaign": "C-2026-Q4-01"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-054/evidence/towerctl.py",
+      "sha256": "303088d81d80cd93996b4639c423efb7ee3b528a06054730124b872b34942804",
+      "bytes": 395736,
+      "at": "2026-10-31T16:28:41+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-054/evidence/test_record_layer.py",
+      "sha256": "f91861d8420d813369795ea27936c5c949925fb311594a3adc80b75a74d0aa33",
+      "bytes": 25164,
+      "at": "2026-10-31T16:28:41+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-054/evidence/test_completion_and_base.py",
+      "sha256": "798e36302ce2b02fb45fc35c500de9aea0fd208b92c2d22d176293d0124424fb",
+      "bytes": 41380,
+      "at": "2026-10-31T16:28:41+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-054/evidence/test-output.txt",
+      "sha256": "c1c80761ca6fccaf12d0428c43241fa5c4fb1ae920b345c6c12e880fa59d173d",
+      "bytes": 87735,
+      "at": "2026-10-31T16:28:41+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-054/evidence/record_probe.py",
+      "sha256": "12ed1c7717316c5c8bc276c7e2638efd59344e3baf2574a6d918dc8cdfbd7ad0",
+      "bytes": 18839,
+      "at": "2026-10-31T16:28:41+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-054/evidence/probe.txt",
+      "sha256": "5aae8a7de5b1c9d9b665cb255251f657e19b1baf44697dfc9fa9735450fe122f",
+      "bytes": 1539,
+      "at": "2026-10-31T16:28:41+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-054/evidence/probe-old-code.txt",
+      "sha256": "c1eda09b737061c1cf02b49a18d92a54aa224826f1eef8718c638bdde8852bb7",
+      "bytes": 1140,
+      "at": "2026-10-31T16:28:41+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-054/evidence/commit.txt",
+      "sha256": "22bea1299491c4c5d8b3b0afea3e056caa4f6ebc5363ac33d0d00adb081a7e35",
+      "bytes": 2634,
+      "at": "2026-10-31T16:28:41+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-054/evidence/diff.txt",
+      "sha256": "70cc45fceee04ff0490446fe846ca4caf32abc5c2adbb24473f6e3e1e1d04ae0",
+      "bytes": 45798,
+      "at": "2026-10-31T16:28:41+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-054/evidence/state-verify.txt",
+      "sha256": "408000d7bebab3ba150fc0433b5c505ee041fb946097a76df460adc2fe52f490",
+      "bytes": 2140,
+      "at": "2026-10-31T16:28:41+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-054/evidence/gates.txt",
+      "sha256": "f27c015e4318f1da59d0a1510b5dc9b0ffb68e55e5d128724fced71338b85a14",
+      "bytes": 12775,
+      "at": "2026-10-31T16:28:41+08:00",
+      "id": "E-011"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+    "verdict": "PASS",
+    "note": "054 PASS（聚焦确认）。11/11 证据；3 路径；spec da33d019…；裸 worktree（不 seed）Ran 630 OK(skipped=1)；真实塔 state-verify 54/53 drift []；R1 7/7：record/event base_sha 不一致 → exit 2 零写入，正常 0，legacy both empty 0，record 无事件 2，event 无 record 2，non-ancestor 2，多次 DISPATCH 取 latest；旧 main 同攻击 0/0 drift；630=609+20+1；043 分支已删、worktree 移除，ENV-PILOT-043 merge-check exit 2（branch gone），stale envelope 不可合并；054 尚无 envelope（正常）。已记录 deviation/residual：spec 写 53/52 实际 54/53（043 保留 closed、054 计一）；054 evidence commit.txt 仍写“043 no envelope”，事实是“stale CORRECTION_REQUIRED envelope + 分支删除后不可合并”；043 commit 对象仍可解析，重建分支可复活 envelope，需 cleanup/tombstone 卡；R3/R4 低危留 follow-up。",
+    "structure": "",
+    "at": "2026-10-31T16:47:46+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-054",
+    "actor": "owner",
+    "text": "PASS; R1 closed; 630 bare; 043 stale envelope unmergeable",
+    "at": "2026-10-31T16:47:47+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-054/CLOSEOUT.md",
+    "at": "2026-10-31T16:47:47+08:00"
+  },
+  "created_at": "2026-10-31T15:23:12+08:00",
+  "updated_at": "2026-10-31T16:47:47+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-054/MERGE.md",
+  "delivered_at": "2026-10-31T16:28:41+08:00",
+  "accepted_at": "2026-10-31T16:47:47+08:00"
+}

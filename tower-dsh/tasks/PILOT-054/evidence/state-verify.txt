@@ -1,0 +1,87 @@
+﻿=== state-verify real tower (exit 0) ===
+root: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh
+{
+  "ok": true,
+  "tasks": 54,
+  "envelopes": 53,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-039-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-041-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-043-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-044-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-053-VOID",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 6,
+  "evidence_checked": 493
+}
+
+=== state-verify worktree (exit 0) ===
+root: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-054\tower-dsh
+{
+  "ok": true,
+  "tasks": 53,
+  "envelopes": 53,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-039-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-041-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-043-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-044-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-053-VOID",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 6,
+  "evidence_checked": 493
+}
+
+note: real tower tasks=54/envelopes=53 (spec said 53/52); worktree is the branch checkout at main and has tasks=53/envelopes=53. Deviation is numbering only: PILOT-043 stays closed without an envelope, PILOT-054 counts as one task.

@@ -476,7 +476,16 @@
       "base": "main",
       "status": "CORRECTION_REQUIRED",
       "added_at": "2026-10-31T13:49:28+08:00"
+    },
+    {
+      "envelope_id": "ENV-PILOT-054",
+      "task": "PILOT-054",
+      "branch": "pilot/PILOT-054",
+      "base": "main",
+      "status": "MERGED",
+      "added_at": "2026-10-31T16:48:08+08:00",
+      "merge_commit": "bc823b1120bea5c09b8c82474a2b4ccddd654a2f"
     }
   ],
-  "updated_at": "2026-10-31T13:58:20+08:00"
+  "updated_at": "2026-10-31T16:56:46+08:00"
 }

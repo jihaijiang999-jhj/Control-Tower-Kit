@@ -1,0 +1,12 @@
+[deliver:deliver_matched] exit=0 errors=[] scope_completions=[] status=delivered evidence=True deliver_events=1
+[deliver:deliver_completion_backed] exit=0 errors=[] scope_completions=['tower-dsh/tools/helper.py'] status=delivered evidence=True deliver_events=1
+[deliver:deliver_out_of_scope_head] exit=0 errors=[] scope_completions=[] status=delivered evidence=True deliver_events=1
+[deliver:deliver_record_sha_without_event] exit=0 errors=[] scope_completions=[] status=delivered evidence=True deliver_events=1
+[deliver:deliver_forged_completion] exit=0 errors=[] scope_completions=['tower-dsh/tools/helper.py'] status=delivered evidence=True deliver_events=1
+[verify:verify_tampered_base_sha] exit=0 drift=[] errors=[] stderr=''
+[verify:verify_orphan_completion] exit=0 drift=[] errors=[] stderr=''
+
+tool=C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-054\tower-dsh\scratch\.oldtool\towerctl.py
+label=old
+deviation in tower counts: spec says 53/52, real tower is 54/53; numbering only (PILOT-043 kept closed without an envelope).
+RESULT: OK (7 probes matched the 'old' expectations)

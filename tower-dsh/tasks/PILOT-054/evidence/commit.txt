@@ -1,0 +1,55 @@
+# PILOT-054 commit evidence
+
+worktree: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-054
+branch: pilot/PILOT-054
+HEAD: 2b2e5311650b177f2a308abab3b30a67e50fd134
+main: 504b35bd3cc05ad015f3686de33cefe2e46302d3
+
+## commits main..HEAD
+2b2e5311650b177f2a308abab3b30a67e50fd134 PILOT-054: adopt record-layer code from PILOT-043 v2
+f8a2aa42c53f8ed4fd5be23fe2511b7c743790e5 PILOT-043: deliver uses DISPATCH base_sha, not record
+9a72848b78bfc8cbab47fc8ebb079ceaaeb91ae6 PILOT-043: record-layer depth (completion backing, base_sha audit, orphan drift)
+
+## diff --name-only main..HEAD (must be exactly 3 allowed paths)
+tower-dsh/tools/tests/test_completion_and_base.py
+tower-dsh/tools/tests/test_record_layer.py
+tower-dsh/tools/towerctl.py
+
+## diff --stat
+ tower-dsh/tools/tests/test_completion_and_base.py |  24 +-
+ tower-dsh/tools/tests/test_record_layer.py        | 561 ++++++++++++++++++++++
+ tower-dsh/tools/towerctl.py                       | 296 +++++++++++-
+ 3 files changed, 866 insertions(+), 15 deletions(-)
+
+## git status --short
+?? tower-dsh/scratch/
+
+## worktree suite (scratch/test-output.txt)
+Ran 630 tests in 442.468s / OK (skipped=1)
+
+## gates (all exit 0)
+state-verify real tower: 0 (tasks 54 / envelopes 53 / drift [])
+state-verify worktree: 0 (tasks 53 / envelopes 53 / drift [])
+authority-check real tower: 0 (configured + required)
+authority-check worktree: 0 (configured + required)
+arch-check worktree: 0
+shape-check worktree: 0 (functions 1744, unused_imports 1 pre-existing)
+verify-ledger worktree: 0 (0 errors)
+spec-coverage worktree: 0 (tool 27/27)
+spec-lint --strict worktree: 0 (6/6)
+
+## probes (scratch/probe.txt / scratch/probe-old-code.txt)
+new code: 7/7 probes match new expectations
+  - completion-add backed deliver: exit 0, scope_completions [tower-dsh/tools/helper.py]
+  - out-of-scope commit + record base_sha=HEAD + old DISPATCH event: exit 2, zero writes
+  - record base_sha with no DISPATCH event: exit 2, zero writes
+  - forged record.completions with no COMPLETION_ADDED: exit 2, zero writes
+  - tampered record base_sha: state-verify drift dispatch_base_mismatch
+  - orphan COMPLETION_ADDED: state-verify drift completion_orphan
+main code: 7/7 probes match old expectations (all attacks exit 0, 0 drift)
+  - i.e. the vulnerability is real on main and fixed on this branch
+
+## deviation
+spec says tasks=53/envelopes=52 before the envelope; the real tower is 54/53.
+PILOT-043 was renumbered but kept closed with no envelope; PILOT-054 counts once.
+Read as 54/53 -> 54/54; the worktree (branch checkout) shows 53/53 because PILOT-054/ has no directory there.
