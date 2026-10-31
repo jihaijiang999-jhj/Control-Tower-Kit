@@ -611,6 +611,20 @@ class DeliverWithCompletionsTestCase(GitWorktreeFixture):
         # Only the completion path is reported as a completion win.
         self.assertEqual(out["scope_completions"], ["tower-dsh/tools/helper.py"])
 
+    def test_hand_written_record_completion_is_rejected(self) -> None:
+        """PILOT-043: a record-only completion no longer delivers (exit 2)."""
+        record = self.load_record()
+        record["completions"] = [completion_entry(
+            f"{WORKTREE_REL}/tower-dsh/tools/helper.py")]
+        self.save_record(record)
+        self.write_worktree("tower-dsh/tools/helper.py", "helper = 1\n")
+        self.commit_worktree("hand-written record completion")
+
+        deliver = self.deliver()
+        self.assert_failed_with(
+            deliver, "completion not backed by COMPLETION_ADDED")
+        self.assert_delivery_wrote_nothing()
+
     def test_legacy_record_without_completions_has_empty_scope_completions(self) -> None:
         self.write_worktree("tower-dsh/tools/x.py", "x = 2\n")
         self.commit_worktree("in scope change")
