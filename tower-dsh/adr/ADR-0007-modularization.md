@@ -1,13 +1,14 @@
 ---
 schema: tower/adr@1
 id: ADR-0007
-title: "towerctl 模块化 + shape 接 CI"
+title: "shape 接 CI（055）+ towerctl 模块化（056）"
 status: accepted
 date: 2026-10-31
 deciders:
   - mac
 related_cards:
   - PILOT-055
+  - PILOT-056
 related_files:
   - tower-dsh/tools/towerctl.py
   - tower-dsh/ARCHITECTURE.md
@@ -21,21 +22,11 @@ related_files:
 
 ## 决策
 
-1. **按职责拆模块**（每个 <600 行，shape 新文件上限）：
-   - `tower_common.py`（JSON/IO/id/path/emit）
-   - `tower_ledger.py`（append/verify/replay/lock）
-   - `tower_task.py`（task-new/check/approve/close/board）
-   - `tower_delivery.py`（dispatch/deliver/evidence/completion）
-   - `tower_merge.py`（envelope/queue/merge/post-merge）
-   - `tower_command.py`（campaign/brief/where/status）
-   - `tower_arch.py`（arch-check/graph）
-   - `tower_profile.py`（profile-check）
-   - `tower_cli.py`（parser/handlers/composition）
-   - `towerctl.py` 只做入口，目标 <500 行（硬上限 <3000）。
-2. **依赖方向单向**：`towerctl → tower_cli → {各域模块} → tower_common/tower_ledger`；域模块之间只允许 `delivery/merge` 依赖 `ledger/task`，禁止循环。
-3. **行为不变**：所有 CLI 子命令、退出码、JSON 输出、证据/状态语义不变；630 tests 全绿。
-4. **shape 接 CI**：`.github/workflows/tower-gate.yml` 在 `status` 前增加 `python tools/towerctl.py shape-check`；status 仍最后。
-5. **门表**：`GATE-MODULES` 校验 `towerctl.py <3000`、每个新模块 <600、无循环 import；`test_arch` 的 gates 17→18。
+1. **拆模块放到 056**：towerctl 8,863 行，9×599 + 2,999 数学上装不下；056 用 23 模块/4 层 DAG（base → domain → compose → entry），每模块 <600，`towerctl.py` 只做入口；22 个既有长函数搬家需基线迁移（同 metrics 换文件，不新增债务）。
+2. **055 只做 shape 接 CI**：workflow 在 status 前加 `shape-check`，status 最后；`test_ci_gate` 的 COMMANDS/顺序/7→8 步同步；`ARCHITECTURE.md` 改 8 步。055 不改 `towerctl.py`、不拆模块。
+3. **依赖方向（056）**：`towerctl → tower_cli → 域模块 → tower_common/tower_ledger`；聚合层（views/status/state_verify）单列，禁止循环。
+4. **行为不变（056）**：所有 CLI 子命令、退出码、JSON 输出、证据/状态语义不变；630 tests 全绿。
+5. **门表（056）**：`GATE-MODULES` 校验 `towerctl.py <3000`、每个模块 <600、无循环 import；`test_arch` gates 17→18。
 6. **不加事件类型、不改状态机、不改 spec@2**。
 
 ## 替代方案
