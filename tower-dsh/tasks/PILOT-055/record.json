@@ -1,0 +1,185 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-055",
+  "title": "shape 接 CI（8 步门）+ re-dispatch 修复",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "workflow（仓库根 `.github/workflows/tower-gate.yml`）：在 `Campaign check` 之后、`Status` 之前增加 `- name: Shape check` / `run: python tools/towerctl.py shape-check`；status 仍最后；不加 continue-on-error；其它 7 步不变",
+    "tools/tests/test_ci_gate.py：COMMANDS 增加 shape 命令；顺序表/步数断言从 7 改 8；断言 shape 在 campaign-check 之后、status 之前；status 仍唯一且最后；continue-on-error 仍不存在",
+    "ARCHITECTURE.md：把 CI 的“7 步”改成“8 步”，列表加入 shape-check；注明 055 接入；与 workflow 实体一致",
+    "towerctl.py：TASK_TRANSITIONS[DISPATCH] 加 dispatched；cmd_dispatch 允许从 dispatched 重派（替换 executor）；其它状态仍拒",
+    "EVENT_CATALOG.json：DISPATCH note 改为 ready/rework/dispatched -> dispatched（re-dispatch 替换 executor）"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-055/.github/workflows/tower-gate.yml",
+    "pilot/worktrees/PILOT-055/tower-dsh/tools/tests/test_ci_gate.py",
+    "pilot/worktrees/PILOT-055/tower-dsh/ARCHITECTURE.md",
+    "pilot/worktrees/PILOT-055/tower-dsh/tools/tests/test_wiring.py",
+    "pilot/worktrees/PILOT-055/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-055/tower-dsh/tools/tests/test_dispatch_repair.py",
+    "pilot/worktrees/PILOT-055/tower-dsh/EVENT_CATALOG.json"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "changing shape baseline",
+    "weakening CI (continue-on-error, removing steps, moving status earlier)",
+    "modifying other tests or ARCHITECTURE sections beyond the CI step list and the re-dispatch note",
+    "blanket dispatch from delivered/reviewed/accepted/closed"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-055/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 630（main 基线 630）",
+    "test-ci-gate：COMMANDS 含 shape；顺序为 unit → spec-lint → spec-coverage → verify-ledger → arch → campaign → shape → status；步数 8；status 唯一且最后；无 continue-on-error",
+    "workflow 中 shape 命令精确为 `python tools/towerctl.py shape-check`；位置在 campaign-check 之后、status 之前；status 最后",
+    "ARCHITECTURE.md 的 CI 段为 8 步并含 shape；与 workflow 实体一致",
+    "shape-check 在 worktree exit 0（不改 baseline/规则）",
+    "真实塔：worktree 新工具 state-verify drift []、arch-check 0、profile-check 11/0；建信封前 tasks=55/envelopes=54，建信封后 55/55；verify-ledger 0、coverage 27/27、spec-lint 6/6",
+    "旧码对照：main 的 workflow 7 步且无 shape；新码 8 步且有 shape。证据写进 scratch/probe-old-code.txt",
+    "git -C pilot/worktrees/PILOT-055 diff --name-only main..HEAD 恰 7 个 allowed_paths",
+    "EVENT_CATALOG 的 DISPATCH note 与 TASK_TRANSITIONS 一致；re-dispatch 只替换 executor，delivered/reviewed/accepted/closed 仍 exit 2"
+  ],
+  "depends_on": [
+    "PILOT-054"
+  ],
+  "worktree": "pilot/worktrees/PILOT-055",
+  "spec_path": "pilot/PILOT-055.spec.json",
+  "spec_sha256": "9ff579346305b1b130300b626281a76338d30d7e6df9f2bdbd5483003ed5d853",
+  "spec_gate": "PASS",
+  "executor": "subagent:7cca490f-1148-4dfc-b4aa-4b7231b10248",
+  "dispatch": {
+    "executor": "subagent:7cca490f-1148-4dfc-b4aa-4b7231b10248",
+    "worktree": "pilot/worktrees/PILOT-055",
+    "at": "2026-11-01T03:10:07+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "385e9365fd698fddbed3418e7794ba2164e1e834",
+    "campaign": "C-2026-Q4-01"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-055/evidence/tower-gate.yml",
+      "sha256": "c482adfaca1b73d6478c9a5adee305ba35baa53f66f4ae565ac3ae741ce86f63",
+      "bytes": 1092,
+      "at": "2026-11-01T03:36:13+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/test_ci_gate.py",
+      "sha256": "8cae9eba301f946a89ae7372203cfa5a8630dd6abae3cf88975e5e9f9741fe6b",
+      "bytes": 10900,
+      "at": "2026-11-01T03:36:13+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/test_wiring.py",
+      "sha256": "68775cdf864d94580939651c8ec5609cdc0affbf321872875439311c24025652",
+      "bytes": 21279,
+      "at": "2026-11-01T03:36:13+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/test_dispatch_repair.py",
+      "sha256": "5e70b4b5ca77495b019c8b1b29105865fa6a1ee4461992b63b4b5c436de62edb",
+      "bytes": 11375,
+      "at": "2026-11-01T03:36:13+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/towerctl.py",
+      "sha256": "1c80f62fd967e3968e392c0225b34168d7d2cfb56c04e1d50d9df31addd4b5b7",
+      "bytes": 396487,
+      "at": "2026-11-01T03:36:13+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/EVENT_CATALOG.json",
+      "sha256": "08e8227d8f5b6c37257d8d80135fa7ea16a892fb1f4332d4c95f7937835fbe1c",
+      "bytes": 12170,
+      "at": "2026-11-01T03:36:13+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/ARCHITECTURE.md",
+      "sha256": "b786bce69b7910eac6551bff5599c479863e854dd8034c90ab16087ccef060ba",
+      "bytes": 13238,
+      "at": "2026-11-01T03:36:13+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/test-output.txt",
+      "sha256": "766f9d1184817a4f9ab71661ce98532a65f3d0caf22390810b67b3ec171c6733",
+      "bytes": 180512,
+      "at": "2026-11-01T03:36:13+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/repair_probe.py",
+      "sha256": "a7fb55716c841a3154491e8412efde88a543d25ee07e9106a708ea0e66da4d04",
+      "bytes": 2585,
+      "at": "2026-11-01T03:36:13+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/probe.txt",
+      "sha256": "c31d1fa703c246584c777912cee04d99f52bbfa58bac33fcac7d18623eb6dc15",
+      "bytes": 1612,
+      "at": "2026-11-01T03:36:13+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/commit.txt",
+      "sha256": "742a327a7bd52635835e6527423bc25f90a7a0efc63bbd8282ea4eb5ea5ad2c4",
+      "bytes": 1278,
+      "at": "2026-11-01T03:36:13+08:00",
+      "id": "E-011"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/diff.txt",
+      "sha256": "c477ec8a4019c98cffd9fbc9595e736d9f95dd3e513355c4b0b52f9d671472a5",
+      "bytes": 22541,
+      "at": "2026-11-01T03:36:13+08:00",
+      "id": "E-012"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/gates.txt",
+      "sha256": "798acee32743a47ac84eb9534cc28072d9b40c21216307528e80dc334970adc6",
+      "bytes": 4917,
+      "at": "2026-11-01T03:36:13+08:00",
+      "id": "E-013"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/ci_probe.py",
+      "sha256": "0ab5e81c9f76f3de1dc7e223077482017d50b131765e0a201154ad6170a8694a",
+      "bytes": 2447,
+      "at": "2026-11-01T03:36:13+08:00",
+      "id": "E-014"
+    }
+  ],
+  "review": {
+    "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+    "verdict": "PASS",
+    "note": "055 PASS（v2.4 final；证据已按最终 HEAD 刷新）。7 paths；spec 9ff579…；HEAD 5a9304e（base 385e936）；14/14 证据；裸 worktree Ran 638 OK(skipped=1)；worktree + 真实塔 state-verify drift []（55/54，new tool）；profile 11/0；arch 0；shape 0；8 步 CI（unit/spec-lint/spec-coverage/verify-ledger/arch/campaign/shape/status，status 最后，无 continue-on-error）；test_dispatch_repair 7/7；test_ci_gate 12/12；re-dispatch 窄语义：DISPATCH 源状态 {ready,rework,dispatched}，delivered/reviewed/accepted/closed 仍拒；EVENT_CATALOG/ARCHITECTURE 已记录；最终链 seq 520 TASK_NEW→521 SPEC_APPROVED→523 DISPATCH(base 385e936)→524 DELIVER，旧链归档 VOID2。残余：re-dispatch 重算 base_sha（后续加固）、同 executor 重派仍合法、真实 GitHub Actions 待 PR 实跑、056 不得先于 055 完成。",
+    "structure": "",
+    "at": "2026-11-01T03:36:28+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-055",
+    "actor": "owner",
+    "text": "v2.4 PASS; 7 paths; 638; re-dispatch legal",
+    "at": "2026-11-01T03:36:28+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-055/CLOSEOUT.md",
+    "at": "2026-11-01T03:36:28+08:00"
+  },
+  "created_at": "2026-11-01T03:10:02+08:00",
+  "updated_at": "2026-11-01T03:36:28+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-055/MERGE.md",
+  "delivered_at": "2026-11-01T03:36:13+08:00",
+  "accepted_at": "2026-11-01T03:36:28+08:00"
+}

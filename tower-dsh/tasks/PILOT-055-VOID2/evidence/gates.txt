@@ -1,0 +1,128 @@
+﻿PILOT-055 re-dispatch repair gates
+generated: 2026-11-01T02:27:17.2090972+08:00
+worktree HEAD: 066a6c6ec8078a20c1537ac068f06699d06224d9
+
+## 1. full suite (python -B tools/run_tests.py)
+Ran 638 tests in 447.598s
+OK (skipped=1)
+## 2. targeted module (python -B -m unittest tools.tests.test_dispatch_repair -v)
+test_dispatch_command_refuses_other_statuses (tools.tests.test_dispatch_repair.DispatchRepairCase.test_dispatch_command_refuses_other_statuses) ... ok
+test_dispatch_table_adds_only_dispatched (tools.tests.test_dispatch_repair.DispatchRepairCase.test_dispatch_table_adds_only_dispatched) ... ok
+test_first_dispatch_from_ready_is_still_clean (tools.tests.test_dispatch_repair.DispatchRepairCase.test_first_dispatch_from_ready_is_still_clean) ... ok
+test_redispatch_command_replaces_executor (tools.tests.test_dispatch_repair.DispatchRepairCase.test_redispatch_command_replaces_executor) ... ok
+test_replay_dispatch_from_closed_is_illegal (tools.tests.test_dispatch_repair.DispatchRepairCase.test_replay_dispatch_from_closed_is_illegal) ... ok
+test_replay_dispatch_from_reviewed_is_illegal (tools.tests.test_dispatch_repair.DispatchRepairCase.test_replay_dispatch_from_reviewed_is_illegal) ... ok
+test_replay_two_consecutive_dispatches_is_legal (tools.tests.test_dispatch_repair.DispatchRepairCase.test_replay_two_consecutive_dispatches_is_legal) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 1.801s
+
+OK
+targeted exit=0
+## 3. state-verify worktree
+{
+  "ok": true,
+  "tasks": 54,
+  "envelopes": 54,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-039-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-041-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-043-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-044-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-053-VOID",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 6,
+  "evidence_checked": 504
+}
+state-verify worktree exit=0
+## 4. state-verify real tower
+{
+  "ok": true,
+  "tasks": 55,
+  "envelopes": 54,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-039-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-041-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-043-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-044-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-053-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 7,
+  "evidence_checked": 515
+}
+state-verify real exit=0
+## 5. shape-check worktree
+{
+  "ok": true,
+  "shape_check": "checked",
+  "shape_checked": true,
+  "files": 42,
+  "functions": 1765,
+  "duplicate_blocks": 169,
+  "unused_imports": 1
+}
+shape-check exit=0
+## 6. git diff --name-only main..HEAD
+.github/workflows/tower-gate.yml
+tower-dsh/ARCHITECTURE.md
+tower-dsh/tools/tests/test_ci_gate.py
+tower-dsh/tools/tests/test_dispatch_repair.py
+tower-dsh/tools/tests/test_wiring.py
+tower-dsh/tools/towerctl.py

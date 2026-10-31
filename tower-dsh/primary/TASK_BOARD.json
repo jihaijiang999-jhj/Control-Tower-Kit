@@ -541,7 +541,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-054/MERGE.md",
       "updated_at": "2026-10-31T16:47:47+08:00"
+    },
+    {
+      "id": "PILOT-055",
+      "title": "shape 接 CI（8 步门）+ re-dispatch 修复",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:7cca490f-1148-4dfc-b4aa-4b7231b10248",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-055/MERGE.md",
+      "updated_at": "2026-11-01T03:36:28+08:00"
     }
   ],
-  "updated_at": "2026-10-31T16:47:47+08:00"
+  "updated_at": "2026-11-01T03:36:28+08:00"
 }

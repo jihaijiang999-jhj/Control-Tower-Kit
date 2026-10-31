@@ -1,0 +1,27 @@
+﻿PILOT-055 re-dispatch repair commit
+
+HEAD: 066a6c6ec8078a20c1537ac068f06699d06224d9
+branch: pilot/PILOT-055
+
+## git log -1
+066a6c6ec8078a20c1537ac068f06699d06224d9
+mac <mac@local>
+Sun Nov 1 02:26:37 2026 +0800
+PILOT-055: legalize re-dispatch from dispatched (executor replacement)
+
+## git show --stat
+066a6c6 PILOT-055: legalize re-dispatch from dispatched (executor replacement)
+ tower-dsh/tools/tests/test_dispatch_repair.py | 246 ++++++++++++++++++++++++++
+ tower-dsh/tools/towerctl.py                   |  14 +-
+ 2 files changed, 258 insertions(+), 2 deletions(-)
+
+## git status --short
+?? scratch/
+
+## diff --name-only main..HEAD
+.github/workflows/tower-gate.yml
+tower-dsh/ARCHITECTURE.md
+tower-dsh/tools/tests/test_ci_gate.py
+tower-dsh/tools/tests/test_dispatch_repair.py
+tower-dsh/tools/tests/test_wiring.py
+tower-dsh/tools/towerctl.py

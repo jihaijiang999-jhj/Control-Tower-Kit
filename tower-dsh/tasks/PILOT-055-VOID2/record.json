@@ -1,0 +1,168 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-055",
+  "title": "shape 接 CI（8 步门）",
+  "status": "delivered",
+  "authority": "workspace_write",
+  "scope": [
+    "workflow（仓库根 `.github/workflows/tower-gate.yml`）：在 `Campaign check` 之后、`Status` 之前增加 `- name: Shape check` / `run: python tools/towerctl.py shape-check`；status 仍最后；不加 continue-on-error；其它 7 步不变",
+    "tools/tests/test_ci_gate.py：COMMANDS 增加 shape 命令；顺序表/步数断言从 7 改 8；断言 shape 在 campaign-check 之后、status 之前；status 仍唯一且最后；continue-on-error 仍不存在",
+    "ARCHITECTURE.md：把 CI 的“7 步”改成“8 步”，列表加入 shape-check；注明 055 接入；与 workflow 实体一致",
+    "不修改 towerctl.py、shape-check 规则、state/SHAPE-BASELINE.json、其它测试、GATES/EVENT_CATALOG/ADR 决策"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-055/.github/workflows/tower-gate.yml",
+    "pilot/worktrees/PILOT-055/tower-dsh/tools/tests/test_ci_gate.py",
+    "pilot/worktrees/PILOT-055/tower-dsh/ARCHITECTURE.md",
+    "pilot/worktrees/PILOT-055/tower-dsh/tools/tests/test_wiring.py",
+    "pilot/worktrees/PILOT-055/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-055/tower-dsh/tools/tests/test_dispatch_repair.py",
+    "pilot/worktrees/PILOT-055/tower-dsh/EVENT_CATALOG.json"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "modifying towerctl.py or shape-check rule",
+    "changing shape baseline",
+    "weakening CI (continue-on-error, removing steps, moving status earlier)",
+    "modifying other tests or ARCHITECTURE sections beyond the CI step list"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-055/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 630（main 基线 630）",
+    "test-ci-gate：COMMANDS 含 shape；顺序为 unit → spec-lint → spec-coverage → verify-ledger → arch → campaign → shape → status；步数 8；status 唯一且最后；无 continue-on-error",
+    "workflow 中 shape 命令精确为 `python tools/towerctl.py shape-check`；位置在 campaign-check 之后、status 之前；status 最后",
+    "ARCHITECTURE.md 的 CI 段为 8 步并含 shape；与 workflow 实体一致",
+    "shape-check 在 worktree exit 0（不改 baseline/规则）",
+    "真实塔：worktree 新工具 state-verify drift []、arch-check 0、profile-check 11/0；建信封前 tasks=55/envelopes=54，建信封后 55/55；verify-ledger 0、coverage 27/27、spec-lint 6/6",
+    "旧码对照：main 的 workflow 7 步且无 shape；新码 8 步且有 shape。证据写进 scratch/probe-old-code.txt",
+    "git -C pilot/worktrees/PILOT-055 diff --name-only main..HEAD 恰 3 个 allowed_paths"
+  ],
+  "depends_on": [
+    "PILOT-054"
+  ],
+  "worktree": "pilot/worktrees/PILOT-055",
+  "spec_path": "pilot/PILOT-055.spec.json",
+  "spec_sha256": "9ff579346305b1b130300b626281a76338d30d7e6df9f2bdbd5483003ed5d853",
+  "spec_gate": "PASS",
+  "executor": "subagent:8f5e45fa-21c8-4e42-94da-061f02879995",
+  "dispatch": {
+    "executor": "subagent:8f5e45fa-21c8-4e42-94da-061f02879995",
+    "worktree": "pilot/worktrees/PILOT-055",
+    "at": "2026-11-01T02:05:19+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "914822ddedda57cb194e66af2ef6b858065c06fc",
+    "campaign": "C-2026-Q4-01"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-055/evidence/ci_probe.py",
+      "sha256": "0ab5e81c9f76f3de1dc7e223077482017d50b131765e0a201154ad6170a8694a",
+      "bytes": 2447,
+      "at": "2026-11-01T02:05:34+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/probe-old-code.txt",
+      "sha256": "19906308a5b30bee659e2884839069cfc09f96da00ec9ae09267c1479e281ea0",
+      "bytes": 4980,
+      "at": "2026-11-01T02:05:34+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/tower-gate.yml",
+      "sha256": "c482adfaca1b73d6478c9a5adee305ba35baa53f66f4ae565ac3ae741ce86f63",
+      "bytes": 1092,
+      "at": "2026-11-01T02:36:05+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/test_ci_gate.py",
+      "sha256": "8cae9eba301f946a89ae7372203cfa5a8630dd6abae3cf88975e5e9f9741fe6b",
+      "bytes": 10900,
+      "at": "2026-11-01T02:36:05+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/test_wiring.py",
+      "sha256": "68775cdf864d94580939651c8ec5609cdc0affbf321872875439311c24025652",
+      "bytes": 21279,
+      "at": "2026-11-01T02:36:05+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/ARCHITECTURE.md",
+      "sha256": "29dbd028593a8a46ead29ebc210ab2068e7a1a2d7b582acdd5dfc696f353e583",
+      "bytes": 12965,
+      "at": "2026-11-01T02:36:05+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/towerctl.py",
+      "sha256": "1c80f62fd967e3968e392c0225b34168d7d2cfb56c04e1d50d9df31addd4b5b7",
+      "bytes": 396487,
+      "at": "2026-11-01T02:36:05+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/test_dispatch_repair.py",
+      "sha256": "5e70b4b5ca77495b019c8b1b29105865fa6a1ee4461992b63b4b5c436de62edb",
+      "bytes": 11375,
+      "at": "2026-11-01T02:36:05+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/test-output.txt",
+      "sha256": "d253c3ca4f90ae6ec09f602364ef4f8c5cd64d086611b71f5ab8c54a7f0362c8",
+      "bytes": 180500,
+      "at": "2026-11-01T02:36:05+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/repair_probe.py",
+      "sha256": "a7fb55716c841a3154491e8412efde88a543d25ee07e9106a708ea0e66da4d04",
+      "bytes": 2585,
+      "at": "2026-11-01T02:36:05+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/probe.txt",
+      "sha256": "c31d1fa703c246584c777912cee04d99f52bbfa58bac33fcac7d18623eb6dc15",
+      "bytes": 1612,
+      "at": "2026-11-01T02:36:05+08:00",
+      "id": "E-011"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/commit.txt",
+      "sha256": "98df861340266f22db25aec362a746b2b000295ebac6925898d072a7579a278f",
+      "bytes": 873,
+      "at": "2026-11-01T02:36:05+08:00",
+      "id": "E-012"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/diff.txt",
+      "sha256": "09000e8569826337a4aedf181d7873d368e278fd8d27a6c191022cf7fc841e29",
+      "bytes": 14373,
+      "at": "2026-11-01T02:36:05+08:00",
+      "id": "E-013"
+    },
+    {
+      "path": "tasks/PILOT-055/evidence/gates.txt",
+      "sha256": "8ea4148c952c028334878cf2bfd69166d8e791e96b6fdc7546d2d767dc27a3f0",
+      "bytes": 3823,
+      "at": "2026-11-01T02:36:05+08:00",
+      "id": "E-014"
+    }
+  ],
+  "review": null,
+  "decision": null,
+  "closeout": null,
+  "created_at": "2026-10-31T19:39:00+08:00",
+  "updated_at": "2026-11-01T02:36:05+08:00",
+  "next": "等待独立 reviewer",
+  "delivered_at": "2026-11-01T02:36:05+08:00"
+}
