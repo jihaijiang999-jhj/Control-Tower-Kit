@@ -37,7 +37,7 @@ owner: mac
 | Tasks | `tasks/<ID>/{TASK.md,record.json,evidence/,DELIVERY.md,REVIEW.md}` | 任务卡与证据 | 绕过 `towerctl` 写 |
 | Pilot | `pilot/<ID>.spec.json` + `pilot/worktrees/<ID>/` | 冻结 spec、隔离执行区 | merge |
 | Tools | `tools/towerctl.py`、`tools/run_tests.py`、`tools/spec_lint.py`、`tools/spec_coverage.py` | 唯一状态/门禁 CLI 与静态检查 | 联网、写塔外路径 |
-| CI | `.github/workflows/tower-gate.yml` | 只读复跑 7 步：unit tests / spec-lint --strict / spec-coverage / verify-ledger / arch-check / campaign-check / status（status 仍是最后一步，无 continue-on-error）；shape-check 于 051 接入，state-verify/authority-check 待明确 | 改状态、merge |
+| CI | `.github/workflows/tower-gate.yml` | 只读复跑 8 步：unit tests / spec-lint --strict / spec-coverage / verify-ledger / arch-check / campaign-check / shape-check / status（status 仍是最后一步，无 continue-on-error）；shape-check 于 055 接入 CI（ADR-0007），state-verify/authority-check 待明确 | 改状态、merge |
 | Docs | `ARCHITECTURE.md`、`arch/`、`adr/`、`EVENT_CATALOG.json` | WHY/HOW 的可证伪描述 | 冒充权威（代码与 ledger 才是） |
 
 ## 3. 数据流
@@ -59,10 +59,10 @@ spec (pilot/<ID>.spec.json)
                    存在 command/campaigns/*.md 时追加 campaign-check，存在
                    arch/GATES.json 时追加 arch-check（失败即 CORRECTION_REQUIRED，
                    文件不存在则该门不追加，旧塔行为不变）
-  → CI             只跑 7 步：unit tests / spec-lint --strict / spec-coverage /
-                   verify-ledger / arch-check / campaign-check / status（GATE-CI，
-                   status 最后；shape-check 于 051 接入，state-verify/authority-check
-                   待明确）
+  → CI             只跑 8 步：unit tests / spec-lint --strict / spec-coverage /
+                   verify-ledger / arch-check / campaign-check / shape-check /
+                   status（GATE-CI，status 最后；shape-check 于 055 接入，
+                   state-verify/authority-check 待明确）
 ```
 
 每一步的输入/输出都是文件：ledger 事件是权威，record/board/queue/envelope 是

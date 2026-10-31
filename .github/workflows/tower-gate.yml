@@ -43,5 +43,8 @@ jobs:
       - name: Campaign check
         run: python tools/towerctl.py campaign-check
 
+      - name: Shape check
+        run: python tools/towerctl.py shape-check
+
       - name: Status
         run: python tools/towerctl.py status

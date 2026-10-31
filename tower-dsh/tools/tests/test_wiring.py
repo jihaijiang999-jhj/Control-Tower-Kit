@@ -444,6 +444,7 @@ class CiWorkflowCase(unittest.TestCase):
             "python tools/towerctl.py verify-ledger",
             "python tools/towerctl.py arch-check",
             "python tools/towerctl.py campaign-check",
+            "python tools/towerctl.py shape-check",
             "python tools/towerctl.py status",
         ])
         self.assertEqual(runs[-1], "python tools/towerctl.py status")
