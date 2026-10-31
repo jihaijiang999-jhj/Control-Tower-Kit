@@ -1,0 +1,18 @@
+﻿commit 2ed23a8a13c2362ac7ffdbfc121d11b1b25fff16
+Author:     mac <mac@local>
+AuthorDate: Sat Oct 31 13:16:59 2026 +0800
+Commit:     mac <mac@local>
+CommitDate: Sat Oct 31 13:16:59 2026 +0800
+
+    PILOT-043: deliver uses DISPATCH base_sha, not record
+
+## branch commits (main..HEAD)
+2ed23a8a13c2362ac7ffdbfc121d11b1b25fff16 PILOT-043: deliver uses DISPATCH base_sha, not record
+a9e5f513d6ec5755b5052549d3a50378ebaddd40 PILOT-043: record-layer depth (completion backing, base_sha audit, orphan drift)
+
+## HEAD stat
+2ed23a8 PILOT-043: deliver uses DISPATCH base_sha, not record
+ tower-dsh/tools/tests/test_completion_and_base.py | 10 +--
+ tower-dsh/tools/tests/test_record_layer.py        | 79 +++++++++++++++++++++++
+ tower-dsh/tools/towerctl.py                       | 45 +++++++++++--
+ 3 files changed, 125 insertions(+), 9 deletions(-)

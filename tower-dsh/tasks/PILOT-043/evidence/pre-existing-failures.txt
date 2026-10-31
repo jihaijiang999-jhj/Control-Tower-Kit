@@ -1,0 +1,27 @@
+PILOT-043 — bare-worktree baseline vs reviewer-approved seed
+============================================================
+
+BARE worktree (no seed): `python -B tools/run_tests.py` = Ran 626,
+FAILED (4, skipped=1). The 4 failures are pre-existing and NOT caused by this
+card: the worktree has the committed TASK_NEW for PILOT-043 but no
+`tasks/PILOT-043/record.json` (that directory is untracked in the tower root),
+so worktree state-verify reports `record_missing PILOT-043` and exits 2.
+Failing: test_profile (3) + test_envelope_recovery.test_real_tower_history_
+has_no_envelope_drift. Main's unmodified tool on the same worktree reproduces
+the identical `record_missing` (exit 2) and profile-check STATE exit 2.
+
+SEEDED run (reviewer-approved one-time seed): copy the tower root's
+`tasks/PILOT-043/` (incl. evidence/), `ledger/primary.jsonl` and
+`primary/TASK_BOARD.json` into the worktree, then:
+
+    python -B tools/run_tests.py
+    Ran 630 tests in 422.854s
+    OK (skipped=1)
+
+All 630 tests pass (609 baseline + 20 test_record_layer + 1 new 042 deliver
+case). Afterwards the tracked ledger/board are restored with `git checkout`
+and `tasks/PILOT-043/` is deleted, leaving `git status --short` = `?? scratch/`.
+
+The non-hermetic fixture is intentionally NOT fixed by this card; a follow-up
+card was requested by the reviewer. See scratch/state-verify.txt for the
+bare/seeded/real-tower state-verify snapshots.

@@ -1,4 +1,4 @@
-﻿"""Tests for PILOT-042: authorized completions and the dispatch base_sha anchor.
+"""Tests for PILOT-042: authorized completions and the dispatch base_sha anchor.
 
 ``completion-add`` records an owner-signed completion twice -- one
 ``COMPLETION_ADDED`` event in ``ledger/primary.jsonl`` and one isomorphic
@@ -611,6 +611,20 @@ class DeliverWithCompletionsTestCase(GitWorktreeFixture):
         # Only the completion path is reported as a completion win.
         self.assertEqual(out["scope_completions"], ["tower-dsh/tools/helper.py"])
 
+    def test_hand_written_record_completion_is_rejected(self) -> None:
+        """PILOT-043: a record-only completion no longer delivers (exit 2)."""
+        record = self.load_record()
+        record["completions"] = [completion_entry(
+            f"{WORKTREE_REL}/tower-dsh/tools/helper.py")]
+        self.save_record(record)
+        self.write_worktree("tower-dsh/tools/helper.py", "helper = 1\n")
+        self.commit_worktree("hand-written record completion")
+
+        deliver = self.deliver()
+        self.assert_failed_with(
+            deliver, "completion not backed by COMPLETION_ADDED")
+        self.assert_delivery_wrote_nothing()
+
     def test_legacy_record_without_completions_has_empty_scope_completions(self) -> None:
         self.write_worktree("tower-dsh/tools/x.py", "x = 2\n")
         self.commit_worktree("in scope change")
@@ -695,13 +709,13 @@ class BaseShaTestCase(GitWorktreeFixture):
 
     # -- 3. base_sha must be an ancestor of HEAD ---------------------------
     def test_base_sha_not_ancestor_is_rejected(self) -> None:
-        self.require_dispatch()
+        # PILOT-043 R1: move main before dispatch so the event itself carries
+        # a non-ancestor sha (record-only tampering is caught by the sha gate).
         run_git(self.kit, "commit", "--allow-empty", "-m", "divergent main")
         divergent = run_git(self.kit, "rev-parse", "main").stdout.strip()
+        self.require_dispatch()
+        self.assertEqual(self.load_record()["dispatch"]["base_sha"], divergent)
 
-        record = self.load_record()
-        record["dispatch"]["base_sha"] = divergent
-        self.save_record(record)
         self.write_worktree("tower-dsh/tools/x.py", "x = 2\n")
         self.commit_worktree("in scope change")
 
