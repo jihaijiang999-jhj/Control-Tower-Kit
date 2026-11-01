@@ -15,7 +15,7 @@
     "新增 state/TASK_IDS.json（schema tower/task-ids@1）：{ids: {PILOT-xxx: {title,status,spec_path,created_at,updated_at}}, next?: null}；status ∈ reserved/active/closed/void",
     "新增 towerctl task-ids-init：扫描 tasks/PILOT-*（含 PILOT-*-VOID、PILOT-*-VOID2）去重，按 record.status 与目录名推导 closed/void/active，写注册表；已存在注册表时只在缺失 ID 上补齐，不覆盖现有条目",
     "新增 towerctl task-ids-reserve --id --title [--spec]：为未建卡草稿占号（如 056）；已存在 ID exit 2",
-    "task-new：写卡前检查 id 是否已在注册表（任何状态）→ exit 2 `task id already registered`，零写入；写卡成功后登记 status=active；注册表缺失时提示先 task-ids-init，不自动建",
+    "task-new：写卡前检查 id 是否已在注册表（任何状态）→ exit 2 `task id already registered`，零写入；写卡成功后登记 status=active；注册表缺失时自动从现有 tasks 构建（空塔空表），保证旧夹具兼容；task-ids-init 可显式重建/补齐",
     "close：成功后把对应 ID 置 closed；task-ids-init 对 `-VOID` 目录置 void；不删除条目",
     "check --phase spec：校验 ID 在注册表且 title 与 spec 一致；缺失/不一致 exit 2",
     "真实塔：init 后 001–055 全部登记（043/055 为 void/closed），056 可 reserve；task-new 057 成功；再用 057/055/043 建卡均 exit 2 零写入",
@@ -45,6 +45,8 @@
     "真实塔 state-verify drift []；真塔 tasks=56/envelopes=55（057 建卡后），建信封后 56/56",
     "git -C pilot/worktrees/PILOT-057 diff --name-only main..HEAD 恰 3 个 allowed_paths"
   ],
-  "depends_on": ["PILOT-055"],
+  "depends_on": [
+    "PILOT-055"
+  ],
   "worktree": "pilot/worktrees/PILOT-057"
 }
