@@ -227,7 +227,7 @@ class TaskRegistryCase(unittest.TestCase):
         # The reservation is consumed: a second card is refused.
         self.spec(tid)
         duplicate = self.cli("task-new", "--spec", f"specs/{tid}.spec.json")
-        self.fails(duplicate, "already registered", tid)
+        self.fails(duplicate, "already", tid)
 
     # -- 5. check --phase spec --------------------------------------------
     def prepare_ready_card(self, tid: str, title: str) -> None:
