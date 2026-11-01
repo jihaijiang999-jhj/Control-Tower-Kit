@@ -246,7 +246,13 @@ ENVELOPE_TRANSITIONS = {
     "ENVELOPE_NEW": frozenset({None, "DRAFT", "WAITING",
                                "CORRECTION_REQUIRED"}),
     "QUEUE_ADD": frozenset({"DRAFT"}),
-    "MERGE_START": frozenset({"WAITING", "CORRECTION_REQUIRED"}),
+    # PILOT-060: a merge that already wrote ``MERGE_START`` and then failed
+    # (056: dirty working tree before any ledger write) retries from the
+    # internal ``MERGING`` state.  Only the retry joins the table: the merge
+    # has not settled anything yet, so ``DRAFT`` / ``MERGED`` /
+    # ``POST_MERGE_VERIFIED`` still cannot start a merge.
+    "MERGE_START": frozenset({"WAITING", "CORRECTION_REQUIRED",
+                              ENVELOPE_MERGING_STATUS}),
     "MERGE": frozenset({ENVELOPE_MERGING_STATUS}),
     "POST_MERGE_VERIFIED": frozenset({"MERGED", "CORRECTION_REQUIRED"}),
     "MERGE_BLOCKED": frozenset({"WAITING", ENVELOPE_MERGING_STATUS,
