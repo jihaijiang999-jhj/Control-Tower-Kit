@@ -10,7 +10,7 @@
   "created_at": "2026-11-02T01:52:06+08:00",
   "scope": "PILOT-056: modularize towerctl (23 modules, 4-layer DAG, baseline move)",
   "tests_baseline": 2,
-  "tower_tests_baseline": 675,
+  "tower_tests_baseline": 688,
   "forbidden": [
     "production",
     "external_call",
