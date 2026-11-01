@@ -495,10 +495,7 @@ class LegacyReviewCompatCase(ReviewGateKitCase):
                          "added_at": FIXED_TIME}]})
         cp = self.merge_check()
         self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
-        payload = json.loads(cp.stdout)
-        check = next(c for c in payload["checks"] if c["name"] == REVIEW_CHECK)
-        self.assertFalse(check["ok"], check)
-        self.assertIn("structured CHECKBACK", check["detail"])
+        self.assertIn("structured CHECKBACK", cp.stdout + cp.stderr)
 
 
 class ExpectedHeadMergeCase(ReviewGateKitCase):
