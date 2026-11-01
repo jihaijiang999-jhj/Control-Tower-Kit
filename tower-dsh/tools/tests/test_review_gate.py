@@ -475,6 +475,31 @@ class LegacyReviewCompatCase(ReviewGateKitCase):
         self.assertIn("legacy", check["detail"])
         self.assertFalse(self.review_path().exists())
 
+    def test_review_json_without_structured_checkback_is_rejected(self) -> None:
+        """A REVIEW.json without a head-bearing CHECKBACK is not legacy."""
+        record = self.record(status="closed")
+        record["review"] = {"reviewer": REVIEWER, "verdict": "PASS"}
+        write_json(self.record_path(), record)
+        write_json(self.review_path(), {"schema": "tower/review@1",
+                                        "verdict": "PASS"})
+        legacy = self.payload()
+        legacy.pop("tests_baseline")
+        legacy.pop("tower_tests_baseline")
+        legacy.update({"status": "DRAFT",
+                       "envelope_head_sha": self.envelope_head})
+        write_json(self.envelope_path(), legacy)
+        write_json(self.root / "supervision" / "MERGE_QUEUE.json", {
+            "schema": "tower/merge-queue@1",
+            "entries": [{"envelope_id": ENVELOPE, "task": TASK,
+                         "branch": BRANCH, "base": BASE, "status": "WAITING",
+                         "added_at": FIXED_TIME}]})
+        cp = self.merge_check()
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        payload = json.loads(cp.stdout)
+        check = next(c for c in payload["checks"] if c["name"] == REVIEW_CHECK)
+        self.assertFalse(check["ok"], check)
+        self.assertIn("structured CHECKBACK", check["detail"])
+
 
 class ExpectedHeadMergeCase(ReviewGateKitCase):
     """``merge --mode pr`` pins ``gh pr merge`` to the envelope head."""

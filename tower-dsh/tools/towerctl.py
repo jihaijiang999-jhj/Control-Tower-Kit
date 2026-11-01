@@ -2065,6 +2065,14 @@ def review_binding_check(root: Path, env: dict, task: str) -> tuple[bool, str]:
         # a traceback here.
         return True, "legacy: CHECKBACK ledger unreadable"
     if not any("head" in payload for payload in payloads):
+        review_path = task_dir(root, task) / "REVIEW.json"
+        try:
+            number = int(task.rsplit("-", 1)[1]) if task.startswith("PILOT-") else 0
+        except (IndexError, ValueError):
+            number = 0
+        if review_path.exists() or number >= 58:
+            return False, ("structured CHECKBACK required for PILOT-058+ cards "
+                           "(missing head binding)")
         return True, "legacy: no structured CHECKBACK event (pre-058 review)"
     problems = review_problems(root, env, task)
     return not problems, "; ".join(problems) or "ok"
