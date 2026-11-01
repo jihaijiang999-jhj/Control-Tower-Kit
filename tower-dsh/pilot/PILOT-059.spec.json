@@ -6,7 +6,7 @@
     "problem": "木塔的 checkback/accept 基本全有全无：一个非关键人工体验项没做，整卡不能 accept；同时没有结构化的 A/M 清单，human 验收与自动证据混在 prose 里。SteerLine 的 acceptance 分 A/M、允许非关键人工后置，值得借。",
     "outcome": "每张新卡有 tasks/<id>/ACCEPTANCE.md（人读）与 ACCEPTANCE.json（机读）：items[{id,kind:auto|manual,status:pending|passed|failed,note}]；task-new 建卡时生成默认 A-01；acceptance-add 增/改项；accept 要求所有 auto=passed，manual 只能 passed 或显式 --allow-manual-pending 且每项有非空 note；任何 failed/pending auto 都 exit 2。",
     "approach": "task-new 写 ACCEPTANCE.json + 渲染 ACCEPTANCE.md；acceptance-add 校验 id/kind/status，更新 JSON 并重渲染；accept 读取 JSON 做门；不把 manual pending 当默认放行，必须 owner 在 accept 决定里显式允许；真实塔 57 之前旧卡无文件不回溯，059 起新卡适用。",
-    "non_goals_and_done": "不改 owner 四闸/merge/authority；不把真实失败/未实现改称 manual pending；不做 Web UI；A/M 分项、accept 门、638+ tests 全绿才算完成。"
+    "non_goals_and_done": "不改 owner 四闸/merge/authority；不把真实失败/未实现改称 manual pending；不做 Web UI；A/M 分项、accept 门、646+ tests 全绿才算完成。"
   },
   "authority": "workspace_write",
   "anchor": "ADR-0009 / SteerLine acceptance",
@@ -35,13 +35,15 @@
     "weakening owner gates"
   ],
   "acceptance": [
-    "cd pilot/worktrees/PILOT-059/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 638 + 新增用例数（main 基线 638）",
+    "cd pilot/worktrees/PILOT-059/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 646 + 新增用例数（main 基线 646）",
     "task-new 生成 ACCEPTANCE.json（A-01 auto pending）与 ACCEPTANCE.md；JSON/MD 一致",
     "acceptance-add 增 A-02 auto passed、M-01 manual passed 成功；重复 id 不加 --replace → exit 2；未知 task → exit 2 零写入",
     "accept：A-01 pending → exit 2；A-01 passed 但 M-01 pending 且无 --allow-manual-pending → exit 2；带 flag 且 note 空 → exit 2；带 flag 且 note 非空 → 0 并写 ACCEPT；任何 failed → exit 2",
     "真实塔 state-verify drift []；真塔 tasks=58/envelopes=57（059 建卡后），建信封后 58/58",
     "git -C pilot/worktrees/PILOT-059 diff --name-only main..HEAD 恰 2 个 allowed_paths"
   ],
-  "depends_on": ["PILOT-058"],
+  "depends_on": [
+    "PILOT-058"
+  ],
   "worktree": "pilot/worktrees/PILOT-059"
 }

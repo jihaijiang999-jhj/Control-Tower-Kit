@@ -6,7 +6,7 @@
     "problem": "checkback 的 PASS 是一段自由文本；reviewer 复核的 head 与 envelope/PR head 没有硬绑定，head 变了 review 仍可能被当成有效；merge 也没有把 expected head 传给 gh。055 就出现过 PASS 后证据仍是旧 HEAD 的返工。",
     "outcome": "checkback 写出结构化 tasks/<id>/REVIEW.json（schema tower/review@1，含 reviewer/verdict/head/base/scope/findings/note/at）；merge-check 要求 REVIEW.json 存在、PASS、head == envelope implementation_head_sha；merge 使用 gh pr merge --match-head-commit <head>；head 变化后旧 review 自动失效，必须重新 checkback。",
     "approach": "扩展 checkback 写 REVIEW.json（head 默认 worktree HEAD，base 默认 record.dispatch.base_sha）；merge-check 加 REVIEW 绑定校验；merge 在 PR 模式加 --match-head-commit；envelope-new 不改 review，但 merge-check 会发现 head 不一致；旧卡无 REVIEW.json 时给出明确错误（首次适用从 057 起）。",
-    "non_goals_and_done": "不做 review 平台/评论系统；不改 reviewer 角色/独立复核语义；不改 envelope 状态机；HEAD 绑定、expected-head merge、638+ tests 全绿才算完成。"
+    "non_goals_and_done": "不做 review 平台/评论系统；不改 reviewer 角色/独立复核语义；不改 envelope 状态机；HEAD 绑定、expected-head merge、646+ tests 全绿才算完成。"
   },
   "authority": "workspace_write",
   "anchor": "ADR-0009 / SteerLine merge_ready",
@@ -35,7 +35,7 @@
     "weakening existing review/merge gates"
   ],
   "acceptance": [
-    "cd pilot/worktrees/PILOT-058/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 638 + 新增用例数（main 基线 638）",
+    "cd pilot/worktrees/PILOT-058/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 646 + 新增用例数（main 基线 646）",
     "checkback PASS 写 REVIEW.json，head=worktree HEAD，base=dispatch base_sha，scope/findings/verdict/reviewer/at 齐全；FAIL 也写 verdict=FAIL",
     "merge-check：无 REVIEW → exit 2；verdict FAIL → exit 2；review.head != envelope head → exit 2（stale）；head/base 一致 → 0",
     "merge --mode pr 的 gh 参数含 `--match-head-commit <envelope head>`；head 不匹配时 fail 且不产生 MERGED",
@@ -43,6 +43,8 @@
     "真实塔 state-verify drift []；真塔 tasks=57/envelopes=56（058 建卡后），建信封后 57/57",
     "git -C pilot/worktrees/PILOT-058 diff --name-only main..HEAD 恰 2 个 allowed_paths"
   ],
-  "depends_on": ["PILOT-057"],
+  "depends_on": [
+    "PILOT-057"
+  ],
   "worktree": "pilot/worktrees/PILOT-058"
 }
