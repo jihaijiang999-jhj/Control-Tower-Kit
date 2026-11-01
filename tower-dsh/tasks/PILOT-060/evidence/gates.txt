@@ -1,0 +1,238 @@
+HEAD=d9d56a2f2efa6dc07a98dd81c0bb7abb891133b9
+base=fae6edd1628d42faa476d5b10a66f1b2f3223af6
+=== state-verify exit=0
+{
+  "ok": true,
+  "tasks": 60,
+  "envelopes": 59,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-039-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-041-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-043-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-044-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-053-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID2",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID2",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 10,
+  "evidence_checked": 559
+}
+=== verify-ledger exit=0
+{
+  "ok": true,
+  "files": {
+    "primary": {
+      "path": "ledger/primary.jsonl",
+      "exists": true,
+      "events": 583,
+      "legacy_unhashed": 53,
+      "errors": []
+    },
+    "supervision": {
+      "path": "ledger/supervision.jsonl",
+      "exists": true,
+      "events": 327,
+      "legacy_unhashed": 26,
+      "errors": []
+    }
+  },
+  "errors": []
+}
+=== profile-check exit=0
+{
+  "ok": true,
+  "object": "TOWER-DSH",
+  "checked": 11,
+  "findings": []
+}
+=== arch-check exit=0
+{
+  "ok": true,
+  "counts": {
+    "gates": 18,
+    "invariants": 16,
+    "events": 29,
+    "event_types_in_code": 29,
+    "unresolved_event_calls": 1,
+    "adrs": 8,
+    "sections": 6,
+    "nodes": 70,
+    "edges": 161
+  },
+  "errors": []
+}
+=== shape-check exit=0
+{
+  "ok": true,
+  "shape_check": "checked",
+  "shape_checked": true,
+  "files": 70,
+  "functions": 1921,
+  "duplicate_blocks": 169,
+  "unused_imports": 1
+}
+=== authority-check exit=0
+{
+  "ok": true,
+  "status": "configured",
+  "requirement": "required",
+  "required": true,
+  "checks": [
+    {
+      "name": "primary ledger chain intact",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority state file readable",
+      "ok": true,
+      "detail": "state/AUTHORITY.json"
+    },
+    {
+      "name": "authority schema is tower/authority-state@1",
+      "ok": true,
+      "detail": "schema 'tower/authority-state@1'"
+    },
+    {
+      "name": "authority state backed by ledger",
+      "ok": true,
+      "detail": "AUTHORITY_SET revision 2"
+    },
+    {
+      "name": "authority field types",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority tower_id matches primary state",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority owner matches primary state",
+      "ok": true,
+      "detail": "file 'mac' vs primary state 'mac'"
+    },
+    {
+      "name": "authority primary.id matches primary state",
+      "ok": true,
+      "detail": "file 'ctl-yingxian-qa-001' vs primary state 'ctl-yingxian-qa-001'"
+    },
+    {
+      "name": "authority supervision.id matches supervision state",
+      "ok": true,
+      "detail": "file 'sup-phase2-pilot' vs supervision state 'sup-phase2-pilot'"
+    },
+    {
+      "name": "merge authority differs from primary",
+      "ok": true,
+      "detail": "merge authority 'sup-phase2-pilot' vs primary 'ctl-yingxian-qa-001'"
+    },
+    {
+      "name": "authority ledger payload types",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority requirement pinned",
+      "ok": true,
+      "detail": "authority requirement pinned: shared/AUTHORITY_POLICY.json + AUTHORITY_REQUIRED event"
+    }
+  ]
+}
+=== wiring exit=0
+{
+  "ok": true,
+  "status": "WIRED",
+  "checks": [
+    {
+      "name": "TOWER.md",
+      "ok": true,
+      "detail": "TOWER.md"
+    },
+    {
+      "name": "tower/AGENTS.md -> TOWER.md",
+      "ok": true,
+      "detail": "AGENTS.md"
+    },
+    {
+      "name": "workspace/AGENTS.md -> tower-dsh/TOWER.md",
+      "ok": true,
+      "detail": "C:\\Users\\mac\\Documents\\deepseek-harness\\default-workspace\\AGENTS.md"
+    },
+    {
+      "name": "START-HERE.md -> CURRENT_STATE",
+      "ok": true,
+      "detail": "START-HERE.md"
+    },
+    {
+      "name": "PROJECT_PROFILE.workspace_root exists",
+      "ok": true,
+      "detail": "C:/Users/mac/Documents/deepseek-harness/default-workspace"
+    },
+    {
+      "name": "primary/CURRENT_STATE.json parse",
+      "ok": true,
+      "detail": "primary/CURRENT_STATE.json"
+    },
+    {
+      "name": "primary/TASK_BOARD.json parse",
+      "ok": true,
+      "detail": "primary/TASK_BOARD.json"
+    }
+  ]
+}
+=== diff --name-only main..HEAD
+tower-dsh/tools/tests/test_envelope_retry.py
+tower-dsh/tools/tower_ledger_replay.py
+=== status --porcelain
+?? scratch/

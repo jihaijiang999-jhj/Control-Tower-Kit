@@ -591,7 +591,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-056/MERGE.md",
       "updated_at": "2026-11-02T01:51:53+08:00"
+    },
+    {
+      "id": "PILOT-060",
+      "title": "信封 MERGE_START 允许 MERGING 重试",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:39278b6e-c160-4e96-ad10-28260b9467c8",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-060/MERGE.md",
+      "updated_at": "2026-11-02T02:54:33+08:00"
     }
   ],
-  "updated_at": "2026-11-02T01:51:53+08:00"
+  "updated_at": "2026-11-02T02:54:33+08:00"
 }

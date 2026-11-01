@@ -1,0 +1,137 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-060",
+  "title": "信封 MERGE_START 允许 MERGING 重试",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "tools/tower_ledger_replay.py：ENVELOPE_TRANSITIONS['MERGE_START'] 加 'MERGING'（仅重试语义）",
+    "新增 tools/tests/test_envelope_retry.py：WAITING→MERGING→MERGING 合法；CORRECTION→MERGING 合法；DRAFT/MERGED 仍拒；重复 MERGE_START 不报 illegal_transition",
+    "真实塔 056 的 state-verify drift 归零；其它信封事件不变",
+    "不改 merge/queue/envelope-new 行为；不放宽其它转移"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-060/tower-dsh/tools/tower_ledger_replay.py",
+    "pilot/worktrees/PILOT-060/tower-dsh/tools/tests/test_envelope_retry.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "allowing MERGE_START from DRAFT/MERGED/POST_MERGE_VERIFIED",
+    "weakening other envelope transitions"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-060/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 683 + 新增用例数（main 基线 683）",
+    "MERGE_START 源状态 = {WAITING, CORRECTION_REQUIRED, MERGING}；DRAFT/MERGED/POST_MERGE_VERIFIED 仍拒",
+    "真实塔 state-verify 0（056 的重复 MERGE_START 合法），59/59；profile 11/0；arch gates 18",
+    "其它 055 re-dispatch/058 review/059 acceptance 测试不回归",
+    "git -C pilot/worktrees/PILOT-060 diff --name-only main..HEAD 恰 2 个 allowed_paths"
+  ],
+  "depends_on": [
+    "PILOT-056"
+  ],
+  "worktree": "pilot/worktrees/PILOT-060",
+  "spec_path": "pilot/PILOT-060.spec.json",
+  "spec_sha256": "2677579f23128fc9fb947544b098977169f7e01ce3cb2deff0721278a62cde00",
+  "spec_gate": "PASS",
+  "executor": "subagent:39278b6e-c160-4e96-ad10-28260b9467c8",
+  "dispatch": {
+    "executor": "subagent:39278b6e-c160-4e96-ad10-28260b9467c8",
+    "worktree": "pilot/worktrees/PILOT-060",
+    "at": "2026-11-02T02:13:41+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "fae6edd1628d42faa476d5b10a66f1b2f3223af6",
+    "campaign": "C-2026-Q4-03"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-060/evidence/tower_ledger_replay.py",
+      "sha256": "c6bae185541e4e54361c490188a7eed98af2b35d792ea5d4bd1fb2d732ad5edd",
+      "bytes": 18348,
+      "at": "2026-11-02T02:44:01+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-060/evidence/test_envelope_retry.py",
+      "sha256": "29abcc8d393e5d402e3f77d5de0b50f2c7618ffd1836558878142a7dcc41e0c0",
+      "bytes": 9033,
+      "at": "2026-11-02T02:44:01+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-060/evidence/test-output.txt",
+      "sha256": "196400610da74e7e026d1b3a507afa72f3af2c7931338521ac2fcfc225e8d4ff",
+      "bytes": 95132,
+      "at": "2026-11-02T02:44:01+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-060/evidence/retry_probe.py",
+      "sha256": "2522a4f399d5e32ea20da595990130594e157ea1ce51e19482b5c6b656be835b",
+      "bytes": 3776,
+      "at": "2026-11-02T02:44:01+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-060/evidence/probe.txt",
+      "sha256": "db5e2b03cc5adf42bbd2159ed7d4e2615d2945752bcdee0dbac7dedc1cac9ad5",
+      "bytes": 1014,
+      "at": "2026-11-02T02:44:01+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-060/evidence/commit.txt",
+      "sha256": "80cb4605b098ce020dd8224265acf35773784e21764a562221bfb5a6f713f512",
+      "bytes": 345,
+      "at": "2026-11-02T02:44:01+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-060/evidence/diff.txt",
+      "sha256": "9bf65805b45040e44f7a7314cbe5a07942ef4440cb6d8fa6b9de7595b46729f9",
+      "bytes": 10613,
+      "at": "2026-11-02T02:44:01+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-060/evidence/gates.txt",
+      "sha256": "53d52f617cf9bc16e61e0b8a168976887026c920398a4680be6eefdba17c0b74",
+      "bytes": 5246,
+      "at": "2026-11-02T02:44:01+08:00",
+      "id": "E-008"
+    }
+  ],
+  "review": {
+    "schema": "tower/review@1",
+    "task": "PILOT-060",
+    "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+    "verdict": "PASS",
+    "head": "d9d56a2f2efa6dc07a98dd81c0bb7abb891133b9",
+    "base": "fae6edd1628d42faa476d5b10a66f1b2f3223af6",
+    "scope": [],
+    "findings": [],
+    "note": "060 PASS。2 paths；HEAD d9d56a2（base fae6edd）；8/8 证据；Ran 688 OK；MERGE_START 源 {WAITING,CORRECTION_REQUIRED,MERGING}，其它转移不变；真实塔 60 tasks/59 envelopes/drift []；056 重复 MERGE_START 合法。",
+    "at": "2026-11-02T02:54:32+08:00",
+    "structure": ""
+  },
+  "decision": {
+    "id": "D-PILOT-060",
+    "actor": "owner",
+    "text": "PASS; MERGE_START retry",
+    "at": "2026-11-02T02:54:32+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-060/CLOSEOUT.md",
+    "at": "2026-11-02T02:54:33+08:00"
+  },
+  "created_at": "2026-11-02T02:13:32+08:00",
+  "updated_at": "2026-11-02T02:54:33+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-060/MERGE.md",
+  "delivered_at": "2026-11-02T02:44:01+08:00",
+  "accepted_at": "2026-11-02T02:54:32+08:00"
+}

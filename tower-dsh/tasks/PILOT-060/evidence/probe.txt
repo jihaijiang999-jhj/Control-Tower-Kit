@@ -1,0 +1,10 @@
+﻿old MERGE_START = ['CORRECTION_REQUIRED', 'WAITING']
+new MERGE_START = ['CORRECTION_REQUIRED', 'MERGING', 'WAITING']
+real tower ENV-PILOT-056 (old table): 2 illegal_transition [{"actual": "MERGING", "event": "MERGE_START", "expected": ["CORRECTION_REQUIRED", "WAITING"], "kind": "illegal_transition", "target": "ENV-PILOT-056"}, {"actual": "MERGING", "event": "MERGE_START", "expected": ["CORRECTION_REQUIRED", "WAITING"], "kind": "illegal_transition", "target": "ENV-PILOT-056"}]
+real tower ENV-PILOT-056 (new table): 0 illegal_transition []
+real tower ENV-PILOT-056 MERGE_START events: 4
+synthetic ENV-PROBE-RETRY: old=1 new=0 new_actual=[]
+synthetic ENV-PROBE-DRAFT: old=1 new=1 new_actual=['DRAFT']
+synthetic ENV-PROBE-MERGED: old=1 new=1 new_actual=['MERGED']
+synthetic ENV-PROBE-VERIFIED: old=1 new=1 new_actual=['POST_MERGE_VERIFIED']
+synthetic folded states: {"ENV-PROBE-DRAFT": "DRAFT", "ENV-PROBE-MERGED": "MERGED", "ENV-PROBE-RETRY": "WAITING", "ENV-PROBE-VERIFIED": "POST_MERGE_VERIFIED"}
