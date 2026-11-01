@@ -2394,31 +2394,8 @@ def write_task_card(root: Path, tid: str, spec: dict, spec_path: Path) -> dict:
 
 
 def cmd_task_new(root: Path, args) -> None:
-    spec_path = resolve_input_within(root, args.spec, "spec")
-    if not spec_path.exists():
-        fail([f"spec not found: {spec_path}"])
-    try:
-        spec = jload(spec_path)
-    except (OSError, ValueError) as exc:
-        fail([f"spec is not readable JSON: {exc}"])
-    if not isinstance(spec, dict):
-        fail(["spec must be a JSON object"])
-    tid = str(spec.get("id", ""))
-    errors = task_new_errors(root, spec, tid)
-    if errors:
-        fail(errors)
-    tdir = task_dir(root, tid)
-    if tdir.exists():
-        fail([f"task already exists: {tid}"])
-    view = task_id_view(root)
-    if tid in view and view[tid].get("status") != "reserved":
-        fail([f"task id already registered: {tid} "
-              f"(status {view[tid].get('status')})"])
-    record = write_task_card(root, tid, spec, spec_path)
-    activate_task_id(root, record, view)
-    emit({"ok": True, "task": tid,
-          "record": rel(root, tdir / "record.json"),
-          "task_md": rel(root, tdir / "TASK.md")})
+    """Create a card (PILOT-059 adds its acceptance list; see ``task_new_card``)."""
+    task_new_card(root, args)
 
 
 def ledger_has_task_event(root: Path, event_type: str, task: str) -> bool:
@@ -3719,26 +3696,8 @@ def cmd_checkback(root: Path, args) -> None:
 
 
 def cmd_accept(root: Path, args) -> None:
-    rec = load_record(root, args.task)
-    review = rec.get("review") or {}
-    if review.get("verdict") != "PASS":
-        fail(["cannot accept without PASS checkback"])
-    if rec.get("status") not in ("reviewed", "accepted"):
-        fail([f"task status {rec.get('status')} cannot accept"])
-    evidence_errors = check_evidence(root, rec)
-    if evidence_errors:
-        fail(evidence_errors)
-    rec["decision"] = {"id": args.decision, "actor": "owner",
-                       "text": args.note or "owner authorized pilot acceptance",
-                       "at": now()}
-    rec["status"] = "accepted"
-    rec["accepted_at"] = now()
-    rec["next"] = "closeout"
-    save_record(root, rec)
-    update_board(root, rec)
-    append_ledger(root, "ACCEPT", "primary",
-                  {"task": args.task, "decision": args.decision})
-    emit({"ok": True, "task": args.task, "status": rec["status"], "decision": args.decision})
+    """Owner accept (PILOT-059 adds the A/M gate; see ``accept_card``)."""
+    accept_card(root, args)
 
 
 def cmd_close(root: Path, args) -> None:
@@ -3775,6 +3734,235 @@ def cmd_close(root: Path, args) -> None:
     close_task_id(root, rec)
     emit(with_position(root, {"ok": True, "task": args.task, "status": rec["status"],
           "closeout": rel(root, closeout)}))
+
+
+# ---------------------------------------------------------------------------
+# PILOT-059: per-card acceptance list (auto/manual split)
+# ---------------------------------------------------------------------------
+# ``tasks/<id>/ACCEPTANCE.json`` is the machine-readable list and
+# ``ACCEPTANCE.md`` the reader-facing table rendered from it.  ``accept`` only
+# passes when every ``auto`` item is ``passed`` and no item is ``failed``; a
+# ``manual`` item may stay ``pending`` only when the owner explicitly allows it
+# (``--allow-manual-pending``) and every such item carries a note.  Cards up to
+# PILOT-058 have no list, are never retrofitted, and stay acceptable.
+ACCEPTANCE_SCHEMA = "tower/acceptance@1"
+ACCEPTANCE_JSON = "ACCEPTANCE.json"
+ACCEPTANCE_MD = "ACCEPTANCE.md"
+ACCEPTANCE_KINDS = ("auto", "manual")
+ACCEPTANCE_STATUSES = ("pending", "passed", "failed")
+# Filename-safe, same spirit as ``is_safe_id``: ``..`` would escape the dir.
+ACCEPTANCE_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,31}$")
+ACCEPTANCE_LEGACY_MAX = 58
+ACCEPTANCE_LEGACY_BEFORE = "2026-11-01T00:00:00+08:00"
+ACCEPTANCE_DEFAULT_ITEM = {"id": "A-01", "kind": "auto",
+                           "status": "pending", "note": ""}
+
+
+def acceptance_json_path(root: Path, tid: str) -> Path:
+    """``tasks/<id>/ACCEPTANCE.json``: the machine-readable acceptance list."""
+    return task_dir(root, tid) / ACCEPTANCE_JSON
+
+
+def acceptance_md_path(root: Path, tid: str) -> Path:
+    """``tasks/<id>/ACCEPTANCE.md``: the same list as a reader-facing table."""
+    return task_dir(root, tid) / ACCEPTANCE_MD
+
+
+def acceptance_row(item: dict) -> str:
+    """One Markdown table row for an acceptance item (pipes escaped)."""
+    note = str(item.get("note") or "").replace("|", "\\|").replace("\n", " ")
+    return f"| {item['id']} | {item['kind']} | {item['status']} | {note} |"
+
+
+def render_acceptance_md(tid: str, items: list[dict]) -> str:
+    """Render ``ACCEPTANCE.md``; the table mirrors the JSON item order."""
+    lines = [f"# {tid} - Acceptance", "",
+             "| ID | kind | status | note |", "| --- | --- | --- | --- |"]
+    lines += [acceptance_row(item) for item in items]
+    return "\n".join(lines) + "\n"
+
+
+def acceptance_item_errors(items) -> list[str]:
+    """Structural errors for an acceptance item list; empty means valid."""
+    if not isinstance(items, list):
+        return ["acceptance items must be a list"]
+    errors: list[str] = []
+    seen: set[str] = set()
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            errors.append(f"acceptance item {index} must be an object")
+            continue
+        item_id = str(item.get("id") or "")
+        if not ACCEPTANCE_ID_RE.match(item_id) or ".." in item_id:
+            errors.append(f"acceptance item {index} has invalid id: {item_id!r}")
+        elif item_id in seen:
+            errors.append(f"acceptance id duplicated: {item_id}")
+        seen.add(item_id)
+        if item.get("kind") not in ACCEPTANCE_KINDS:
+            errors.append(f"acceptance {item_id} kind must be auto | manual")
+        if item.get("status") not in ACCEPTANCE_STATUSES:
+            errors.append(f"acceptance {item_id} status must be pending | passed | failed")
+        if not isinstance(item.get("note", ""), str):
+            errors.append(f"acceptance {item_id} note must be a string")
+    return errors
+
+
+def write_acceptance(root: Path, tid: str, items: list[dict]) -> None:
+    """Write the JSON list and re-render the Markdown table from that same list."""
+    jdump(acceptance_json_path(root, tid),
+          {"schema": ACCEPTANCE_SCHEMA, "items": items})
+    acceptance_md_path(root, tid).write_text(
+        render_acceptance_md(tid, items), encoding="utf-8")
+
+
+def write_default_acceptance(root: Path, tid: str) -> list[dict]:
+    """Give a new card its default ``A-01 auto pending`` item (PILOT-059)."""
+    items = [dict(ACCEPTANCE_DEFAULT_ITEM)]
+    write_acceptance(root, tid, items)
+    return items
+
+
+def load_acceptance(root: Path, tid: str) -> list[dict] | None:
+    """Read one card's acceptance list; ``None`` when the file is absent."""
+    path = acceptance_json_path(root, tid)
+    if not path.exists():
+        return None
+    try:
+        data = jload(path)
+    except (OSError, ValueError) as exc:
+        fail([f"{ACCEPTANCE_JSON} unreadable: {exc}"])
+    if not isinstance(data, dict) or data.get("schema") != ACCEPTANCE_SCHEMA:
+        fail([f"{ACCEPTANCE_JSON} schema must be {ACCEPTANCE_SCHEMA}"])
+    items = data.get("items")
+    errors = acceptance_item_errors(items)
+    if errors:
+        fail(errors)
+    return items
+
+
+def acceptance_legacy_ok(rec: dict) -> bool:
+    """True for cards that predate PILOT-059 (no list, never retrofitted).
+
+    A numeric id up to ``ACCEPTANCE_LEGACY_MAX`` is legacy by construction.
+    Everything newer must carry ``ACCEPTANCE.json``; a missing or malformed
+    ``created_at`` is not an exemption.
+    """
+    match = re.search(r"(\d+)$", str(rec.get("id") or ""))
+    return bool(match and int(match.group(1)) <= ACCEPTANCE_LEGACY_MAX)
+
+
+def acceptance_gate_errors(root: Path, rec: dict, args) -> list[str]:
+    """The A/M gate: auto all passed, nothing failed, manual pending by flag."""
+    tid = str(rec.get("id") or getattr(args, "task", ""))
+    items = load_acceptance(root, tid)
+    if items is None:
+        if acceptance_legacy_ok(rec):
+            return []
+        return [f"task {tid} has no {ACCEPTANCE_JSON}; only cards up to "
+                f"PILOT-{ACCEPTANCE_LEGACY_MAX:03d} may omit it"]
+    allowed = bool(getattr(args, "allow_manual_pending", False))
+    errors: list[str] = []
+    for item in items:
+        label = f"acceptance {item['id']}"
+        if item["status"] == "failed":
+            errors.append(f"{label} is failed")
+        elif item["kind"] == "auto" and item["status"] != "passed":
+            errors.append(f"{label} is auto {item['status']}; auto items must be passed")
+        elif item["status"] == "pending":
+            if not allowed:
+                errors.append(f"{label} is manual pending; "
+                              "pass --allow-manual-pending")
+            elif not str(item.get("note") or "").strip():
+                errors.append(f"{label} is manual pending without a note")
+    return errors
+
+
+def cmd_acceptance_add(root: Path, args) -> None:
+    """Add or update one acceptance item, keeping JSON and Markdown in sync."""
+    rec = load_record(root, args.task)
+    item_id = str(args.id or "").strip()
+    if not ACCEPTANCE_ID_RE.match(item_id) or ".." in item_id:
+        fail([f"invalid acceptance id: {item_id!r}"])
+    items = load_acceptance(root, rec["id"]) or []
+    existing = next((item for item in items if item["id"] == item_id), None)
+    if existing is not None and existing.get("kind") != args.kind:
+        fail([f"acceptance {item_id} kind is {existing.get('kind')}; "
+              "kind cannot change"])
+    if existing is not None and not args.replace:
+        fail([f"acceptance id already exists: {item_id}; "
+              "pass --replace to update it"])
+    note = str(args.note or "")
+    if existing is None:
+        items.append({"id": item_id, "kind": args.kind,
+                      "status": args.status, "note": note})
+    else:
+        existing["status"] = args.status
+        existing["note"] = note
+    write_acceptance(root, rec["id"], items)
+    emit({"ok": True, "task": rec["id"], "id": item_id, "kind": args.kind,
+          "status": args.status, "replaced": existing is not None,
+          "acceptance_json": rel(root, acceptance_json_path(root, rec["id"])),
+          "acceptance_md": rel(root, acceptance_md_path(root, rec["id"]))})
+
+
+def accept_card(root: Path, args) -> None:
+    """The accept checks, plus the PILOT-059 A/M gate before ACCEPT is written."""
+    rec = load_record(root, args.task)
+    review = rec.get("review") or {}
+    if review.get("verdict") != "PASS":
+        fail(["cannot accept without PASS checkback"])
+    if rec.get("status") not in ("reviewed", "accepted"):
+        fail([f"task status {rec.get('status')} cannot accept"])
+    evidence_errors = check_evidence(root, rec)
+    if evidence_errors:
+        fail(evidence_errors)
+    acceptance_errors = acceptance_gate_errors(root, rec, args)
+    if acceptance_errors:
+        fail(acceptance_errors)
+    rec["decision"] = {"id": args.decision, "actor": "owner",
+                       "text": args.note or "owner authorized pilot acceptance",
+                       "at": now()}
+    rec["status"] = "accepted"
+    rec["accepted_at"] = now()
+    rec["next"] = "closeout"
+    save_record(root, rec)
+    update_board(root, rec)
+    append_ledger(root, "ACCEPT", "primary",
+                  {"task": args.task, "decision": args.decision})
+    emit({"ok": True, "task": args.task, "status": rec["status"],
+          "decision": args.decision})
+
+
+def task_new_card(root: Path, args) -> None:
+    """``task-new`` body plus the PILOT-059 default acceptance files."""
+    spec_path = resolve_input_within(root, args.spec, "spec")
+    if not spec_path.exists():
+        fail([f"spec not found: {spec_path}"])
+    try:
+        spec = jload(spec_path)
+    except (OSError, ValueError) as exc:
+        fail([f"spec is not readable JSON: {exc}"])
+    if not isinstance(spec, dict):
+        fail(["spec must be a JSON object"])
+    tid = str(spec.get("id", ""))
+    errors = task_new_errors(root, spec, tid)
+    if errors:
+        fail(errors)
+    tdir = task_dir(root, tid)
+    if tdir.exists():
+        fail([f"task already exists: {tid}"])
+    view = task_id_view(root)
+    if tid in view and view[tid].get("status") != "reserved":
+        fail([f"task id already registered: {tid} "
+              f"(status {view[tid].get('status')})"])
+    record = write_task_card(root, tid, spec, spec_path)
+    write_default_acceptance(root, tid)
+    activate_task_id(root, record, view)
+    emit({"ok": True, "task": tid,
+          "record": rel(root, tdir / "record.json"),
+          "task_md": rel(root, tdir / "TASK.md"),
+          "acceptance_json": rel(root, acceptance_json_path(root, tid)),
+          "acceptance_md": rel(root, acceptance_md_path(root, tid))})
 
 
 def _latest_by(items: list[dict], field: str) -> dict:
@@ -9020,7 +9208,8 @@ COMMAND_LAYER_HANDLERS = {
     "status-snapshot": cmd_status_snapshot, "status-index": cmd_status_index,
     "status-rollup": cmd_status_rollup, "status-archive": cmd_status_archive,
     "where": cmd_where, "arch-check": cmd_arch_check,
-    "arch-graph": cmd_arch_graph, "profile-check": cmd_profile_check}
+    "arch-graph": cmd_arch_graph, "profile-check": cmd_profile_check,
+    "acceptance-add": cmd_acceptance_add}
 
 # PILOT-057 registry commands keep their own handler table for the same reason.
 TASK_IDS_HANDLERS = {"task-ids-init": cmd_task_ids_init,
@@ -9258,6 +9447,33 @@ def review_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
     return parser
 
 
+def acceptance_layer_parsers(
+        parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """PILOT-059: the ``acceptance-add`` command and accept's manual flag.
+
+    Same layering as ``review_layer_parsers``: ``build_parser`` keeps its
+    PILOT-044 size, and this layer owns only its own surface.
+    """
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        accept = action.choices.get("accept")
+        if accept is not None:
+            accept.add_argument(
+                "--allow-manual-pending", action="store_true",
+                help="owner decision to leave manual items pending (each needs a note)")
+        add = action.add_parser("acceptance-add")
+        add.add_argument("--task", required=True)
+        add.add_argument("--id", required=True)
+        add.add_argument("--kind", required=True, choices=list(ACCEPTANCE_KINDS))
+        add.add_argument("--status", required=True,
+                         choices=list(ACCEPTANCE_STATUSES))
+        add.add_argument("--note", default="")
+        add.add_argument("--replace", action="store_true",
+                         help="update an existing id (kind may not change)")
+    return parser
+
+
 def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Register the PILOT-045 commands on the parser built by ``build_parser``.
 
@@ -9275,8 +9491,8 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         action.add_parser("brief")
     dispatch_campaign_parser(parser)
     review_layer_parsers(parser)
-    return profile_layer_parsers(arch_layer_parsers(
-        position_layer_parsers(status_layer_parsers(task_ids_layer_parsers(parser)))))
+    return profile_layer_parsers(arch_layer_parsers(position_layer_parsers(
+        status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser))))))
 
 
 def cli_commands() -> list[str]:
