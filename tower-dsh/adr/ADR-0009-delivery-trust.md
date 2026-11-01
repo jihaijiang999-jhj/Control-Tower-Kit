@@ -12,7 +12,6 @@ related_cards:
   - PILOT-059
 related_files:
   - tower-dsh/tools/towerctl.py
-  - tower-dsh/state/TASK_IDS.json
   - tower-dsh/tasks/PILOT-057/TASK.md
 ---
 
