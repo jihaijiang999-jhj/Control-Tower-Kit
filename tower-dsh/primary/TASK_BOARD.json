@@ -561,7 +561,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-057/MERGE.md",
       "updated_at": "2026-11-01T18:07:18+08:00"
+    },
+    {
+      "id": "PILOT-058",
+      "title": "结构化 REVIEW：head/base 绑定 + expected-head merge",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:52e3fde0-716c-4cb9-a369-3453d263ddc7",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-058/MERGE.md",
+      "updated_at": "2026-11-01T20:42:57+08:00"
     }
   ],
-  "updated_at": "2026-11-01T18:07:18+08:00"
+  "updated_at": "2026-11-01T20:42:57+08:00"
 }

@@ -399,6 +399,13 @@
       "spec_path": "pilot/PILOT-057.spec.json",
       "created_at": "2026-11-01T17:53:36+08:00",
       "updated_at": "2026-11-01T18:07:18+08:00"
+    },
+    "PILOT-058": {
+      "title": "结构化 REVIEW：head/base 绑定 + expected-head merge",
+      "status": "closed",
+      "spec_path": "pilot/PILOT-058.spec.json",
+      "created_at": "2026-11-01T19:09:42+08:00",
+      "updated_at": "2026-11-01T20:42:57+08:00"
     }
   }
 }
