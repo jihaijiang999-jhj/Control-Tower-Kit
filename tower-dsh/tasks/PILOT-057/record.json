@@ -2,7 +2,7 @@
   "schema": "tower/task@1",
   "id": "PILOT-057",
   "title": "Task ID 注册表：ID 永不复用",
-  "status": "delivered",
+  "status": "closed",
   "authority": "workspace_write",
   "scope": [
     "新增 state/TASK_IDS.json（schema tower/task-ids@1）：{ids: {PILOT-xxx: {title,status,spec_path,created_at,updated_at}}, next?: null}；status ∈ reserved/active/closed/void",
@@ -34,7 +34,7 @@
     "cd pilot/worktrees/PILOT-057/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 638 + 新增用例数（main 基线 638）",
     "task-ids-init 在真实塔写出 55 个 ID；001–055 每个恰一条；043/055 状态为 void/closed；重复运行字节稳定或仅补缺失，不覆盖",
     "task-new 057 成功并登记 active；再用 057、055、043 分别 task-new → exit 2 且 tasks/ / board / ledger 零写入",
-    "task-ids-reserve 056 成功；再 reserve 056 或 task-new 056 → exit 2；close 057 后注册表 status=closed",
+    "task-ids-reserve 056 成功；task-new 056 成功并置 active；再次 task-new 056 拒绝；active/closed/void 仍零写入拒绝；close 057 后注册表 status=closed",
     "check --phase spec 对缺失/标题不一致注册表 exit 2；正常卡 exit 0",
     "真实塔 state-verify drift []；真塔 tasks=56/envelopes=55（057 建卡后），建信封后 56/56",
     "git -C pilot/worktrees/PILOT-057 diff --name-only main..HEAD 恰 3 个 allowed_paths",
@@ -51,11 +51,11 @@
   "dispatch": {
     "executor": "subagent:0b065961-9a06-48d9-be7d-81b8382f4aea",
     "worktree": "pilot/worktrees/PILOT-057",
-    "at": "2026-11-01T17:13:22+08:00",
+    "at": "2026-11-01T17:53:36+08:00",
     "kind": "subagent",
     "model": null,
     "parent": null,
-    "base_sha": "360695e629747694ec865f42fee21448ff18ccab",
+    "base_sha": "a6cb0ba9739094535bcd995d7f8d41b97c296497",
     "campaign": "C-2026-Q4-02"
   },
   "evidence": [
@@ -63,71 +63,86 @@
       "path": "tasks/PILOT-057/evidence/towerctl.py",
       "sha256": "da82b670a33f155936ce9e03d70de591b30cca81f954800a062a32502f2cef13",
       "bytes": 408330,
-      "at": "2026-11-01T17:37:06+08:00",
+      "at": "2026-11-01T18:00:47+08:00",
       "id": "E-001"
     },
     {
       "path": "tasks/PILOT-057/evidence/test_task_registry.py",
       "sha256": "90524105432723123c4752bfee57055af15f81f607829cb43bc373a79e9b2795",
       "bytes": 14752,
-      "at": "2026-11-01T17:37:06+08:00",
+      "at": "2026-11-01T18:00:47+08:00",
       "id": "E-002"
     },
     {
       "path": "tasks/PILOT-057/evidence/TASK_IDS.json",
       "sha256": "adfaf7044685f2bdc57e8b8a0240fcbdad13358051d88d1bc17b220fa9070c19",
       "bytes": 16733,
-      "at": "2026-11-01T17:37:06+08:00",
+      "at": "2026-11-01T18:00:47+08:00",
       "id": "E-003"
     },
     {
       "path": "tasks/PILOT-057/evidence/test-output.txt",
-      "sha256": "bdf98cc29ffbc6881c488c21045f41385f0edf108f6dd54b5814fccd2752affb",
+      "sha256": "1da90f86dc5c19923380a3278e955bfde941dd7b390066831192bf4cc4a6e444",
       "bytes": 182886,
-      "at": "2026-11-01T17:37:06+08:00",
+      "at": "2026-11-01T18:00:47+08:00",
       "id": "E-004"
     },
     {
       "path": "tasks/PILOT-057/evidence/registry_probe.py",
       "sha256": "e1e4ebfe8da72312d25130e47f8836adeb7517d06bac64b8f7a530c8db868cb5",
       "bytes": 13740,
-      "at": "2026-11-01T17:37:06+08:00",
+      "at": "2026-11-01T18:00:47+08:00",
       "id": "E-005"
     },
     {
       "path": "tasks/PILOT-057/evidence/probe.txt",
       "sha256": "6ae85f7f90fa6c604558f79f1cfce049daa36fe12a50510b586a4f2336aba386",
       "bytes": 5024,
-      "at": "2026-11-01T17:37:06+08:00",
+      "at": "2026-11-01T18:00:47+08:00",
       "id": "E-006"
     },
     {
       "path": "tasks/PILOT-057/evidence/commit.txt",
-      "sha256": "a6668c50225253ae5d5bd44182ca5887b678f758191b2fbd87d781d9c277f237",
+      "sha256": "b94f18c47189be653798f9bbef52a34481b8dda164266f3d92b81b64fbebb390",
       "bytes": 886,
-      "at": "2026-11-01T17:37:06+08:00",
+      "at": "2026-11-01T18:00:47+08:00",
       "id": "E-007"
     },
     {
       "path": "tasks/PILOT-057/evidence/diff.txt",
       "sha256": "982a227ad8d8396bf0dc75e1f1ea360d442b65420a3516f157cd7ee89c7d79b1",
       "bytes": 95862,
-      "at": "2026-11-01T17:37:06+08:00",
+      "at": "2026-11-01T18:00:47+08:00",
       "id": "E-008"
     },
     {
       "path": "tasks/PILOT-057/evidence/gates.txt",
-      "sha256": "049441d8bf92c8cb9bb2a672dd045a3f07cc237a1560dad3ce649123730d0e14",
-      "bytes": 4962,
-      "at": "2026-11-01T17:37:06+08:00",
+      "sha256": "3fd204f9fbcd8a8c100be5cfe5ceddaef6a26838342b602290404eb887e14f35",
+      "bytes": 4854,
+      "at": "2026-11-01T18:00:47+08:00",
       "id": "E-009"
     }
   ],
-  "review": null,
-  "decision": null,
-  "closeout": null,
-  "created_at": "2026-11-01T17:13:22+08:00",
-  "updated_at": "2026-11-01T17:37:06+08:00",
-  "next": "等待独立 reviewer",
-  "delivered_at": "2026-11-01T17:37:06+08:00"
+  "review": {
+    "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+    "verdict": "PASS",
+    "note": "057 PASS（最终合同/最终 HEAD）。3 paths；HEAD 0873e0f（base a6cb0ba）；9/9 证据；Ran 646 OK；probe 34/34；state/TASK_IDS.json 56 条（55 closed + 056 reserved）；task-new active/closed/void 拒绝、reserved 消费为 active、再次拒绝、零写入；task-ids-init 回填稳定；task-ids-reserve 占号；check --phase spec 缺 ID/标题不一致 exit 2；真实塔 56/55 drift []；arch/profile 0。残余：057 自身合并后由 task-ids-init 登记；043/055 closed 可接受；056 不再死路。",
+    "structure": "",
+    "at": "2026-11-01T18:07:18+08:00"
+  },
+  "decision": {
+    "id": "D-PILOT-057",
+    "actor": "owner",
+    "text": "PASS; reserved claim; 646",
+    "at": "2026-11-01T18:07:18+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-057/CLOSEOUT.md",
+    "at": "2026-11-01T18:07:18+08:00"
+  },
+  "created_at": "2026-11-01T17:53:36+08:00",
+  "updated_at": "2026-11-01T18:07:18+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-057/MERGE.md",
+  "delivered_at": "2026-11-01T18:00:47+08:00",
+  "accepted_at": "2026-11-01T18:07:18+08:00"
 }

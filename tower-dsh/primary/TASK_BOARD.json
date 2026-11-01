@@ -551,7 +551,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-055/MERGE.md",
       "updated_at": "2026-11-01T03:36:28+08:00"
+    },
+    {
+      "id": "PILOT-057",
+      "title": "Task ID 注册表：ID 永不复用",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:0b065961-9a06-48d9-be7d-81b8382f4aea",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-057/MERGE.md",
+      "updated_at": "2026-11-01T18:07:18+08:00"
     }
   ],
-  "updated_at": "2026-11-01T03:36:28+08:00"
+  "updated_at": "2026-11-01T18:07:18+08:00"
 }
