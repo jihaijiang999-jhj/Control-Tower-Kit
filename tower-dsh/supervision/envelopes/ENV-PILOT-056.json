@@ -89,5 +89,5 @@
   "supervisor": "sup-phase2-pilot",
   "merge_mode": "local",
   "tests_count": 2,
-  "tower_tests_count": 683
+  "tower_tests_count": 688
 }
