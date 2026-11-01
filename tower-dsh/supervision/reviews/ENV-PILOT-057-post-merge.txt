@@ -4,8 +4,8 @@
 - implementation: 0873e0ffa9279914d19298962a12d2310fa56ebf
 - merge_commit: a28426c029e9e41ecbe334d5cc3dda9720cdcce2
 - result: PASS
-- working_tree_clean: False
-- tool_owned_paths_ignored: ['tower-dsh/supervision/reviews/ENV-PILOT-057-post-merge.txt']
+- working_tree_clean: True
+- tool_owned_paths_ignored: []
 - test_exit: 0
 - tests_count: 2
 - tests_baseline: 2
@@ -19,7 +19,7 @@ test_non_utf8_child_output_is_replaced_not_raised (test_tower_gates.NonUtf8Child
 test_tower_gate_suite (test_tower_gates.TowerGateSuite.test_tower_gate_suite) ... ok
 
 ----------------------------------------------------------------------
-Ran 2 tests in 450.882s
+Ran 2 tests in 458.876s
 
 OK
 
