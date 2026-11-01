@@ -118,6 +118,13 @@
       "id": "GATE-PROFILE",
       "phase": "objects",
       "test": "test_unknown_probe_is_rejected"
+    },
+    {
+      "blocks": "a module budget/layering regression: towerctl.py >=3000 lines, a tower_* module >=600, an import outside the one-way 4-layer DAG, or an import cycle",
+      "command": "arch-check",
+      "id": "GATE-MODULES",
+      "phase": "objects",
+      "test": "test_modules_present_and_small"
     }
   ],
   "schema": "tower/gates@1"
