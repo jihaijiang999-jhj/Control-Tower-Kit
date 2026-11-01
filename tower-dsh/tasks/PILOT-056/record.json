@@ -1,0 +1,235 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-056",
+  "title": "towerctl 模块化（23 模块 / 4 层 DAG）+ 基线迁移",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "拆 23 个模块（每模块 <600 行，含 header）：tower_common、tower_ledger、tower_ledger_replay；tower_task、tower_authority、tower_authority_cmd、tower_delivery、tower_dispatch、tower_envelope、tower_handoff、tower_merge、tower_post_merge、tower_command、tower_campaign、tower_shape、tower_arch、tower_arch_check、tower_profile；tower_views、tower_status、tower_lookup、tower_state_verify；tower_cli",
+    "towerctl.py 只保留 bootstrap/main，<3000 行（目标 <500）；所有 CLI 子命令/退出码/JSON/证据/状态语义不变",
+    "4 层依赖 DAG：base → domain → compose → entry；只允许向下 import；禁止循环；test_modules 用 AST 校验",
+    "基线迁移：state/SHAPE-BASELINE.json 中 22 个长函数（cmd_merge/state_verify_drift/authority_state_check/build_parser 等）从 towerctl.py 条目迁移到新模块条目，lines/branches 保持原值；新增 test_shape_baseline_move 校验迁移前后函数数/metrics 净额不变（不得借机放宽）",
+    "新增 tools/tests/test_modules.py：towerctl.py <3000、每模块 <600、import DAG 无环、CLI smoke",
+    "arch/GATES.json 加 GATE-MODULES（test 指向 test_modules 行数用例）；test_arch gates 17→18",
+    "ARCHITECTURE.md 加模块图/职责/4 层依赖；与实体文件一致",
+    "不改 workflow（055 已有 shape 第 8 步）；不改 shape 规则/阈值；不拆长函数（只换文件）",
+    "真实塔：新建卡后 tasks=56/envelopes=55，建信封后 56/56；state-verify/profile/arch 全绿；638+ tests"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/towerctl.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_common.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_ledger.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_ledger_replay.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_task.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_authority.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_authority_cmd.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_delivery.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_dispatch.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_envelope.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_handoff.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_merge.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_post_merge.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_command.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_campaign.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_shape.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_arch.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_arch_check.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_profile.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_views.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_status.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_lookup.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_state_verify.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tower_cli.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tests/test_modules.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tests/test_shape_baseline_move.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/tools/tests/test_arch.py",
+    "pilot/worktrees/PILOT-056/tower-dsh/ARCHITECTURE.md",
+    "pilot/worktrees/PILOT-056/tower-dsh/arch/GATES.json",
+    "pilot/worktrees/PILOT-056/tower-dsh/state/SHAPE-BASELINE.json"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "behavior changes disguised as refactor",
+    "splitting or rewriting the 22 long functions (only move them)",
+    "raising shape thresholds or deleting baseline entries to pass",
+    "new ledger event types",
+    "changing tower/spec@2 fields",
+    "touching TOWER.md (L0)",
+    "deleting tests to make the split pass"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-056/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 675 + 新增用例数（main 基线 675）",
+    "towerctl.py <3000；23 个模块每个 <600；test_modules 校验行数、4 层 DAG、无循环、CLI smoke 全 0",
+    "基线迁移净债务为 0：SHAPE-BASELINE 中 22 个长函数的 lines/branches 与迁移前逐项相等，只是 file 改变；test_shape_baseline_move 通过；shape-check 0",
+    "所有 CLI 子命令行为不变：state-verify/authority-check/arch-check/profile-check/campaign-check/where/shape-check/spec-lint --strict 均 exit 0",
+    "arch/GATES.json 含 GATE-MODULES 且 test 真实存在；test_arch gates 18；arch-check 0",
+    "ARCHITECTURE.md 模块图/职责/4 层依赖与 23 个实体文件一致",
+    "旧码对照：main towerctl.py 8,863 行、无 tower_* 模块；新码 <3000、23 模块、CLI 等价；证据 scratch/probe-old-code.txt",
+    "真实塔：新建卡后 tasks=59/envelopes=58，建信封后 59/59；worktree 新工具 state-verify drift []、profile-check 11/0、arch-check 0；verify-ledger 0；coverage 27/27；spec-lint 6/6",
+    "git -C pilot/worktrees/PILOT-056 diff --name-only main..HEAD 恰 30 个 allowed_paths"
+  ],
+  "depends_on": [
+    "PILOT-055"
+  ],
+  "worktree": "pilot/worktrees/PILOT-056",
+  "spec_path": "pilot/PILOT-056.spec.json",
+  "spec_sha256": "5e388589251d06bd9d5721836b2b78b2db7501ddb86230f4c354c42a7583ff85",
+  "spec_gate": "PASS",
+  "executor": "subagent:7ea1af07-2467-48d3-8be3-ecd7855e1cc9",
+  "dispatch": {
+    "executor": "subagent:7ea1af07-2467-48d3-8be3-ecd7855e1cc9",
+    "worktree": "pilot/worktrees/PILOT-056",
+    "at": "2026-11-02T00:50:34+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "89d625e4e88d21ae788a98a552318ae2243ed8be",
+    "campaign": "C-2026-Q4-03"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-056/evidence/towerctl.py",
+      "sha256": "919b8ad4db60680445925d2a5aaa9e5c1ad62cdf0420f37d5190b32621bd4267",
+      "bytes": 13760,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-056/evidence/tower_cli.py",
+      "sha256": "ab09ff56ff1f3407f284321866e6991e38a2cff189ed85f99a29c74a31c83f32",
+      "bytes": 20312,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-056/evidence/test_modules.py",
+      "sha256": "7288ccdde1194814ebd437755d886626b30f16d54c43d3186bc7d3d92fed3d3e",
+      "bytes": 5953,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-056/evidence/test_shape_baseline_move.py",
+      "sha256": "11f7a9e075a634abdf884f7d963820008edfc022b34292315a41bf463dddbdbd",
+      "bytes": 5103,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-056/evidence/test_arch.py",
+      "sha256": "47d4c17f049a1c6779874cce4bc15099a383f34d6683fc812bbaa646178e0ce1",
+      "bytes": 11228,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-056/evidence/ARCHITECTURE.md",
+      "sha256": "86a04ad1a8904053e2de2114ba1e0205ec4fc3fba852b5fbfc18bc3424802248",
+      "bytes": 16475,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-056/evidence/GATES.json",
+      "sha256": "e2523edcc294dbd8842b6bb402f0de827835a3eada4fd24d867b9f372aee8c00",
+      "bytes": 4438,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-056/evidence/SHAPE-BASELINE.json",
+      "sha256": "665d6633c656a1b65a8ebe46dec167329f2b39598fad1cdf354fa343734b6b11",
+      "bytes": 229125,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-056/evidence/test-output.txt",
+      "sha256": "862bea564d9433af99028c1a2796d03e966c0a2105342823d14b22a7831806ff",
+      "bytes": 192932,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-056/evidence/module_probe.py",
+      "sha256": "0ddbb0ea73875c4eb5309f3a3f3608f22b6de6d8a6f5b39d9b4db2f79d768ef4",
+      "bytes": 4653,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-056/evidence/probe.txt",
+      "sha256": "b481828237e9aa2006544c033f8f1ba8a3420cb2e0396dc0574e5fb7434bab75",
+      "bytes": 16814,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-011"
+    },
+    {
+      "path": "tasks/PILOT-056/evidence/probe-old-code.txt",
+      "sha256": "1aa4c884ee75d86c638fe30a07a4ea9040fd0e55ff16ccb9a3981fa360eb1b34",
+      "bytes": 2186,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-012"
+    },
+    {
+      "path": "tasks/PILOT-056/evidence/commit.txt",
+      "sha256": "40a43a4acfa63e4cafe770896fd04932af361939d8c7dabc343691a540b3e778",
+      "bytes": 2195,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-013"
+    },
+    {
+      "path": "tasks/PILOT-056/evidence/diff.txt",
+      "sha256": "f0d41474d6ee6e5c7a73451eb3efd25469e487cba4e04c72b054549e4db20cdf",
+      "bytes": 2974,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-014"
+    },
+    {
+      "path": "tasks/PILOT-056/evidence/gates.txt",
+      "sha256": "436ba7d20a23a27cfba845c3cd5e3d0677bfb1f654ab76825ab9cad77d894a23",
+      "bytes": 8886,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-015"
+    },
+    {
+      "path": "tasks/PILOT-056/evidence/lines.txt",
+      "sha256": "27f2db50504a44e1a3537efd3cc5d9b0f82b1ddebbd53fa784afe3682f00325c",
+      "bytes": 2336,
+      "at": "2026-11-02T01:31:26+08:00",
+      "id": "E-016"
+    }
+  ],
+  "review": {
+    "schema": "tower/review@1",
+    "task": "PILOT-056",
+    "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+    "verdict": "PASS",
+    "head": "e98aee918883e8c17b7edc89c2b27e2a3eb21e0b",
+    "base": "89d625e4e88d21ae788a98a552318ae2243ed8be",
+    "scope": [],
+    "findings": [],
+    "note": "056 PASS（最终）。30 paths；HEAD e98aee9（base 89d625e）；16/16 证据；Ran 683 OK；23 模块 <600、towerctl 246；4 层 DAG 无环；52 CLI 命令集合不变；22 长函数基线迁移 lines/branches 不变、净债务 1080 不变；worktree shape/arch(gates18)/profile/state 0；真实塔 59/58 drift []。root 侧 arch/profile/shape 的 pre-merge 红在 merge 后复跑。",
+    "at": "2026-11-02T01:51:52+08:00",
+    "structure": ""
+  },
+  "decision": {
+    "id": "D-PILOT-056",
+    "actor": "owner",
+    "text": "PASS; 683; 30 paths; baseline move",
+    "at": "2026-11-02T01:51:53+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-056/CLOSEOUT.md",
+    "at": "2026-11-02T01:51:53+08:00"
+  },
+  "created_at": "2026-11-01T23:22:41+08:00",
+  "updated_at": "2026-11-02T01:51:53+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-056/MERGE.md",
+  "delivered_at": "2026-11-02T01:31:26+08:00",
+  "accepted_at": "2026-11-02T01:51:53+08:00"
+}

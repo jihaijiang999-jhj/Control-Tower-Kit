@@ -1,0 +1,131 @@
+{
+  "gates": [
+    {
+      "blocks": "ready/dispatch before SPEC_APPROVED and a fresh spec gate PASS",
+      "command": "check",
+      "id": "GATE-SPEC",
+      "phase": "spec",
+      "test": "test_dispatch_rejects_missing_spec_gate"
+    },
+    {
+      "blocks": "spec creation with a missing, placeholder or too-short objective",
+      "command": "task-new",
+      "id": "GATE-SPEC-OBJECTIVE",
+      "phase": "spec",
+      "test": "test_rejects_missing_objective"
+    },
+    {
+      "blocks": "dispatch when the frozen spec changed after the spec gate passed",
+      "command": "check",
+      "id": "GATE-READY",
+      "phase": "ready",
+      "test": "test_check_ready_rejects_spec_changed_after_gate_pass"
+    },
+    {
+      "blocks": "dispatch without a passing spec gate; anchors dispatch.base_sha",
+      "command": "dispatch",
+      "id": "GATE-DISPATCH",
+      "phase": "dispatch",
+      "test": "test_dispatch_rejects_spec_changed_after_task_new"
+    },
+    {
+      "blocks": "delivery of paths outside allowed_paths + completions",
+      "command": "deliver",
+      "id": "GATE-DELIVER-SCOPE",
+      "phase": "deliver",
+      "test": "test_out_of_scope_change_rejected_with_zero_writes"
+    },
+    {
+      "blocks": "delivery whose dispatch.base_sha is not an ancestor of HEAD",
+      "command": "deliver",
+      "id": "GATE-DELIVER-BASE-SHA",
+      "phase": "deliver",
+      "test": "test_base_sha_not_ancestor_is_rejected"
+    },
+    {
+      "blocks": "delivery that adds new shape debt over the frozen baseline",
+      "command": "deliver",
+      "id": "GATE-DELIVER-SHAPE",
+      "phase": "deliver",
+      "test": "test_new_long_function_blocks_delivery_with_no_writes"
+    },
+    {
+      "blocks": "self-review (reviewer == executor) and verdict-free review",
+      "command": "checkback",
+      "id": "GATE-REVIEW",
+      "phase": "review",
+      "test": "test_checkback_rejects_reviewer_equal_to_executor"
+    },
+    {
+      "blocks": "acceptance without a PASS review and hash-clean evidence",
+      "command": "accept",
+      "id": "GATE-ACCEPT",
+      "phase": "accept",
+      "test": "test_accept_rejects_missing_evidence"
+    },
+    {
+      "blocks": "closeout with missing TASK.md/CLOSEOUT or stale evidence",
+      "command": "close",
+      "id": "GATE-CLOSE",
+      "phase": "close",
+      "test": "test_close_rejects_missing_task_md"
+    },
+    {
+      "blocks": "a merge envelope before the task is accepted and reviewed",
+      "command": "envelope-new",
+      "id": "GATE-ENVELOPE",
+      "phase": "envelope",
+      "test": "test_envelope_new_requires_accepted_task_and_pass_review"
+    },
+    {
+      "blocks": "merging an envelope that is not queued with tests baselines",
+      "command": "queue-add",
+      "id": "GATE-QUEUE",
+      "phase": "queue",
+      "test": "test_queue_add_rejects_handwritten_missing_tests_baseline"
+    },
+    {
+      "blocks": "merge-check when reviewer == executor or evidence drifted",
+      "command": "merge-check",
+      "id": "GATE-MERGE-CHECK",
+      "phase": "merge-check",
+      "test": "test_merge_check_requires_independent_reviewer"
+    },
+    {
+      "blocks": "merge of an unqueued envelope, wrong branch or mismatched base",
+      "command": "merge",
+      "id": "GATE-MERGE-PREFLIGHT",
+      "phase": "merge",
+      "test": "test_merge_rejects_current_branch_not_envelope_base"
+    },
+    {
+      "blocks": "completion claims while the envelope is only MERGED",
+      "command": "post-merge",
+      "id": "GATE-POST-MERGE",
+      "phase": "post-merge",
+      "test": "test_merged_is_not_completion_until_post_merge_verified"
+    },
+    {
+      "blocks": "merge --mode pr while GitHub checks are red or unregistered",
+      "command": "merge",
+      "id": "GATE-CI",
+      "phase": "ci",
+      "test": "test_failing_checks_block_with_correction_required"
+    },
+    {
+      "blocks": "PROFILE with missing fields, an unknown/write probe, a bad expect or a failing assertion",
+      "command": "profile-check",
+      "id": "GATE-PROFILE",
+      "phase": "objects",
+      "test": "test_unknown_probe_is_rejected"
+    },
+    {
+      "blocks": "a module budget/layering regression: towerctl.py >=3000 lines, a tower_* module >=600, an import outside the one-way 4-layer DAG, or an import cycle",
+      "command": "arch-check",
+      "id": "GATE-MODULES",
+      "phase": "objects",
+      "test": "test_modules_present_and_small"
+    }
+  ],
+  "schema": "tower/gates@1"
+}

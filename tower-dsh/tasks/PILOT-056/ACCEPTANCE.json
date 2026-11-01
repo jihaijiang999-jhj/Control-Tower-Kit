@@ -1,0 +1,11 @@
+{
+  "schema": "tower/acceptance@1",
+  "items": [
+    {
+      "id": "A-01",
+      "kind": "auto",
+      "status": "passed",
+      "note": "683 tests, 30 paths, worktree shape/arch/profile/state 0"
+    }
+  ]
+}

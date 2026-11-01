@@ -1,0 +1,37 @@
+﻿HEAD e98aee918883e8c17b7edc89c2b27e2a3eb21e0b
+short e98aee9
+subject PILOT-056: modularize towerctl (23 modules, baseline move)
+author mac <mac@local>
+date Mon Nov 2 01:22:42 2026 +0800
+e98aee9 PILOT-056: modularize towerctl (23 modules, baseline move)
+ tower-dsh/ARCHITECTURE.md                         |   62 +-
+ tower-dsh/arch/GATES.json                         |    7 +
+ tower-dsh/state/SHAPE-BASELINE.json               | 5464 +++++++++---
+ tower-dsh/tools/tests/test_arch.py                |    2 +-
+ tower-dsh/tools/tests/test_modules.py             |  143 +
+ tower-dsh/tools/tests/test_shape_baseline_move.py |  117 +
+ tower-dsh/tools/tower_arch.py                     |  308 +
+ tower-dsh/tools/tower_arch_check.py               |  341 +
+ tower-dsh/tools/tower_authority.py                |  587 ++
+ tower-dsh/tools/tower_authority_cmd.py            |  499 ++
+ tower-dsh/tools/tower_campaign.py                 |  534 ++
+ tower-dsh/tools/tower_cli.py                      |  471 +
+ tower-dsh/tools/tower_command.py                  |  305 +
+ tower-dsh/tools/tower_common.py                   |  496 ++
+ tower-dsh/tools/tower_delivery.py                 |  593 ++
+ tower-dsh/tools/tower_dispatch.py                 |  256 +
+ tower-dsh/tools/tower_envelope.py                 |  567 ++
+ tower-dsh/tools/tower_handoff.py                  |  539 ++
+ tower-dsh/tools/tower_ledger.py                   |  560 ++
+ tower-dsh/tools/tower_ledger_replay.py            |  426 +
+ tower-dsh/tools/tower_lookup.py                   |  164 +
+ tower-dsh/tools/tower_merge.py                    |  574 ++
+ tower-dsh/tools/tower_post_merge.py               |  552 ++
+ tower-dsh/tools/tower_profile.py                  |  327 +
+ tower-dsh/tools/tower_shape.py                    |  277 +
+ tower-dsh/tools/tower_state_verify.py             |  522 ++
+ tower-dsh/tools/tower_status.py                   |  467 +
+ tower-dsh/tools/tower_task.py                     |  460 +
+ tower-dsh/tools/tower_views.py                    |  118 +
+ tower-dsh/tools/towerctl.py                       | 9760 +--------------------
+ 30 files changed, 14943 insertions(+), 10555 deletions(-)

@@ -1,0 +1,452 @@
+﻿=== shape-check -> exit 0 ===
+{
+  "ok": true,
+  "shape_check": "checked",
+  "shape_checked": true,
+  "files": 70,
+  "functions": 1921,
+  "duplicate_blocks": 169,
+  "unused_imports": 1
+}
+
+=== arch-check -> exit 0 ===
+{
+  "ok": true,
+  "counts": {
+    "gates": 18,
+    "invariants": 16,
+    "events": 29,
+    "event_types_in_code": 29,
+    "unresolved_event_calls": 1,
+    "adrs": 8,
+    "sections": 6,
+    "nodes": 70,
+    "edges": 161
+  },
+  "errors": []
+}
+
+=== profile-check -> exit 0 ===
+{
+  "ok": true,
+  "object": "TOWER-DSH",
+  "checked": 11,
+  "findings": []
+}
+
+=== state-verify -> exit 0 ===
+{
+  "ok": true,
+  "tasks": 58,
+  "envelopes": 58,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-039-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-041-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-043-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-044-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-053-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID2",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID2",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 10,
+  "evidence_checked": 543
+}
+
+=== authority-check -> exit 0 ===
+{
+  "ok": true,
+  "status": "configured",
+  "requirement": "required",
+  "required": true,
+  "checks": [
+    {
+      "name": "primary ledger chain intact",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority state file readable",
+      "ok": true,
+      "detail": "state/AUTHORITY.json"
+    },
+    {
+      "name": "authority schema is tower/authority-state@1",
+      "ok": true,
+      "detail": "schema 'tower/authority-state@1'"
+    },
+    {
+      "name": "authority state backed by ledger",
+      "ok": true,
+      "detail": "AUTHORITY_SET revision 2"
+    },
+    {
+      "name": "authority field types",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority tower_id matches primary state",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority owner matches primary state",
+      "ok": true,
+      "detail": "file 'mac' vs primary state 'mac'"
+    },
+    {
+      "name": "authority primary.id matches primary state",
+      "ok": true,
+      "detail": "file 'ctl-yingxian-qa-001' vs primary state 'ctl-yingxian-qa-001'"
+    },
+    {
+      "name": "authority supervision.id matches supervision state",
+      "ok": true,
+      "detail": "file 'sup-phase2-pilot' vs supervision state 'sup-phase2-pilot'"
+    },
+    {
+      "name": "merge authority differs from primary",
+      "ok": true,
+      "detail": "merge authority 'sup-phase2-pilot' vs primary 'ctl-yingxian-qa-001'"
+    },
+    {
+      "name": "authority ledger payload types",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority requirement pinned",
+      "ok": true,
+      "detail": "authority requirement pinned: shared/AUTHORITY_POLICY.json + AUTHORITY_REQUIRED event"
+    }
+  ]
+}
+
+=== campaign-check -> exit 0 ===
+{
+  "ok": true,
+  "strict": false,
+  "strategy": "S-2026-Q4",
+  "goals": [
+    "G1",
+    "G2",
+    "G3",
+    "G4"
+  ],
+  "campaigns": 3,
+  "campaign_ids": [
+    "C-2026-Q4-01",
+    "C-2026-Q4-02",
+    "C-2026-Q4-03"
+  ],
+  "wip": {
+    "in_flight": 0,
+    "limit": 1,
+    "campaigns": {
+      "C-2026-Q4-03": 0
+    }
+  },
+  "errors": [],
+  "warnings": [
+    {
+      "code": "W3",
+      "target": "C-2026-Q4-03",
+      "detail": "task_forces references a spec-only card (no tasks/PILOT-056/): PILOT-056"
+    }
+  ]
+}
+
+=== spec-lint --strict -> exit 0 ===
+{
+  "ok": true,
+  "dir": ".",
+  "files": [
+    {
+      "path": "specs/WF-HANDOFF.md",
+      "kind": "workflow",
+      "id": "WF-HANDOFF",
+      "states": [
+        "PREPARED",
+        "READY_FOR_RECEIVER",
+        "RECEIVED",
+        "ACCEPTED",
+        "ACTIVE"
+      ],
+      "transitions": [
+        "TR-01",
+        "TR-02",
+        "TR-03",
+        "TR-04",
+        "TR-05"
+      ],
+      "invariants": [
+        "INV-01",
+        "INV-02",
+        "INV-03",
+        "INV-04",
+        "INV-05",
+        "INV-06",
+        "INV-07"
+      ],
+      "failures": [
+        "FM-01",
+        "FM-02",
+        "FM-03",
+        "FM-04",
+        "FM-05",
+        "FM-06"
+      ],
+      "errors": []
+    },
+    {
+      "path": "specs/WF-LEDGER.md",
+      "kind": "workflow",
+      "id": "WF-LEDGER",
+      "states": [
+        "empty",
+        "legacy",
+        "chained",
+        "broken"
+      ],
+      "transitions": [
+        "TR-01",
+        "TR-02",
+        "TR-03",
+        "TR-04",
+        "TR-05",
+        "TR-06",
+        "TR-07"
+      ],
+      "invariants": [
+        "INV-01",
+        "INV-02",
+        "INV-03",
+        "INV-04",
+        "INV-05",
+        "INV-06",
+        "INV-07"
+      ],
+      "failures": [
+        "FM-01",
+        "FM-02",
+        "FM-03",
+        "FM-04",
+        "FM-05",
+        "FM-06"
+      ],
+      "errors": []
+    },
+    {
+      "path": "specs/WF-MERGE.md",
+      "kind": "workflow",
+      "id": "WF-MERGE",
+      "states": [
+        "DRAFT",
+        "WAITING",
+        "MERGING",
+        "MERGED",
+        "POST_MERGE_VERIFIED",
+        "CORRECTION_REQUIRED"
+      ],
+      "transitions": [
+        "TR-01",
+        "TR-02",
+        "TR-03",
+        "TR-04",
+        "TR-05",
+        "TR-06",
+        "TR-07"
+      ],
+      "invariants": [
+        "INV-01",
+        "INV-02",
+        "INV-03",
+        "INV-04",
+        "INV-05",
+        "INV-06",
+        "INV-07",
+        "INV-08",
+        "INV-09"
+      ],
+      "failures": [
+        "FM-01",
+        "FM-02",
+        "FM-03",
+        "FM-04",
+        "FM-05",
+        "FM-06"
+      ],
+      "errors": []
+    },
+    {
+      "path": "specs/WF-TASK.md",
+      "kind": "workflow",
+      "id": "WF-TASK",
+      "states": [
+        "ready",
+        "dispatched",
+        "delivered",
+        "reviewed",
+        "rework",
+        "accepted",
+        "closed"
+      ],
+      "transitions": [
+        "TR-01",
+        "TR-02",
+        "TR-03",
+        "TR-04",
+        "TR-05",
+        "TR-06",
+        "TR-07",
+        "TR-08",
+        "TR-09"
+      ],
+      "invariants": [
+        "INV-01",
+        "INV-02",
+        "INV-03",
+        "INV-04",
+        "INV-05",
+        "INV-06",
+        "INV-07"
+      ],
+      "failures": [
+        "FM-01",
+        "FM-02",
+        "FM-03",
+        "FM-04",
+        "FM-05",
+        "FM-06"
+      ],
+      "errors": []
+    },
+    {
+      "path": "CHANGE-LEVELS.md",
+      "kind": "policy",
+      "id": "POL-CHANGE-LEVELS",
+      "clauses": [
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-06",
+        "C-07",
+        "C-08",
+        "C-09",
+        "C-10"
+      ],
+      "failures": [
+        "FM-01",
+        "FM-02",
+        "FM-03",
+        "FM-04"
+      ],
+      "errors": []
+    },
+    {
+      "path": "RED-LINES.md",
+      "kind": "policy",
+      "id": "POL-RED-LINES",
+      "clauses": [
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-06",
+        "C-07",
+        "C-08",
+        "C-09",
+        "C-10",
+        "C-11",
+        "C-12",
+        "C-13",
+        "C-14",
+        "C-15",
+        "C-16"
+      ],
+      "failures": [
+        "FM-01",
+        "FM-02",
+        "FM-03",
+        "FM-04"
+      ],
+      "errors": []
+    }
+  ],
+  "errors": []
+}
+
+=== verify-ledger -> exit 0 ===
+{
+  "ok": true,
+  "files": {
+    "primary": {
+      "path": "ledger/primary.jsonl",
+      "exists": true,
+      "events": 571,
+      "legacy_unhashed": 53,
+      "errors": []
+    },
+    "supervision": {
+      "path": "ledger/supervision.jsonl",
+      "exists": true,
+      "events": 316,
+      "legacy_unhashed": 26,
+      "errors": []
+    }
+  },
+  "errors": []
+}
+

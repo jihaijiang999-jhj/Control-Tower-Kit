@@ -581,7 +581,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-059/MERGE.md",
       "updated_at": "2026-11-01T22:08:32+08:00"
+    },
+    {
+      "id": "PILOT-056",
+      "title": "towerctl 模块化（23 模块 / 4 层 DAG）+ 基线迁移",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:7ea1af07-2467-48d3-8be3-ecd7855e1cc9",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-056/MERGE.md",
+      "updated_at": "2026-11-02T01:51:53+08:00"
     }
   ],
-  "updated_at": "2026-11-01T22:08:32+08:00"
+  "updated_at": "2026-11-02T01:51:53+08:00"
 }
