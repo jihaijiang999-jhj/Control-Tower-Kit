@@ -350,6 +350,15 @@ class AcceptGateCase(AcceptanceKit):
         self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
         self.assertEqual(self.record_on_disk("PILOT-042")["status"], "accepted")
 
+    def test_new_card_without_created_at_still_needs_acceptance(self) -> None:
+        self.install_card("PILOT-701", created_at=None)
+        self.assertFalse(
+            (self.root / "tasks" / "PILOT-701" / "ACCEPTANCE.json").exists())
+        cp = self.cli("accept", "--task", "PILOT-701", "--decision", "D-059")
+        self.fails(cp, "ACCEPTANCE.json")
+        self.assertNotEqual(
+            self.record_on_disk("PILOT-701")["status"], "accepted")
+
 
 if __name__ == "__main__":
     unittest.main()

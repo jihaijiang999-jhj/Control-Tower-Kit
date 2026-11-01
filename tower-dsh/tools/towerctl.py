@@ -3843,22 +3843,12 @@ def load_acceptance(root: Path, tid: str) -> list[dict] | None:
 def acceptance_legacy_ok(rec: dict) -> bool:
     """True for cards that predate PILOT-059 (no list, never retrofitted).
 
-    A numeric id up to ``ACCEPTANCE_LEGACY_MAX`` is legacy by construction; a
-    card without ``created_at`` (a fixture or a hand-written legacy record) is
-    legacy too, and a timestamp before the 059 cutoff is legacy.  Anything
-    else must carry ``ACCEPTANCE.json``.
+    A numeric id up to ``ACCEPTANCE_LEGACY_MAX`` is legacy by construction.
+    Everything newer must carry ``ACCEPTANCE.json``; a missing or malformed
+    ``created_at`` is not an exemption.
     """
     match = re.search(r"(\d+)$", str(rec.get("id") or ""))
-    if match and int(match.group(1)) <= ACCEPTANCE_LEGACY_MAX:
-        return True
-    created = str(rec.get("created_at") or "")
-    if not created:
-        return True
-    try:
-        return datetime.fromisoformat(created) < datetime.fromisoformat(
-            ACCEPTANCE_LEGACY_BEFORE)
-    except ValueError:
-        return True
+    return bool(match and int(match.group(1)) <= ACCEPTANCE_LEGACY_MAX)
 
 
 def acceptance_gate_errors(root: Path, rec: dict, args) -> list[str]:
