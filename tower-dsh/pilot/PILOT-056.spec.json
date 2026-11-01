@@ -69,16 +69,18 @@
     "deleting tests to make the split pass"
   ],
   "acceptance": [
-    "cd pilot/worktrees/PILOT-056/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 638 + 新增用例数（main 基线 638）",
+    "cd pilot/worktrees/PILOT-056/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 675 + 新增用例数（main 基线 675）",
     "towerctl.py <3000；23 个模块每个 <600；test_modules 校验行数、4 层 DAG、无循环、CLI smoke 全 0",
     "基线迁移净债务为 0：SHAPE-BASELINE 中 22 个长函数的 lines/branches 与迁移前逐项相等，只是 file 改变；test_shape_baseline_move 通过；shape-check 0",
     "所有 CLI 子命令行为不变：state-verify/authority-check/arch-check/profile-check/campaign-check/where/shape-check/spec-lint --strict 均 exit 0",
     "arch/GATES.json 含 GATE-MODULES 且 test 真实存在；test_arch gates 18；arch-check 0",
     "ARCHITECTURE.md 模块图/职责/4 层依赖与 23 个实体文件一致",
     "旧码对照：main towerctl.py 8,863 行、无 tower_* 模块；新码 <3000、23 模块、CLI 等价；证据 scratch/probe-old-code.txt",
-    "真实塔：新建卡后 tasks=56/envelopes=55，建信封后 56/56；worktree 新工具 state-verify drift []、profile-check 11/0、arch-check 0；verify-ledger 0；coverage 27/27；spec-lint 6/6",
+    "真实塔：新建卡后 tasks=59/envelopes=58，建信封后 59/59；worktree 新工具 state-verify drift []、profile-check 11/0、arch-check 0；verify-ledger 0；coverage 27/27；spec-lint 6/6",
     "git -C pilot/worktrees/PILOT-056 diff --name-only main..HEAD 恰 30 个 allowed_paths"
   ],
-  "depends_on": ["PILOT-055"],
+  "depends_on": [
+    "PILOT-055"
+  ],
   "worktree": "pilot/worktrees/PILOT-056"
 }
