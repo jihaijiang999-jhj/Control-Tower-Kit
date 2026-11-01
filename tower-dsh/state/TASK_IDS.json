@@ -406,6 +406,13 @@
       "spec_path": "pilot/PILOT-058.spec.json",
       "created_at": "2026-11-01T19:09:42+08:00",
       "updated_at": "2026-11-01T20:42:57+08:00"
+    },
+    "PILOT-059": {
+      "title": "每卡 ACCEPTANCE.md：自动/人工分项",
+      "status": "closed",
+      "spec_path": "pilot/PILOT-059.spec.json",
+      "created_at": "2026-11-01T21:07:25+08:00",
+      "updated_at": "2026-11-01T22:08:32+08:00"
     }
   }
 }
