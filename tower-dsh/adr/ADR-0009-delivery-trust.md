@@ -13,7 +13,7 @@ related_cards:
 related_files:
   - tower-dsh/tools/towerctl.py
   - tower-dsh/state/TASK_IDS.json
-  - tower-dsh/tasks/PILOT-057/ACCEPTANCE.md
+  - tower-dsh/tasks/PILOT-057/TASK.md
 ---
 
 # ADR-0009 — 交付信任加固
