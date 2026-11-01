@@ -83,11 +83,13 @@
     }
   ],
   "envelope_head_sha": "66389193535eca909103676c86e0bb6af31921de",
-  "status": "CORRECTION_REQUIRED",
+  "status": "POST_MERGE_VERIFIED",
   "merge_commit": "3c00187573755deceef7d49be4b412944406aa54",
   "merged_at": "2026-11-02T02:02:48+08:00",
   "supervisor": "sup-phase2-pilot",
   "merge_mode": "local",
   "tests_count": 2,
-  "tower_tests_count": 688
+  "tower_tests_count": 688,
+  "post_merge_at": "2026-11-02T03:41:04+08:00",
+  "post_merge_note": "retry after 060; baseline 688"
 }
