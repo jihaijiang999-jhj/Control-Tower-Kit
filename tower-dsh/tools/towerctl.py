@@ -2009,6 +2009,67 @@ def envelope_has_baselines(env: dict) -> bool:
             and tower_tests_baseline >= 1)
 
 
+def review_mismatches(root: Path, task: str, review: dict, head: str) -> list[str]:
+    """Field-level staleness between one ``REVIEW.json`` and the envelope.
+
+    ``base`` is only compared when the record still carries a
+    ``dispatch.base_sha``; a legacy record has nothing to compare against, and
+    an absent field is ``None`` (never an accidental match).
+    """
+    base = _dispatch_base_sha(_optional_task_record(root, task) or {})
+    expected = (("schema", review.get("schema"), REVIEW_SCHEMA),
+                ("verdict", review.get("verdict"), "PASS"),
+                ("head", review.get("head"), head),
+                ("base", review.get("base"), base))
+    return [f"stale review: {name} {actual!r} != {want!r}"
+            for name, actual, want in expected if want is not None and actual != want]
+
+
+def review_problems(root: Path, env: dict, task: str) -> list[str]:
+    """Why this envelope's structured review does not bind it (``[]`` = bound).
+
+    ``REVIEW.json`` is the authority: it must declare the schema, a PASS
+    verdict, the envelope's ``implementation_head_sha`` and — when the record
+    still carries one — the recorded ``dispatch.base_sha``.  A mismatch is
+    reported as *stale*: the review was written for other code and must be
+    re-run, never silently accepted.
+    """
+    path = review_json_path(root, task)
+    head = str(env.get("implementation_head_sha") or "")
+    try:
+        review = jload(path) if path.exists() else None
+    except (OSError, ValueError) as exc:
+        return [f"REVIEW.json unreadable: {rel(root, path)}: {exc}"]
+    if not isinstance(review, dict):
+        return [f"stale review: {rel(root, path)} missing or not a JSON object; "
+                f"checkback must bind the review to head {head}"]
+    return review_mismatches(root, task, review, head)
+
+
+def review_binding_check(root: Path, env: dict, task: str) -> tuple[bool, str]:
+    """The ``review bound to head`` check: is a structured review in force?
+
+    Cards checked back before PILOT-058 have a ``CHECKBACK`` ledger event with
+    no ``head`` field; those keep the old review gate (record verdict only) and
+    are reported as legacy instead of being retro-fitted.  Every checkback from
+    this version on writes the head into that event, so the card is bound and
+    :func:`review_problems` decides.
+    """
+    if not is_safe_id(task, TASK_ID_RE):
+        return True, "legacy: no task record to bind a review to"
+    try:
+        payloads = ledger_payloads_by_task(root, "CHECKBACK").get(task, [])
+    except OSError:
+        # An unreadable primary ledger is already a failing gate of its own
+        # (``ledger chain intact`` / ``verify-ledger``); never a second error or
+        # a traceback here.
+        return True, "legacy: CHECKBACK ledger unreadable"
+    if not any("head" in payload for payload in payloads):
+        return True, "legacy: no structured CHECKBACK event (pre-058 review)"
+    problems = review_problems(root, env, task)
+    return not problems, "; ".join(problems) or "ok"
+
+
 def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
     checks: list[dict] = []
 
@@ -2045,13 +2106,12 @@ def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
                 for error in report["errors"])
         add("ledger chain intact", not chain_errors,
             chain_errors[0] if chain_errors else "ok")
-        # The two lifecycle checks below read ``ledger/supervision.jsonl``.
-        # When that file itself is missing or unreadable they cannot tell "no
-        # event" from "no ledger" and would report a misleading
-        # ``ENVELOPE_NEW event missing``; the chain check above already fails
-        # the envelope and blocks the merge, so they are skipped in exactly
-        # that one case.  A readable ledger with a broken chain still runs
-        # them: their verdicts are then independent evidence.
+        # The two lifecycle checks below read ``ledger/supervision.jsonl``; when
+        # that file is missing or unreadable they cannot tell "no event" from
+        # "no ledger" and would report a misleading ``ENVELOPE_NEW event
+        # missing``.  The chain check above already fails the envelope and
+        # blocks the merge, so they are skipped in exactly that one case; a
+        # readable ledger with a broken chain still runs them.
         supervision = reports["supervision"]
         supervision_available = supervision["exists"] and not any(
             error.startswith("ledger unreadable:")
@@ -2127,6 +2187,7 @@ def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
         add("review PASS", review.get("verdict") == "PASS", str(review.get("verdict")))
         add("reviewer != executor", review.get("reviewer") != rec.get("executor"),
             f"{review.get('reviewer')} vs {rec.get('executor')}")
+        add(REVIEW_CHECK, *review_binding_check(root, env, task))
         ev_errors = check_evidence(root, rec)
         add("evidence hashes valid", not ev_errors, "; ".join(ev_errors) or "ok")
     return checks
@@ -3543,7 +3604,10 @@ def write_review_md(root: Path, task_id: str, rec: dict, reviewer: str,
     """Render ``REVIEW.md``: verdict, note, evidence and the structure block."""
     lines = [f"# {rec['id']} — Independent Checkback", "",
              f"- Reviewer: `{reviewer}`", f"- Verdict: **{verdict}**",
-             f"- At: {rec['review']['at']}", "", "## Note", "", note or "(none)", "",
+             f"- At: {rec['review']['at']}",
+             f"- Head: `{rec['review'].get('head') or ''}`",
+             f"- Base: `{rec['review'].get('base') or ''}`", "",
+             "## Note", "", note or "(none)", "",
              "## Evidence checked", ""]
     lines += [f"- `{e['path']}` `{e['sha256']}`" for e in rec.get("evidence", [])]
     lines += structure_review_lines(structure) + position_review_lines(root, task_id)
@@ -3561,14 +3625,76 @@ def checkback_reviewer(rec: dict, raw) -> str:
     return reviewer
 
 
+REVIEW_SCHEMA = "tower/review@1"
+REVIEW_CHECK = "review bound to head"
+# ``accepted`` joins the checkback sources in PILOT-058: a re-envelope can move
+# the implementation head after acceptance, and the only correct response is a
+# re-review that re-binds the verdict to the new head.  The replay table
+# (``TASK_TRANSITIONS``) uses this same tuple, so command and audit cannot drift.
+CHECKBACK_STATUSES = ("delivered", "reviewed", "rework", "accepted")
+
+
+def review_json_path(root: Path, task_id: str) -> Path:
+    """``tasks/<id>/REVIEW.json``: the structured review (PILOT-058)."""
+    return task_dir(root, task_id) / "REVIEW.json"
+
+
+def worktree_review_head(root: Path, rec: dict) -> str:
+    """The task worktree's ``HEAD``, or ``""`` when it cannot be read.
+
+    A review binds to the code the reviewer actually saw, so the default head
+    is read from the worktree, never supplied by the caller.  A card without a
+    worktree (fixture or legacy) records an empty head; only a CHECKBACK event
+    that carries a head arms the merge-check gate (see
+    :func:`review_binding_check`).
+    """
+    worktree = rec.get("worktree")
+    if not isinstance(worktree, str) or not worktree.strip():
+        return ""
+    path = root / worktree
+    try:
+        if root.resolve() not in path.resolve().parents:
+            return ""
+    except OSError:
+        return ""
+    if not path.exists():
+        return ""
+    cp = git(path, "rev-parse", "HEAD")
+    return cp.stdout.strip() if cp.returncode == 0 else ""
+
+
+def write_review_json(root: Path, rec: dict, reviewer: str, args) -> dict:
+    """Write ``tasks/<id>/REVIEW.json`` for one checkback (PASS or FAIL).
+
+    ``--head`` defaults to the worktree HEAD and ``--base`` to the recorded
+    ``dispatch.base_sha``, so the structured review names the exact code and
+    baseline the verdict covers.  FAIL is written as well: a failed review is
+    evidence, not an absence of one.
+    """
+    task = str(rec.get("id") or args.task)
+    head = (getattr(args, "head", None) or "").strip() or worktree_review_head(root, rec)
+    base = ((getattr(args, "base", None) or "").strip()
+            or (_dispatch_base_sha(rec) or ""))
+    review = {
+        "schema": REVIEW_SCHEMA, "task": task, "reviewer": reviewer,
+        "verdict": args.verdict, "head": head, "base": base,
+        "scope": [str(item) for item in getattr(args, "scope", None) or []],
+        "findings": [str(item) for item in getattr(args, "finding", None) or []],
+        "note": args.note or "", "at": now(),
+    }
+    jdump(review_json_path(root, task), review)
+    return review
+
+
 def cmd_checkback(root: Path, args) -> None:
     rec = load_record(root, args.task)
-    if rec.get("status") not in ("delivered", "reviewed", "rework"):
+    if rec.get("status") not in CHECKBACK_STATUSES:
         fail([f"task status {rec.get('status')} cannot checkback"])
     reviewer = checkback_reviewer(rec, args.reviewer)
     structure = args.structure or ""
-    rec["review"] = {"reviewer": reviewer, "verdict": args.verdict,
-                     "note": args.note or "", "structure": structure, "at": now()}
+    review = write_review_json(root, rec, reviewer, args)
+    review["structure"] = structure
+    rec["review"] = review
     rec["status"] = "reviewed" if args.verdict == "PASS" else "rework"
     rec["next"] = "等待 accept" if args.verdict == "PASS" else "返工"
     save_record(root, rec)
@@ -3576,9 +3702,12 @@ def cmd_checkback(root: Path, args) -> None:
     write_review_md(root, args.task, rec, reviewer, args.verdict,
                     args.note or "", structure)
     append_ledger(root, "CHECKBACK", "reviewer",
-                  {"task": args.task, "reviewer": reviewer, "verdict": args.verdict})
+                  {"task": args.task, "reviewer": reviewer,
+                   "verdict": args.verdict, "head": review["head"],
+                   "base": review["base"]})
     emit(with_position(root, {"ok": True, "task": args.task, "status": rec["status"],
-          "verdict": args.verdict, "structure": bool(structure)}))
+          "verdict": args.verdict, "structure": bool(structure),
+          "head": review["head"], "base": review["base"]}))
 
 
 def cmd_accept(root: Path, args) -> None:
@@ -4712,6 +4841,12 @@ def wait_for_checks(repo: Path, number: int, timeout: float,
         time.sleep(min(interval, remaining))
 
 
+def expected_merge_head(env: dict) -> str:
+    """The implementation head a PR merge must match (PILOT-058)."""
+    head = env.get("implementation_head_sha")
+    return head.strip() if isinstance(head, str) else ""
+
+
 def pr_remote_merge(repo: Path, env: dict, args) -> dict:
     """Steps 1-4 of a ``--mode pr`` merge: push, create, checks, merge the PR.
 
@@ -4730,8 +4865,7 @@ def pr_remote_merge(repo: Path, env: dict, args) -> dict:
     # 1. the remote must actually see the envelope branch before a PR exists.
     require_git(repo, "push", "push", remote, branch)
 
-    # 2. open the PR.  ``gh pr create`` deliberately gets no ``--json``: real
-    #    gh rejects it and only prints the PR URL (parsed below).
+    # 2. open the PR: real gh has no ``--json`` here and prints the URL only.
     body = (
         f"Tower merge envelope {args.envelope} for task {env.get('task')}.\n\n"
         f"- implementation: {env.get('implementation_head_sha')}\n"
@@ -4745,8 +4879,7 @@ def pr_remote_merge(repo: Path, env: dict, args) -> dict:
     if cp.returncode != 0:
         combined = f"{cp.stdout or ''}\n{cp.stderr or ''}"
         if "already exists" in combined.lower():
-            # Re-running a merge must reuse the open PR instead of failing.
-            # ``gh pr view --json`` is a flag the real CLI does support.
+            # Re-running a merge reuses the open PR (``gh pr view`` supports json).
             cp = run_gh(repo, ["pr", "view", branch, "--json", "number,url"],
                         phase="pr-view", timeout=timeout)
             if cp.returncode != 0:
@@ -4771,12 +4904,14 @@ def pr_remote_merge(repo: Path, env: dict, args) -> dict:
                 f"{(cp.stdout or '')}{(cp.stderr or '')}".strip())
         url, number = parsed
 
-    # 3. CI gate; a hung gate is bounded by --check-timeout and a PR whose
-    #    checks have not registered yet is retried until that deadline.
+    # 3. CI gate, bounded by --check-timeout; a PR whose checks have not
+    #    registered yet is retried until that deadline.
     wait_for_checks(repo, number, timeout, interval)
 
-    # 4. merge the PR once the checks are green.
-    cp = run_gh(repo, ["pr", "merge", str(number), "--merge"],
+    # 4. merge the PR once the checks are green.  ``--match-head-commit`` pins
+    #    the merge to the implementation head this envelope names.
+    cp = run_gh(repo, ["pr", "merge", str(number), "--merge",
+                       "--match-head-commit", expected_merge_head(env)],
                 phase="pr-merge", timeout=timeout)
     if cp.returncode != 0:
         raise MergeBlocked("pr-merge", "merge", command_failure(cp))
@@ -5662,7 +5797,9 @@ TASK_TRANSITIONS = {
     # re-dispatched, so the table is not a blanket ``any -> dispatched``.
     "DISPATCH": frozenset({"ready", "rework", "dispatched"}),
     "DELIVER": frozenset({"dispatched", "delivered", "rework"}),
-    "CHECKBACK": frozenset({"delivered", "reviewed", "rework"}),
+    # PILOT-058 adds ``accepted``: a re-envelope can move the reviewed head, so
+    # a re-review of an accepted card is legal (and re-opens it to ``reviewed``).
+    "CHECKBACK": frozenset(CHECKBACK_STATUSES),
     "ACCEPT": frozenset({"reviewed"}),
     "CLOSEOUT": frozenset({"accepted"}),
 }
@@ -9091,6 +9228,28 @@ def task_ids_layer_parsers(parser: argparse.ArgumentParser) -> argparse.Argument
     return parser
 
 
+def review_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """PILOT-058: the structured-review flags on the existing ``checkback``.
+
+    ``build_parser`` is frozen at its PILOT-044 size, so the new arguments are
+    registered here, the same way ``dispatch_campaign_parser`` grows dispatch.
+    """
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        checkback = action.choices.get("checkback")
+        if checkback is not None:
+            checkback.add_argument("--head", default=None,
+                                   help="reviewed head (default: worktree HEAD)")
+            checkback.add_argument("--base", default=None,
+                                   help="reviewed base (default: dispatch.base_sha)")
+            checkback.add_argument("--scope", action="append", default=[],
+                                   help="reviewed path (repeatable)")
+            checkback.add_argument("--finding", action="append", default=[],
+                                   help="review finding (repeatable)")
+    return parser
+
+
 def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Register the PILOT-045 commands on the parser built by ``build_parser``.
 
@@ -9107,6 +9266,7 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
                         help="treat warnings (W1/W2) as errors")
         action.add_parser("brief")
     dispatch_campaign_parser(parser)
+    review_layer_parsers(parser)
     return profile_layer_parsers(arch_layer_parsers(
         position_layer_parsers(status_layer_parsers(task_ids_layer_parsers(parser)))))
 
