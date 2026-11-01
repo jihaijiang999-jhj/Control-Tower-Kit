@@ -392,6 +392,13 @@
       "spec_path": "pilot/PILOT-056.spec.json",
       "created_at": "2026-11-01T16:47:50+08:00",
       "updated_at": "2026-11-01T16:47:50+08:00"
+    },
+    "PILOT-057": {
+      "title": "Task ID 注册表：ID 永不复用",
+      "status": "closed",
+      "spec_path": "pilot/PILOT-057.spec.json",
+      "created_at": "2026-11-01T17:53:36+08:00",
+      "updated_at": "2026-11-01T18:07:18+08:00"
     }
   }
 }
