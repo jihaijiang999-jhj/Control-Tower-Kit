@@ -12,7 +12,6 @@ related_cards:
   - PILOT-059
 related_files:
   - tower-dsh/tools/towerctl.py
-  - tower-dsh/tasks/PILOT-057/TASK.md
 ---
 
 # ADR-0009 — 交付信任加固
