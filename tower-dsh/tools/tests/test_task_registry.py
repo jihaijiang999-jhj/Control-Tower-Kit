@@ -193,7 +193,7 @@ class TaskRegistryCase(unittest.TestCase):
     # -- 3. duplicate ids -------------------------------------------------
     def test_task_new_refuses_every_registered_status_with_no_writes(self) -> None:
         held = {"PILOT-801": "active", "PILOT-802": "closed",
-                "PILOT-803": "void", "PILOT-804": "reserved"}
+                "PILOT-803": "void"}
         self.write_registry({tid: entry("held", status)
                              for tid, status in held.items()})
         snapshot = self.written()
@@ -206,7 +206,7 @@ class TaskRegistryCase(unittest.TestCase):
         self.assertEqual(self.written(), snapshot)
 
     # -- 4. reserve -------------------------------------------------------
-    def test_reserve_blocks_task_new_and_double_reserve(self) -> None:
+    def test_reserved_id_is_claimed_by_task_new(self) -> None:
         tid = "PILOT-901"
         first = self.cli("task-ids-reserve", "--id", tid,
                          "--title", "draft 056", "--spec", "pilot/056.spec.json")
@@ -220,10 +220,14 @@ class TaskRegistryCase(unittest.TestCase):
         self.fails(again, "already registered", tid)
         self.assertEqual((self.root / REGISTRY).read_bytes(), before)
         self.spec(tid)
-        reuse = self.cli("task-new", "--spec", f"specs/{tid}.spec.json")
-        self.fails(reuse, "already registered", tid)
-        self.assertFalse((self.root / "tasks" / tid).exists())
-        self.assertEqual((self.root / REGISTRY).read_bytes(), before)
+        claim = self.cli("task-new", "--spec", f"specs/{tid}.spec.json")
+        self.assertEqual(claim.returncode, 0, claim.stdout + claim.stderr)
+        self.assertTrue((self.root / "tasks" / tid).exists())
+        self.assertEqual(self.registry_ids()[tid]["status"], "active")
+        # The reservation is consumed: a second card is refused.
+        self.spec(tid)
+        duplicate = self.cli("task-new", "--spec", f"specs/{tid}.spec.json")
+        self.fails(duplicate, "already registered", tid)
 
     # -- 5. check --phase spec --------------------------------------------
     def prepare_ready_card(self, tid: str, title: str) -> None:

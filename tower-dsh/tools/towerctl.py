@@ -644,7 +644,7 @@ def activate_task_id(root: Path, record: dict, base: dict[str, dict]) -> None:
         ids = load_task_ids(root)
         if ids is None:
             ids = dict(base)
-        if tid in ids:
+        if tid in ids and ids[tid].get("status") != "reserved":
             fail([f"task id already registered: {tid} "
                   f"(status {ids[tid].get('status')})"])
         ids[tid] = task_id_entry(root, tid, record, "active")
@@ -2342,7 +2342,7 @@ def cmd_task_new(root: Path, args) -> None:
     if tdir.exists():
         fail([f"task already exists: {tid}"])
     view = task_id_view(root)
-    if tid in view:
+    if tid in view and view[tid].get("status") != "reserved":
         fail([f"task id already registered: {tid} "
               f"(status {view[tid].get('status')})"])
     record = write_task_card(root, tid, spec, spec_path)
