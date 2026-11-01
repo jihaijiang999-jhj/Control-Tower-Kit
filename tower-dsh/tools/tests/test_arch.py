@@ -88,7 +88,7 @@ class ArchCheckPositiveCase(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["errors"], [])
         counts = payload["counts"]
-        self.assertEqual(counts["gates"], 17)
+        self.assertEqual(counts["gates"], 18)
         self.assertEqual(counts["invariants"], 16)
         self.assertEqual(counts["sections"], 6)
         self.assertEqual(counts["events"], counts["event_types_in_code"])

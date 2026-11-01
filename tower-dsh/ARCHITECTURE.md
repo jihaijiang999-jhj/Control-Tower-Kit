@@ -2,7 +2,7 @@
 schema: tower/architecture@1
 id: ARCH-001
 version: 1
-updated: 2026-10-30
+updated: 2026-11-02
 review_by: 2026-12-31
 owner: mac
 ---
@@ -36,9 +36,56 @@ owner: mac
 | Ledger | `ledger/primary.jsonl` / `ledger/supervision.jsonl` | 只追加的权威事实链（seq + prev_hash + hash） | 手改 |
 | Tasks | `tasks/<ID>/{TASK.md,record.json,evidence/,DELIVERY.md,REVIEW.md}` | 任务卡与证据 | 绕过 `towerctl` 写 |
 | Pilot | `pilot/<ID>.spec.json` + `pilot/worktrees/<ID>/` | 冻结 spec、隔离执行区 | merge |
-| Tools | `tools/towerctl.py`、`tools/run_tests.py`、`tools/spec_lint.py`、`tools/spec_coverage.py` | 唯一状态/门禁 CLI 与静态检查 | 联网、写塔外路径 |
+| Tools | `tools/towerctl.py`（入口）+ `tools/tower_*.py`（23 模块）、`tools/run_tests.py`、`tools/spec_lint.py`、`tools/spec_coverage.py` | 唯一状态/门禁 CLI 与静态检查 | 联网、写塔外路径 |
 | CI | `.github/workflows/tower-gate.yml` | 只读复跑 8 步：unit tests / spec-lint --strict / spec-coverage / verify-ledger / arch-check / campaign-check / shape-check / status（status 仍是最后一步，无 continue-on-error）；shape-check 于 055 接入 CI（ADR-0007），state-verify/authority-check 待明确 | 改状态、merge |
 | Docs | `ARCHITECTURE.md`、`arch/`、`adr/`、`EVENT_CATALOG.json` | WHY/HOW 的可证伪描述 | 冒充权威（代码与 ledger 才是） |
+
+### 2.1 `towerctl` 模块（PILOT-056）
+
+`tools/towerctl.py` 只是入口 + 兼容 facade（246 行，`main` 与历史 import 面）；实现在
+`tools/tower_*.py` 的 23 个模块里，每个模块 <600 行。依赖是单向 4 层 DAG（下表顺序
+即声明拓扑序）：只允许 import 更早的模块，禁止循环；compose 可 import 下层 domain，
+entry 可 import 全部。`tools/tests/test_modules.py` 用 AST 校验行数与 DAG，
+`GATE-MODULES` 把它接进 `arch-check`。
+
+```text
+base     tower_common · tower_ledger · tower_ledger_replay
+   ↓
+domain   tower_task · tower_command · tower_authority · tower_authority_cmd ·
+         tower_profile · tower_shape · tower_campaign · tower_dispatch ·
+         tower_delivery · tower_envelope · tower_handoff · tower_merge ·
+         tower_arch · tower_arch_check · tower_post_merge
+   ↓
+compose  tower_views · tower_lookup · tower_status · tower_state_verify
+   ↓
+entry    tower_cli  ←  tools/towerctl.py（bootstrap / client 入口）
+```
+
+| 模块 | 层 | 职责 |
+|---|---|---|
+| `tower_common` | base | JSON/IO、路径安全、git/gh、共享常量与 `emit`/`fail` |
+| `tower_ledger` | base | 事件哈希链、单写者锁、`append_ledger`、task-id 注册表（只追加） |
+| `tower_ledger_replay` | base | `verify-ledger`、事件命名/重放、生命周期迁移表 |
+| `tower_task` | domain | 任务卡/board、task-id 激活、spec 校验、`task-new`、依赖结构 |
+| `tower_command` | domain | STRATEGY/campaign front matter、预算窗口与命令层告警 |
+| `tower_authority` | domain | authority state/policy 字段、漂移与 requirement 读取 |
+| `tower_authority_cmd` | domain | `authority-set/require/check` 与 authority 状态门 |
+| `tower_profile` | domain | `PROFILE-*.md` 解析、pilot repo/worktree 解析 |
+| `tower_shape` | domain | shape 棘轮扫描与 `shape-check` |
+| `tower_campaign` | domain | campaign 文档校验、roadmap/position 对象 |
+| `tower_dispatch` | domain | dispatch  provenance/base_sha、依赖调度、`dispatch` |
+| `tower_delivery` | domain | scope/shape 三闸、证据收集、`deliver`、completion |
+| `tower_envelope` | domain | envelope/queue、review 绑定、`envelope-new`/`queue-add`/`checkback` |
+| `tower_handoff` | domain | handoff 包、snapshot、handoff 生命周期命令 |
+| `tower_merge` | domain | `merge-check`、gh PR 路径、`merge` 与合并记录 |
+| `tower_arch` | domain | 架构 spine：GATES/INVARIANTS/EVENT_CATALOG 解析、import 图 |
+| `tower_arch_check` | domain | `arch-check` findings 与 reconciled payload |
+| `tower_post_merge` | domain | `post-merge`、CI/门复跑、status/phase、accept/close/acceptance |
+| `tower_views` | compose | 只读塔视图：`init`/`wiring`/`startup` |
+| `tower_lookup` | compose | position 人读视图、`where`、`check`/`hash` 只读查询 |
+| `tower_status` | compose | status 历史、`brief`、index/rollup/archive |
+| `tower_state_verify` | compose | `state-verify`：重放两本账并报告 drift |
+| `tower_cli` | entry | argparse 子命令、handler 表、`main` |
 
 ## 3. 数据流
 
@@ -113,10 +160,10 @@ ready 时的状态）。失败一律 exit 2 单 JSON、零状态变更，错误�
 **证据**：所有完成声明必须有 sha256 证据（`tasks/<ID>/evidence/`）、ledger 事件
 与 `check_evidence` 复核；`MERGED` 不等于完成，只有 `POST_MERGE_VERIFIED` 是。
 
-**门表**：`arch/GATES.json`（17 道门，含 spec/ready/dispatch/deliver 三闸/review/
-accept/close/envelope/queue/merge-check/merge 前置/post-merge/CI/对象层）。每道门优先指向
+**门表**：`arch/GATES.json`（18 道门，含 spec/ready/dispatch/deliver 三闸/review/
+accept/close/envelope/queue/merge-check/merge 前置/post-merge/CI/对象层/模块层）。每道门优先指向
 **拒绝路径**测试（负例）；`weak: true` 表示该门当前只有正例测试，只证“能过”、
-不证“会拒”。本卡 17 道门均为负例（或无 `weak` 字段）。
+不证“会拒”。本卡 18 道门均为负例（或无 `weak` 字段）。
 
 **对象层**：`state/PROFILE-<OBJECT>.md` 是对象事实的可执行契约（schema
 `tower/profile@1`）。front-matter 固定 `schema/object/version/updated/owner/status`
@@ -167,8 +214,9 @@ active` 的每条事实以子进程运行 probe（cwd=塔根，60s 超时），�
 
 **已知边界（Known limits）**：
 
-1. **单文件**：`tools/towerctl.py` 8,587 行（约 8.6k；本卡 HEAD 实测）；模块化
-   （PILOT-051）之前，所有命令共享一个进程与一个 parser。
+1. **模块化（PILOT-056）**：`tools/towerctl.py` 是 246 行入口/facade，实现在 23 个
+   `tools/tower_*.py` 模块（每模块 <600 行，4 层单向 DAG，`test_modules` 锁住）；
+   单进程、单 parser 的假设不变。
 2. **无密钥链**：owner 四闸依赖人工决定与记录，没有密码学签名；信任是 TOFU
    （首次设置即信任，之后靠 revision 与事件复核）。
 3. **legacy 兼容**：无 `dispatch.base_sha` 的旧卡回退到 `merge-base main HEAD`；

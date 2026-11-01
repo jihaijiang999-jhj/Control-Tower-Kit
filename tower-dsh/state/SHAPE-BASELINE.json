@@ -267,6 +267,14 @@
           "branches": 0,
           "lines": 2
         },
+        "_lint_root_policies": {
+          "branches": 2,
+          "lines": 10
+        },
+        "_lint_specs_md": {
+          "branches": 2,
+          "lines": 10
+        },
         "_split_states": {
           "branches": 0,
           "lines": 2
@@ -308,8 +316,12 @@
           "lines": 2
         },
         "lint_root": {
-          "branches": 4,
-          "lines": 28
+          "branches": 0,
+          "lines": 21
+        },
+        "objective_errors": {
+          "branches": 6,
+          "lines": 30
         },
         "parse_front_matter": {
           "branches": 8,
@@ -327,6 +339,10 @@
           "branches": 6,
           "lines": 20
         },
+        "pilot_spec_errors": {
+          "branches": 7,
+          "lines": 23
+        },
         "split_cells": {
           "branches": 7,
           "lines": 28
@@ -340,11 +356,261 @@
           "lines": 3
         }
       },
-      "lines": 712
+      "lines": 803
     },
     "tools/tests/clause_bindings.py": {
       "functions": {},
       "lines": 166
+    },
+    "tools/tests/test_acceptance.py": {
+      "functions": {
+        "AcceptGateCase.test_failed_item_blocks_accept": {
+          "branches": 0,
+          "lines": 8
+        },
+        "AcceptGateCase.test_legacy_card_without_acceptance_file_accepts": {
+          "branches": 0,
+          "lines": 7
+        },
+        "AcceptGateCase.test_manual_pending_with_flag_and_note_accepts": {
+          "branches": 0,
+          "lines": 9
+        },
+        "AcceptGateCase.test_manual_pending_with_flag_still_needs_a_note": {
+          "branches": 0,
+          "lines": 8
+        },
+        "AcceptGateCase.test_manual_pending_without_flag_is_refused": {
+          "branches": 0,
+          "lines": 8
+        },
+        "AcceptGateCase.test_new_card_without_acceptance_file_is_refused": {
+          "branches": 0,
+          "lines": 6
+        },
+        "AcceptGateCase.test_new_card_without_created_at_still_needs_acceptance": {
+          "branches": 0,
+          "lines": 8
+        },
+        "AcceptGateCase.test_pending_auto_item_blocks_accept": {
+          "branches": 0,
+          "lines": 7
+        },
+        "AcceptanceAddCase.test_auto_passed_and_manual_passed_items_are_appended": {
+          "branches": 0,
+          "lines": 16
+        },
+        "AcceptanceAddCase.test_duplicate_id_without_replace_is_refused_with_zero_writes": {
+          "branches": 0,
+          "lines": 8
+        },
+        "AcceptanceAddCase.test_replace_cannot_change_kind": {
+          "branches": 0,
+          "lines": 7
+        },
+        "AcceptanceAddCase.test_replace_updates_status_and_note": {
+          "branches": 0,
+          "lines": 9
+        },
+        "AcceptanceAddCase.test_unknown_task_is_refused_with_zero_writes": {
+          "branches": 0,
+          "lines": 7
+        },
+        "AcceptanceKit.accept": {
+          "branches": 0,
+          "lines": 3
+        },
+        "AcceptanceKit.acceptance": {
+          "branches": 1,
+          "lines": 3
+        },
+        "AcceptanceKit.accepted": {
+          "branches": 0,
+          "lines": 2
+        },
+        "AcceptanceKit.add": {
+          "branches": 0,
+          "lines": 5
+        },
+        "AcceptanceKit.cli": {
+          "branches": 0,
+          "lines": 2
+        },
+        "AcceptanceKit.fails": {
+          "branches": 1,
+          "lines": 9
+        },
+        "AcceptanceKit.install_card": {
+          "branches": 0,
+          "lines": 13
+        },
+        "AcceptanceKit.md_rows": {
+          "branches": 5,
+          "lines": 12
+        },
+        "AcceptanceKit.md_text": {
+          "branches": 1,
+          "lines": 3
+        },
+        "AcceptanceKit.record_on_disk": {
+          "branches": 1,
+          "lines": 3
+        },
+        "AcceptanceKit.setUp": {
+          "branches": 1,
+          "lines": 29
+        },
+        "AcceptanceKit.snapshot": {
+          "branches": 3,
+          "lines": 8
+        },
+        "AcceptanceKit.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "AcceptanceKit.write_acceptance": {
+          "branches": 0,
+          "lines": 3
+        },
+        "AcceptanceKit.write_record": {
+          "branches": 0,
+          "lines": 5
+        },
+        "TaskNewAcceptanceCase.test_task_new_json_and_md_agree": {
+          "branches": 0,
+          "lines": 9
+        },
+        "TaskNewAcceptanceCase.test_task_new_writes_default_acceptance_json_and_md": {
+          "branches": 0,
+          "lines": 17
+        },
+        "TaskNewAcceptanceCase.write_spec": {
+          "branches": 0,
+          "lines": 22
+        },
+        "digest": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_cli": {
+          "branches": 0,
+          "lines": 4
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 364
+    },
+    "tools/tests/test_arch.py": {
+      "functions": {
+        "ArchCheckNegativeCase.assert_arch_failure": {
+          "branches": 1,
+          "lines": 9
+        },
+        "ArchCheckNegativeCase.fixture": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ArchCheckNegativeCase.test_adr_related_file_rejects_drive_path": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ArchCheckNegativeCase.test_adr_related_file_rejects_parent_escape": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ArchCheckNegativeCase.test_catalog_extra_type_is_rejected": {
+          "branches": 0,
+          "lines": 12
+        },
+        "ArchCheckNegativeCase.test_catalog_missing_a_code_type_is_rejected": {
+          "branches": 0,
+          "lines": 8
+        },
+        "ArchCheckNegativeCase.test_duplicate_tool_stem_is_rejected": {
+          "branches": 0,
+          "lines": 12
+        },
+        "ArchCheckNegativeCase.test_invalid_adr_status_is_rejected": {
+          "branches": 0,
+          "lines": 6
+        },
+        "ArchCheckNegativeCase.test_invariant_probe_must_exist": {
+          "branches": 2,
+          "lines": 9
+        },
+        "ArchCheckNegativeCase.test_invariant_without_c16_is_rejected": {
+          "branches": 0,
+          "lines": 8
+        },
+        "ArchCheckNegativeCase.test_missing_adr_related_file_is_rejected": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ArchCheckNegativeCase.test_missing_architecture_section_is_rejected": {
+          "branches": 0,
+          "lines": 6
+        },
+        "ArchCheckNegativeCase.test_towerctl_must_not_import_tests": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ArchCheckNegativeCase.test_unknown_gate_command_is_rejected": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ArchCheckNegativeCase.test_unknown_gate_test_is_rejected": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ArchCheckNegativeCase.test_unreadable_catalog_is_one_json_error": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ArchCheckPositiveCase.test_arch_commands_are_read_only": {
+          "branches": 0,
+          "lines": 8
+        },
+        "ArchCheckPositiveCase.test_arch_graph_is_parseable_and_byte_stable": {
+          "branches": 0,
+          "lines": 14
+        },
+        "ArchCheckPositiveCase.test_design_md_is_archived_as_adr_0001": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ArchCheckPositiveCase.test_real_worktree_arch_check_is_green": {
+          "branches": 0,
+          "lines": 13
+        },
+        "adr_body": {
+          "branches": 1,
+          "lines": 7
+        },
+        "read_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_cli": {
+          "branches": 0,
+          "lines": 5
+        },
+        "tower_copy": {
+          "branches": 2,
+          "lines": 12
+        },
+        "tree_digest": {
+          "branches": 3,
+          "lines": 9
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 3
+        }
+      },
+      "lines": 270
     },
     "tools/tests/test_authority_drift.py": {
       "functions": {
@@ -1016,6 +1282,10 @@
           "branches": 0,
           "lines": 6
         },
+        "CiGateWorkflowTestCase.test_gate_runs_eight_steps_with_shape_after_campaign": {
+          "branches": 0,
+          "lines": 20
+        },
         "CiGateWorkflowTestCase.test_workflow_checks_out_before_setting_up_python": {
           "branches": 1,
           "lines": 7
@@ -1057,7 +1327,180 @@
           "lines": 5
         }
       },
-      "lines": 189
+      "lines": 220
+    },
+    "tools/tests/test_command_layer.py": {
+      "functions": {
+        "BriefCase.brief": {
+          "branches": 0,
+          "lines": 2
+        },
+        "BriefCase.test_brief_and_campaign_check_write_nothing": {
+          "branches": 0,
+          "lines": 5
+        },
+        "BriefCase.test_brief_caps_lists_but_keeps_all_sections": {
+          "branches": 1,
+          "lines": 9
+        },
+        "BriefCase.test_brief_has_seven_sections_and_fits_sixty_lines": {
+          "branches": 0,
+          "lines": 11
+        },
+        "BriefCase.test_brief_ignores_void_archives_and_mismatched_ids": {
+          "branches": 0,
+          "lines": 16
+        },
+        "BriefCase.test_brief_lists_rework_and_blockers": {
+          "branches": 0,
+          "lines": 6
+        },
+        "BriefCase.test_brief_survives_missing_command_docs": {
+          "branches": 0,
+          "lines": 8
+        },
+        "CampaignCheckCase.test_e1_campaign_front_matter_error": {
+          "branches": 0,
+          "lines": 6
+        },
+        "CampaignCheckCase.test_e1_malformed_front_matter_is_clean_exit_two": {
+          "branches": 0,
+          "lines": 7
+        },
+        "CampaignCheckCase.test_e1_missing_strategy": {
+          "branches": 0,
+          "lines": 6
+        },
+        "CampaignCheckCase.test_e2_goal_not_in_strategy": {
+          "branches": 0,
+          "lines": 6
+        },
+        "CampaignCheckCase.test_e3_active_campaign_past_review_by": {
+          "branches": 0,
+          "lines": 5
+        },
+        "CampaignCheckCase.test_e3_strategy_past_review_by": {
+          "branches": 0,
+          "lines": 6
+        },
+        "CampaignCheckCase.test_e4_wip_over_limit": {
+          "branches": 0,
+          "lines": 7
+        },
+        "CampaignCheckCase.test_e5_pilot_spec_counts_as_existing": {
+          "branches": 0,
+          "lines": 8
+        },
+        "CampaignCheckCase.test_e5_unknown_task_force": {
+          "branches": 0,
+          "lines": 6
+        },
+        "CampaignCheckCase.test_e6_duplicate_campaign_id": {
+          "branches": 0,
+          "lines": 6
+        },
+        "CampaignCheckCase.test_e6_duplicate_goal_id": {
+          "branches": 0,
+          "lines": 6
+        },
+        "CampaignCheckCase.test_valid_fixture_is_green": {
+          "branches": 0,
+          "lines": 10
+        },
+        "CampaignCheckCase.test_w1_board_card_not_referenced": {
+          "branches": 0,
+          "lines": 6
+        },
+        "CampaignCheckCase.test_w1_upgrades_to_error_under_strict": {
+          "branches": 0,
+          "lines": 7
+        },
+        "CampaignCheckCase.test_w2_review_by_within_a_week": {
+          "branches": 0,
+          "lines": 6
+        },
+        "CampaignCheckCase.test_w2_task_forces_over_budget": {
+          "branches": 0,
+          "lines": 5
+        },
+        "CommandLayerCase.check": {
+          "branches": 0,
+          "lines": 2
+        },
+        "CommandLayerCase.codes": {
+          "branches": 1,
+          "lines": 2
+        },
+        "CommandLayerCase.payload": {
+          "branches": 1,
+          "lines": 3
+        },
+        "CommandLayerCase.setUp": {
+          "branches": 0,
+          "lines": 11
+        },
+        "CommandLayerCase.snapshot": {
+          "branches": 0,
+          "lines": 4
+        },
+        "CommandLayerCase.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "CommandLayerCase.write_board": {
+          "branches": 0,
+          "lines": 4
+        },
+        "CommandLayerCase.write_doc": {
+          "branches": 0,
+          "lines": 5
+        },
+        "CommandLayerCase.write_record": {
+          "branches": 1,
+          "lines": 6
+        },
+        "YamlSubsetCase.parse": {
+          "branches": 0,
+          "lines": 2
+        },
+        "YamlSubsetCase.test_front_matter_block_stops_at_the_fence": {
+          "branches": 0,
+          "lines": 3
+        },
+        "YamlSubsetCase.test_missing_or_unterminated_fence_raises": {
+          "branches": 1,
+          "lines": 5
+        },
+        "YamlSubsetCase.test_scalars_lists_and_mapping_items": {
+          "branches": 0,
+          "lines": 17
+        },
+        "YamlSubsetCase.test_unsupported_structures_raise": {
+          "branches": 1,
+          "lines": 8
+        },
+        "campaign_text": {
+          "branches": 1,
+          "lines": 29
+        },
+        "day": {
+          "branches": 0,
+          "lines": 3
+        },
+        "run_cli": {
+          "branches": 0,
+          "lines": 4
+        },
+        "strategy_text": {
+          "branches": 1,
+          "lines": 28
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 3
+        }
+      },
+      "lines": 401
     },
     "tools/tests/test_completion_and_base.py": {
       "functions": {
@@ -1229,6 +1672,10 @@
           "branches": 0,
           "lines": 17
         },
+        "DeliverWithCompletionsTestCase.test_hand_written_record_completion_is_rejected": {
+          "branches": 0,
+          "lines": 13
+        },
         "DeliverWithCompletionsTestCase.test_legacy_record_without_completions_has_empty_scope_completions": {
           "branches": 0,
           "lines": 7
@@ -1398,7 +1845,7 @@
           "lines": 3
         }
       },
-      "lines": 919
+      "lines": 933
     },
     "tools/tests/test_coverage.py": {
       "functions": {
@@ -1923,6 +2370,228 @@
       },
       "lines": 622
     },
+    "tools/tests/test_dependencies.py": {
+      "functions": {
+        "DependencyGateCase.assert_fails": {
+          "branches": 1,
+          "lines": 10
+        },
+        "DependencyGateCase.assert_zero_write": {
+          "branches": 0,
+          "lines": 3
+        },
+        "DependencyGateCase.board_bytes": {
+          "branches": 0,
+          "lines": 2
+        },
+        "DependencyGateCase.ledger_bytes": {
+          "branches": 1,
+          "lines": 3
+        },
+        "DependencyGateCase.make_worktree": {
+          "branches": 0,
+          "lines": 2
+        },
+        "DependencyGateCase.prepare": {
+          "branches": 0,
+          "lines": 3
+        },
+        "DependencyGateCase.record": {
+          "branches": 0,
+          "lines": 2
+        },
+        "DependencyGateCase.record_path": {
+          "branches": 0,
+          "lines": 2
+        },
+        "DependencyGateCase.run_cli": {
+          "branches": 0,
+          "lines": 4
+        },
+        "DependencyGateCase.setUp": {
+          "branches": 1,
+          "lines": 9
+        },
+        "DependencyGateCase.spec_data": {
+          "branches": 1,
+          "lines": 21
+        },
+        "DependencyGateCase.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "DependencyGateCase.test_check_ready_accepts_closed_dependency": {
+          "branches": 0,
+          "lines": 6
+        },
+        "DependencyGateCase.test_check_ready_rejects_cycle": {
+          "branches": 0,
+          "lines": 7
+        },
+        "DependencyGateCase.test_check_ready_rejects_open_dependency": {
+          "branches": 0,
+          "lines": 5
+        },
+        "DependencyGateCase.test_check_ready_rejects_self_cycle": {
+          "branches": 0,
+          "lines": 4
+        },
+        "DependencyGateCase.test_check_ready_reports_missing_dependency_target": {
+          "branches": 0,
+          "lines": 4
+        },
+        "DependencyGateCase.test_dispatch_accepts_closed_dependency": {
+          "branches": 0,
+          "lines": 8
+        },
+        "DependencyGateCase.test_dispatch_rejects_cycle_without_writes": {
+          "branches": 0,
+          "lines": 9
+        },
+        "DependencyGateCase.test_dispatch_rejects_open_dependency_without_writes": {
+          "branches": 0,
+          "lines": 11
+        },
+        "DependencyGateCase.test_legacy_empty_depends_on_passes_ready_and_dispatch": {
+          "branches": 0,
+          "lines": 6
+        },
+        "DependencyGateCase.test_legacy_missing_depends_on_key_passes": {
+          "branches": 0,
+          "lines": 8
+        },
+        "DependencyGateCase.test_task_new_accepts_dependency_on_ready_card": {
+          "branches": 0,
+          "lines": 6
+        },
+        "DependencyGateCase.test_task_new_accepts_empty_depends_on": {
+          "branches": 0,
+          "lines": 6
+        },
+        "DependencyGateCase.test_task_new_rejects_duplicate_dependency": {
+          "branches": 0,
+          "lines": 7
+        },
+        "DependencyGateCase.test_task_new_rejects_missing_dependency": {
+          "branches": 0,
+          "lines": 6
+        },
+        "DependencyGateCase.test_task_new_rejects_non_list_depends_on": {
+          "branches": 0,
+          "lines": 6
+        },
+        "DependencyGateCase.test_task_new_rejects_self_dependency": {
+          "branches": 0,
+          "lines": 6
+        },
+        "DependencyGateCase.write_board": {
+          "branches": 0,
+          "lines": 5
+        },
+        "DependencyGateCase.write_record": {
+          "branches": 1,
+          "lines": 21
+        },
+        "DependencyGateCase.write_spec": {
+          "branches": 0,
+          "lines": 6
+        },
+        "DependencyGateCase.write_task_md": {
+          "branches": 0,
+          "lines": 4
+        },
+        "sha256": {
+          "branches": 0,
+          "lines": 2
+        }
+      },
+      "lines": 273
+    },
+    "tools/tests/test_dispatch_repair.py": {
+      "functions": {
+        "DispatchRepairCase.build_ready_task": {
+          "branches": 0,
+          "lines": 18
+        },
+        "DispatchRepairCase.dispatch_events": {
+          "branches": 0,
+          "lines": 3
+        },
+        "DispatchRepairCase.illegal_transitions": {
+          "branches": 0,
+          "lines": 3
+        },
+        "DispatchRepairCase.primary": {
+          "branches": 0,
+          "lines": 2
+        },
+        "DispatchRepairCase.put_record": {
+          "branches": 0,
+          "lines": 8
+        },
+        "DispatchRepairCase.record": {
+          "branches": 0,
+          "lines": 3
+        },
+        "DispatchRepairCase.run_cli": {
+          "branches": 0,
+          "lines": 4
+        },
+        "DispatchRepairCase.setUp": {
+          "branches": 1,
+          "lines": 12
+        },
+        "DispatchRepairCase.state_verify": {
+          "branches": 0,
+          "lines": 3
+        },
+        "DispatchRepairCase.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "DispatchRepairCase.test_dispatch_command_refuses_other_statuses": {
+          "branches": 1,
+          "lines": 19
+        },
+        "DispatchRepairCase.test_dispatch_table_adds_only_dispatched": {
+          "branches": 1,
+          "lines": 6
+        },
+        "DispatchRepairCase.test_first_dispatch_from_ready_is_still_clean": {
+          "branches": 0,
+          "lines": 11
+        },
+        "DispatchRepairCase.test_redispatch_command_replaces_executor": {
+          "branches": 0,
+          "lines": 23
+        },
+        "DispatchRepairCase.test_replay_dispatch_from_closed_is_illegal": {
+          "branches": 1,
+          "lines": 18
+        },
+        "DispatchRepairCase.test_replay_dispatch_from_reviewed_is_illegal": {
+          "branches": 1,
+          "lines": 15
+        },
+        "DispatchRepairCase.test_replay_two_consecutive_dispatches_is_legal": {
+          "branches": 0,
+          "lines": 15
+        },
+        "DispatchRepairCase.write_board": {
+          "branches": 0,
+          "lines": 6
+        },
+        "file_sha256": {
+          "branches": 0,
+          "lines": 2
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 246
+    },
     "tools/tests/test_empty_ledger_guard.py": {
       "functions": {
         "EmptyLedgerGuardTestCase.assert_merge_check_refused_by_guard": {
@@ -2244,6 +2913,123 @@
         }
       },
       "lines": 677
+    },
+    "tools/tests/test_envelope_recovery.py": {
+      "functions": {
+        "EnvelopeRecoveryTestCase.commit": {
+          "branches": 0,
+          "lines": 4
+        },
+        "EnvelopeRecoveryTestCase.envelope": {
+          "branches": 0,
+          "lines": 2
+        },
+        "EnvelopeRecoveryTestCase.envelope_new": {
+          "branches": 0,
+          "lines": 4
+        },
+        "EnvelopeRecoveryTestCase.envelope_path": {
+          "branches": 0,
+          "lines": 2
+        },
+        "EnvelopeRecoveryTestCase.git": {
+          "branches": 0,
+          "lines": 7
+        },
+        "EnvelopeRecoveryTestCase.init_repo": {
+          "branches": 0,
+          "lines": 22
+        },
+        "EnvelopeRecoveryTestCase.ledger_events": {
+          "branches": 1,
+          "lines": 6
+        },
+        "EnvelopeRecoveryTestCase.ledger_text": {
+          "branches": 0,
+          "lines": 3
+        },
+        "EnvelopeRecoveryTestCase.merge": {
+          "branches": 0,
+          "lines": 4
+        },
+        "EnvelopeRecoveryTestCase.queue_add": {
+          "branches": 0,
+          "lines": 2
+        },
+        "EnvelopeRecoveryTestCase.queue_entry": {
+          "branches": 0,
+          "lines": 3
+        },
+        "EnvelopeRecoveryTestCase.run_cli": {
+          "branches": 0,
+          "lines": 12
+        },
+        "EnvelopeRecoveryTestCase.setUp": {
+          "branches": 1,
+          "lines": 16
+        },
+        "EnvelopeRecoveryTestCase.state_verify": {
+          "branches": 0,
+          "lines": 3
+        },
+        "EnvelopeRecoveryTestCase.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "EnvelopeRecoveryTestCase.test_failed_merge_keeps_correction_after_reenvelope_and_merges": {
+          "branches": 0,
+          "lines": 32
+        },
+        "EnvelopeRecoveryTestCase.test_first_draft_envelope_without_queue_is_refused": {
+          "branches": 0,
+          "lines": 6
+        },
+        "EnvelopeRecoveryTestCase.test_first_envelope_merges_from_draft_and_waiting_queue": {
+          "branches": 0,
+          "lines": 20
+        },
+        "EnvelopeRecoveryTestCase.test_merged_envelope_cannot_be_reenveloped": {
+          "branches": 0,
+          "lines": 14
+        },
+        "EnvelopeRecoveryTestCase.test_real_tower_history_has_no_envelope_drift": {
+          "branches": 0,
+          "lines": 13
+        },
+        "EnvelopeRecoveryTestCase.test_reenvelope_draft_is_refused_before_merge_start": {
+          "branches": 0,
+          "lines": 21
+        },
+        "EnvelopeRecoveryTestCase.test_replay_preserves_statuses_across_repeated_envelope_new": {
+          "branches": 0,
+          "lines": 41
+        },
+        "EnvelopeRecoveryTestCase.test_waiting_envelope_keeps_waiting_across_reenvelope": {
+          "branches": 0,
+          "lines": 18
+        },
+        "EnvelopeRecoveryTestCase.write_envelope_source": {
+          "branches": 0,
+          "lines": 13
+        },
+        "EnvelopeRecoveryTestCase.write_envelope_status": {
+          "branches": 0,
+          "lines": 4
+        },
+        "EnvelopeRecoveryTestCase.write_static_tower_files": {
+          "branches": 0,
+          "lines": 40
+        },
+        "read_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 446
     },
     "tools/tests/test_gates.py": {
       "functions": {
@@ -2992,6 +3778,156 @@
       },
       "lines": 825
     },
+    "tools/tests/test_modules.py": {
+      "functions": {
+        "ModulesSplitCase.test_cli_smoke_is_read_only_and_single_json": {
+          "branches": 0,
+          "lines": 11
+        },
+        "ModulesSplitCase.test_import_dag_is_one_way_and_acyclic": {
+          "branches": 7,
+          "lines": 25
+        },
+        "ModulesSplitCase.test_import_dag_is_one_way_and_acyclic.visit": {
+          "branches": 2,
+          "lines": 8
+        },
+        "ModulesSplitCase.test_modules_present_and_small": {
+          "branches": 1,
+          "lines": 11
+        },
+        "ModulesSplitCase.test_towerctl_entry_is_thin_and_reexports": {
+          "branches": 0,
+          "lines": 10
+        },
+        "imports_of": {
+          "branches": 4,
+          "lines": 10
+        },
+        "line_count": {
+          "branches": 0,
+          "lines": 2
+        },
+        "module_path": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_cli": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 143
+    },
+    "tools/tests/test_objective.py": {
+      "functions": {
+        "ObjectiveCase.assert_rejected": {
+          "branches": 1,
+          "lines": 12
+        },
+        "ObjectiveCase.assert_zero_writes": {
+          "branches": 1,
+          "lines": 9
+        },
+        "ObjectiveCase.lint": {
+          "branches": 0,
+          "lines": 2
+        },
+        "ObjectiveCase.run_cli": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ObjectiveCase.setUp": {
+          "branches": 1,
+          "lines": 7
+        },
+        "ObjectiveCase.task_new": {
+          "branches": 0,
+          "lines": 2
+        },
+        "ObjectiveCase.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "ObjectiveCase.test_accepts_complete_spec2": {
+          "branches": 0,
+          "lines": 9
+        },
+        "ObjectiveCase.test_accepts_real_049_bootstrap_spec": {
+          "branches": 0,
+          "lines": 14
+        },
+        "ObjectiveCase.test_accepts_spec1_bootstrap_with_objective": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ObjectiveCase.test_rejects_angle_placeholder": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ObjectiveCase.test_rejects_bad_json_cleanly": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ObjectiveCase.test_rejects_each_missing_field": {
+          "branches": 1,
+          "lines": 8
+        },
+        "ObjectiveCase.test_rejects_empty_and_too_short_field": {
+          "branches": 1,
+          "lines": 8
+        },
+        "ObjectiveCase.test_rejects_fill_marker": {
+          "branches": 0,
+          "lines": 6
+        },
+        "ObjectiveCase.test_rejects_missing_objective": {
+          "branches": 0,
+          "lines": 6
+        },
+        "ObjectiveCase.test_rejects_non_string_field": {
+          "branches": 0,
+          "lines": 6
+        },
+        "ObjectiveCase.test_spec_lint_accepts_good_spec2": {
+          "branches": 0,
+          "lines": 5
+        },
+        "ObjectiveCase.test_spec_lint_ignores_nested_copy": {
+          "branches": 0,
+          "lines": 8
+        },
+        "ObjectiveCase.test_spec_lint_rejects_bad_spec2": {
+          "branches": 0,
+          "lines": 6
+        },
+        "ObjectiveCase.test_spec_lint_skips_frozen_spec1": {
+          "branches": 0,
+          "lines": 10
+        },
+        "ObjectiveCase.test_template_is_accepted_by_task_new": {
+          "branches": 0,
+          "lines": 8
+        },
+        "ObjectiveCase.test_template_is_spec2_with_real_objective": {
+          "branches": 1,
+          "lines": 10
+        },
+        "ObjectiveCase.write_spec": {
+          "branches": 1,
+          "lines": 7
+        },
+        "ledger_events": {
+          "branches": 1,
+          "lines": 6
+        },
+        "make_spec": {
+          "branches": 0,
+          "lines": 17
+        }
+      },
+      "lines": 265
+    },
     "tools/tests/test_output_encoding.py": {
       "functions": {
         "OutputEncodingTestCase.assert_utf8_json": {
@@ -3158,6 +4094,195 @@
       },
       "lines": 343
     },
+    "tools/tests/test_position.py": {
+      "functions": {
+        "BriefCase.test_brief_falls_back_to_task_forces": {
+          "branches": 0,
+          "lines": 5
+        },
+        "BriefCase.test_brief_progress_uses_the_roadmap": {
+          "branches": 0,
+          "lines": 5
+        },
+        "InjectionCase.test_checkback_adds_position_and_review_section": {
+          "branches": 0,
+          "lines": 12
+        },
+        "InjectionCase.test_close_adds_position": {
+          "branches": 0,
+          "lines": 18
+        },
+        "InjectionCase.test_legacy_campaign_keeps_checkback_output": {
+          "branches": 0,
+          "lines": 10
+        },
+        "InjectionCase.test_no_campaign_keeps_checkback_output": {
+          "branches": 0,
+          "lines": 7
+        },
+        "InjectionCase.test_post_merge_adds_position": {
+          "branches": 0,
+          "lines": 12
+        },
+        "PositionModelCase.test_all_done_sets_index_to_total_and_next_to_null": {
+          "branches": 1,
+          "lines": 8
+        },
+        "PositionModelCase.test_current_without_record_is_active": {
+          "branches": 0,
+          "lines": 4
+        },
+        "PositionModelCase.test_live_shape_is_index_two_of_six": {
+          "branches": 0,
+          "lines": 19
+        },
+        "PositionModelCase.test_planned_nodes_need_no_record": {
+          "branches": 1,
+          "lines": 5
+        },
+        "PositionModelCase.test_rework_marks_node_blocked": {
+          "branches": 0,
+          "lines": 9
+        },
+        "PositionModelCase.test_status_enum_is_fixed_and_keys_are_sorted": {
+          "branches": 0,
+          "lines": 7
+        },
+        "PositionModelCase.test_wip_counts_the_whole_tower": {
+          "branches": 0,
+          "lines": 5
+        },
+        "PositionTowerCase.cli": {
+          "branches": 0,
+          "lines": 2
+        },
+        "PositionTowerCase.hashes": {
+          "branches": 0,
+          "lines": 4
+        },
+        "PositionTowerCase.setUp": {
+          "branches": 0,
+          "lines": 15
+        },
+        "PositionTowerCase.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "PositionTowerCase.where_json": {
+          "branches": 1,
+          "lines": 3
+        },
+        "PositionTowerCase.write_board": {
+          "branches": 0,
+          "lines": 5
+        },
+        "PositionTowerCase.write_doc": {
+          "branches": 0,
+          "lines": 5
+        },
+        "PositionTowerCase.write_json": {
+          "branches": 0,
+          "lines": 3
+        },
+        "PositionTowerCase.write_record": {
+          "branches": 1,
+          "lines": 6
+        },
+        "PositionUnitCase.test_position_status_maps_every_record_shape": {
+          "branches": 0,
+          "lines": 14
+        },
+        "PositionValidationCase.assert_unavailable": {
+          "branches": 0,
+          "lines": 8
+        },
+        "PositionValidationCase.test_campaign_check_e8_for_duplicate_roadmap": {
+          "branches": 0,
+          "lines": 8
+        },
+        "PositionValidationCase.test_campaign_check_e8_for_outside_current": {
+          "branches": 0,
+          "lines": 6
+        },
+        "PositionValidationCase.test_campaign_check_legacy_campaign_without_roadmap_stays_green": {
+          "branches": 0,
+          "lines": 7
+        },
+        "PositionValidationCase.test_campaign_check_w4_lists_uncreated_roadmap_nodes": {
+          "branches": 1,
+          "lines": 11
+        },
+        "PositionValidationCase.test_e8_current_not_in_roadmap": {
+          "branches": 0,
+          "lines": 3
+        },
+        "PositionValidationCase.test_e8_duplicate_roadmap_id": {
+          "branches": 0,
+          "lines": 4
+        },
+        "PositionValidationCase.test_e8_empty_roadmap": {
+          "branches": 0,
+          "lines": 3
+        },
+        "PositionValidationCase.test_e8_missing_roadmap": {
+          "branches": 0,
+          "lines": 5
+        },
+        "PositionValidationCase.test_e9_without_an_active_campaign": {
+          "branches": 0,
+          "lines": 3
+        },
+        "PositionValidationCase.test_e9_without_any_campaign": {
+          "branches": 0,
+          "lines": 3
+        },
+        "StatusSnapshotCase.snapshot": {
+          "branches": 0,
+          "lines": 4
+        },
+        "StatusSnapshotCase.test_snapshot_does_not_touch_the_control_plane": {
+          "branches": 0,
+          "lines": 7
+        },
+        "StatusSnapshotCase.test_snapshot_has_position_line": {
+          "branches": 0,
+          "lines": 10
+        },
+        "StatusSnapshotCase.test_snapshot_placeholder_without_roadmap": {
+          "branches": 0,
+          "lines": 5
+        },
+        "WhereViewCase.test_human_view_has_bar_position_and_next": {
+          "branches": 1,
+          "lines": 11
+        },
+        "WhereViewCase.test_md_view_wraps_the_same_content": {
+          "branches": 0,
+          "lines": 8
+        },
+        "WhereViewCase.test_where_and_views_write_nothing": {
+          "branches": 0,
+          "lines": 6
+        },
+        "campaign_text": {
+          "branches": 2,
+          "lines": 22
+        },
+        "day": {
+          "branches": 0,
+          "lines": 3
+        },
+        "run_cli": {
+          "branches": 0,
+          "lines": 4
+        },
+        "strategy_text": {
+          "branches": 0,
+          "lines": 14
+        }
+      },
+      "lines": 460
+    },
     "tools/tests/test_post_merge.py": {
       "functions": {
         "PostMergeTestCase.append_raw_ledger_row": {
@@ -3323,6 +4448,513 @@
       },
       "lines": 624
     },
+    "tools/tests/test_profile.py": {
+      "functions": {
+        "ProfileCheckNegativeCase.assert_rejected": {
+          "branches": 1,
+          "lines": 11
+        },
+        "ProfileCheckNegativeCase.fixture": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ProfileCheckNegativeCase.run_profile": {
+          "branches": 0,
+          "lines": 3
+        },
+        "ProfileCheckNegativeCase.test_bad_expect_is_rejected": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ProfileCheckNegativeCase.test_bad_table_is_rejected": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ProfileCheckNegativeCase.test_duplicate_id_is_rejected": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ProfileCheckNegativeCase.test_exit_mismatch_is_rejected": {
+          "branches": 0,
+          "lines": 6
+        },
+        "ProfileCheckNegativeCase.test_missing_column_is_rejected": {
+          "branches": 0,
+          "lines": 5
+        },
+        "ProfileCheckNegativeCase.test_missing_file_is_rejected": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ProfileCheckNegativeCase.test_missing_front_matter_is_rejected": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ProfileCheckNegativeCase.test_optional_authority_breaks_required_fact": {
+          "branches": 0,
+          "lines": 15
+        },
+        "ProfileCheckNegativeCase.test_recursive_probe_is_rejected": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ProfileCheckNegativeCase.test_stdout_mismatch_is_rejected": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ProfileCheckNegativeCase.test_unknown_probe_is_rejected": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ProfileCheckNegativeCase.test_write_probe_is_rejected": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ProfileCheckPositiveCase.test_object_selector_matches_default": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ProfileCheckPositiveCase.test_profile_check_writes_no_tower_state": {
+          "branches": 0,
+          "lines": 5
+        },
+        "ProfileCheckPositiveCase.test_real_profile_runs_all_facts": {
+          "branches": 1,
+          "lines": 12
+        },
+        "ProfileCheckPositiveCase.test_template_is_parseable_without_running_probes": {
+          "branches": 0,
+          "lines": 9
+        },
+        "authority_fixture": {
+          "branches": 1,
+          "lines": 19
+        },
+        "digest_tree": {
+          "branches": 3,
+          "lines": 11
+        },
+        "fact": {
+          "branches": 0,
+          "lines": 3
+        },
+        "profile_doc": {
+          "branches": 0,
+          "lines": 2
+        },
+        "tower_cli": {
+          "branches": 0,
+          "lines": 4
+        },
+        "tower_copy": {
+          "branches": 2,
+          "lines": 12
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 254
+    },
+    "tools/tests/test_record_layer.py": {
+      "functions": {
+        "DeliverBackingTestCase.test_backed_completion_is_accepted_and_reported": {
+          "branches": 0,
+          "lines": 15
+        },
+        "DeliverBackingTestCase.test_empty_event_fields_are_rejected": {
+          "branches": 2,
+          "lines": 25
+        },
+        "DeliverBackingTestCase.test_event_by_non_owner_is_rejected": {
+          "branches": 0,
+          "lines": 14
+        },
+        "DeliverBackingTestCase.test_forged_record_completion_is_rejected_with_zero_writes": {
+          "branches": 0,
+          "lines": 13
+        },
+        "DeliverBackingTestCase.test_record_event_field_mismatch_is_rejected": {
+          "branches": 1,
+          "lines": 22
+        },
+        "DispatchBaseAuthorityTestCase.test_event_base_sha_missing_from_record_is_rejected": {
+          "branches": 0,
+          "lines": 9
+        },
+        "DispatchBaseAuthorityTestCase.test_record_and_event_base_sha_match_delivers": {
+          "branches": 0,
+          "lines": 13
+        },
+        "DispatchBaseAuthorityTestCase.test_record_base_sha_rewritten_to_head_is_rejected": {
+          "branches": 0,
+          "lines": 19
+        },
+        "DispatchBaseAuthorityTestCase.test_record_base_sha_without_dispatch_event_is_rejected": {
+          "branches": 0,
+          "lines": 7
+        },
+        "LegacyRecordVerifyTestCase.setUp": {
+          "branches": 0,
+          "lines": 7
+        },
+        "LegacyRecordVerifyTestCase.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "LegacyRecordVerifyTestCase.test_legacy_record_adds_no_drift_or_extra_skip": {
+          "branches": 0,
+          "lines": 8
+        },
+        "RecordLayerGitFixture.append_completion_event": {
+          "branches": 0,
+          "lines": 2
+        },
+        "RecordLayerGitFixture.append_dispatch_event": {
+          "branches": 0,
+          "lines": 3
+        },
+        "RecordLayerGitFixture.assert_delivery_wrote_nothing": {
+          "branches": 0,
+          "lines": 6
+        },
+        "RecordLayerGitFixture.assert_failed_with": {
+          "branches": 0,
+          "lines": 6
+        },
+        "RecordLayerGitFixture.commit_worktree": {
+          "branches": 0,
+          "lines": 4
+        },
+        "RecordLayerGitFixture.completion_add": {
+          "branches": 0,
+          "lines": 4
+        },
+        "RecordLayerGitFixture.completion_events": {
+          "branches": 0,
+          "lines": 3
+        },
+        "RecordLayerGitFixture.deliver": {
+          "branches": 0,
+          "lines": 6
+        },
+        "RecordLayerGitFixture.evidence_dir": {
+          "branches": 0,
+          "lines": 2
+        },
+        "RecordLayerGitFixture.git_sha": {
+          "branches": 0,
+          "lines": 4
+        },
+        "RecordLayerGitFixture.kit_main_sha": {
+          "branches": 0,
+          "lines": 2
+        },
+        "RecordLayerGitFixture.ledger_events": {
+          "branches": 0,
+          "lines": 4
+        },
+        "RecordLayerGitFixture.load_record": {
+          "branches": 0,
+          "lines": 2
+        },
+        "RecordLayerGitFixture.prepare_repository": {
+          "branches": 0,
+          "lines": 20
+        },
+        "RecordLayerGitFixture.save_record": {
+          "branches": 0,
+          "lines": 2
+        },
+        "RecordLayerGitFixture.setUp": {
+          "branches": 0,
+          "lines": 8
+        },
+        "RecordLayerGitFixture.set_record_base_sha": {
+          "branches": 1,
+          "lines": 7
+        },
+        "RecordLayerGitFixture.task_record": {
+          "branches": 0,
+          "lines": 10
+        },
+        "RecordLayerGitFixture.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "RecordLayerGitFixture.worktree_head_sha": {
+          "branches": 0,
+          "lines": 2
+        },
+        "RecordLayerGitFixture.write_tower_state": {
+          "branches": 0,
+          "lines": 12
+        },
+        "RecordLayerGitFixture.write_worktree": {
+          "branches": 0,
+          "lines": 4
+        },
+        "RecordLayerVerifyFixture.append_completion": {
+          "branches": 0,
+          "lines": 2
+        },
+        "RecordLayerVerifyFixture.completion_add": {
+          "branches": 0,
+          "lines": 4
+        },
+        "RecordLayerVerifyFixture.drift_kinds": {
+          "branches": 0,
+          "lines": 2
+        },
+        "RecordLayerVerifyFixture.put_record": {
+          "branches": 1,
+          "lines": 4
+        },
+        "RecordLayerVerifyFixture.setUp": {
+          "branches": 0,
+          "lines": 6
+        },
+        "RecordLayerVerifyFixture.state_verify": {
+          "branches": 0,
+          "lines": 3
+        },
+        "RecordLayerVerifyFixture.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "RecordLayerVerifyFixture.test_completion_field_mismatch_is_reported": {
+          "branches": 0,
+          "lines": 15
+        },
+        "RecordLayerVerifyFixture.test_event_base_sha_missing_from_record_is_reported": {
+          "branches": 0,
+          "lines": 7
+        },
+        "RecordLayerVerifyFixture.test_forged_completion_record_is_unbacked": {
+          "branches": 0,
+          "lines": 6
+        },
+        "RecordLayerVerifyFixture.test_legacy_skipped_task_without_completions_adds_nothing": {
+          "branches": 0,
+          "lines": 8
+        },
+        "RecordLayerVerifyFixture.test_matching_base_sha_has_no_dispatch_drift": {
+          "branches": 0,
+          "lines": 4
+        },
+        "RecordLayerVerifyFixture.test_orphan_completion_event_is_reported": {
+          "branches": 0,
+          "lines": 7
+        },
+        "RecordLayerVerifyFixture.test_skipped_task_with_completions_is_still_audited": {
+          "branches": 0,
+          "lines": 10
+        },
+        "RecordLayerVerifyFixture.test_skipped_task_with_mismatched_event_is_audited": {
+          "branches": 0,
+          "lines": 11
+        },
+        "RecordLayerVerifyFixture.test_tampered_base_sha_is_a_mismatch": {
+          "branches": 0,
+          "lines": 10
+        },
+        "RecordLayerVerifyFixture.test_valid_completion_pair_has_no_form_drift": {
+          "branches": 0,
+          "lines": 9
+        },
+        "build_verify_tower": {
+          "branches": 2,
+          "lines": 23
+        },
+        "completion_entry": {
+          "branches": 0,
+          "lines": 5
+        },
+        "put_verify_record": {
+          "branches": 3,
+          "lines": 12
+        }
+      },
+      "lines": 561
+    },
+    "tools/tests/test_review_gate.py": {
+      "functions": {
+        "CheckbackReviewJsonCase.checkback": {
+          "branches": 0,
+          "lines": 3
+        },
+        "CheckbackReviewJsonCase.record": {
+          "branches": 0,
+          "lines": 2
+        },
+        "CheckbackReviewJsonCase.review": {
+          "branches": 0,
+          "lines": 2
+        },
+        "CheckbackReviewJsonCase.setUp": {
+          "branches": 0,
+          "lines": 25
+        },
+        "CheckbackReviewJsonCase.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "CheckbackReviewJsonCase.test_explicit_head_and_base_override_defaults": {
+          "branches": 0,
+          "lines": 9
+        },
+        "CheckbackReviewJsonCase.test_fail_writes_verdict_fail_and_rework": {
+          "branches": 0,
+          "lines": 11
+        },
+        "CheckbackReviewJsonCase.test_pass_writes_json_with_worktree_head_and_dispatch_base": {
+          "branches": 0,
+          "lines": 20
+        },
+        "ExpectedHeadMergeCase.merge_argv": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ExpectedHeadMergeCase.run_merge": {
+          "branches": 1,
+          "lines": 11
+        },
+        "ExpectedHeadMergeCase.test_pr_merge_head_mismatch_does_not_merge": {
+          "branches": 0,
+          "lines": 21
+        },
+        "ExpectedHeadMergeCase.test_pr_merge_passes_match_head_commit": {
+          "branches": 0,
+          "lines": 16
+        },
+        "LegacyReviewCompatCase.test_legacy_review_without_checkback_is_not_retrofitted": {
+          "branches": 0,
+          "lines": 22
+        },
+        "LegacyReviewCompatCase.test_review_json_without_structured_checkback_is_rejected": {
+          "branches": 0,
+          "lines": 21
+        },
+        "MergeCheckReviewGateCase.errors": {
+          "branches": 0,
+          "lines": 3
+        },
+        "MergeCheckReviewGateCase.test_base_mismatch_is_stale": {
+          "branches": 0,
+          "lines": 7
+        },
+        "MergeCheckReviewGateCase.test_fail_verdict_fails_merge_check": {
+          "branches": 0,
+          "lines": 10
+        },
+        "MergeCheckReviewGateCase.test_head_mismatch_is_stale": {
+          "branches": 0,
+          "lines": 7
+        },
+        "MergeCheckReviewGateCase.test_legacy_envelope_json_remains_the_only_binding": {
+          "branches": 0,
+          "lines": 9
+        },
+        "MergeCheckReviewGateCase.test_matching_head_and_base_passes": {
+          "branches": 0,
+          "lines": 9
+        },
+        "MergeCheckReviewGateCase.test_missing_review_json_fails_stale": {
+          "branches": 0,
+          "lines": 10
+        },
+        "MergeCheckReviewGateCase.test_new_head_needs_recheckback_before_merge_check_passes": {
+          "branches": 0,
+          "lines": 14
+        },
+        "ReviewGateKitCase.checkback": {
+          "branches": 0,
+          "lines": 3
+        },
+        "ReviewGateKitCase.cli": {
+          "branches": 0,
+          "lines": 3
+        },
+        "ReviewGateKitCase.commit": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ReviewGateKitCase.envelope_path": {
+          "branches": 0,
+          "lines": 2
+        },
+        "ReviewGateKitCase.init_origin": {
+          "branches": 0,
+          "lines": 6
+        },
+        "ReviewGateKitCase.init_repo": {
+          "branches": 0,
+          "lines": 13
+        },
+        "ReviewGateKitCase.merge_check": {
+          "branches": 0,
+          "lines": 2
+        },
+        "ReviewGateKitCase.payload": {
+          "branches": 0,
+          "lines": 8
+        },
+        "ReviewGateKitCase.promote": {
+          "branches": 0,
+          "lines": 12
+        },
+        "ReviewGateKitCase.record": {
+          "branches": 0,
+          "lines": 19
+        },
+        "ReviewGateKitCase.record_path": {
+          "branches": 0,
+          "lines": 2
+        },
+        "ReviewGateKitCase.review_path": {
+          "branches": 0,
+          "lines": 2
+        },
+        "ReviewGateKitCase.setUp": {
+          "branches": 0,
+          "lines": 16
+        },
+        "ReviewGateKitCase.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "ReviewGateKitCase.write_state": {
+          "branches": 0,
+          "lines": 16
+        },
+        "init_worktree_repo": {
+          "branches": 0,
+          "lines": 9
+        },
+        "ok": {
+          "branches": 1,
+          "lines": 5
+        },
+        "read_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_cli": {
+          "branches": 1,
+          "lines": 11
+        },
+        "run_git": {
+          "branches": 0,
+          "lines": 4
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 562
+    },
     "tools/tests/test_run_tests.py": {
       "functions": {
         "BannerOrdering.test_tower_test_tmp_printed_before_child_output": {
@@ -3375,6 +5007,260 @@
         }
       },
       "lines": 234
+    },
+    "tools/tests/test_shape_baseline_move.py": {
+      "functions": {
+        "BaselineMoveCase.setUpClass": {
+          "branches": 0,
+          "lines": 3
+        },
+        "BaselineMoveCase.test_baseline_is_never_loosened": {
+          "branches": 3,
+          "lines": 12
+        },
+        "BaselineMoveCase.test_moved_entries_keep_exact_metrics": {
+          "branches": 1,
+          "lines": 9
+        },
+        "BaselineMoveCase.test_no_new_long_function_debt": {
+          "branches": 5,
+          "lines": 15
+        },
+        "BaselineMoveCase.test_towerctl_no_longer_owns_the_moved_functions": {
+          "branches": 1,
+          "lines": 5
+        },
+        "debt": {
+          "branches": 0,
+          "lines": 2
+        },
+        "load_baseline": {
+          "branches": 0,
+          "lines": 2
+        },
+        "scan": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 117
+    },
+    "tools/tests/test_shape_check.py": {
+      "functions": {
+        "CheckbackStructureCase.checkback": {
+          "branches": 0,
+          "lines": 3
+        },
+        "CheckbackStructureCase.load_record": {
+          "branches": 0,
+          "lines": 2
+        },
+        "CheckbackStructureCase.review_text": {
+          "branches": 0,
+          "lines": 2
+        },
+        "CheckbackStructureCase.setUp": {
+          "branches": 0,
+          "lines": 22
+        },
+        "CheckbackStructureCase.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "CheckbackStructureCase.test_structure_answer_defaults_to_pending": {
+          "branches": 1,
+          "lines": 9
+        },
+        "CheckbackStructureCase.test_structure_answer_is_recorded_and_rendered": {
+          "branches": 1,
+          "lines": 12
+        },
+        "DeliverShapeDeletedBaselineCase.test_deleted_baseline_blocks_delivery": {
+          "branches": 0,
+          "lines": 7
+        },
+        "DeliverShapeFixture.add_worktree": {
+          "branches": 0,
+          "lines": 5
+        },
+        "DeliverShapeFixture.allowed_paths": {
+          "branches": 1,
+          "lines": 6
+        },
+        "DeliverShapeFixture.commit_worktree": {
+          "branches": 0,
+          "lines": 5
+        },
+        "DeliverShapeFixture.deliver": {
+          "branches": 1,
+          "lines": 5
+        },
+        "DeliverShapeFixture.init_kit": {
+          "branches": 0,
+          "lines": 7
+        },
+        "DeliverShapeFixture.ledger_types": {
+          "branches": 0,
+          "lines": 5
+        },
+        "DeliverShapeFixture.load_record": {
+          "branches": 0,
+          "lines": 2
+        },
+        "DeliverShapeFixture.put_worktree": {
+          "branches": 0,
+          "lines": 4
+        },
+        "DeliverShapeFixture.record": {
+          "branches": 0,
+          "lines": 12
+        },
+        "DeliverShapeFixture.setUp": {
+          "branches": 0,
+          "lines": 11
+        },
+        "DeliverShapeFixture.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "DeliverShapeFixture.write_source_tree": {
+          "branches": 2,
+          "lines": 19
+        },
+        "DeliverShapeFixture.write_tower_state": {
+          "branches": 0,
+          "lines": 11
+        },
+        "DeliverShapeGateCase.test_clean_shape_delivers_with_shape_checked": {
+          "branches": 0,
+          "lines": 10
+        },
+        "DeliverShapeGateCase.test_new_long_function_blocks_delivery_with_no_writes": {
+          "branches": 0,
+          "lines": 14
+        },
+        "DeliverShapeNoToolsCase.test_missing_tools_dir_skips_shape_check": {
+          "branches": 0,
+          "lines": 7
+        },
+        "DeliverShapeNoTowerBaselineCase.test_missing_tower_baseline_blocks_delivery": {
+          "branches": 0,
+          "lines": 7
+        },
+        "DeliverShapeTamperedBaselineCase.test_modified_baseline_blocks_delivery": {
+          "branches": 0,
+          "lines": 12
+        },
+        "ShapeCheckCase.check": {
+          "branches": 0,
+          "lines": 2
+        },
+        "ShapeCheckCase.freeze": {
+          "branches": 0,
+          "lines": 3
+        },
+        "ShapeCheckCase.setUp": {
+          "branches": 0,
+          "lines": 6
+        },
+        "ShapeCheckCase.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "ShapeCheckCase.test_baseline_uses_qualified_names": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ShapeCheckCase.test_baselined_long_function_passes": {
+          "branches": 0,
+          "lines": 5
+        },
+        "ShapeCheckCase.test_baselined_long_method_passes": {
+          "branches": 0,
+          "lines": 5
+        },
+        "ShapeCheckCase.test_growing_a_baselined_function_fails": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ShapeCheckCase.test_growing_a_baselined_method_fails": {
+          "branches": 0,
+          "lines": 8
+        },
+        "ShapeCheckCase.test_missing_baseline_fails_with_hint": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ShapeCheckCase.test_new_duplicate_block_fails": {
+          "branches": 0,
+          "lines": 9
+        },
+        "ShapeCheckCase.test_new_long_file_fails": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ShapeCheckCase.test_new_long_function_fails": {
+          "branches": 0,
+          "lines": 6
+        },
+        "ShapeCheckCase.test_new_long_method_fails": {
+          "branches": 0,
+          "lines": 6
+        },
+        "ShapeCheckCase.test_new_nested_long_function_fails": {
+          "branches": 0,
+          "lines": 6
+        },
+        "ShapeCheckCase.test_new_unused_import_fails": {
+          "branches": 0,
+          "lines": 6
+        },
+        "ShapeCheckCase.test_syntax_error_fails_cleanly": {
+          "branches": 0,
+          "lines": 7
+        },
+        "ShapeCheckCase.test_write_baseline_is_byte_identical": {
+          "branches": 0,
+          "lines": 9
+        },
+        "ShapeCheckCase.write_tool": {
+          "branches": 0,
+          "lines": 5
+        },
+        "long_function": {
+          "branches": 0,
+          "lines": 4
+        },
+        "long_method": {
+          "branches": 0,
+          "lines": 4
+        },
+        "nested_long_function": {
+          "branches": 0,
+          "lines": 4
+        },
+        "read_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_cli": {
+          "branches": 0,
+          "lines": 4
+        },
+        "run_git": {
+          "branches": 0,
+          "lines": 4
+        },
+        "write_baseline": {
+          "branches": 0,
+          "lines": 6
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 3
+        }
+      },
+      "lines": 497
     },
     "tools/tests/test_spec_lint.py": {
       "functions": {
@@ -3862,6 +5748,252 @@
       },
       "lines": 1632
     },
+    "tools/tests/test_status_history.py": {
+      "functions": {
+        "ArchiveCase.test_archive_keeps_originals_and_is_byte_stable": {
+          "branches": 0,
+          "lines": 14
+        },
+        "BoardShapeCase.test_board_array_is_clean_exit_two": {
+          "branches": 0,
+          "lines": 6
+        },
+        "BoardShapeCase.test_board_non_object_task_element_is_clean_exit_two": {
+          "branches": 0,
+          "lines": 7
+        },
+        "IndexCase.test_index_counts_entries_and_matches_file_hash": {
+          "branches": 0,
+          "lines": 18
+        },
+        "IndexCase.test_index_ignores_weekly_archive_and_readme": {
+          "branches": 0,
+          "lines": 10
+        },
+        "IndexCase.test_index_is_byte_stable_and_recomputable": {
+          "branches": 0,
+          "lines": 10
+        },
+        "R3EmptyTaskForcesCase.test_empty_list_and_empty_key_are_zero_of_zero": {
+          "branches": 1,
+          "lines": 9
+        },
+        "R4QuotedScalarCase.test_single_quotes_parse_and_campaign_goal_is_linked": {
+          "branches": 0,
+          "lines": 8
+        },
+        "R4QuotedScalarCase.test_unsupported_structure_still_exits_two_cleanly": {
+          "branches": 0,
+          "lines": 7
+        },
+        "R5BudgetCase.test_card_budget_units_are_parsed": {
+          "branches": 2,
+          "lines": 14
+        },
+        "R5BudgetCase.test_started_plus_week_window_is_w2": {
+          "branches": 0,
+          "lines": 10
+        },
+        "R5BudgetCase.test_unparseable_budget_is_not_a_false_positive": {
+          "branches": 1,
+          "lines": 6
+        },
+        "RollupCase.test_rollup_summarises_the_week_and_is_byte_stable": {
+          "branches": 0,
+          "lines": 17
+        },
+        "RollupCase.test_rollup_writes_nothing_but_weekly": {
+          "branches": 2,
+          "lines": 10
+        },
+        "SnapshotCase.test_at_freezes_the_whole_date": {
+          "branches": 0,
+          "lines": 7
+        },
+        "SnapshotCase.test_same_day_twice_appends_two_entries": {
+          "branches": 0,
+          "lines": 13
+        },
+        "SnapshotCase.test_snapshot_records_campaign_wip_blocked_and_tests": {
+          "branches": 0,
+          "lines": 8
+        },
+        "StatusIsolationCase.test_status_commands_leave_control_plane_untouched": {
+          "branches": 0,
+          "lines": 8
+        },
+        "StatusTowerCase.check": {
+          "branches": 0,
+          "lines": 2
+        },
+        "StatusTowerCase.codes": {
+          "branches": 1,
+          "lines": 2
+        },
+        "StatusTowerCase.headings": {
+          "branches": 0,
+          "lines": 2
+        },
+        "StatusTowerCase.payload": {
+          "branches": 1,
+          "lines": 3
+        },
+        "StatusTowerCase.setUp": {
+          "branches": 0,
+          "lines": 12
+        },
+        "StatusTowerCase.snapshot": {
+          "branches": 2,
+          "lines": 8
+        },
+        "StatusTowerCase.status_text": {
+          "branches": 0,
+          "lines": 2
+        },
+        "StatusTowerCase.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "StatusTowerCase.write_doc": {
+          "branches": 0,
+          "lines": 5
+        },
+        "StatusTowerCase.write_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "StatusTowerCase.write_record": {
+          "branches": 1,
+          "lines": 6
+        },
+        "W3SpecOnlyCase.test_missing_card_is_still_e5": {
+          "branches": 0,
+          "lines": 5
+        },
+        "W3SpecOnlyCase.test_spec_only_is_warning_and_strict_upgrades": {
+          "branches": 0,
+          "lines": 9
+        },
+        "campaign_text": {
+          "branches": 2,
+          "lines": 23
+        },
+        "day": {
+          "branches": 0,
+          "lines": 3
+        },
+        "plane_hashes": {
+          "branches": 0,
+          "lines": 5
+        },
+        "run_cli": {
+          "branches": 0,
+          "lines": 4
+        },
+        "sha": {
+          "branches": 0,
+          "lines": 2
+        },
+        "strategy_text": {
+          "branches": 0,
+          "lines": 16
+        }
+      },
+      "lines": 420
+    },
+    "tools/tests/test_task_registry.py": {
+      "functions": {
+        "TaskRegistryCase.card": {
+          "branches": 2,
+          "lines": 12
+        },
+        "TaskRegistryCase.cli": {
+          "branches": 0,
+          "lines": 4
+        },
+        "TaskRegistryCase.fails": {
+          "branches": 1,
+          "lines": 9
+        },
+        "TaskRegistryCase.prepare_ready_card": {
+          "branches": 0,
+          "lines": 25
+        },
+        "TaskRegistryCase.record": {
+          "branches": 0,
+          "lines": 3
+        },
+        "TaskRegistryCase.registry": {
+          "branches": 0,
+          "lines": 2
+        },
+        "TaskRegistryCase.registry_ids": {
+          "branches": 0,
+          "lines": 2
+        },
+        "TaskRegistryCase.setUp": {
+          "branches": 1,
+          "lines": 6
+        },
+        "TaskRegistryCase.spec": {
+          "branches": 1,
+          "lines": 24
+        },
+        "TaskRegistryCase.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "TaskRegistryCase.test_check_spec_reads_missing_registry_as_a_scan": {
+          "branches": 0,
+          "lines": 7
+        },
+        "TaskRegistryCase.test_check_spec_requires_registration_and_matching_title": {
+          "branches": 0,
+          "lines": 15
+        },
+        "TaskRegistryCase.test_init_backfills_void_dirs_and_is_byte_stable": {
+          "branches": 0,
+          "lines": 26
+        },
+        "TaskRegistryCase.test_init_on_empty_tower_writes_an_empty_registry": {
+          "branches": 0,
+          "lines": 5
+        },
+        "TaskRegistryCase.test_reserved_id_is_claimed_by_task_new": {
+          "branches": 0,
+          "lines": 22
+        },
+        "TaskRegistryCase.test_task_new_bootstraps_a_missing_registry": {
+          "branches": 0,
+          "lines": 14
+        },
+        "TaskRegistryCase.test_task_new_refuses_every_registered_status_with_no_writes": {
+          "branches": 1,
+          "lines": 13
+        },
+        "TaskRegistryCase.test_task_new_registers_active_and_close_marks_closed": {
+          "branches": 0,
+          "lines": 23
+        },
+        "TaskRegistryCase.write_registry": {
+          "branches": 0,
+          "lines": 5
+        },
+        "TaskRegistryCase.written": {
+          "branches": 3,
+          "lines": 9
+        },
+        "entry": {
+          "branches": 0,
+          "lines": 4
+        },
+        "sha256": {
+          "branches": 0,
+          "lines": 2
+        }
+      },
+      "lines": 301
+    },
     "tools/tests/test_trust_boundary.py": {
       "functions": {
         "TrustBoundaryTestCase.assert_single_json": {
@@ -3995,24 +6127,303 @@
       },
       "lines": 525
     },
-    "tools/towerctl.py": {
+    "tools/tests/test_wiring.py": {
       "functions": {
-        "MergeBlocked.__init__": {
+        "CampaignCoverageCase.test_w1_covers_the_current_card": {
+          "branches": 1,
+          "lines": 13
+        },
+        "CampaignCoverageCase.test_w1_ignores_a_current_card_the_board_does_not_have": {
+          "branches": 0,
+          "lines": 11
+        },
+        "CampaignCoverageCase.test_w1_ignores_a_dispatch_naming_an_unknown_campaign": {
+          "branches": 0,
+          "lines": 10
+        },
+        "CampaignCoverageCase.test_w1_is_silent_when_any_source_covers_the_card": {
+          "branches": 0,
+          "lines": 11
+        },
+        "CampaignCoverageCase.test_w1_reports_a_card_no_source_covers": {
+          "branches": 0,
+          "lines": 10
+        },
+        "CampaignCoverageCase.test_w1_returns_when_legacy_cards_are_missing": {
+          "branches": 0,
+          "lines": 9
+        },
+        "CampaignCoverageCase.test_w2_does_not_charge_closed_cards_to_the_budget": {
+          "branches": 0,
+          "lines": 11
+        },
+        "CampaignCoverageCase.test_w2_warns_when_open_cards_exceed_the_budget": {
+          "branches": 1,
+          "lines": 11
+        },
+        "CiWorkflowCase.test_ci_runs_arch_and_campaign_before_status": {
+          "branches": 0,
+          "lines": 15
+        },
+        "DispatchCampaignCase.dispatch": {
+          "branches": 0,
+          "lines": 3
+        },
+        "DispatchCampaignCase.ledger_text": {
+          "branches": 0,
+          "lines": 2
+        },
+        "DispatchCampaignCase.load_record": {
+          "branches": 0,
+          "lines": 2
+        },
+        "DispatchCampaignCase.setUp": {
+          "branches": 0,
+          "lines": 20
+        },
+        "DispatchCampaignCase.test_legacy_tower_still_validates_a_given_campaign": {
+          "branches": 0,
+          "lines": 6
+        },
+        "DispatchCampaignCase.test_legacy_tower_with_no_campaign_keeps_old_behaviour": {
+          "branches": 0,
+          "lines": 6
+        },
+        "DispatchCampaignCase.test_more_than_one_active_campaign_is_ambiguous": {
+          "branches": 0,
+          "lines": 8
+        },
+        "DispatchCampaignCase.test_single_active_campaign_requires_the_flag_and_writes_nothing": {
+          "branches": 0,
+          "lines": 8
+        },
+        "DispatchCampaignCase.test_unknown_or_out_of_roadmap_campaign_is_rejected": {
+          "branches": 0,
+          "lines": 10
+        },
+        "DispatchCampaignCase.test_valid_campaign_is_recorded_in_record_and_ledger": {
+          "branches": 0,
+          "lines": 9
+        },
+        "PostMergeWiringCase.commit_all": {
           "branches": 0,
           "lines": 5
         },
-        "_acquire_lock_file": {
-          "branches": 10,
-          "lines": 34
+        "PostMergeWiringCase.envelope": {
+          "branches": 0,
+          "lines": 3
         },
-        "_append_ledger_event": {
+        "PostMergeWiringCase.git": {
+          "branches": 0,
+          "lines": 6
+        },
+        "PostMergeWiringCase.init_repo": {
+          "branches": 0,
+          "lines": 22
+        },
+        "PostMergeWiringCase.run_post_merge": {
+          "branches": 0,
+          "lines": 3
+        },
+        "PostMergeWiringCase.setUp": {
+          "branches": 1,
+          "lines": 32
+        },
+        "PostMergeWiringCase.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "PostMergeWiringCase.test_legacy_fixture_keeps_the_pre_050_check_list": {
+          "branches": 0,
+          "lines": 10
+        },
+        "PostMergeWiringCase.test_wired_tower_appends_both_checks_and_campaign_failure_blocks": {
+          "branches": 0,
+          "lines": 21
+        },
+        "WiringCase.report": {
+          "branches": 0,
+          "lines": 3
+        },
+        "WiringCase.setUp": {
+          "branches": 1,
+          "lines": 8
+        },
+        "WiringCase.tearDown": {
+          "branches": 0,
+          "lines": 2
+        },
+        "WiringCase.write_board": {
           "branches": 0,
           "lines": 5
         },
-        "_append_ledger_event_locked": {
+        "WiringCase.write_campaign": {
+          "branches": 3,
+          "lines": 22
+        },
+        "WiringCase.write_card": {
+          "branches": 0,
+          "lines": 9
+        },
+        "WiringCase.write_strategy": {
+          "branches": 0,
+          "lines": 9
+        },
+        "codes": {
+          "branches": 0,
+          "lines": 2
+        },
+        "read_json": {
+          "branches": 0,
+          "lines": 2
+        },
+        "run_cli": {
+          "branches": 0,
+          "lines": 5
+        },
+        "sha256_file": {
+          "branches": 0,
+          "lines": 2
+        },
+        "write_json": {
+          "branches": 0,
+          "lines": 4
+        }
+      },
+      "lines": 454
+    },
+    "tools/tower_arch.py": {
+      "functions": {
+        "arch_constants": {
+          "branches": 3,
+          "lines": 10
+        },
+        "arch_event_types": {
+          "branches": 12,
+          "lines": 51
+        },
+        "arch_finding": {
+          "branches": 0,
+          "lines": 3
+        },
+        "arch_graph_nodes": {
+          "branches": 1,
+          "lines": 6
+        },
+        "arch_graph_payload": {
+          "branches": 6,
+          "lines": 21
+        },
+        "arch_graph_stem_findings": {
+          "branches": 1,
+          "lines": 10
+        },
+        "arch_imports": {
           "branches": 4,
-          "lines": 34
+          "lines": 11
         },
+        "arch_literal": {
+          "branches": 3,
+          "lines": 7
+        },
+        "arch_load_json": {
+          "branches": 4,
+          "lines": 13
+        },
+        "arch_resolve_imports": {
+          "branches": 2,
+          "lines": 8
+        },
+        "arch_resolve_rel": {
+          "branches": 8,
+          "lines": 22
+        },
+        "arch_string_list": {
+          "branches": 2,
+          "lines": 4
+        },
+        "arch_test_names": {
+          "branches": 7,
+          "lines": 18
+        },
+        "arch_writer_ledger": {
+          "branches": 5,
+          "lines": 15
+        },
+        "cmd_arch_graph": {
+          "branches": 1,
+          "lines": 6
+        }
+      },
+      "lines": 308
+    },
+    "tools/tower_arch_check.py": {
+      "functions": {
+        "arch_adr_file_findings": {
+          "branches": 4,
+          "lines": 12
+        },
+        "arch_adr_findings": {
+          "branches": 4,
+          "lines": 17
+        },
+        "arch_adr_meta_findings": {
+          "branches": 7,
+          "lines": 28
+        },
+        "arch_architecture_findings": {
+          "branches": 8,
+          "lines": 25
+        },
+        "arch_boundary_findings": {
+          "branches": 1,
+          "lines": 7
+        },
+        "arch_check_payload": {
+          "branches": 0,
+          "lines": 21
+        },
+        "arch_command_names": {
+          "branches": 0,
+          "lines": 3
+        },
+        "arch_event_entry_findings": {
+          "branches": 6,
+          "lines": 24
+        },
+        "arch_event_fields_findings": {
+          "branches": 6,
+          "lines": 22
+        },
+        "arch_events_findings": {
+          "branches": 5,
+          "lines": 21
+        },
+        "arch_gate_field_findings": {
+          "branches": 6,
+          "lines": 19
+        },
+        "arch_gates_findings": {
+          "branches": 7,
+          "lines": 30
+        },
+        "arch_invariants_findings": {
+          "branches": 9,
+          "lines": 38
+        },
+        "arch_probe_findings": {
+          "branches": 4,
+          "lines": 17
+        },
+        "cmd_arch_check": {
+          "branches": 1,
+          "lines": 6
+        }
+      },
+      "lines": 341
+    },
+    "tools/tower_authority.py": {
+      "functions": {
         "_authority_field_errors": {
           "branches": 8,
           "lines": 18
@@ -4033,106 +6444,6 @@
           "branches": 27,
           "lines": 129
         },
-        "_clear_stale_lock": {
-          "branches": 10,
-          "lines": 29
-        },
-        "_completion_drift": {
-          "branches": 19,
-          "lines": 79
-        },
-        "_contained_tower_path": {
-          "branches": 6,
-          "lines": 36
-        },
-        "_dispatch_base_sha": {
-          "branches": 3,
-          "lines": 9
-        },
-        "_evidence_entry_drift": {
-          "branches": 21,
-          "lines": 94
-        },
-        "_force_utf8_stdio": {
-          "branches": 3,
-          "lines": 7
-        },
-        "_illegal_transition": {
-          "branches": 0,
-          "lines": 6
-        },
-        "_is_executable_path": {
-          "branches": 3,
-          "lines": 13
-        },
-        "_latest_by": {
-          "branches": 4,
-          "lines": 13
-        },
-        "_latest_by.sort_key": {
-          "branches": 3,
-          "lines": 6
-        },
-        "_lexical_tower_path": {
-          "branches": 9,
-          "lines": 29
-        },
-        "_load_optional_record": {
-          "branches": 1,
-          "lines": 2
-        },
-        "_looks_like_path": {
-          "branches": 3,
-          "lines": 4
-        },
-        "_norm_tower_rel": {
-          "branches": 11,
-          "lines": 28
-        },
-        "_optional_git": {
-          "branches": 4,
-          "lines": 10
-        },
-        "_optional_git_status": {
-          "branches": 6,
-          "lines": 11
-        },
-        "_optional_task_record": {
-          "branches": 5,
-          "lines": 16
-        },
-        "_path_has_symlink": {
-          "branches": 6,
-          "lines": 20
-        },
-        "_profile_base": {
-          "branches": 4,
-          "lines": 16
-        },
-        "_profile_worktree_matches_task": {
-          "branches": 4,
-          "lines": 10
-        },
-        "_read_json_object": {
-          "branches": 4,
-          "lines": 19
-        },
-        "_release_lock_file": {
-          "branches": 7,
-          "lines": 18
-        },
-        "_sorted_states": {
-          "branches": 1,
-          "lines": 3
-        },
-        "_spec_drift": {
-          "branches": 17,
-          "lines": 45
-        },
-        "_split_argv": {
-          "branches": 4,
-          "lines": 17
-        },
         "_state_nested_id": {
           "branches": 1,
           "lines": 4
@@ -4140,22 +6451,6 @@
         "_state_owner_name": {
           "branches": 1,
           "lines": 4
-        },
-        "add_merge_ledger": {
-          "branches": 1,
-          "lines": 8
-        },
-        "allowed_repo_path": {
-          "branches": 10,
-          "lines": 32
-        },
-        "append_ledger": {
-          "branches": 0,
-          "lines": 2
-        },
-        "append_supervision_ledger": {
-          "branches": 0,
-          "lines": 3
         },
         "authority_commit_hint": {
           "branches": 3,
@@ -4168,10 +6463,6 @@
         "authority_drift": {
           "branches": 9,
           "lines": 39
-        },
-        "authority_lock": {
-          "branches": 5,
-          "lines": 26
         },
         "authority_payload_fields": {
           "branches": 0,
@@ -4201,10 +6492,6 @@
           "branches": 3,
           "lines": 17
         },
-        "authority_require_locked": {
-          "branches": 29,
-          "lines": 102
-        },
         "authority_required_event": {
           "branches": 2,
           "lines": 13
@@ -4216,6 +6503,31 @@
         "authority_requirement_errors": {
           "branches": 9,
           "lines": 41
+        },
+        "authority_state_fields": {
+          "branches": 2,
+          "lines": 21
+        },
+        "last_authority_event": {
+          "branches": 4,
+          "lines": 17
+        },
+        "last_authority_required_event": {
+          "branches": 4,
+          "lines": 17
+        },
+        "next_authority_revision": {
+          "branches": 7,
+          "lines": 18
+        }
+      },
+      "lines": 587
+    },
+    "tools/tower_authority_cmd.py": {
+      "functions": {
+        "authority_require_locked": {
+          "branches": 29,
+          "lines": 102
         },
         "authority_set_locked": {
           "branches": 21,
@@ -4229,46 +6541,6 @@
           "branches": 1,
           "lines": 4
         },
-        "authority_state_fields": {
-          "branches": 2,
-          "lines": 21
-        },
-        "block_pr_merge": {
-          "branches": 0,
-          "lines": 17
-        },
-        "build_parser": {
-          "branches": 0,
-          "lines": 169
-        },
-        "canonical_event_bytes": {
-          "branches": 0,
-          "lines": 10
-        },
-        "check_evidence": {
-          "branches": 7,
-          "lines": 21
-        },
-        "check_package_id": {
-          "branches": 1,
-          "lines": 6
-        },
-        "check_task_id": {
-          "branches": 1,
-          "lines": 6
-        },
-        "checks_timeout_detail": {
-          "branches": 1,
-          "lines": 4
-        },
-        "cli_commands": {
-          "branches": 2,
-          "lines": 7
-        },
-        "cmd_accept": {
-          "branches": 5,
-          "lines": 21
-        },
         "cmd_authority_check": {
           "branches": 2,
           "lines": 8
@@ -4281,17 +6553,498 @@
           "branches": 0,
           "lines": 15
         },
-        "cmd_check": {
-          "branches": 35,
-          "lines": 73
+        "ledger_empty_guard": {
+          "branches": 3,
+          "lines": 34
+        }
+      },
+      "lines": 499
+    },
+    "tools/tower_campaign.py": {
+      "functions": {
+        "active_campaign": {
+          "branches": 2,
+          "lines": 6
         },
-        "cmd_checkback": {
-          "branches": 9,
+        "board_orphan_warnings": {
+          "branches": 0,
+          "lines": 6
+        },
+        "board_rows": {
+          "branches": 6,
+          "lines": 28
+        },
+        "board_shape_errors": {
+          "branches": 0,
+          "lines": 3
+        },
+        "campaign_check_report": {
+          "branches": 7,
+          "lines": 27
+        },
+        "campaign_coverage_ids": {
+          "branches": 6,
+          "lines": 22
+        },
+        "campaign_heading": {
+          "branches": 6,
+          "lines": 13
+        },
+        "campaign_map_progress": {
+          "branches": 3,
+          "lines": 7
+        },
+        "campaign_progress": {
+          "branches": 3,
+          "lines": 9
+        },
+        "campaign_roadmap_errors": {
+          "branches": 1,
+          "lines": 5
+        },
+        "campaign_wip_limit": {
+          "branches": 5,
+          "lines": 13
+        },
+        "check_strategy_doc": {
+          "branches": 4,
+          "lines": 13
+        },
+        "cmd_campaign_check": {
+          "branches": 1,
+          "lines": 4
+        },
+        "command_warnings": {
+          "branches": 0,
+          "lines": 5
+        },
+        "duplicate_id_errors": {
+          "branches": 2,
+          "lines": 10
+        },
+        "goal_link_errors": {
+          "branches": 3,
+          "lines": 10
+        },
+        "in_flight_ids": {
+          "branches": 3,
+          "lines": 8
+        },
+        "legacy_card_ids": {
+          "branches": 0,
+          "lines": 3
+        },
+        "load_campaign_docs": {
+          "branches": 3,
+          "lines": 12
+        },
+        "load_strategy_quiet": {
+          "branches": 2,
+          "lines": 6
+        },
+        "open_task_force_ids": {
+          "branches": 3,
+          "lines": 8
+        },
+        "position_context": {
+          "branches": 5,
+          "lines": 31
+        },
+        "position_fig_value": {
+          "branches": 2,
+          "lines": 7
+        },
+        "position_for": {
+          "branches": 2,
+          "lines": 6
+        },
+        "position_index": {
+          "branches": 0,
+          "lines": 8
+        },
+        "position_next": {
+          "branches": 2,
+          "lines": 6
+        },
+        "position_nodes": {
+          "branches": 1,
+          "lines": 8
+        },
+        "position_payload": {
+          "branches": 0,
+          "lines": 3
+        },
+        "position_review_lines": {
+          "branches": 2,
+          "lines": 9
+        },
+        "position_status": {
+          "branches": 5,
+          "lines": 11
+        },
+        "record_is_blocked": {
+          "branches": 2,
+          "lines": 5
+        },
+        "review_by_errors": {
+          "branches": 4,
+          "lines": 15
+        },
+        "review_warnings": {
+          "branches": 7,
+          "lines": 17
+        },
+        "roadmap_gap_warnings": {
+          "branches": 4,
+          "lines": 10
+        },
+        "roadmap_ids": {
+          "branches": 0,
+          "lines": 3
+        },
+        "roadmap_problem": {
+          "branches": 8,
+          "lines": 22
+        },
+        "strategy_goals": {
+          "branches": 2,
+          "lines": 6
+        },
+        "task_force_errors": {
+          "branches": 4,
+          "lines": 11
+        },
+        "wip_errors": {
+          "branches": 6,
+          "lines": 21
+        },
+        "with_position": {
+          "branches": 1,
+          "lines": 6
+        }
+      },
+      "lines": 534
+    },
+    "tools/tower_cli.py": {
+      "functions": {
+        "acceptance_layer_parsers": {
+          "branches": 3,
           "lines": 25
         },
-        "cmd_close": {
+        "arch_layer_parsers": {
+          "branches": 2,
+          "lines": 10
+        },
+        "build_parser": {
+          "branches": 0,
+          "lines": 169
+        },
+        "cli_commands": {
+          "branches": 2,
+          "lines": 7
+        },
+        "cmd_spec_coverage": {
+          "branches": 1,
+          "lines": 7
+        },
+        "cmd_spec_lint": {
           "branches": 4,
+          "lines": 19
+        },
+        "command_layer_parsers": {
+          "branches": 2,
+          "lines": 19
+        },
+        "dispatch_campaign_parser": {
+          "branches": 3,
+          "lines": 17
+        },
+        "main": {
+          "branches": 3,
           "lines": 34
+        },
+        "position_layer_parsers": {
+          "branches": 2,
+          "lines": 11
+        },
+        "profile_layer_parsers": {
+          "branches": 2,
+          "lines": 11
+        },
+        "review_layer_parsers": {
+          "branches": 3,
+          "lines": 20
+        },
+        "status_layer_parsers": {
+          "branches": 2,
+          "lines": 18
+        },
+        "task_ids_layer_parsers": {
+          "branches": 2,
+          "lines": 16
+        }
+      },
+      "lines": 471
+    },
+    "tools/tower_command.py": {
+      "functions": {
+        "budget_card_limit": {
+          "branches": 2,
+          "lines": 4
+        },
+        "budget_week_limit": {
+          "branches": 2,
+          "lines": 4
+        },
+        "budget_window_warnings": {
+          "branches": 6,
+          "lines": 20
+        },
+        "campaign_relpaths": {
+          "branches": 1,
+          "lines": 7
+        },
+        "campaign_started": {
+          "branches": 0,
+          "lines": 3
+        },
+        "command_card_exists": {
+          "branches": 2,
+          "lines": 6
+        },
+        "command_date": {
+          "branches": 3,
+          "lines": 6
+        },
+        "command_doc_meta": {
+          "branches": 1,
+          "lines": 6
+        },
+        "command_finding": {
+          "branches": 0,
+          "lines": 3
+        },
+        "front_matter_block": {
+          "branches": 4,
+          "lines": 9
+        },
+        "load_command_doc": {
+          "branches": 4,
+          "lines": 11
+        },
+        "parse_command_front_matter": {
+          "branches": 7,
+          "lines": 26
+        },
+        "scalar_items": {
+          "branches": 2,
+          "lines": 5
+        },
+        "single_quoted_scalar": {
+          "branches": 3,
+          "lines": 8
+        },
+        "spec_only_warnings": {
+          "branches": 6,
+          "lines": 19
+        },
+        "task_force_ids": {
+          "branches": 0,
+          "lines": 3
+        },
+        "yaml_key_value": {
+          "branches": 3,
+          "lines": 12
+        },
+        "yaml_list_block": {
+          "branches": 7,
+          "lines": 25
+        },
+        "yaml_mapping_entry": {
+          "branches": 6,
+          "lines": 21
+        },
+        "yaml_mapping_item": {
+          "branches": 1,
+          "lines": 4
+        },
+        "yaml_scalar": {
+          "branches": 8,
+          "lines": 20
+        }
+      },
+      "lines": 305
+    },
+    "tools/tower_common.py": {
+      "functions": {
+        "MergeBlocked.__init__": {
+          "branches": 0,
+          "lines": 5
+        },
+        "_contained_tower_path": {
+          "branches": 6,
+          "lines": 36
+        },
+        "_force_utf8_stdio": {
+          "branches": 3,
+          "lines": 7
+        },
+        "_is_executable_path": {
+          "branches": 3,
+          "lines": 13
+        },
+        "_lexical_tower_path": {
+          "branches": 9,
+          "lines": 29
+        },
+        "_looks_like_path": {
+          "branches": 3,
+          "lines": 4
+        },
+        "_norm_tower_rel": {
+          "branches": 11,
+          "lines": 28
+        },
+        "_optional_git": {
+          "branches": 4,
+          "lines": 10
+        },
+        "_optional_git_status": {
+          "branches": 6,
+          "lines": 11
+        },
+        "_path_has_symlink": {
+          "branches": 6,
+          "lines": 20
+        },
+        "_read_json_object": {
+          "branches": 4,
+          "lines": 19
+        },
+        "_split_argv": {
+          "branches": 4,
+          "lines": 17
+        },
+        "allowed_repo_path": {
+          "branches": 10,
+          "lines": 32
+        },
+        "check_package_id": {
+          "branches": 1,
+          "lines": 6
+        },
+        "check_task_id": {
+          "branches": 1,
+          "lines": 6
+        },
+        "command_failure": {
+          "branches": 3,
+          "lines": 4
+        },
+        "emit": {
+          "branches": 0,
+          "lines": 3
+        },
+        "emit_sorted": {
+          "branches": 0,
+          "lines": 4
+        },
+        "ensure_within": {
+          "branches": 4,
+          "lines": 16
+        },
+        "fail": {
+          "branches": 0,
+          "lines": 4
+        },
+        "gh_command": {
+          "branches": 4,
+          "lines": 20
+        },
+        "git": {
+          "branches": 0,
+          "lines": 5
+        },
+        "git_ok": {
+          "branches": 2,
+          "lines": 5
+        },
+        "is_safe_id": {
+          "branches": 2,
+          "lines": 9
+        },
+        "jdump": {
+          "branches": 0,
+          "lines": 5
+        },
+        "jload": {
+          "branches": 0,
+          "lines": 2
+        },
+        "now": {
+          "branches": 0,
+          "lines": 2
+        },
+        "rel": {
+          "branches": 2,
+          "lines": 5
+        },
+        "repo_relative": {
+          "branches": 2,
+          "lines": 6
+        },
+        "resolve_input_within": {
+          "branches": 1,
+          "lines": 5
+        },
+        "resolve_repository": {
+          "branches": 2,
+          "lines": 5
+        },
+        "sha256_file": {
+          "branches": 1,
+          "lines": 6
+        },
+        "status_path": {
+          "branches": 2,
+          "lines": 6
+        },
+        "tool_owned_paths": {
+          "branches": 2,
+          "lines": 8
+        },
+        "working_tree_state": {
+          "branches": 6,
+          "lines": 23
+        }
+      },
+      "lines": 496
+    },
+    "tools/tower_delivery.py": {
+      "functions": {
+        "_completion_at_second": {
+          "branches": 4,
+          "lines": 10
+        },
+        "_completion_backing_entry_errors": {
+          "branches": 6,
+          "lines": 20
+        },
+        "_completion_entries_by_target": {
+          "branches": 5,
+          "lines": 15
+        },
+        "_completion_event_paths": {
+          "branches": 2,
+          "lines": 9
+        },
+        "_completion_field_differences": {
+          "branches": 11,
+          "lines": 25
+        },
+        "check_evidence": {
+          "branches": 7,
+          "lines": 21
         },
         "cmd_completion_add": {
           "branches": 18,
@@ -4305,14 +7058,197 @@
           "branches": 11,
           "lines": 62
         },
+        "collect_delivery_evidence": {
+          "branches": 6,
+          "lines": 27
+        },
+        "completion_backing_errors": {
+          "branches": 9,
+          "lines": 33
+        },
+        "completion_events": {
+          "branches": 4,
+          "lines": 15
+        },
+        "completion_paths": {
+          "branches": 5,
+          "lines": 11
+        },
+        "deliver_scope": {
+          "branches": 21,
+          "lines": 112
+        },
+        "deliver_shape_gate": {
+          "branches": 9,
+          "lines": 29
+        },
+        "delivery_gate_fields": {
+          "branches": 4,
+          "lines": 13
+        },
+        "shape_baseline_guard": {
+          "branches": 3,
+          "lines": 18
+        },
+        "write_delivery_md": {
+          "branches": 1,
+          "lines": 10
+        }
+      },
+      "lines": 593
+    },
+    "tools/tower_dispatch.py": {
+      "functions": {
+        "_dispatch_base_sha": {
+          "branches": 3,
+          "lines": 9
+        },
+        "_dispatch_base_sha_drift": {
+          "branches": 5,
+          "lines": 20
+        },
+        "_payload_base_sha": {
+          "branches": 3,
+          "lines": 6
+        },
         "cmd_dispatch": {
           "branches": 7,
           "lines": 33
+        },
+        "deliver_dispatch_base_sha": {
+          "branches": 5,
+          "lines": 24
+        },
+        "dependency_closure_errors": {
+          "branches": 5,
+          "lines": 16
+        },
+        "dependency_cycle_errors": {
+          "branches": 9,
+          "lines": 37
+        },
+        "dependency_cycle_errors.walk": {
+          "branches": 4,
+          "lines": 15
+        },
+        "dispatch_base_sha": {
+          "branches": 4,
+          "lines": 20
+        },
+        "dispatch_campaign": {
+          "branches": 11,
+          "lines": 30
+        },
+        "dispatch_provenance_field": {
+          "branches": 2,
+          "lines": 13
+        },
+        "resolve_dispatch_worktree": {
+          "branches": 3,
+          "lines": 9
+        },
+        "scheduling_dependency_errors": {
+          "branches": 0,
+          "lines": 3
+        }
+      },
+      "lines": 256
+    },
+    "tools/tower_envelope.py": {
+      "functions": {
+        "add_merge_ledger": {
+          "branches": 1,
+          "lines": 8
+        },
+        "checkback_reviewer": {
+          "branches": 4,
+          "lines": 8
+        },
+        "cmd_checkback": {
+          "branches": 9,
+          "lines": 25
         },
         "cmd_envelope_new": {
           "branches": 15,
           "lines": 66
         },
+        "cmd_queue_add": {
+          "branches": 5,
+          "lines": 54
+        },
+        "envelope_checks": {
+          "branches": 20,
+          "lines": 121
+        },
+        "envelope_checks.add": {
+          "branches": 0,
+          "lines": 2
+        },
+        "envelope_has_baselines": {
+          "branches": 1,
+          "lines": 15
+        },
+        "envelope_new_status": {
+          "branches": 6,
+          "lines": 20
+        },
+        "envelope_remerge_errors": {
+          "branches": 2,
+          "lines": 20
+        },
+        "load_queue": {
+          "branches": 1,
+          "lines": 5
+        },
+        "load_supervision": {
+          "branches": 1,
+          "lines": 5
+        },
+        "review_binding_check": {
+          "branches": 10,
+          "lines": 30
+        },
+        "review_json_path": {
+          "branches": 0,
+          "lines": 3
+        },
+        "review_mismatches": {
+          "branches": 2,
+          "lines": 14
+        },
+        "review_problems": {
+          "branches": 5,
+          "lines": 19
+        },
+        "save_queue": {
+          "branches": 0,
+          "lines": 3
+        },
+        "select_envelope": {
+          "branches": 3,
+          "lines": 12
+        },
+        "structure_review_lines": {
+          "branches": 1,
+          "lines": 7
+        },
+        "worktree_review_head": {
+          "branches": 7,
+          "lines": 22
+        },
+        "write_review_json": {
+          "branches": 9,
+          "lines": 21
+        },
+        "write_review_md": {
+          "branches": 3,
+          "lines": 14
+        }
+      },
+      "lines": 567
+    },
+    "tools/tower_handoff.py": {
+      "functions": {
         "cmd_handoff_accept": {
           "branches": 4,
           "lines": 35
@@ -4341,161 +7277,13 @@
           "branches": 3,
           "lines": 12
         },
-        "cmd_hash": {
-          "branches": 1,
-          "lines": 6
-        },
-        "cmd_init": {
-          "branches": 4,
-          "lines": 35
-        },
-        "cmd_merge": {
-          "branches": 35,
-          "lines": 197
-        },
-        "cmd_merge_check": {
-          "branches": 11,
-          "lines": 72
-        },
-        "cmd_phase": {
-          "branches": 1,
-          "lines": 13
-        },
-        "cmd_post_merge": {
-          "branches": 30,
-          "lines": 171
-        },
-        "cmd_queue_add": {
-          "branches": 5,
-          "lines": 54
-        },
-        "cmd_spec_approve": {
-          "branches": 3,
-          "lines": 10
-        },
-        "cmd_spec_coverage": {
-          "branches": 1,
-          "lines": 7
-        },
-        "cmd_spec_lint": {
-          "branches": 4,
-          "lines": 19
-        },
-        "cmd_startup": {
-          "branches": 8,
-          "lines": 27
-        },
-        "cmd_state_verify": {
-          "branches": 3,
-          "lines": 22
-        },
-        "cmd_status": {
-          "branches": 1,
-          "lines": 11
-        },
-        "cmd_supervision_init": {
-          "branches": 4,
-          "lines": 24
-        },
-        "cmd_supervision_phase": {
-          "branches": 1,
-          "lines": 13
-        },
-        "cmd_supervision_status": {
-          "branches": 2,
-          "lines": 14
-        },
-        "cmd_task_new": {
-          "branches": 9,
-          "lines": 56
-        },
-        "cmd_task_next": {
-          "branches": 0,
-          "lines": 7
-        },
-        "cmd_verify_ledger": {
-          "branches": 3,
-          "lines": 10
-        },
-        "cmd_wiring": {
-          "branches": 10,
-          "lines": 40
-        },
-        "cmd_wiring.add": {
-          "branches": 0,
-          "lines": 2
-        },
-        "command_failure": {
-          "branches": 3,
-          "lines": 4
-        },
-        "completion_events": {
-          "branches": 4,
-          "lines": 15
-        },
-        "completion_paths": {
-          "branches": 5,
-          "lines": 11
-        },
         "current_snapshot": {
           "branches": 23,
           "lines": 63
         },
-        "deliver_scope": {
-          "branches": 21,
-          "lines": 112
-        },
-        "dispatch_base_sha": {
-          "branches": 4,
-          "lines": 20
-        },
-        "dispatch_provenance_field": {
-          "branches": 2,
-          "lines": 13
-        },
-        "emit": {
-          "branches": 0,
-          "lines": 3
-        },
-        "ensure_within": {
-          "branches": 4,
-          "lines": 16
-        },
-        "envelope_checks": {
-          "branches": 20,
-          "lines": 121
-        },
-        "envelope_checks.add": {
-          "branches": 0,
-          "lines": 2
-        },
         "envelope_for_task": {
           "branches": 5,
           "lines": 10
-        },
-        "envelope_has_baselines": {
-          "branches": 1,
-          "lines": 15
-        },
-        "event_hash": {
-          "branches": 0,
-          "lines": 2
-        },
-        "fail": {
-          "branches": 0,
-          "lines": 4
-        },
-        "gh_command": {
-          "branches": 4,
-          "lines": 20
-        },
-        "git": {
-          "branches": 0,
-          "lines": 5
-        },
-        "git_ok": {
-          "branches": 2,
-          "lines": 5
         },
         "handoff_checks": {
           "branches": 16,
@@ -4505,33 +7293,171 @@
           "branches": 0,
           "lines": 2
         },
-        "is_safe_id": {
-          "branches": 2,
-          "lines": 9
+        "match_task_by_evidence": {
+          "branches": 9,
+          "lines": 27
+        }
+      },
+      "lines": 539
+    },
+    "tools/tower_ledger.py": {
+      "functions": {
+        "_acquire_lock_file": {
+          "branches": 10,
+          "lines": 34
         },
-        "jdump": {
+        "_append_ledger_event": {
           "branches": 0,
           "lines": 5
         },
-        "jload": {
+        "_append_ledger_event_locked": {
+          "branches": 4,
+          "lines": 34
+        },
+        "_clear_stale_lock": {
+          "branches": 10,
+          "lines": 29
+        },
+        "_release_lock_file": {
+          "branches": 7,
+          "lines": 18
+        },
+        "activate_task_id": {
+          "branches": 3,
+          "lines": 18
+        },
+        "append_ledger": {
           "branches": 0,
           "lines": 2
         },
-        "last_authority_event": {
+        "append_supervision_ledger": {
+          "branches": 0,
+          "lines": 3
+        },
+        "authority_lock": {
+          "branches": 5,
+          "lines": 26
+        },
+        "canonical_event_bytes": {
+          "branches": 0,
+          "lines": 10
+        },
+        "close_task_id": {
+          "branches": 1,
+          "lines": 11
+        },
+        "cmd_task_ids_init": {
+          "branches": 2,
+          "lines": 12
+        },
+        "cmd_task_ids_reserve": {
           "branches": 4,
+          "lines": 20
+        },
+        "event_hash": {
+          "branches": 0,
+          "lines": 2
+        },
+        "ledger_lock": {
+          "branches": 5,
           "lines": 17
         },
-        "last_authority_required_event": {
+        "ledger_lock_path": {
+          "branches": 0,
+          "lines": 2
+        },
+        "ledger_rows": {
+          "branches": 7,
+          "lines": 22
+        },
+        "legacy_anchor": {
+          "branches": 0,
+          "lines": 3
+        },
+        "load_task_ids": {
+          "branches": 9,
+          "lines": 24
+        },
+        "parse_ledger_row": {
+          "branches": 3,
+          "lines": 7
+        },
+        "prev_hash_for_rows": {
           "branches": 4,
-          "lines": 17
+          "lines": 10
+        },
+        "scan_task_ids": {
+          "branches": 4,
+          "lines": 20
+        },
+        "spec_registry_errors": {
+          "branches": 8,
+          "lines": 20
+        },
+        "task_dir": {
+          "branches": 0,
+          "lines": 2
+        },
+        "task_id_base": {
+          "branches": 0,
+          "lines": 3
+        },
+        "task_id_dir_status": {
+          "branches": 2,
+          "lines": 5
+        },
+        "task_id_entry": {
+          "branches": 2,
+          "lines": 10
+        },
+        "task_id_record": {
+          "branches": 4,
+          "lines": 10
+        },
+        "task_id_spec_path": {
+          "branches": 3,
+          "lines": 7
+        },
+        "task_id_title": {
+          "branches": 7,
+          "lines": 14
+        },
+        "task_id_view": {
+          "branches": 1,
+          "lines": 10
+        },
+        "task_ids_lock": {
+          "branches": 5,
+          "lines": 21
+        },
+        "task_ids_save": {
+          "branches": 2,
+          "lines": 8
+        }
+      },
+      "lines": 560
+    },
+    "tools/tower_ledger_replay.py": {
+      "functions": {
+        "_fold_envelope_state": {
+          "branches": 3,
+          "lines": 18
+        },
+        "_illegal_transition": {
+          "branches": 0,
+          "lines": 6
+        },
+        "_sorted_states": {
+          "branches": 1,
+          "lines": 3
+        },
+        "cmd_verify_ledger": {
+          "branches": 3,
+          "lines": 10
         },
         "ledger_break_phrase": {
           "branches": 1,
           "lines": 4
-        },
-        "ledger_empty_guard": {
-          "branches": 3,
-          "lines": 34
         },
         "ledger_events_in_seq_order": {
           "branches": 4,
@@ -4549,97 +7475,13 @@
           "branches": 0,
           "lines": 8
         },
-        "ledger_has_task_event": {
-          "branches": 8,
-          "lines": 14
-        },
-        "ledger_lock": {
+        "ledger_payloads_by_task": {
           "branches": 5,
-          "lines": 17
-        },
-        "ledger_lock_path": {
-          "branches": 0,
-          "lines": 2
+          "lines": 18
         },
         "ledger_precondition_breaks": {
           "branches": 2,
           "lines": 17
-        },
-        "ledger_rows": {
-          "branches": 7,
-          "lines": 22
-        },
-        "legacy_anchor": {
-          "branches": 0,
-          "lines": 3
-        },
-        "load_board": {
-          "branches": 1,
-          "lines": 5
-        },
-        "load_profile": {
-          "branches": 3,
-          "lines": 8
-        },
-        "load_queue": {
-          "branches": 1,
-          "lines": 5
-        },
-        "load_record": {
-          "branches": 1,
-          "lines": 5
-        },
-        "load_supervision": {
-          "branches": 1,
-          "lines": 5
-        },
-        "main": {
-          "branches": 3,
-          "lines": 34
-        },
-        "match_task_by_evidence": {
-          "branches": 9,
-          "lines": 27
-        },
-        "max_verified_tower_tests": {
-          "branches": 8,
-          "lines": 26
-        },
-        "next_authority_revision": {
-          "branches": 7,
-          "lines": 18
-        },
-        "now": {
-          "branches": 0,
-          "lines": 2
-        },
-        "parse_created_pr": {
-          "branches": 3,
-          "lines": 15
-        },
-        "parse_ledger_row": {
-          "branches": 3,
-          "lines": 7
-        },
-        "parse_test_count": {
-          "branches": 3,
-          "lines": 7
-        },
-        "pr_fast_forward": {
-          "branches": 1,
-          "lines": 7
-        },
-        "pr_remote_merge": {
-          "branches": 17,
-          "lines": 69
-        },
-        "prev_hash_for_rows": {
-          "branches": 4,
-          "lines": 10
-        },
-        "rel": {
-          "branches": 2,
-          "lines": 5
         },
         "replay_envelope_statuses": {
           "branches": 11,
@@ -4649,9 +7491,91 @@
           "branches": 10,
           "lines": 37
         },
-        "repo_relative": {
-          "branches": 2,
+        "supervision_artifacts": {
+          "branches": 10,
+          "lines": 31
+        },
+        "supervision_ledger_event_count": {
+          "branches": 3,
+          "lines": 16
+        },
+        "verify_ledger_file": {
+          "branches": 14,
+          "lines": 64
+        }
+      },
+      "lines": 426
+    },
+    "tools/tower_lookup.py": {
+      "functions": {
+        "cmd_check": {
+          "branches": 35,
+          "lines": 73
+        },
+        "cmd_hash": {
+          "branches": 1,
           "lines": 6
+        },
+        "cmd_where": {
+          "branches": 4,
+          "lines": 12
+        },
+        "position_delivery": {
+          "branches": 7,
+          "lines": 15
+        },
+        "position_human_lines": {
+          "branches": 3,
+          "lines": 13
+        },
+        "position_risk": {
+          "branches": 3,
+          "lines": 9
+        },
+        "position_spec_title": {
+          "branches": 3,
+          "lines": 7
+        }
+      },
+      "lines": 164
+    },
+    "tools/tower_merge.py": {
+      "functions": {
+        "block_pr_merge": {
+          "branches": 0,
+          "lines": 17
+        },
+        "checks_timeout_detail": {
+          "branches": 1,
+          "lines": 4
+        },
+        "cmd_merge": {
+          "branches": 35,
+          "lines": 197
+        },
+        "cmd_merge_check": {
+          "branches": 11,
+          "lines": 72
+        },
+        "expected_merge_head": {
+          "branches": 1,
+          "lines": 4
+        },
+        "merge_queue_errors": {
+          "branches": 2,
+          "lines": 18
+        },
+        "parse_created_pr": {
+          "branches": 3,
+          "lines": 15
+        },
+        "pr_fast_forward": {
+          "branches": 1,
+          "lines": 7
+        },
+        "pr_remote_merge": {
+          "branches": 17,
+          "lines": 69
         },
         "require_gh_auth": {
           "branches": 7,
@@ -4661,13 +7585,175 @@
           "branches": 1,
           "lines": 6
         },
-        "resolve_input": {
-          "branches": 2,
-          "lines": 6
+        "run_gh": {
+          "branches": 4,
+          "lines": 19
         },
-        "resolve_input_within": {
+        "wait_for_checks": {
+          "branches": 9,
+          "lines": 34
+        },
+        "write_task_merge_record": {
+          "branches": 7,
+          "lines": 33
+        }
+      },
+      "lines": 574
+    },
+    "tools/tower_post_merge.py": {
+      "functions": {
+        "accept_card": {
+          "branches": 6,
+          "lines": 26
+        },
+        "acceptance_gate_errors": {
+          "branches": 11,
+          "lines": 24
+        },
+        "acceptance_item_errors": {
+          "branches": 10,
+          "lines": 23
+        },
+        "acceptance_legacy_ok": {
+          "branches": 2,
+          "lines": 9
+        },
+        "cmd_accept": {
+          "branches": 5,
+          "lines": 21
+        },
+        "cmd_acceptance_add": {
+          "branches": 10,
+          "lines": 26
+        },
+        "cmd_close": {
+          "branches": 4,
+          "lines": 34
+        },
+        "cmd_phase": {
           "branches": 1,
-          "lines": 5
+          "lines": 13
+        },
+        "cmd_post_merge": {
+          "branches": 30,
+          "lines": 171
+        },
+        "cmd_status": {
+          "branches": 1,
+          "lines": 11
+        },
+        "cmd_supervision_init": {
+          "branches": 4,
+          "lines": 24
+        },
+        "cmd_supervision_phase": {
+          "branches": 1,
+          "lines": 13
+        },
+        "cmd_supervision_status": {
+          "branches": 2,
+          "lines": 14
+        },
+        "cmd_task_next": {
+          "branches": 0,
+          "lines": 7
+        },
+        "load_acceptance": {
+          "branches": 6,
+          "lines": 16
+        },
+        "max_verified_tower_tests": {
+          "branches": 8,
+          "lines": 26
+        },
+        "parse_test_count": {
+          "branches": 3,
+          "lines": 7
+        },
+        "run_test_suite": {
+          "branches": 0,
+          "lines": 13
+        },
+        "valid_baseline": {
+          "branches": 1,
+          "lines": 3
+        },
+        "wiring_checks": {
+          "branches": 2,
+          "lines": 17
+        }
+      },
+      "lines": 552
+    },
+    "tools/tower_profile.py": {
+      "functions": {
+        "_profile_base": {
+          "branches": 4,
+          "lines": 16
+        },
+        "_profile_worktree_matches_task": {
+          "branches": 4,
+          "lines": 10
+        },
+        "cmd_profile_check": {
+          "branches": 5,
+          "lines": 22
+        },
+        "load_profile": {
+          "branches": 3,
+          "lines": 8
+        },
+        "profile_cells": {
+          "branches": 0,
+          "lines": 3
+        },
+        "profile_document_findings": {
+          "branches": 5,
+          "lines": 13
+        },
+        "profile_execute": {
+          "branches": 4,
+          "lines": 12
+        },
+        "profile_expect": {
+          "branches": 3,
+          "lines": 9
+        },
+        "profile_finding": {
+          "branches": 0,
+          "lines": 2
+        },
+        "profile_front_matter": {
+          "branches": 9,
+          "lines": 19
+        },
+        "profile_load": {
+          "branches": 2,
+          "lines": 8
+        },
+        "profile_meta_findings": {
+          "branches": 6,
+          "lines": 17
+        },
+        "profile_meta_value": {
+          "branches": 0,
+          "lines": 3
+        },
+        "profile_row_findings": {
+          "branches": 7,
+          "lines": 21
+        },
+        "profile_run_probe": {
+          "branches": 3,
+          "lines": 12
+        },
+        "profile_select": {
+          "branches": 5,
+          "lines": 12
+        },
+        "profile_table_rows": {
+          "branches": 5,
+          "lines": 18
         },
         "resolve_pilot_paths": {
           "branches": 13,
@@ -4676,46 +7762,112 @@
         "resolve_pilot_paths.join": {
           "branches": 2,
           "lines": 5
+        }
+      },
+      "lines": 327
+    },
+    "tools/tower_shape.py": {
+      "functions": {
+        "cmd_shape_check": {
+          "branches": 3,
+          "lines": 23
         },
-        "resolve_repository": {
+        "load_shape_baseline": {
+          "branches": 5,
+          "lines": 11
+        },
+        "shape_branch_count": {
+          "branches": 0,
+          "lines": 3
+        },
+        "shape_collect_functions": {
+          "branches": 3,
+          "lines": 13
+        },
+        "shape_debt_errors": {
+          "branches": 3,
+          "lines": 9
+        },
+        "shape_duplicate_errors": {
           "branches": 2,
           "lines": 5
         },
-        "run_gh": {
+        "shape_duplicate_windows": {
+          "branches": 2,
+          "lines": 13
+        },
+        "shape_file_errors": {
+          "branches": 10,
+          "lines": 27
+        },
+        "shape_function_stats": {
+          "branches": 0,
+          "lines": 10
+        },
+        "shape_import_bindings": {
+          "branches": 9,
+          "lines": 15
+        },
+        "shape_py_files": {
+          "branches": 4,
+          "lines": 8
+        },
+        "shape_scan": {
+          "branches": 5,
+          "lines": 24
+        },
+        "shape_unique_name": {
+          "branches": 1,
+          "lines": 8
+        },
+        "shape_unused_import_errors": {
+          "branches": 4,
+          "lines": 9
+        },
+        "shape_unused_imports": {
+          "branches": 5,
+          "lines": 13
+        },
+        "shape_used_names": {
+          "branches": 6,
+          "lines": 11
+        },
+        "write_shape_baseline": {
+          "branches": 0,
+          "lines": 8
+        }
+      },
+      "lines": 277
+    },
+    "tools/tower_state_verify.py": {
+      "functions": {
+        "_completion_drift": {
+          "branches": 19,
+          "lines": 79
+        },
+        "_completion_mismatch_drift": {
+          "branches": 8,
+          "lines": 33
+        },
+        "_evidence_entry_drift": {
+          "branches": 21,
+          "lines": 94
+        },
+        "_record_layer_drift": {
+          "branches": 0,
+          "lines": 6
+        },
+        "_skipped_completion_drift": {
           "branches": 4,
           "lines": 19
         },
-        "run_test_suite": {
-          "branches": 0,
-          "lines": 13
+        "_spec_drift": {
+          "branches": 17,
+          "lines": 45
         },
-        "save_board": {
-          "branches": 0,
-          "lines": 3
-        },
-        "save_queue": {
-          "branches": 0,
-          "lines": 3
-        },
-        "save_record": {
-          "branches": 0,
-          "lines": 3
-        },
-        "select_envelope": {
+        "cmd_state_verify": {
           "branches": 3,
-          "lines": 12
-        },
-        "select_task": {
-          "branches": 4,
-          "lines": 16
-        },
-        "sha256_file": {
-          "branches": 1,
-          "lines": 6
-        },
-        "spec_gate_errors": {
-          "branches": 4,
-          "lines": 29
+          "lines": 22
         },
         "state_verify_drift": {
           "branches": 49,
@@ -4724,30 +7876,280 @@
         "state_verify_drift.skip": {
           "branches": 0,
           "lines": 2
+        }
+      },
+      "lines": 522
+    },
+    "tools/tower_status.py": {
+      "functions": {
+        "brief_blocked_lines": {
+          "branches": 1,
+          "lines": 4
         },
-        "status_path": {
+        "brief_campaign_lines": {
+          "branches": 2,
+          "lines": 7
+        },
+        "brief_cap": {
+          "branches": 1,
+          "lines": 5
+        },
+        "brief_constraint_lines": {
+          "branches": 3,
+          "lines": 7
+        },
+        "brief_markdown": {
+          "branches": 1,
+          "lines": 17
+        },
+        "brief_next_lines": {
+          "branches": 5,
+          "lines": 12
+        },
+        "brief_pending_lines": {
+          "branches": 3,
+          "lines": 10
+        },
+        "brief_record_lines": {
+          "branches": 1,
+          "lines": 4
+        },
+        "brief_strategy_lines": {
+          "branches": 4,
+          "lines": 9
+        },
+        "brief_wip_lines": {
+          "branches": 1,
+          "lines": 4
+        },
+        "cmd_brief": {
+          "branches": 0,
+          "lines": 3
+        },
+        "cmd_status_archive": {
+          "branches": 1,
+          "lines": 6
+        },
+        "cmd_status_index": {
+          "branches": 0,
+          "lines": 7
+        },
+        "cmd_status_rollup": {
+          "branches": 0,
+          "lines": 9
+        },
+        "cmd_status_snapshot": {
+          "branches": 2,
+          "lines": 12
+        },
+        "read_current_state": {
           "branches": 2,
           "lines": 6
         },
-        "supervision_artifacts": {
-          "branches": 10,
-          "lines": 31
+        "status_append": {
+          "branches": 3,
+          "lines": 11
         },
-        "supervision_ledger_event_count": {
+        "status_archive": {
+          "branches": 4,
+          "lines": 22
+        },
+        "status_archive_line": {
+          "branches": 1,
+          "lines": 7
+        },
+        "status_base_figures": {
           "branches": 3,
           "lines": 16
         },
-        "task_dir": {
+        "status_blocked_count": {
+          "branches": 3,
+          "lines": 7
+        },
+        "status_blocks": {
+          "branches": 3,
+          "lines": 9
+        },
+        "status_campaign_rollup": {
+          "branches": 2,
+          "lines": 9
+        },
+        "status_campaign_value": {
+          "branches": 4,
+          "lines": 6
+        },
+        "status_day_entries": {
+          "branches": 2,
+          "lines": 8
+        },
+        "status_day_file": {
           "branches": 0,
+          "lines": 3
+        },
+        "status_dir_path": {
+          "branches": 0,
+          "lines": 3
+        },
+        "status_entry": {
+          "branches": 4,
+          "lines": 12
+        },
+        "status_entry_base_lines": {
+          "branches": 3,
+          "lines": 15
+        },
+        "status_entry_lines": {
+          "branches": 0,
+          "lines": 6
+        },
+        "status_figures": {
+          "branches": 0,
+          "lines": 3
+        },
+        "status_index_payload": {
+          "branches": 3,
+          "lines": 19
+        },
+        "status_moment": {
+          "branches": 3,
+          "lines": 8
+        },
+        "status_quarter": {
+          "branches": 0,
+          "lines": 3
+        },
+        "status_rollup_lines": {
+          "branches": 3,
+          "lines": 18
+        },
+        "status_snapshot_files": {
+          "branches": 2,
+          "lines": 7
+        },
+        "status_week_entries": {
+          "branches": 2,
+          "lines": 10
+        },
+        "status_wip_span": {
+          "branches": 3,
+          "lines": 6
+        },
+        "status_write_json": {
+          "branches": 0,
+          "lines": 5
+        },
+        "week_bounds": {
+          "branches": 4,
+          "lines": 10
+        }
+      },
+      "lines": 467
+    },
+    "tools/tower_task.py": {
+      "functions": {
+        "_latest_by": {
+          "branches": 4,
+          "lines": 13
+        },
+        "_latest_by.sort_key": {
+          "branches": 3,
+          "lines": 6
+        },
+        "_load_optional_record": {
+          "branches": 1,
           "lines": 2
+        },
+        "_optional_task_record": {
+          "branches": 5,
+          "lines": 16
+        },
+        "acceptance_json_path": {
+          "branches": 0,
+          "lines": 3
+        },
+        "acceptance_md_path": {
+          "branches": 0,
+          "lines": 3
+        },
+        "acceptance_row": {
+          "branches": 1,
+          "lines": 4
+        },
+        "canonical_task_dir": {
+          "branches": 1,
+          "lines": 8
+        },
+        "cmd_spec_approve": {
+          "branches": 3,
+          "lines": 10
+        },
+        "cmd_task_new": {
+          "branches": 9,
+          "lines": 56
+        },
+        "dependency_status_text": {
+          "branches": 2,
+          "lines": 5
+        },
+        "dependency_target_status": {
+          "branches": 10,
+          "lines": 19
+        },
+        "depends_on_structure_errors": {
+          "branches": 7,
+          "lines": 27
+        },
+        "ledger_has_task_event": {
+          "branches": 8,
+          "lines": 14
+        },
+        "load_board": {
+          "branches": 1,
+          "lines": 5
+        },
+        "load_record": {
+          "branches": 1,
+          "lines": 5
+        },
+        "read_task_records": {
+          "branches": 4,
+          "lines": 15
+        },
+        "render_acceptance_md": {
+          "branches": 0,
+          "lines": 6
+        },
+        "resolve_input": {
+          "branches": 2,
+          "lines": 6
+        },
+        "save_board": {
+          "branches": 0,
+          "lines": 3
+        },
+        "save_record": {
+          "branches": 0,
+          "lines": 3
+        },
+        "select_task": {
+          "branches": 4,
+          "lines": 16
+        },
+        "spec_gate_errors": {
+          "branches": 4,
+          "lines": 29
+        },
+        "task_new_card": {
+          "branches": 8,
+          "lines": 30
+        },
+        "task_new_errors": {
+          "branches": 6,
+          "lines": 20
         },
         "task_record_path": {
           "branches": 0,
           "lines": 2
-        },
-        "tool_owned_paths": {
-          "branches": 2,
-          "lines": 8
         },
         "update_board": {
           "branches": 1,
@@ -4757,24 +8159,50 @@
           "branches": 10,
           "lines": 20
         },
-        "verify_ledger_file": {
-          "branches": 14,
-          "lines": 64
+        "write_acceptance": {
+          "branches": 0,
+          "lines": 6
         },
-        "wait_for_checks": {
-          "branches": 9,
-          "lines": 34
+        "write_default_acceptance": {
+          "branches": 0,
+          "lines": 5
         },
-        "working_tree_state": {
-          "branches": 6,
-          "lines": 23
-        },
-        "write_task_merge_record": {
-          "branches": 7,
+        "write_task_card": {
+          "branches": 0,
           "lines": 33
         }
       },
-      "lines": 5642
+      "lines": 460
+    },
+    "tools/tower_views.py": {
+      "functions": {
+        "cmd_init": {
+          "branches": 4,
+          "lines": 35
+        },
+        "cmd_startup": {
+          "branches": 8,
+          "lines": 27
+        },
+        "cmd_wiring": {
+          "branches": 10,
+          "lines": 40
+        },
+        "cmd_wiring.add": {
+          "branches": 0,
+          "lines": 2
+        }
+      },
+      "lines": 118
+    },
+    "tools/towerctl.py": {
+      "functions": {
+        "_FacadeModule.__setattr__": {
+          "branches": 1,
+          "lines": 4
+        }
+      },
+      "lines": 246
     }
   },
   "schema": "tower/shape-baseline@1",
