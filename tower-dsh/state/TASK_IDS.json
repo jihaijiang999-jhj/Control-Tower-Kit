@@ -385,6 +385,13 @@
       "spec_path": "pilot/PILOT-055.spec.json",
       "created_at": "2026-11-01T03:10:02+08:00",
       "updated_at": "2026-11-01T03:36:28+08:00"
+    },
+    "PILOT-056": {
+      "title": "towerctl modularization (23 modules)",
+      "status": "reserved",
+      "spec_path": "pilot/PILOT-056.spec.json",
+      "created_at": "2026-11-01T16:47:50+08:00",
+      "updated_at": "2026-11-01T16:47:50+08:00"
     }
   }
 }
