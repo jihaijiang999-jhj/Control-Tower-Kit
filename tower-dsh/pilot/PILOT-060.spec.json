@@ -1,0 +1,42 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-060",
+  "title": "信封 MERGE_START 允许 MERGING 重试",
+  "objective": {
+    "problem": "056 本地 merge 在写 MERGE_START 后因工作树脏失败；重试又从 MERGING 写 MERGE_START，旧转移表只允许 WAITING/CORRECTION_REQUIRED，state-verify 报 illegal_transition。与 055 双 DISPATCH 同类。",
+    "outcome": "ENVELOPE_TRANSITIONS['MERGE_START'] 增加 MERGING；重试/部分失败后的 merge 合法；056 的重复 MERGE_START 变为合法，state-verify 0；其它信封转移不变。",
+    "approach": "在 tower_ledger_replay 的 ENVELOPE_TRANSITIONS 加 MERGING；补 test_envelope_retry 覆盖 WAITING→MERGING→MERGING 合法、其它源仍拒；真实塔 056 drift 归零。",
+    "non_goals_and_done": "不放宽 MERGE/QUEUE_ADD/ENVELOPE_NEW；不改 merge 前置；683+ tests 全绿、056 state-verify 0 才完成。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0005 / 056 merge retry",
+  "why_now": "056 已本地 merge 但 state-verify 红；不修则 post-merge 无法通过，整个塔 drift 非 0。",
+  "scope": [
+    "tools/tower_ledger_replay.py：ENVELOPE_TRANSITIONS['MERGE_START'] 加 'MERGING'（仅重试语义）",
+    "新增 tools/tests/test_envelope_retry.py：WAITING→MERGING→MERGING 合法；CORRECTION→MERGING 合法；DRAFT/MERGED 仍拒；重复 MERGE_START 不报 illegal_transition",
+    "真实塔 056 的 state-verify drift 归零；其它信封事件不变",
+    "不改 merge/queue/envelope-new 行为；不放宽其它转移"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-060/tower-dsh/tools/tower_ledger_replay.py",
+    "pilot/worktrees/PILOT-060/tower-dsh/tools/tests/test_envelope_retry.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "allowing MERGE_START from DRAFT/MERGED/POST_MERGE_VERIFIED",
+    "weakening other envelope transitions"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-060/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 683 + 新增用例数（main 基线 683）",
+    "MERGE_START 源状态 = {WAITING, CORRECTION_REQUIRED, MERGING}；DRAFT/MERGED/POST_MERGE_VERIFIED 仍拒",
+    "真实塔 state-verify 0（056 的重复 MERGE_START 合法），59/59；profile 11/0；arch gates 18",
+    "其它 055 re-dispatch/058 review/059 acceptance 测试不回归",
+    "git -C pilot/worktrees/PILOT-060 diff --name-only main..HEAD 恰 2 个 allowed_paths"
+  ],
+  "depends_on": ["PILOT-056"],
+  "worktree": "pilot/worktrees/PILOT-060"
+}
