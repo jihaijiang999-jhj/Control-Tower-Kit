@@ -462,6 +462,267 @@ def update_board(root: Path, record: dict) -> None:
     save_board(root, board)
 
 
+# ---------------------------------------------------------------------------
+# PILOT-057: task id registry (an id is never reused)
+# ---------------------------------------------------------------------------
+# ``state/TASK_IDS.json`` records every id this tower ever handed out: the card
+# may be archived, voided or gone, the id still belongs to the registry.
+# ``task-new`` refuses any registered id before it writes anything, so the
+# 043/055 reuse (stale TASK_NEW left in the ledger, CI record_missing, a second
+# DISPATCH that is an illegal transition) cannot recur.
+TASK_IDS_SCHEMA = "tower/task-ids@1"
+TASK_IDS_REL = "state/TASK_IDS.json"
+TASK_IDS_LOCK_FILE = "state/.task-ids.lock"
+TASK_ID_STATUSES = ("reserved", "active", "closed", "void")
+TASK_ID_VOID_RE = re.compile(r"-VOID\d*$")
+
+
+@contextmanager
+def task_ids_lock(root: Path, timeout: float | None = None,
+                  stale_after: float | None = None):
+    """Single-writer lock around the registry read/modify/write section.
+
+    Same primitive as :func:`authority_lock`: ``jdump`` keeps the write itself
+    atomic, so only the read-then-write window needs the lock.  The lock file is
+    created under ``state/`` and released in ``finally`` even when a gate fails.
+    """
+    path = root / TASK_IDS_LOCK_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    limit = LEDGER_LOCK_TIMEOUT if timeout is None else timeout
+    stale = LEDGER_LOCK_STALE_AFTER if stale_after is None else stale_after
+    _acquire_lock_file(path, limit, stale)
+    try:
+        identity = path.stat()
+    except OSError:
+        identity = None
+    try:
+        yield path
+    finally:
+        _release_lock_file(path, identity)
+
+
+def task_id_base(name: str) -> str:
+    """The id a task directory owns (``PILOT-055-VOID2`` -> ``PILOT-055``)."""
+    return TASK_ID_VOID_RE.sub("", name)
+
+
+def task_id_dir_status(name: str, record: dict) -> str:
+    """Registry status for one directory: closed, then void, else active."""
+    if record.get("status") == "closed":
+        return "closed"
+    return "void" if "-VOID" in name else "active"
+
+
+def task_id_record(tdir: Path) -> dict:
+    """The directory's record, or ``{}`` when it is absent/unreadable."""
+    path = tdir / "record.json"
+    if not path.is_file():
+        return {}
+    try:
+        record = jload(path)
+    except (OSError, ValueError):
+        return {}
+    return record if isinstance(record, dict) else {}
+
+
+def task_id_spec_path(root: Path, tid: str, record: dict) -> str | None:
+    """The recorded spec path, else ``pilot/<id>.spec.json`` when it exists."""
+    recorded = record.get("spec_path")
+    if isinstance(recorded, str) and recorded:
+        return recorded
+    candidate = root / "pilot" / f"{tid}.spec.json"
+    return rel(root, candidate) if candidate.is_file() else None
+
+
+def task_id_title(root: Path, tid: str, record: dict) -> str:
+    """The card/spec title recorded for an id, falling back to the id itself."""
+    title = record.get("title")
+    if isinstance(title, str) and title.strip():
+        return title
+    spec_path = task_id_spec_path(root, tid, record)
+    if spec_path:
+        try:
+            spec = jload(root / spec_path)
+        except (OSError, ValueError):
+            spec = None
+        if isinstance(spec, dict) and isinstance(spec.get("title"), str):
+            return spec["title"]
+    return tid
+
+
+def task_id_entry(root: Path, tid: str, record: dict, status: str) -> dict:
+    """One registry entry; card timestamps are kept, ``now`` fills the gaps."""
+    stamp = now()
+    return {
+        "title": task_id_title(root, tid, record),
+        "status": status,
+        "spec_path": task_id_spec_path(root, tid, record),
+        "created_at": record.get("created_at") or stamp,
+        "updated_at": record.get("updated_at") or stamp,
+    }
+
+
+def scan_task_ids(root: Path) -> dict[str, dict]:
+    """Every id already present under ``tasks/`` (``-VOID`` dirs included).
+
+    Directories are walked in sorted order and the first directory for an id
+    wins, so the canonical ``PILOT-NNN`` card (which sorts before its
+    ``-VOID``/``-VOID2`` tombstones) decides the recorded status.  The result is
+    sorted by id, which makes repeated ``task-ids-init`` runs byte-stable.
+    """
+    entries: dict[str, dict] = {}
+    tasks = root / "tasks"
+    if not tasks.is_dir():
+        return entries
+    for tdir in sorted(path for path in tasks.iterdir() if path.is_dir()):
+        tid = task_id_base(tdir.name)
+        if tid in entries or not is_safe_id(tid, TASK_ID_RE):
+            continue
+        record = task_id_record(tdir)
+        entries[tid] = task_id_entry(
+            root, tid, record, task_id_dir_status(tdir.name, record))
+    return dict(sorted(entries.items()))
+
+
+def load_task_ids(root: Path) -> dict[str, dict] | None:
+    """The registry entries, ``None`` when absent, exit 2 when malformed."""
+    path = root / TASK_IDS_REL
+    if not path.is_file():
+        return None
+    try:
+        data = jload(path)
+    except (OSError, ValueError) as exc:
+        fail([f"task id registry unreadable: {TASK_IDS_REL}: {exc}"])
+    if not isinstance(data, dict) or data.get("schema") != TASK_IDS_SCHEMA:
+        fail([f"task id registry must be a {TASK_IDS_SCHEMA} object: "
+              f"{TASK_IDS_REL}"])
+    entries = data.get("ids")
+    if not isinstance(entries, dict):
+        fail([f"task id registry ids must be an object: {TASK_IDS_REL}"])
+    ids: dict[str, dict] = {}
+    for tid, entry in entries.items():
+        if not isinstance(entry, dict):
+            fail([f"task id registry entry {tid} must be an object"])
+        if entry.get("status") not in TASK_ID_STATUSES:
+            fail([f"task id registry entry {tid} has invalid status "
+                  f"{entry.get('status')!r}"])
+        ids[str(tid)] = entry
+    return ids
+
+
+def task_id_view(root: Path) -> dict[str, dict]:
+    """The registry, or an in-memory scan while it does not exist yet.
+
+    Legacy fixtures and pre-PILOT-057 towers have cards but no registry; they
+    must keep working, so a missing registry is read as "whatever ``tasks/``
+    proves" instead of failing.  This function never writes: ``task-new``
+    bootstraps on its own successful write, ``check`` only reads.
+    """
+    entries = load_task_ids(root)
+    return scan_task_ids(root) if entries is None else entries
+
+
+def task_ids_save(root: Path, ids: dict[str, dict], failure: str) -> None:
+    """Write the sorted registry atomically or exit 2 naming what was kept."""
+    try:
+        jdump(root / TASK_IDS_REL,
+              {"schema": TASK_IDS_SCHEMA, "ids": dict(sorted(ids.items()))})
+    except OSError as exc:
+        fail([f"{failure}: {exc}",
+              f"{TASK_IDS_REL} is unchanged; run task-ids-init to repair it"])
+
+
+def activate_task_id(root: Path, record: dict, base: dict[str, dict]) -> None:
+    """Register a card that was just written as ``active`` (bootstraps too).
+
+    ``base`` is the registry view taken *before* the card existed: a missing
+    registry must be seeded from that view, because re-scanning after the write
+    would find this very card and refuse it as a duplicate.
+    """
+    tid = str(record["id"])
+    with task_ids_lock(root):
+        ids = load_task_ids(root)
+        if ids is None:
+            ids = dict(base)
+        if tid in ids:
+            fail([f"task id already registered: {tid} "
+                  f"(status {ids[tid].get('status')})"])
+        ids[tid] = task_id_entry(root, tid, record, "active")
+        task_ids_save(root, ids, f"task card written but id {tid} was not "
+                                 "registered")
+
+
+def close_task_id(root: Path, record: dict) -> None:
+    """Mark the closed card's id ``closed``; the entry is never removed."""
+    tid = str(record["id"])
+    with task_ids_lock(root):
+        ids = task_id_view(root)
+        entry = ids.get(tid) or task_id_entry(root, tid, record, "closed")
+        entry["status"] = "closed"
+        entry["updated_at"] = now()
+        ids[tid] = entry
+        task_ids_save(root, ids, f"task {tid} is closed but its id registry "
+                                 "entry was not updated")
+
+
+def spec_registry_errors(root: Path, record: dict) -> list[str]:
+    """``check --phase spec``: the id must be registered under the same title."""
+    tid = str(record.get("id") or "")
+    entry = task_id_view(root).get(tid)
+    if entry is None:
+        return [f"task id not registered: {tid}; run task-ids-init to backfill "
+                f"{TASK_IDS_REL}"]
+    expected = record.get("title")
+    spec_path = record.get("spec_path")
+    if spec_path:
+        try:
+            spec = jload(root / spec_path)
+        except (OSError, ValueError):
+            spec = None
+        if isinstance(spec, dict) and isinstance(spec.get("title"), str):
+            expected = spec["title"]
+    if entry.get("title") != expected:
+        return [f"task id registry title mismatch for {tid}: registry "
+                f"{entry.get('title')!r} != spec {expected!r}"]
+    return []
+
+
+def cmd_task_ids_init(root: Path, args) -> None:
+    """Backfill the registry from ``tasks/``; existing entries are never edited."""
+    scanned = scan_task_ids(root)
+    with task_ids_lock(root):
+        ids = load_task_ids(root) or {}
+        added = [tid for tid in scanned if tid not in ids]
+        for tid in added:
+            ids[tid] = scanned[tid]
+        task_ids_save(root, ids, "cannot write the task id registry")
+        total = len(ids)
+    emit({"ok": True, "registry": TASK_IDS_REL, "scanned": len(scanned),
+          "added": len(added), "ids": total})
+
+
+def cmd_task_ids_reserve(root: Path, args) -> None:
+    """Reserve an id for a draft with no card yet (any existing id exits 2)."""
+    tid = check_task_id(args.id)
+    title = (args.title or "").strip()
+    if not title:
+        fail(["--title must be a non-empty string"])
+    spec_path = (rel(root, resolve_input_within(root, args.spec, "spec"))
+                 if args.spec else None)
+    with task_ids_lock(root):
+        ids = task_id_view(root)
+        if tid in ids:
+            fail([f"task id already registered: {tid} "
+                  f"(status {ids[tid].get('status')})"])
+        stamp = now()
+        ids[tid] = {"title": title, "status": "reserved",
+                    "spec_path": spec_path, "created_at": stamp,
+                    "updated_at": stamp}
+        task_ids_save(root, ids, f"cannot reserve {tid}")
+    emit({"ok": True, "task": tid, "status": "reserved",
+          "registry": TASK_IDS_REL})
+
+
 def resolve_input(root: Path, value: str) -> Path:
     p = Path(value)
     if p.is_absolute():
@@ -2080,7 +2341,12 @@ def cmd_task_new(root: Path, args) -> None:
     tdir = task_dir(root, tid)
     if tdir.exists():
         fail([f"task already exists: {tid}"])
-    write_task_card(root, tid, spec, spec_path)
+    view = task_id_view(root)
+    if tid in view:
+        fail([f"task id already registered: {tid} "
+              f"(status {view[tid].get('status')})"])
+    record = write_task_card(root, tid, spec, spec_path)
+    activate_task_id(root, record, view)
     emit({"ok": True, "task": tid,
           "record": rel(root, tdir / "record.json"),
           "task_md": rel(root, tdir / "TASK.md")})
@@ -2121,10 +2387,8 @@ def cmd_check(root: Path, args) -> None:
     if phase == "spec":
         spec_path = rec.get("spec_path")
         if not spec_path:
-            errors.append(
-                "task card has no spec_path; legacy task cards are no longer exempt "
-                "from the spec gate, rebuild the card from a spec"
-            )
+            errors.append("task card has no spec_path; legacy task cards are no "
+                          "longer exempt from the spec gate, rebuild from a spec")
         else:
             full = root / spec_path
             if not full.exists():
@@ -2134,6 +2398,7 @@ def cmd_check(root: Path, args) -> None:
                     errors.append("spec file changed since task-new; rebuild the task card instead of editing in place")
                 else:
                     errors += validate_spec(jload(full))
+        errors += spec_registry_errors(root, rec)
         if not ledger_has_task_event(root, "SPEC_APPROVED", args.task):
             errors.append("SPEC_APPROVED ledger event missing; run spec-approve first")
         if not errors and rec.get("spec_gate") != "PASS":
@@ -3369,8 +3634,8 @@ def cmd_close(root: Path, args) -> None:
     rec["next"] = next_text
     save_record(root, rec)
     update_board(root, rec)
-    append_ledger(root, "CLOSEOUT", "primary",
-                  {"task": args.task, "closeout": rel(root, closeout)})
+    append_ledger(root, "CLOSEOUT", "primary", {"task": args.task, "closeout": rel(root, closeout)})
+    close_task_id(root, rec)
     emit(with_position(root, {"ok": True, "task": args.task, "status": rec["status"],
           "closeout": rel(root, closeout)}))
 
@@ -8612,6 +8877,10 @@ COMMAND_LAYER_HANDLERS = {
     "where": cmd_where, "arch-check": cmd_arch_check,
     "arch-graph": cmd_arch_graph, "profile-check": cmd_profile_check}
 
+# PILOT-057 registry commands keep their own handler table for the same reason.
+TASK_IDS_HANDLERS = {"task-ids-init": cmd_task_ids_init,
+                     "task-ids-reserve": cmd_task_ids_reserve}
+
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -8804,6 +9073,24 @@ def dispatch_campaign_parser(parser: argparse.ArgumentParser) -> argparse.Argume
     return parser
 
 
+def task_ids_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Register the PILOT-057 id-registry subcommands.
+
+    ``build_parser`` and the PILOT-044/045 command layer keep their frozen
+    shape; this layer owns only its own two subcommands and returns ``parser``
+    so the caller can keep chaining.
+    """
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        action.add_parser("task-ids-init")
+        reserve = action.add_parser("task-ids-reserve")
+        reserve.add_argument("--id", required=True)
+        reserve.add_argument("--title", required=True)
+        reserve.add_argument("--spec", default=None)
+    return parser
+
+
 def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Register the PILOT-045 commands on the parser built by ``build_parser``.
 
@@ -8820,8 +9107,8 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
                         help="treat warnings (W1/W2) as errors")
         action.add_parser("brief")
     dispatch_campaign_parser(parser)
-    return profile_layer_parsers(
-        arch_layer_parsers(position_layer_parsers(status_layer_parsers(parser))))
+    return profile_layer_parsers(arch_layer_parsers(
+        position_layer_parsers(status_layer_parsers(task_ids_layer_parsers(parser)))))
 
 
 def cli_commands() -> list[str]:
@@ -8839,7 +9126,7 @@ def main() -> None:
     root = Path(args.root).resolve()
     if not root.exists():
         fail([f"root not found: {root}"])
-    handlers = {**COMMAND_LAYER_HANDLERS,
+    handlers = {**COMMAND_LAYER_HANDLERS, **TASK_IDS_HANDLERS,
         "init": cmd_init, "wiring": cmd_wiring, "startup": cmd_startup,
         "status": cmd_status, "phase": cmd_phase, "task-new": cmd_task_new, "check": cmd_check,
         "spec-approve": cmd_spec_approve,
