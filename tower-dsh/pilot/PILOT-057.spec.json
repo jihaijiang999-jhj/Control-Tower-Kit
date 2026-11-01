@@ -4,7 +4,7 @@
   "title": "Task ID 注册表：ID 永不复用",
   "objective": {
     "problem": "043/055 复用旧 id 导致旧 TASK_NEW 留在 ledger、worktree/CI record_missing、二次 DISPATCH illegal_transition，最后靠改号绕开。根因是 task-new 只看目录是否存在，不记录“这个号曾经用过”。",
-    "outcome": "state/TASK_IDS.json 注册所有已用/已保留 ID（含 VOID、closed、reserved）；task-new 对任何已注册 ID（哪怕目录已归档或不存在）exit 2 零写入；新建/关闭/保留同步注册表；真实塔 56 个 ID 全部登记。",
+    "outcome": "state/TASK_IDS.json 注册所有已用/保留 ID（reserved/active/closed/void）；task-new 对 active/closed/void 已注册 ID exit 2 零写入，对 reserved 可消费为 active（草稿占号激活）；新建/关闭/保留同步注册表；真实塔 56 个 ID 全部登记。",
     "approach": "新增 tower/task-ids@1 JSON 注册表与 task-ids-init/task-ids-reserve 命令；task-new 在写卡前查注册表，写卡后登记 active；close 置 closed；init 扫描 tasks/PILOT-*（含 -VOID*）去重回填；reserve 用于未建卡的草稿（如 056）。",
     "non_goals_and_done": "不做数据库/ID 服务；不改任务状态机/账本/信封；不回收/重发已用号；注册表与任务卡一致、重复号 exit 2 零写入、638+ tests 全绿才算完成。"
   },
@@ -41,7 +41,7 @@
     "cd pilot/worktrees/PILOT-057/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 638 + 新增用例数（main 基线 638）",
     "task-ids-init 在真实塔写出 55 个 ID；001–055 每个恰一条；043/055 状态为 void/closed；重复运行字节稳定或仅补缺失，不覆盖",
     "task-new 057 成功并登记 active；再用 057、055、043 分别 task-new → exit 2 且 tasks/ / board / ledger 零写入",
-    "task-ids-reserve 056 成功；再 reserve 056 或 task-new 056 → exit 2；close 057 后注册表 status=closed",
+    "task-ids-reserve 056 成功；task-new 056 成功并置 active；再次 task-new 056 拒绝；active/closed/void 仍零写入拒绝；close 057 后注册表 status=closed",
     "check --phase spec 对缺失/标题不一致注册表 exit 2；正常卡 exit 0",
     "真实塔 state-verify drift []；真塔 tasks=56/envelopes=55（057 建卡后），建信封后 56/56",
     "git -C pilot/worktrees/PILOT-057 diff --name-only main..HEAD 恰 3 个 allowed_paths",
