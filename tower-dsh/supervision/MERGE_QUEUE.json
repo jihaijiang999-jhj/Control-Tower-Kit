@@ -571,9 +571,9 @@
       "task": "PILOT-065",
       "branch": "pilot/PILOT-065",
       "base": "main",
-      "status": "WAITING",
+      "status": "CORRECTION_REQUIRED",
       "added_at": "2026-11-02T20:52:48+08:00"
     }
   ],
-  "updated_at": "2026-11-02T20:52:48+08:00"
+  "updated_at": "2026-11-02T21:03:27+08:00"
 }
