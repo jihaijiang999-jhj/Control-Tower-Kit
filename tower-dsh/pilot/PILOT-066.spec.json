@@ -1,0 +1,47 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-066",
+  "title": "post-merge base-side envelope 路径 + 删除 repo-root shim",
+  "objective": {
+    "problem": "065 的 base-side envelope 在 `tower-dsh/merge-envelopes/`，但 post-merge 仍按 repo 根找 `merge-envelopes/<ENV>.json`；065 靠一个 repo-root 副本 shim 才过。shim 是重复状态，必须删除，post-merge 要按 base-side 用 tower 前缀。",
+    "outcome": "post-merge 对 base_side 信封用 `git --show-prefix` + envelope_path 定位（`tower-dsh/merge-envelopes/...`），legacy branch-side 仍按 repo 根；删除 `merge-envelopes/ENV-PILOT-065.json` shim 后 065 仍可复核；066 自身 base-side envelope + PR merge。",
+    "approach": "在 tower_post_merge 的 envelope 文件检查处按 env.base_side 选择 repo_path；补 post-merge 路径测试；合并后删除 shim；066 用 base-side envelope + PR。",
+    "non_goals_and_done": "不改 legacy envelope 路径、不改 065 envelope、不重跑 065 merge；730+ tests、shim 删除、066 PR merge、post-merge 9/9 才完成。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0009 / 065 shim",
+  "why_now": "shim 是重复状态，外证前必须清掉；否则每个 base-side 卡都要手工复制。",
+  "scope": [
+    "tower_post_merge：envelope 文件存在性/内容检查对 base_side 使用 git show-prefix（tower-dsh/）+ envelope_path；branch-side legacy 仍 repo 根",
+    "错误信息带实际 repo_path，便于定位",
+    "测试：base-side envelope 在 tower-dsh/ 下 post-merge 检查 0；repo 根副本不存在仍 0；legacy branch-side 仍 0；shim 删除后 065 复核 0",
+    "controller 合并后删除 repo 根 `merge-envelopes/ENV-PILOT-065.json`（不是 tower 内文件）",
+    "066 自身 base-side envelope + merge --mode pr；post-merge 9/9",
+    "不改 058/059/060/062/065 行为"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-066/tower-dsh/tools/tower_post_merge.py",
+    "pilot/worktrees/PILOT-066/tower-dsh/tools/tests/test_post_merge_envelope_path.py",
+    "pilot/worktrees/PILOT-066/tower-dsh/tools/tower_envelope.py",
+    "pilot/worktrees/PILOT-066/tower-dsh/tools/tower_cli.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "deleting tower-dsh/merge-envelopes/ENV-PILOT-065.json",
+    "rewriting 065 envelope/ledger",
+    "weakening review/acceptance"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-066/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 730 + 新增用例数（main 基线 730）",
+    "base-side envelope 在 tower-dsh/merge-envelopes/ 下 post-merge 检查 0；repo 根无副本仍 0",
+    "legacy branch-side envelope 仍按 repo 根 0；额外/缺失路径拒绝",
+    "删除 repo 根 shim 后，065 的 envelope 文件仍可在 base 找到；066 自身 post-merge 9/9",
+    "066 merge --mode pr 成功；真实塔 66/66 drift []（066 envelope 后）；arch 18；profile 11/0；shape 0"
+  ],
+  "depends_on": ["PILOT-065"],
+  "worktree": "pilot/worktrees/PILOT-066"
+}
