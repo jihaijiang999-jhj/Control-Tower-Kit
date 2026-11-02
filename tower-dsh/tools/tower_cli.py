@@ -6,21 +6,34 @@ import argparse
 import spec_coverage
 import spec_lint
 from pathlib import Path
-from tower_common import DEFAULT_ROOT, _force_utf8_stdio, emit, fail
-from tower_ledger import LedgerLockTimeout, cmd_task_ids_init, cmd_task_ids_reserve
-from tower_ledger_replay import cmd_verify_ledger
+from tower_common import (
+    DEFAULT_ROOT, _force_utf8_stdio, check_package_id, emit, fail, jdump,
+    jload, now,
+)
+from tower_ledger import (
+    LedgerLockTimeout, append_supervision_ledger, cmd_task_ids_init,
+    cmd_task_ids_reserve,
+)
+from tower_ledger_replay import (
+    ENVELOPE_ABANDONABLE_STATUSES, ENVELOPE_ABANDONED_STATUS,
+    ENVELOPE_TERMINAL_STATUSES, cmd_verify_ledger, ledger_has_event,
+)
 from tower_task import (
     ACCEPTANCE_KINDS, ACCEPTANCE_STATUSES, cmd_spec_approve, cmd_task_new,
 )
 from tower_authority_cmd import (
-    cmd_authority_check, cmd_authority_require, cmd_authority_set,
+    authority_state_check, cmd_authority_check, cmd_authority_require,
+    cmd_authority_set,
 )
 from tower_profile import cmd_profile_check
 from tower_shape import cmd_shape_check
 from tower_campaign import cmd_campaign_check
 from tower_dispatch import cmd_dispatch
 from tower_delivery import cmd_completion_add, cmd_deliver
-from tower_envelope import cmd_checkback, cmd_envelope_new, cmd_queue_add
+from tower_envelope import (
+    cmd_checkback, cmd_envelope_new, cmd_queue_add, load_queue,
+    load_supervision, save_queue,
+)
 from tower_handoff import (
     cmd_handoff_accept, cmd_handoff_activate, cmd_handoff_check, cmd_handoff_claim,
     cmd_handoff_new, cmd_handoff_receipt, cmd_handoff_status,
@@ -70,6 +83,118 @@ def cmd_spec_coverage(root: Path, args) -> None:
         tests_dir=getattr(args, "tests_dir", None),
     )
     emit(result, 0 if result["ok"] else 2)
+
+
+ENVELOPE_ABANDON_EVENT = "ENVELOPE_ABANDON"
+
+
+def abandon_actor(root: Path, args) -> str:
+    """The supervisor allowed to tombstone an envelope: mirrors ``merge``.
+
+    Healthy authority, never the primary, pinned or registered supervisor.
+    """
+    authority = authority_state_check(root)
+    if authority["errors"]:
+        fail(authority["errors"])
+    pinned = (authority["merge_authority"]
+              if authority["status"] == "configured" else "")
+    primary_id = (jload(root / "primary" / "CURRENT_STATE.json").get("primary")
+                  or {}).get("id")
+    supervisor = ((load_supervision(root).get("supervisor") or {}).get("id")
+                  or "")
+    expected = pinned or supervisor
+    by = (getattr(args, "by", None) or "").strip() or expected
+    if not by:
+        fail(["no supervisor identity: pass --by or register a merge authority"])
+    if by == primary_id:
+        fail([f"primary cannot abandon an envelope: --by {by!r} equals "
+              f"primary.id {primary_id!r}"])
+    if expected and by != expected:
+        fail([f"only {expected!r} may abandon envelopes, request {by!r}"])
+    return str(by)
+
+
+def abandon_target(root: Path, envelope_id: str) -> tuple[dict, dict, dict]:
+    """Read envelope/queue and reject a state that cannot be abandoned.
+
+    Read-only, so a refusal writes nothing.  A half-written ``ABANDONED`` side
+    is accepted (a retry finishes it); terminal and ``DRAFT`` states are not.
+    """
+    path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
+    if not path.exists():
+        fail([f"envelope not found: {envelope_id}"])
+    env = jload(path)
+    declared = env.get("envelope_id")
+    if declared != envelope_id:
+        fail([f"envelope identity matches request: file declares {declared!r}, "
+              f"request {envelope_id!r}"])
+    queue = load_queue(root)
+    entry = next((e for e in queue.get("entries") or []
+                  if isinstance(e, dict)
+                  and e.get("envelope_id") == envelope_id), None)
+    status, queued = env.get("status"), entry.get("status") if entry else None
+    if status in ENVELOPE_TERMINAL_STATUSES or queued in ENVELOPE_TERMINAL_STATUSES:
+        fail([f"envelope already {status or queued}; a merged envelope cannot "
+              "be abandoned"])
+    if entry is None:
+        fail([f"envelope not queued: {envelope_id}"])
+    if (ENVELOPE_ABANDONED_STATUS not in (status, queued)
+            and (status not in ENVELOPE_ABANDONABLE_STATUSES
+                 or queued not in ENVELOPE_ABANDONABLE_STATUSES)):
+        fail([f"envelope status {status!r} / queue status {queued!r} cannot be "
+              "abandoned (only WAITING/CORRECTION_REQUIRED/MERGE_BLOCKED/"
+              "MERGING)"])
+    return env, queue, entry
+
+
+def cmd_envelope_abandon(root: Path, args) -> None:
+    """Tombstone a failed envelope: queue + envelope + ledger, no deletes.
+
+    Queue first, then the envelope, then the append-only ``ENVELOPE_ABANDON``
+    event: every crash window is finishable, and a repeat writes nothing.
+    """
+    envelope_id = check_package_id(args.envelope, "envelope")
+    reason = (args.reason or "").strip()
+    if not reason:
+        fail(["--reason must be a non-empty string"])
+    by = abandon_actor(root, args)
+    env, queue, entry = abandon_target(root, envelope_id)
+    recorded = ledger_has_event(root, "supervision", ENVELOPE_ABANDON_EVENT,
+                                envelope_id)
+    if (env.get("status") == ENVELOPE_ABANDONED_STATUS
+            and entry.get("status") == ENVELOPE_ABANDONED_STATUS and recorded):
+        emit({"ok": True, "envelope": envelope_id,
+              "status": ENVELOPE_ABANDONED_STATUS, "already": True})
+        return
+    entry["status"] = ENVELOPE_ABANDONED_STATUS
+    save_queue(root, queue)
+    env["status"] = ENVELOPE_ABANDONED_STATUS
+    jdump(root / "supervision" / "envelopes" / f"{envelope_id}.json", env)
+    if not recorded:
+        append_supervision_ledger(root, ENVELOPE_ABANDON_EVENT, "supervision",
+                                  {"envelope": envelope_id, "reason": reason,
+                                   "by": by, "at": now()})
+    emit({"ok": True, "envelope": envelope_id,
+          "status": ENVELOPE_ABANDONED_STATUS, "by": by,
+          "repaired": bool(recorded)})
+
+
+def envelope_abandon_layer_parsers(
+        parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """PILOT-062: the ``envelope-abandon`` tombstone surface.
+
+    Registered here, not in ``build_parser``: the PILOT-044 parser keeps its
+    size, exactly like the review and acceptance layers.
+    """
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        abandon = action.add_parser("envelope-abandon")
+        abandon.add_argument("--envelope", required=True)
+        abandon.add_argument("--reason", required=True)
+        abandon.add_argument("--by", default=None,
+                             help="supervisor id (default: pinned merge authority)")
+    return parser
 
 
 def status_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -136,7 +261,8 @@ COMMAND_LAYER_HANDLERS = {
     "status-rollup": cmd_status_rollup, "status-archive": cmd_status_archive,
     "where": cmd_where, "arch-check": cmd_arch_check,
     "arch-graph": cmd_arch_graph, "profile-check": cmd_profile_check,
-    "acceptance-add": cmd_acceptance_add}
+    "acceptance-add": cmd_acceptance_add,
+    "envelope-abandon": cmd_envelope_abandon}
 
 
 TASK_IDS_HANDLERS = {"task-ids-init": cmd_task_ids_init,
@@ -417,8 +543,8 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         action.add_parser("brief")
     dispatch_campaign_parser(parser)
     review_layer_parsers(parser)
-    return profile_layer_parsers(arch_layer_parsers(position_layer_parsers(
-        status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser))))))
+    return envelope_abandon_layer_parsers(profile_layer_parsers(arch_layer_parsers(
+        position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser)))))))
 
 
 def cli_commands() -> list[str]:

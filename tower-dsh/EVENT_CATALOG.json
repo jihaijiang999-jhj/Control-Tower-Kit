@@ -312,6 +312,26 @@
         "envelope_unreadable",
         "envelope_status",
         "queue_status",
+        "illegal_transition"
+      ],
+      "ledger": "supervision",
+      "note": "supervisor-only tombstone: envelope + queue -> ABANDONED, history kept",
+      "payload_required": [
+        "envelope",
+        "reason",
+        "by",
+        "at"
+      ],
+      "producer": "envelope-abandon",
+      "state_verify": true,
+      "type": "ENVELOPE_ABANDON"
+    },
+    {
+      "drift_kinds": [
+        "envelope_missing",
+        "envelope_unreadable",
+        "envelope_status",
+        "queue_status",
         "illegal_transition",
         "envelope_unbacked"
       ],
