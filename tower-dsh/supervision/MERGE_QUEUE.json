@@ -474,7 +474,7 @@
       "task": "PILOT-043",
       "branch": "pilot/PILOT-043",
       "base": "main",
-      "status": "CORRECTION_REQUIRED",
+      "status": "ABANDONED",
       "added_at": "2026-10-31T13:49:28+08:00"
     },
     {
@@ -554,10 +554,10 @@
       "task": "PILOT-062",
       "branch": "pilot/PILOT-062",
       "base": "main",
-      "status": "MERGED",
+      "status": "POST_MERGE_VERIFIED",
       "added_at": "2026-11-02T16:04:10+08:00",
       "merge_commit": "26edd85289b1d6c5fcaaba9bac390ee4c4203800"
     }
   ],
-  "updated_at": "2026-11-02T16:27:46+08:00"
+  "updated_at": "2026-11-02T16:44:13+08:00"
 }
