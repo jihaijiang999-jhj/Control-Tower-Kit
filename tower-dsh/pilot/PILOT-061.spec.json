@@ -21,7 +21,8 @@
   ],
   "allowed_paths": [
     "pilot/worktrees/PILOT-061/tower-dsh/tools/tower_merge.py",
-    "pilot/worktrees/PILOT-061/tower-dsh/tools/tests/test_merge_head.py"
+    "pilot/worktrees/PILOT-061/tower-dsh/tools/tests/test_merge_head.py",
+    "pilot/worktrees/PILOT-061/tower-dsh/tools/tests/test_review_gate.py"
   ],
   "forbidden": [
     "network",
@@ -39,8 +40,10 @@
     "implementation + envelope-only PR head：merge --mode pr 0，`--match-head-commit <PR head>`，不报 Head branch modified",
     "implementation + 额外文件 / 多次 envelope 提交：merge exit 2，零 MERGED；review head 不匹配仍 exit 2",
     "真实塔 state-verify 61/61 drift []；arch gates 18；profile 11/0；shape 0",
-    "git -C pilot/worktrees/PILOT-061 diff --name-only main..HEAD 恰 2 个 allowed_paths"
+    "git -C pilot/worktrees/PILOT-061 diff --name-only main..HEAD 恰 3 个 allowed_paths"
   ],
-  "depends_on": ["PILOT-060"],
+  "depends_on": [
+    "PILOT-060"
+  ],
   "worktree": "pilot/worktrees/PILOT-061"
 }
