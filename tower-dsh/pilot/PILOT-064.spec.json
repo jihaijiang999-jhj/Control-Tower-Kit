@@ -1,0 +1,49 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-064",
+  "title": "base-side envelope 重建（tower 子目录前缀 + PR 首验）",
+  "objective": {
+    "problem": "063 已实现 base-side envelope，但塔是仓库子目录 `tower-dsh/`；envelope 文件在 `tower-dsh/merge-envelopes/...`，旧代码拿 `merge-envelopes/...` 比较，envelope-new --base-side 拒绝。063 修了 prefix（c2a1cc5）但卡已 closed，review head 无法追新代码，envelope 未建、PR 未验。",
+    "outcome": "064 以 063 c2a1cc5 的 base-side 代码为起点，明确 repo_prefix/tower-dsh 路径；重新走 review/accept/envelope；PR head == implementation，CI base 已有 ENVELOPE_NEW/QUEUE_ADD；064 自身 merge --mode pr 成功，GitHub PR merge commit 不是 local。",
+    "approach": "064 分支 cherry-pick 063 的 50d1844 + c2a1cc5（5 路径），确认 prefix 逻辑；补/保留 test_envelope_base_side；715→725 tests；新卡重走完整门。",
+    "non_goals_and_done": "不改 063 历史、不重开 063、不 local merge；725+ tests、064 PR merge 成功、post-merge 9/9 才完成。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0009 / 063 prefix deadlock",
+  "why_now": "063 的 base-side 代码是对的，只是卡关闭在 prefix 修复前；需要一张干净卡把它走完。",
+  "scope": [
+    "以 063 `c2a1cc5` 为起点（cherry-pick 50d1844 + c2a1cc5），保留 5 路径：tower_envelope/tower_merge/tower_cli/test_envelope_base_side/test_merge_head",
+    "base-side 路径必须用 git `--show-prefix`（tower-dsh/）+ envelope_path 比较；envelope 文件在 `tower-dsh/merge-envelopes/<ENV>.json`",
+    "envelope-new --base-side：main envelope-only commit（parent main）、branch head == implementation、review.head == implementation；写 ENVELOPE_NEW/QUEUE_ADD",
+    "envelope_checks：base-side 不要求 branch head == envelope head，要求 branch head==implementation/review.head==implementation/envelope 在 base；branch-side legacy 保持",
+    "merge --mode pr：--match-head-commit implementation；CI base 有信封事件；064 自身 PR merge 首验",
+    "测试：base-side 子目录 prefix happy path；branch head 偏移/review 偏移/额外文件拒绝；legacy 0；725+",
+    "不改 058 review / 059 acceptance / 060 MERGE_START / 062 abandon"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-064/tower-dsh/tools/tower_envelope.py",
+    "pilot/worktrees/PILOT-064/tower-dsh/tools/tower_merge.py",
+    "pilot/worktrees/PILOT-064/tower-dsh/tools/tower_cli.py",
+    "pilot/worktrees/PILOT-064/tower-dsh/tools/tests/test_envelope_base_side.py",
+    "pilot/worktrees/PILOT-064/tower-dsh/tools/tests/test_merge_head.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "reopening/rewriting PILOT-063",
+    "using local merge for 064",
+    "weakening review/acceptance gates"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-064/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 715 + 新增用例数（main 基线 715；064 采用 063 代码后应 725+）",
+    "base-side 子目录：main envelope commit + impl 分支，branch head==impl、review.head==impl，merge-check 0；envelope 文件在 tower-dsh/merge-envelopes",
+    "branch head 偏移/review 偏移/额外文件 → exit 2 零 MERGED；branch-side legacy 仍 0",
+    "064 自身 merge --mode pr 成功；PR head == implementation；GitHub merge commit 不是 local；post-merge 9/9",
+    "真实塔 64/64 drift []；arch gates 18；profile 11/0；shape 0"
+  ],
+  "depends_on": ["PILOT-062"],
+  "worktree": "pilot/worktrees/PILOT-064"
+}
