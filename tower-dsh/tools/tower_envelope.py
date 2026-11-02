@@ -50,13 +50,8 @@ def add_merge_ledger(root: Path, entry: dict) -> None:
 
 
 def envelope_has_baselines(env: dict) -> bool:
-    """True for a new-style envelope that declares both test-count baselines.
+    """True when both test-count baselines are declared as ints >= 1."""
 
-    Both counts must be real integers >= 1 (``bool`` excluded).  The same
-    predicate gates the new-style ledger checks in :func:`envelope_checks` and
-    the legacy-only pre-merge chain check in ``merge-check`` (PILOT-039), so
-    the two decisions cannot drift apart.
-    """
     tests_baseline = env.get("tests_baseline")
     tower_tests_baseline = env.get("tower_tests_baseline")
     return (isinstance(tests_baseline, int) and not isinstance(tests_baseline, bool)
@@ -64,6 +59,61 @@ def envelope_has_baselines(env: dict) -> bool:
             and isinstance(tower_tests_baseline, int)
             and not isinstance(tower_tests_baseline, bool)
             and tower_tests_baseline >= 1)
+
+
+def envelope_git_checks(repo: Path, env: dict,
+                        tower_root: Path | None = None) -> tuple[str, list[dict]]:
+    """The envelope commit's git shape, branch-side (pre-063) or base-side.
+
+    Branch-side: the envelope is one commit on the implementation branch.
+    Base-side: it is one commit on the base branch and the implementation
+    branch only carries code.  The envelope head is returned with the checks so
+    ``envelope-new`` and ``envelope_checks`` cannot drift apart.
+    """
+    def item(name: str, ok: bool, detail: str) -> dict:
+        return {"name": name, "ok": ok, "detail": detail}
+
+    base = str(env.get("base") or "main")
+    impl = str(env.get("implementation_head_sha") or "")
+    declared = str(env.get("envelope_head_sha") or "")
+    path = str(env.get("envelope_path") or "")
+    try:
+        head = git_ok(repo, "rev-parse", str(env.get("branch") or ""))
+        if env.get("base_side") is True:
+            # The recorded envelope commit, not the moving base tip.
+            b = git_ok(repo, "rev-parse", base)
+            eh = env.get("envelope_head_sha") or env.get("head") or b
+            parent = git_ok(repo, "rev-parse", f"{eh}^")
+            prefix = (git_ok(tower_root, "rev-parse", "--show-prefix").strip("/")
+                      if tower_root is not None else "")
+            repo_path = f"{prefix}/{path}" if prefix else path
+            changed = git(repo, "diff", "--name-only", f"{parent}..{eh}").stdout.splitlines()
+            in_base = (git(repo, "merge-base", "--is-ancestor", eh, base).returncode == 0
+                       and git(repo, "cat-file", "-e", f"{base}:{repo_path}").returncode == 0)
+            return eh, [
+                item("branch head == implementation head", head == impl, f"{head} vs {impl}"),
+                item("envelope commit only changes envelope path",
+                     changed == [repo_path], f"{changed} vs [{repo_path}]"),
+                item("envelope file in base", in_base, f"{eh} in {base}"),
+                item("envelope parent is ancestor of implementation",
+                     git(repo, "merge-base", "--is-ancestor", parent,
+                         impl).returncode == 0, f"{parent}..{impl}"),
+            ]
+        parent = git_ok(repo, "rev-parse", f"{head}^")
+        changed = git(repo, "diff", "--name-only", f"{impl}..{head}").stdout.splitlines()
+        return head, [
+            item("branch head == envelope head", head == declared,
+                 f"{head} vs {declared}"),
+            item("envelope parent == implementation head", parent == impl,
+                 f"{parent} vs {impl}"),
+            item("envelope commit only changes envelope path",
+                 changed == [path], f"{changed} vs [{path}]"),
+            item(f"base {base} is ancestor of implementation",
+                 git(repo, "merge-base", "--is-ancestor", base,
+                     impl).returncode == 0, f"{base}..{impl}"),
+        ]
+    except Exception as exc:
+        return "", [item("git checks", False, str(exc))]
 
 
 def review_mismatches(root: Path, task: str, review: dict, head: str) -> list[str]:
@@ -219,23 +269,9 @@ def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
                 f"QUEUE_ADD event {'present' if backed else 'missing'}")
     if not repo.exists():
         return checks
-    branch = env.get("branch", "")
-    base = env.get("base", "main")
-    a = env.get("implementation_head_sha", "")
-    b = env.get("envelope_head_sha", "")
-    envelope_path = env.get("envelope_path", "")
-    try:
-        head = git_ok(repo, "rev-parse", branch)
-        add("branch head == envelope head", head == b, f"{head} vs {b}")
-        parent = git_ok(repo, "rev-parse", f"{b}^")
-        add("envelope parent == implementation head", parent == a, f"{parent} vs {a}")
-        changed = git_ok(repo, "diff", "--name-only", f"{a}..{b}").splitlines()
-        add("envelope commit only changes envelope path",
-            changed == [envelope_path], f"{changed} vs [{envelope_path}]")
-        ancestor = git(repo, "merge-base", "--is-ancestor", base, a).returncode == 0
-        add(f"base {base} is ancestor of implementation", ancestor, f"{base}..{a}")
-    except Exception as exc:
-        add("git checks", False, str(exc))
+    _, git_checks = envelope_git_checks(repo, env, root)
+    for item in git_checks:
+        add(item["name"], item["ok"], item["detail"])
     # Never call load_record() here: it emits a JSON object and raises
     # SystemExit, which would print one payload from inside the check list and
     # a second one from the caller.  A missing/invalid record is one failed
@@ -458,34 +494,30 @@ def cmd_envelope_new(root: Path, args) -> None:
     repo = resolve_repository(root, env.get("repository"))
     if not repo.exists():
         fail([f"repository missing: {repo}"])
+    base_side = bool(getattr(args, "base_side", False))
     branch = env.get("branch")
     base = env.get("base", "main")
     a = env.get("implementation_head_sha")
     envelope_path = env.get("envelope_path")
-    if not branch or not a or not envelope_path:
+    if not all((branch, a, envelope_path)):
         fail(["branch, implementation_head_sha and envelope_path are required"])
     try:
-        b = git_ok(repo, "rev-parse", branch)
-        parent = git_ok(repo, "rev-parse", f"{b}^")
-        changed = git_ok(repo, "diff", "--name-only", f"{a}..{b}").splitlines()
-        ancestor = git(repo, "merge-base", "--is-ancestor", base, a).returncode == 0
+        b = git_ok(repo, "rev-parse", base if base_side else branch)
+        b, checks = envelope_git_checks(repo, {
+            **env, "base_side": base_side, "envelope_head_sha": b}, root)
     except Exception as exc:
         fail([str(exc)])
-    checks = [
-        {"name": "envelope parent == implementation", "ok": parent == a,
-         "detail": f"{parent} vs {a}"},
-        {"name": "envelope commit only changes envelope path", "ok": changed == [envelope_path],
-         "detail": f"{changed} vs [{envelope_path}]"},
-        {"name": f"base {base} is ancestor of implementation", "ok": ancestor,
-         "detail": f"{base}..{a}"},
-    ]
     if not all(c["ok"] for c in checks):
         emit({"ok": False, "errors": [c for c in checks if not c["ok"]]}, 2)
     record = dict(env)
-    record.update({"envelope_head_sha": b, "status": status, "created_at": now()})
+    record.update({"envelope_head_sha": b, "head": b, "status": status,
+                   "created_at": now()})
+    payload = {"envelope": env_id, "task": task, "head": b}
+    if base_side:
+        record["base_side"] = True
+        payload.update({"base_side": True, "base": base})
     jdump(env_path, record)
-    append_supervision_ledger(root, "ENVELOPE_NEW", "primary",
-                              {"envelope": env_id, "task": task, "head": b})
+    append_supervision_ledger(root, "ENVELOPE_NEW", "primary", payload)
     emit({"ok": True, "envelope": env_id, "head": b, "checks": checks})
 
 

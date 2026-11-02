@@ -526,6 +526,25 @@ def acceptance_layer_parsers(
     return parser
 
 
+def envelope_base_side_layer_parsers(
+        parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """PILOT-063: the ``--base-side`` flag on the existing ``envelope-new``.
+
+    The envelope commit lives on the base branch, so this layer registers only
+    the flag; ``build_parser`` keeps its PILOT-044 size.
+    """
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        envelope_new = action.choices.get("envelope-new")
+        if envelope_new is not None:
+            envelope_new.add_argument(
+                "--base-side", dest="base_side", action="store_true",
+                help="envelope commit is on base; the implementation branch "
+                     "carries only code")
+    return parser
+
+
 def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Register the PILOT-045 commands on the parser built by ``build_parser``.
 
@@ -543,8 +562,8 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         action.add_parser("brief")
     dispatch_campaign_parser(parser)
     review_layer_parsers(parser)
-    return envelope_abandon_layer_parsers(profile_layer_parsers(arch_layer_parsers(
-        position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser)))))))
+    return envelope_base_side_layer_parsers(envelope_abandon_layer_parsers(profile_layer_parsers(
+        arch_layer_parsers(position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser))))))))
 
 
 def cli_commands() -> list[str]:

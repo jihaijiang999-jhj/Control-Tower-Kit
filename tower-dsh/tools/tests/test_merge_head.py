@@ -12,6 +12,10 @@ the flow fell back to a local merge.  The merge now:
   non-descendant head, an empty diff with a different head) with a
   ``MergeBlocked("pr-merge", "merge", ...)`` and no ``MERGED``.
 
+PILOT-063 adds the base-side envelope: its envelope commit lives on the base
+branch, so the PR branch carries only the implementation and even the
+envelope-only child is refused for it (``base_side: true``).
+
 The review binding is untouched: ``merge-check`` still requires the reviewed
 head to equal the envelope's implementation head (PILOT-058).
 
@@ -227,6 +231,21 @@ class PrMergeHeadUnitCase(RepoKitCase):
             tower_merge.pr_merge_head(self.kit, env)
         self.assertIn("merge-envelopes", caught.exception.detail)
         self.assertNotEqual(head, self.implementation_head)
+
+    # -- base-side (PILOT-063): the branch is exactly the implementation ---
+    def test_base_side_head_is_the_implementation(self) -> None:
+        self.assertEqual(tower_merge.pr_merge_head(self.kit, self.env(base_side=True)),
+                         self.implementation_head)
+
+    def test_base_side_envelope_child_is_blocked(self) -> None:
+        # The envelope commit is on base for a base-side envelope; an
+        # envelope-only child on the PR branch must never be pinned.
+        self.add_envelope()
+        with self.assertRaises(MergeBlocked) as caught:
+            tower_merge.pr_merge_head(self.kit, self.env(base_side=True))
+        self.assertEqual((caught.exception.phase, caught.exception.reason),
+                         ("pr-merge", "merge"))
+        self.assertIn("base-side PR head", caught.exception.detail)
 
 
 class PrRemoteMergeUnitCase(RepoKitCase):
