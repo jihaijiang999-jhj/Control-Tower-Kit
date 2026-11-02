@@ -28,7 +28,8 @@
     "pilot/worktrees/PILOT-062/tower-dsh/tools/tests/test_envelope_abandon.py",
     "pilot/worktrees/PILOT-062/tower-dsh/EVENT_CATALOG.json",
     "pilot/worktrees/PILOT-062/tower-dsh/tools/tower_merge.py",
-    "pilot/worktrees/PILOT-062/tower-dsh/tools/tests/test_merge_head.py"
+    "pilot/worktrees/PILOT-062/tower-dsh/tools/tests/test_merge_head.py",
+    "pilot/worktrees/PILOT-062/tower-dsh/tools/tests/test_modules.py"
   ],
   "forbidden": [
     "network",
@@ -50,6 +51,8 @@
     "062 merge --mode pr 成功，GitHub PR merge commit != 本地 merge commit；无 local fallback",
     "真实塔 62/62 drift []；arch gates 18；profile 11/0；shape 0"
   ],
-  "depends_on": ["PILOT-061"],
+  "depends_on": [
+    "PILOT-061"
+  ],
   "worktree": "pilot/worktrees/PILOT-062"
 }
