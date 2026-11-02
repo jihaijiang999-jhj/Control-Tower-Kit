@@ -226,11 +226,13 @@ def expected_merge_head(env: dict) -> str:
 
 
 def pr_merge_head(repo: Path, env: dict) -> str:
-    """Pin the merge at the implementation head or its one envelope-only child."""
+    """Pin the merge at the implementation head; a child is branch-side only."""
     head = git_ok(repo, "rev-parse", str(env.get("branch") or ""))
     impl = expected_merge_head(env)
     if head == impl:
         return head
+    if env.get("base_side") is True:
+        raise MergeBlocked("pr-merge", "merge", f"base-side PR head {head} != {impl}")
     path = str(env.get("envelope_path") or "").replace("\\", "/")
     if not path.startswith("merge-envelopes/") or not path.endswith(".json"):
         raise MergeBlocked("pr-merge", "merge",
