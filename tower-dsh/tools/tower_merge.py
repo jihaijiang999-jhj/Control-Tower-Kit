@@ -225,6 +225,29 @@ def expected_merge_head(env: dict) -> str:
     return head.strip() if isinstance(head, str) else ""
 
 
+def pr_merge_head(repo: Path, env: dict) -> str:
+    """Pin the merge at the implementation head or its one envelope-only child."""
+    head = git_ok(repo, "rev-parse", str(env.get("branch") or ""))
+    impl = expected_merge_head(env)
+    if head == impl:
+        return head
+    path = str(env.get("envelope_path") or "").replace("\\", "/")
+    if not path.startswith("merge-envelopes/") or not path.endswith(".json"):
+        raise MergeBlocked("pr-merge", "merge",
+                           f"envelope_path must be merge-envelopes/<ENV>.json: {path!r}")
+    if git(repo, "merge-base", "--is-ancestor", impl, head).returncode != 0:
+        raise MergeBlocked("pr-merge", "merge",
+                           f"PR head {head} is not a descendant of {impl}")
+    changed = git_ok(repo, "diff", "--name-only", f"{impl}..{head}").splitlines()
+    if changed != [path]:
+        raise MergeBlocked("pr-merge", "merge",
+                           f"PR head {head} changes {changed} against {impl}; only [{path}]")
+    if git_ok(repo, "rev-list", "--count", f"{impl}..{head}") != "1":
+        raise MergeBlocked("pr-merge", "merge",
+                           f"PR head {head} is not a single envelope commit on {impl}")
+    return head
+
+
 def pr_remote_merge(repo: Path, env: dict, args) -> dict:
     """Steps 1-4 of a ``--mode pr`` merge: push, create, checks, merge the PR.
 
@@ -239,9 +262,9 @@ def pr_remote_merge(repo: Path, env: dict, args) -> dict:
     interval = float(getattr(args, "check_interval", 10) or 10)
     if interval <= 0:
         interval = 1.0
-
-    # 1. the remote must actually see the envelope branch before a PR exists.
+    # 1. push the envelope branch; its head is the PR head (checked below).
     require_git(repo, "push", "push", remote, branch)
+    match_head = pr_merge_head(repo, env)
 
     # 2. open the PR: real gh has no ``--json`` here and prints the URL only.
     body = (
@@ -287,9 +310,9 @@ def pr_remote_merge(repo: Path, env: dict, args) -> dict:
     wait_for_checks(repo, number, timeout, interval)
 
     # 4. merge the PR once the checks are green.  ``--match-head-commit`` pins
-    #    the merge to the implementation head this envelope names.
+    #    the real PR head resolved above; any other shape was already refused.
     cp = run_gh(repo, ["pr", "merge", str(number), "--merge",
-                       "--match-head-commit", expected_merge_head(env)],
+                       "--match-head-commit", match_head],
                 phase="pr-merge", timeout=timeout)
     if cp.returncode != 0:
         raise MergeBlocked("pr-merge", "merge", command_failure(cp))

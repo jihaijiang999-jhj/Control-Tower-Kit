@@ -499,7 +499,14 @@ class LegacyReviewCompatCase(ReviewGateKitCase):
 
 
 class ExpectedHeadMergeCase(ReviewGateKitCase):
-    """``merge --mode pr`` pins ``gh pr merge`` to the envelope head."""
+    """``merge --mode pr`` pins ``gh pr merge`` to the real PR head (PILOT-061).
+
+    The tracked branch carries one envelope-only commit on top of the
+    implementation head, so the PR head is that envelope commit.  Passing the
+    implementation head here is what made 056/059/060 hit "Head branch
+    modified"; the pin must be the PR head, while the review stays bound to the
+    implementation head.
+    """
 
     def run_merge(self, *args: str,
                   expect_head: str | None = None) -> subprocess.CompletedProcess:
@@ -520,7 +527,7 @@ class ExpectedHeadMergeCase(ReviewGateKitCase):
 
     def test_pr_merge_passes_match_head_commit(self) -> None:
         self.promote("--head", self.implementation_head, "--base", self.base_sha)
-        cp = self.run_merge(expect_head=self.implementation_head)
+        cp = self.run_merge(expect_head=self.envelope_head)
         self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
         payload = json.loads(cp.stdout)
         self.assertTrue(payload["ok"], payload)
@@ -528,7 +535,7 @@ class ExpectedHeadMergeCase(ReviewGateKitCase):
         argv = self.merge_argv()
         self.assertIn("--match-head-commit", argv)
         self.assertEqual(argv[argv.index("--match-head-commit") + 1],
-                         self.implementation_head)
+                         self.envelope_head)
         self.assertIn("--merge", argv)
         envelope = read_json(self.envelope_path())
         self.assertEqual(envelope["status"], "MERGED")
@@ -538,7 +545,7 @@ class ExpectedHeadMergeCase(ReviewGateKitCase):
     def test_pr_merge_head_mismatch_does_not_merge(self) -> None:
         self.promote("--head", self.implementation_head, "--base", self.base_sha)
         # The PR head moved: gh rejects the pinned --match-head-commit value.
-        cp = self.run_merge(expect_head=self.envelope_head)
+        cp = self.run_merge(expect_head=self.implementation_head)
         self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
         self.assertFalse(json.loads(cp.stdout)["ok"])
         envelope = read_json(self.envelope_path())
@@ -555,7 +562,7 @@ class ExpectedHeadMergeCase(ReviewGateKitCase):
         self.assertIn("MERGE_BLOCKED", [event["type"] for event in events])
         argv = self.merge_argv()
         self.assertEqual(argv[argv.index("--match-head-commit") + 1],
-                         self.implementation_head)
+                         self.envelope_head)
 
 
 if __name__ == "__main__":
