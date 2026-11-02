@@ -1,0 +1,40 @@
+
+[A] base tip=b783fda1cf envelope=ed8e874727 (state moved base past the envelope: True)
+
+[A state after envelope] head=ed8e874727 expected=ok verdict=ok PASS
+  ok   branch head == implementation head: 87d9940322ab5940929aab7abcfd59af3f4f194c vs 87d9940322ab5940929aab7abcfd59af3f4f194c
+  ok   envelope commit only changes envelope path: ['tower-dsh/merge-envelopes/ENV-PILOT-065.json'] vs [tower-dsh/merge-envelopes/ENV-PILOT-065.json]
+  ok   envelope file in base: ed8e874727ad9c118be992415f84c9911b2c43ba in main
+  ok   envelope parent is ancestor of implementation: 24b37cc5dc1451a6d6461994f2fc61a17d3be505..87d9940322ab5940929aab7abcfd59af3f4f194c
+
+[B base-tip binding (old bug)] head=b783fda1cf expected=refused verdict=refused PASS
+  ok   branch head == implementation head: 87d9940322ab5940929aab7abcfd59af3f4f194c vs 87d9940322ab5940929aab7abcfd59af3f4f194c
+  FAIL envelope commit only changes envelope path: ['tower-dsh/tasks/PILOT-065/record.json'] vs [tower-dsh/merge-envelopes/ENV-PILOT-065.json]
+  ok   envelope file in base: b783fda1cffd1691725299c0031bedb58dd7bd0d in main
+  FAIL envelope parent is ancestor of implementation: 8667caf798cb77e8864f5040ce756883cab4384b..87d9940322ab5940929aab7abcfd59af3f4f194c
+
+[C envelope not in base] head=680cbfafc6 expected=refused verdict=refused PASS
+  ok   branch head == implementation head: f61990dc47757153072839f8155a31a6a91fa3f7 vs f61990dc47757153072839f8155a31a6a91fa3f7
+  ok   envelope commit only changes envelope path: ['tower-dsh/merge-envelopes/ENV-PILOT-065.json'] vs [tower-dsh/merge-envelopes/ENV-PILOT-065.json]
+  FAIL envelope file in base: 680cbfafc6e73eccc79d42ed70f4e7bc79c999f0 in main
+  ok   envelope parent is ancestor of implementation: 6f91092a58245ecd2a134bbd911693c6190d2180..f61990dc47757153072839f8155a31a6a91fa3f7
+
+[D envelope + extra file] head=5f8be8b4d6 expected=refused verdict=refused PASS
+  ok   branch head == implementation head: 1ee2bd5ecdbeb78881bb33402a21a6a24caf755c vs 1ee2bd5ecdbeb78881bb33402a21a6a24caf755c
+  FAIL envelope commit only changes envelope path: ['leak.txt', 'tower-dsh/merge-envelopes/ENV-PILOT-065.json'] vs [tower-dsh/merge-envelopes/ENV-PILOT-065.json]
+  ok   envelope file in base: 5f8be8b4d607ed8d38edc770f1e1e5fe3a81a7c5 in main
+  ok   envelope parent is ancestor of implementation: b4d1418f8b7e426b6fe936e5407b8fcc2af80fce..1ee2bd5ecdbeb78881bb33402a21a6a24caf755c
+
+[E branch head moved] head=5298322c7e expected=refused verdict=refused PASS
+  FAIL branch head == implementation head: 7275482f392296090ea1262912cfdf5f92e4fc13 vs 0b56828e8f48bb43f9b412df5a6d1f4fff0d191f
+  ok   envelope commit only changes envelope path: ['tower-dsh/merge-envelopes/ENV-PILOT-065.json'] vs [tower-dsh/merge-envelopes/ENV-PILOT-065.json]
+  ok   envelope file in base: 5298322c7ee0b663c051febe641dc2766c6936fc in main
+  ok   envelope parent is ancestor of implementation: dd3c0d5bcb9cd15e6385e2ac3aaa1cfea541b1f0..0b56828e8f48bb43f9b412df5a6d1f4fff0d191f
+
+[real 064] base tip=086476385a envelope_head_sha=638932eaff (tip moved past the envelope: True)
+  ok   branch head == implementation head: 5080a0dd4f5ba651067954cb5557516e5c0199bf vs 5080a0dd4f5ba651067954cb5557516e5c0199bf
+  ok   envelope commit only changes envelope path: ['tower-dsh/merge-envelopes/ENV-PILOT-064.json'] vs [tower-dsh/merge-envelopes/ENV-PILOT-064.json]
+  ok   envelope file in base: 638932eaff6460645b4c08c91762fe1a7a653ea2 in main
+  ok   envelope parent is ancestor of implementation: 607224d9cc438eae8648eb629414cf40048e464e..5080a0dd4f5ba651067954cb5557516e5c0199bf
+
+probe PASS (6/6 as expected)

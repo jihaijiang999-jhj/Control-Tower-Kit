@@ -4,8 +4,8 @@
     {
       "id": "A-01",
       "kind": "auto",
-      "status": "pending",
-      "note": ""
+      "status": "passed",
+      "note": "730; 5 paths; envelope_head_sha"
     }
   ]
 }
