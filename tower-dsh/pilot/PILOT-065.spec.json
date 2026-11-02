@@ -1,0 +1,48 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-065",
+  "title": "base-side envelope 形状检查用 envelope_head_sha（允许 state 后置）",
+  "objective": {
+    "problem": "064 的 base-side envelope 已正确生成，但 envelope_checks 把信封提交绑在 base tip：为了让 PR CI 看到 ENVELOPE_NEW/QUEUE_ADD，envelope 之后又提交了 state，main tip 变成 state 提交，于是“envelope commit only changes envelope path”和“envelope parent is ancestor of implementation”失败，064 无法 merge。",
+    "outcome": "base-side 的 git 形状检查改用 envelope 自己记录的 envelope_head_sha：检查 parent(envelope_head)..envelope_head 只改 envelope 文件，要求 envelope_head 是 base 的祖先；允许 envelope 之后再有 ledger/queue/task state 提交。064 的 base-side 代码保留，065 自身 merge --mode pr 成功。",
+    "approach": "cherry-pick 064 的 5080a0dd（5 路径）到 065；tower_envelope.envelope_git_checks 的 base-side 分支用 declared/envelope_head_sha 做 diff/cat-file，base tip 只用于祖先/文件存在；补测试覆盖“envelope 后再提交 state 仍 0”。",
+    "non_goals_and_done": "不放宽 branch head==implementation / review.head==implementation / 额外文件拒绝；不删除 064 历史；727+ tests、065 PR merge、post-merge 9/9 才完成。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0009 / 064 base-tip deadlock",
+  "why_now": "064 的 base-side 逻辑只差这一个不变量；不修则 envelope 后任何 state 提交都会让 PR merge 失败。",
+  "scope": [
+    "cherry-pick 064 5080a0dd 的 5 路径（tower_envelope/tower_merge/tower_cli/test_envelope_base_side/test_merge_head）",
+    "base-side envelope_git_checks：用 env.envelope_head_sha（或 declared）作为形状提交；diff parent(eh)..eh 恰 [repo_path]；eh 是 base 祖先；cat-file base:repo_path 存在；不再要求 base tip == eh",
+    "保留 branch head == implementation、review.head == implementation、额外文件/非 envelope commit 拒绝；branch-side legacy 不变",
+    "测试：envelope 后提交 ledger/queue/task state 仍 merge-check 0；eh 不是 base 祖先/夹带文件仍 2；064 的 prefix 子目录测试保留",
+    "065 自身 merge --mode pr；CI base 含 state、branch 只含实现；post-merge 9/9",
+    "不改 058/059/060/062 行为"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-065/tower-dsh/tools/tower_envelope.py",
+    "pilot/worktrees/PILOT-065/tower-dsh/tools/tower_merge.py",
+    "pilot/worktrees/PILOT-065/tower-dsh/tools/tower_cli.py",
+    "pilot/worktrees/PILOT-065/tower-dsh/tools/tests/test_envelope_base_side.py",
+    "pilot/worktrees/PILOT-065/tower-dsh/tools/tests/test_merge_head.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "using local merge for 065",
+    "weakening review/acceptance",
+    "rewriting 064 history"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-065/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 715 + 新增用例数（采用 064 后应 727+）",
+    "base-side：envelope 后再提交 ledger/queue/task state，merge-check 仍 0",
+    "envelope_head_sha 不是 base 祖先 / parent..eh 含额外文件 / branch head != impl / review.head != impl → exit 2",
+    "065 自身 merge --mode pr 成功；GitHub merge commit 不是 local；post-merge 9/9",
+    "真实塔 65/65 drift []；arch gates 18；profile 11/0；shape 0"
+  ],
+  "depends_on": ["PILOT-062"],
+  "worktree": "pilot/worktrees/PILOT-065"
+}
