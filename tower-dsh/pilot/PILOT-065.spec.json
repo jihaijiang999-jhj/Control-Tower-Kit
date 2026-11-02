@@ -41,8 +41,10 @@
     "base-side：envelope 后再提交 ledger/queue/task state，merge-check 仍 0",
     "envelope_head_sha 不是 base 祖先 / parent..eh 含额外文件 / branch head != impl / review.head != impl → exit 2",
     "065 自身 merge --mode pr 成功；GitHub merge commit 不是 local；post-merge 9/9",
-    "真实塔 65/65 drift []；arch gates 18；profile 11/0；shape 0"
+    "真实塔 65/64 drift []；arch gates 18；profile 11/0；shape 0"
   ],
-  "depends_on": ["PILOT-062"],
+  "depends_on": [
+    "PILOT-062"
+  ],
   "worktree": "pilot/worktrees/PILOT-065"
 }

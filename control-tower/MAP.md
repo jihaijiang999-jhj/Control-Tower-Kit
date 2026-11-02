@@ -731,6 +731,34 @@ SteerLine 评估后只取三条做法，全部重写为木塔的小门：
 
 ---
 
+
+### 6.36 判例：base-side envelope 不是“换个位置”，是把 head 从分支里拿出来（PILOT-061–065）
+
+061–065 连续五张卡都在修 PR merge 的 head 不变量，真正落地的是 **base-side envelope**：
+
+- 061 只放宽 `pr_remote_merge` 的早期检查，允许 PR head = implementation + 仅 envelope 文件；**不够**，`envelope_checks` 仍要求 branch head == envelope head。
+- 062 尝试先提交 state 让 CI 看到 `ENVELOPE_NEW/QUEUE_ADD`，但 envelope 在 branch 上，仍卡 head；最后 local bootstrap。
+- 063 实现 base-side，但 prefix 在 repository 根取，真实塔是 `tower-dsh/` 子目录，路径比较失败；卡又已 closed，无法追新 head。
+- 064 重建并修 tower 前缀，`envelope_head_sha` 未用于形状检查，信封后提交 state 就把 base tip 从 envelope 移开，仍失败。
+- 065 把形状检查改成 **`envelope_head_sha`**：`parent(eh)..eh` 只改 envelope 文件，eh 是 base 祖先，允许 eh 之后再有 ledger/queue/task state；branch 只含 implementation，PR head == implementation。
+
+**结果**：PR #48 MERGED `c199928`（GitHub merge commit），post-merge 9/9；730 tests；65 任务 / 64 信封；`where` 5/5；C-2026-Q4-04 完成。
+
+**必须记录的 deviation**：
+
+- PR #48 用 `--admin` 绕过“head branch not up to date”：base 在 branch 后又有 state，GitHub 要求更新 branch；为保留 review head `78b04df` 未 rebase，owner 级 bypass。
+- post-merge 仍按 repo 根找 `merge-envelopes/<ENV>.json`，base-side 文件在 `tower-dsh/merge-envelopes/`，因此加了 repo-root shim 副本；后续应修 post-merge 路径并删 shim。
+- 063 closed 无 envelope；064 `ENV-PILOT-064` ABANDONED，均由 065 取代。
+- 065 spec 文案仍写“65/65”，实际 pre-envelope 65/64。
+
+可复用判断：
+
+- **envelope 不占实现分支**：PR head 才能恒等于 implementation；否则任何 envelope/空提交都会破坏 head。
+- **base-side 形状检查用记录下来的 `envelope_head_sha`**，不要用移动的 base tip；信封后 state 提交是正常的。
+- **塔是仓库子目录**：所有 git 路径比较必须带 `git --show-prefix`（`tower-dsh/`）。
+- **PR merge 的 head pin 要配 base 状态**：CI 的 base 必须有 `ENVELOPE_NEW/QUEUE_ADD`，否则 `state-verify` 报 unbacked/DRAFT。
+- **admin bypass 只能作为最后一次例外**：它绕过的正是“base 前进后 branch 过期”的保护；下一次应先补 base 同步策略，而不是继续 admin。
+
 ## 7. 与 K3 塔的能力对照（一页）
 
 | 维度 | K3 / SeeMake 塔 | tower-dsh | 谁更强 |

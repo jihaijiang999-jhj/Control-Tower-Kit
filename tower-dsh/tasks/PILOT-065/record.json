@@ -41,7 +41,7 @@
   ],
   "worktree": "pilot/worktrees/PILOT-065",
   "spec_path": "pilot/PILOT-065.spec.json",
-  "spec_sha256": "bfab044acf54e86a916abd7f7b2b0ea7c39927e98ef65af4ada1917ad0e5772b",
+  "spec_sha256": "f4440218e3120fc3dacd76f253009c502bd4db6417ab1d3c132f9d241a7460f0",
   "spec_gate": "PASS",
   "executor": "subagent:8660c9c8-0cbd-424d-ad39-325345631037",
   "dispatch": {
