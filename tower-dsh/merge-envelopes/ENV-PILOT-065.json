@@ -1,0 +1,28 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-065",
+  "task": "PILOT-065",
+  "repository": "..",
+  "branch": "pilot/PILOT-065",
+  "base": "main",
+  "implementation_head_sha": "78b04dfb7be8aad96be06c1db138a5652d6ab17b",
+  "envelope_path": "merge-envelopes/ENV-PILOT-065.json",
+  "created_at": "2026-11-02T21:05:00+08:00",
+  "scope": "PILOT-065: base-side checks use envelope_head_sha",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 715,
+  "forbidden": ["production", "external_call", "deploy"],
+  "evidence": [
+    {"path": "tasks/PILOT-065/evidence/tower_envelope.py", "sha256": "65580dea639019a12641a7b76c6f50963d279eef9c0973d3aed42a3aeb4c844a"},
+    {"path": "tasks/PILOT-065/evidence/tower_merge.py", "sha256": "6936a85002a3df22dd55c300de96b1489903736d69eee9d25cfeb4e32628f4ba"},
+    {"path": "tasks/PILOT-065/evidence/tower_cli.py", "sha256": "ab3cca3583fd97929abf1d20531a0f550bc825caf4d928275d4d53cc1db50250"},
+    {"path": "tasks/PILOT-065/evidence/test_envelope_base_side.py", "sha256": "fb040ca191f3ccf641bbe033c9a29e12f1a1484ab327c9394f7505876d046359"},
+    {"path": "tasks/PILOT-065/evidence/test_merge_head.py", "sha256": "a940dd2721cb705f5682595c35eb4353c9c9bc8c6189032707daf25a1eae1028"},
+    {"path": "tasks/PILOT-065/evidence/test-output.txt", "sha256": "ae791732a9328049daa6c44b40f93b6b9506b6db0cbcd9d111a5f8c9dca5d076"},
+    {"path": "tasks/PILOT-065/evidence/base_side_probe.py", "sha256": "9a902dccc9e37ad41982900b3928fada88961d391ac32b0429a439ec42f4c17b"},
+    {"path": "tasks/PILOT-065/evidence/probe.txt", "sha256": "2a8aa3db30f07a80d6a99b7fe02d15bc993ea0b375db6e93c89a6dc1a9884af5"},
+    {"path": "tasks/PILOT-065/evidence/commit.txt", "sha256": "c2adef1e4182091e413273884d3a2bdbae9bc70565c7c7fc725a14c4bd3cc1fa"},
+    {"path": "tasks/PILOT-065/evidence/diff.txt", "sha256": "831c341386880534aebdc0d1eb58ad65e001333eae29b20b7b14db2997c841a3"},
+    {"path": "tasks/PILOT-065/evidence/gates.txt", "sha256": "a2d6bb7b227c4046d667646a3d6f67fccbeafce906455807eba07bc0306cf728"}
+  ]
+}
