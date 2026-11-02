@@ -1,0 +1,46 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-061",
+  "title": "PR merge head 一致性：只允许 implementation + envelope-only 差量",
+  "objective": {
+    "problem": "056/059/060 的 PR head 是 envelope-only commit，而 merge 把 `--match-head-commit` 指向 implementation head；GitHub 连续报 Head branch modified，最后走 local merge。根因是 PR head 与 implementation head 被强制相等，而流程需要多一个 envelope 文件提交。",
+    "outcome": "merge --mode pr 读取 PR 实际 head：若 head == implementation，或 head 相对 implementation 的差量只有 `merge-envelopes/<ENV>.json`，则用 PR head 作为 `--match-head-commit`；其它任何额外提交 exit 2。review 仍绑 implementation head；不再需要 local fallback。",
+    "approach": "在 pr_remote_merge 取 PR head/base 后，计算 `git diff --name-only implementation..head`；只允许 envelope_path 恰好一个文件；然后 gh pr merge --match-head-commit <PR head>；错误信息区分 extra commits。merge-check 的 review head == envelope implementation 不变。",
+    "non_goals_and_done": "不放宽 review head/base、不跳过 PR、不改 envelope 流程；688+ tests、PR 模式连续成功、真实塔 61/61 才完成。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0009 / 056-060 local merge fallback",
+  "why_now": "056/059/060 都以 local merge 收尾，PR 路径未被证明；外证前必须让 PR merge 成为唯一可走路径。",
+  "scope": [
+    "pr_remote_merge：取 PR head 后，若 head != envelope implementation_head_sha，计算 implementation..head 的 diff；只允许恰好一个 `merge-envelopes/<ENV>.json` 变更，其它文件/多个提交 exit 2（MergeBlocked）",
+    "gh pr merge 的 --match-head-commit 使用 PR 实际 head（不是 envelope implementation head）；head 不匹配/额外提交不产生 MERGED",
+    "merge-check 的 review head == envelope implementation、review base == dispatch base 保持不变；envelope-only commit 不被视为实现变更",
+    "merge --mode local 保留为显式 fallback，但默认 PR 卡不得使用；CI/文档记录 PR 路径成功",
+    "tests：implementation-only head 成功；implementation + envelope-only 成功；implementation + 其它文件 exit 2；多个 envelope 提交 exit 2；review head 仍是 implementation；head 不匹配 fail",
+    "不改 envelope-new/queue/ledger/replay；不改 058 review 门；不改 059 acceptance"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-061/tower-dsh/tools/tower_merge.py",
+    "pilot/worktrees/PILOT-061/tower-dsh/tools/tests/test_merge_head.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "allowing extra implementation commits in PR head",
+    "using local merge as the default path",
+    "weakening review head/base binding"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-061/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 688 + 新增用例数（main 基线 688）",
+    "implementation-only PR head：merge --mode pr 0，`--match-head-commit <impl>`",
+    "implementation + envelope-only PR head：merge --mode pr 0，`--match-head-commit <PR head>`，不报 Head branch modified",
+    "implementation + 额外文件 / 多次 envelope 提交：merge exit 2，零 MERGED；review head 不匹配仍 exit 2",
+    "真实塔 state-verify 61/61 drift []；arch gates 18；profile 11/0；shape 0",
+    "git -C pilot/worktrees/PILOT-061 diff --name-only main..HEAD 恰 2 个 allowed_paths"
+  ],
+  "depends_on": ["PILOT-060"],
+  "worktree": "pilot/worktrees/PILOT-061"
+}
