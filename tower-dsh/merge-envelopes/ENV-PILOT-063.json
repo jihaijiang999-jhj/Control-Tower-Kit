@@ -1,0 +1,28 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-063",
+  "task": "PILOT-063",
+  "repository": "..",
+  "branch": "pilot/PILOT-063",
+  "base": "main",
+  "implementation_head_sha": "50d184436e1819281e916d7923b36c0ad05d426b",
+  "envelope_path": "merge-envelopes/ENV-PILOT-063.json",
+  "created_at": "2026-11-02T18:05:00+08:00",
+  "scope": "PILOT-063: base-side envelope, PR head == implementation",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 715,
+  "forbidden": ["production", "external_call", "deploy"],
+  "evidence": [
+    {"path": "tasks/PILOT-063/evidence/tower_envelope.py", "sha256": "ccab4e257d44ad0493990dcb1af00bd6a69bc6247f6b11e9e79380b0f6c39b98"},
+    {"path": "tasks/PILOT-063/evidence/tower_merge.py", "sha256": "6936a85002a3df22dd55c300de96b1489903736d69eee9d25cfeb4e32628f4ba"},
+    {"path": "tasks/PILOT-063/evidence/tower_cli.py", "sha256": "ab3cca3583fd97929abf1d20531a0f550bc825caf4d928275d4d53cc1db50250"},
+    {"path": "tasks/PILOT-063/evidence/test_envelope_base_side.py", "sha256": "534b668bd146045296ef93ea9ac2591a47dd41fa65e9f2c24b8d2b72ea7e97c2"},
+    {"path": "tasks/PILOT-063/evidence/test_merge_head.py", "sha256": "a940dd2721cb705f5682595c35eb4353c9c9bc8c6189032707daf25a1eae1028"},
+    {"path": "tasks/PILOT-063/evidence/test-output.txt", "sha256": "4948ba507a9c7550f378a2ba94d61e0008d4079e06dbbb22f5bc2bb92eca7cc7"},
+    {"path": "tasks/PILOT-063/evidence/base_side_probe.py", "sha256": "2d69f2c02ea11a9b3cf6cade6c9765db0eef2e5b24fe818696e83d0bd0ed5043"},
+    {"path": "tasks/PILOT-063/evidence/probe.txt", "sha256": "90b1890ffeea1162278961bd2ab977b6c84654b21738e3e265ab3a49852e08ca"},
+    {"path": "tasks/PILOT-063/evidence/commit.txt", "sha256": "d61792ec4cb474803683974fdde079148be14fa9249d354b57380d4f4ddb92e0"},
+    {"path": "tasks/PILOT-063/evidence/diff.txt", "sha256": "89dbd4ab7682820d05c8cb84e085c281a2dd5c10e04274a81d4a21a0f5a177f7"},
+    {"path": "tasks/PILOT-063/evidence/gates.txt", "sha256": "6d173d631d1c721bb95eafad4d704ab69f2eee8dda59a060f246b8f02cc578f4"}
+  ]
+}
