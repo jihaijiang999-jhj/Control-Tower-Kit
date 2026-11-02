@@ -199,10 +199,14 @@ TASK_LIFECYCLE_STATUS = {
 }
 
 
+ENVELOPE_ABANDONED_STATUS = "ABANDONED"
+
+
 ENVELOPE_LIFECYCLE_STATUS = {
     "ENVELOPE_NEW": "DRAFT",
     "QUEUE_ADD": "WAITING",
     "MERGE": "MERGED",
+    "ENVELOPE_ABANDON": ENVELOPE_ABANDONED_STATUS,
     "POST_MERGE_VERIFIED": "POST_MERGE_VERIFIED",
 }
 
@@ -221,6 +225,17 @@ ENVELOPE_MERGEABLE_STATUSES = frozenset({"WAITING", "CORRECTION_REQUIRED"})
 
 
 ENVELOPE_TERMINAL_STATUSES = frozenset({"MERGED", "POST_MERGE_VERIFIED"})
+
+
+# PILOT-062: the statuses a failed envelope may be tombstoned from.  A
+# ``MERGE_BLOCKED`` *event* folds to ``CORRECTION_REQUIRED``, so that source is
+# covered by the status; ``MERGING`` is the internal state after ``MERGE_START``
+# (the queue entry, and after a merge start the replay, still see it).  The
+# literal ``MERGE_BLOCKED`` is accepted as well: a hand-written queue/envelope
+# may carry the event name, and treating it as blocked only widens nothing --
+# the replay fold itself never produces that string.
+ENVELOPE_ABANDONABLE_STATUSES = frozenset({
+    "WAITING", "CORRECTION_REQUIRED", "MERGE_BLOCKED", ENVELOPE_MERGING_STATUS})
 
 
 TASK_TRANSITIONS = {
@@ -258,6 +273,10 @@ ENVELOPE_TRANSITIONS = {
     "MERGE_BLOCKED": frozenset({"WAITING", ENVELOPE_MERGING_STATUS,
                                 "CORRECTION_REQUIRED"}),
     "POST_MERGE_FAILED": frozenset({"MERGED", "CORRECTION_REQUIRED"}),
+    # PILOT-062: the tombstone.  Only a live, non-terminal envelope may be
+    # abandoned -- ``DRAFT`` (never queued) and every terminal status stay
+    # outside the table, so replay keeps refusing those skips.
+    "ENVELOPE_ABANDON": frozenset(ENVELOPE_ABANDONABLE_STATUSES),
 }
 
 
