@@ -611,7 +611,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-061/MERGE.md",
       "updated_at": "2026-11-02T13:14:03+08:00"
+    },
+    {
+      "id": "PILOT-062",
+      "title": "账本清债：ENVELOPE_ABANDON + 记录豁免 + PR 路径首验",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:e54a79fb-2ccc-49c9-95c0-03ad78b5d2d6",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-062/MERGE.md",
+      "updated_at": "2026-11-02T16:03:55+08:00"
     }
   ],
-  "updated_at": "2026-11-02T13:14:03+08:00"
+  "updated_at": "2026-11-02T16:03:55+08:00"
 }
