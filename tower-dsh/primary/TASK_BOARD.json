@@ -601,7 +601,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-060/MERGE.md",
       "updated_at": "2026-11-02T02:54:33+08:00"
+    },
+    {
+      "id": "PILOT-061",
+      "title": "PR merge head 一致性：只允许 implementation + envelope-only 差量",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:2a45be4f-1318-4174-8ef6-2cca1d51203e",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-061/MERGE.md",
+      "updated_at": "2026-11-02T13:14:03+08:00"
     }
   ],
-  "updated_at": "2026-11-02T02:54:33+08:00"
+  "updated_at": "2026-11-02T13:14:03+08:00"
 }

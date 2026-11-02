@@ -1,0 +1,149 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-061",
+  "title": "PR merge head 一致性：只允许 implementation + envelope-only 差量",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "pr_remote_merge：取 PR head 后，若 head != envelope implementation_head_sha，计算 implementation..head 的 diff；只允许恰好一个 `merge-envelopes/<ENV>.json` 变更，其它文件/多个提交 exit 2（MergeBlocked）",
+    "gh pr merge 的 --match-head-commit 使用 PR 实际 head（不是 envelope implementation head）；head 不匹配/额外提交不产生 MERGED",
+    "merge-check 的 review head == envelope implementation、review base == dispatch base 保持不变；envelope-only commit 不被视为实现变更",
+    "merge --mode local 保留为显式 fallback，但默认 PR 卡不得使用；CI/文档记录 PR 路径成功",
+    "tests：implementation-only head 成功；implementation + envelope-only 成功；implementation + 其它文件 exit 2；多个 envelope 提交 exit 2；review head 仍是 implementation；head 不匹配 fail",
+    "不改 envelope-new/queue/ledger/replay；不改 058 review 门；不改 059 acceptance"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-061/tower-dsh/tools/tower_merge.py",
+    "pilot/worktrees/PILOT-061/tower-dsh/tools/tests/test_merge_head.py",
+    "pilot/worktrees/PILOT-061/tower-dsh/tools/tests/test_review_gate.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "allowing extra implementation commits in PR head",
+    "using local merge as the default path",
+    "weakening review head/base binding"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-061/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 688 + 新增用例数（main 基线 688）",
+    "implementation-only PR head：merge --mode pr 0，`--match-head-commit <impl>`",
+    "implementation + envelope-only PR head：merge --mode pr 0，`--match-head-commit <PR head>`，不报 Head branch modified",
+    "implementation + 额外文件 / 多次 envelope 提交：merge exit 2，零 MERGED；review head 不匹配仍 exit 2",
+    "真实塔 state-verify 61/61 drift []；arch gates 18；profile 11/0；shape 0",
+    "git -C pilot/worktrees/PILOT-061 diff --name-only main..HEAD 恰 2 个 allowed_paths"
+  ],
+  "depends_on": [
+    "PILOT-060"
+  ],
+  "worktree": "pilot/worktrees/PILOT-061",
+  "spec_path": "pilot/PILOT-061.spec.json",
+  "spec_sha256": "00dd1859d1c04c0693ba64304819fe3a281147aa2a3c95f8076ca1ff3d297b19",
+  "spec_gate": "PASS",
+  "executor": "subagent:2a45be4f-1318-4174-8ef6-2cca1d51203e",
+  "dispatch": {
+    "executor": "subagent:2a45be4f-1318-4174-8ef6-2cca1d51203e",
+    "worktree": "pilot/worktrees/PILOT-061",
+    "at": "2026-11-02T12:46:57+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "fb81dd2727e5b7b568c3d4a9cfc61707658595c6",
+    "campaign": "C-2026-Q4-04"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-061/evidence/tower_merge.py",
+      "sha256": "f84b9053fbdebbbe1cb26501aa8beb5f8c9b52d0ae5b97fed769e62892819ebd",
+      "bytes": 28595,
+      "at": "2026-11-02T12:57:17+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-061/evidence/test_merge_head.py",
+      "sha256": "32416e8edd2e07430ec244d8cd73515acabf30be690fb31b93db334aca69185a",
+      "bytes": 24285,
+      "at": "2026-11-02T12:57:17+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-061/evidence/test_review_gate.py",
+      "sha256": "2bb2b34778f363b8cebc911e302abbd61e00368e93eca0af1bd0a8b47413a32c",
+      "bytes": 26296,
+      "at": "2026-11-02T12:57:17+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-061/evidence/test-output.txt",
+      "sha256": "faa67841270c00b57007625939073f9172e15fbc675dbacc4309301de69991da",
+      "bytes": 198718,
+      "at": "2026-11-02T12:57:17+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-061/evidence/merge_probe.py",
+      "sha256": "0b3fc257f8bbd1fac3d35ff6878e86ee255d89377c4764260b8f8ddded2ce740",
+      "bytes": 7347,
+      "at": "2026-11-02T12:57:17+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-061/evidence/probe.txt",
+      "sha256": "992c9188e043c6c5fa6988b77ceb2567e6eab703cd59c5671af4eb7f478cc75b",
+      "bytes": 2450,
+      "at": "2026-11-02T12:57:18+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-061/evidence/commit.txt",
+      "sha256": "57a4651143f986c6775054b0625b7cc3e8b017621a5f9b33827f2ef3a9f19dfd",
+      "bytes": 814,
+      "at": "2026-11-02T12:57:18+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-061/evidence/diff.txt",
+      "sha256": "484dbf0b9a75f06a99cfeba9e2fee63e4272b3b4dcbd0ee78155aa6cabad369d",
+      "bytes": 63066,
+      "at": "2026-11-02T12:57:18+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-061/evidence/gates.txt",
+      "sha256": "df9f15a3c9c7bfdcda05242362e4dac8ff191b323aa3d07bb77c5a75642ac88d",
+      "bytes": 3696,
+      "at": "2026-11-02T12:57:18+08:00",
+      "id": "E-009"
+    }
+  ],
+  "review": {
+    "schema": "tower/review@1",
+    "task": "PILOT-061",
+    "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+    "verdict": "PASS",
+    "head": "375e5e200f242079f1abefb288db8f30fa4e3ba2",
+    "base": "fb81dd2727e5b7b568c3d4a9cfc61707658595c6",
+    "scope": [],
+    "findings": [],
+    "note": "061 PASS（合同已同步）。3 paths；HEAD 375e5e2（base fb81dd2）；9/9 证据；Ran 704 OK；helper impl-only pin impl；impl+envelope-only pin PR head；额外文件/多 commit/非后代/空 diff 拒绝；review 仍绑 impl；真实塔 61/60 drift []。",
+    "at": "2026-11-02T13:13:59+08:00",
+    "structure": ""
+  },
+  "decision": {
+    "id": "D-PILOT-061",
+    "actor": "owner",
+    "text": "PASS; envelope-only head",
+    "at": "2026-11-02T13:14:03+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-061/CLOSEOUT.md",
+    "at": "2026-11-02T13:14:03+08:00"
+  },
+  "created_at": "2026-11-02T11:21:38+08:00",
+  "updated_at": "2026-11-02T13:14:03+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-061/MERGE.md",
+  "delivered_at": "2026-11-02T12:57:18+08:00",
+  "accepted_at": "2026-11-02T13:14:03+08:00"
+}
