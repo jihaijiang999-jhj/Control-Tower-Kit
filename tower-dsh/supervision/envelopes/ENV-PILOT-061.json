@@ -55,9 +55,13 @@
     }
   ],
   "envelope_head_sha": "e673e7cd156a6de2c7f8e9dd9369c7e4d197fc04",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "merge_commit": "69728f95bf5296ac6516c4b871dc7a8eac4b39a6",
   "merged_at": "2026-11-02T13:25:12+08:00",
   "supervisor": "sup-phase2-pilot",
-  "merge_mode": "local"
+  "merge_mode": "local",
+  "tests_count": 2,
+  "tower_tests_count": 704,
+  "post_merge_at": "2026-11-02T13:41:55+08:00",
+  "post_merge_note": "bootstrap local; 062 will test PR"
 }
