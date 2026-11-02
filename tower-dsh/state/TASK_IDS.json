@@ -427,6 +427,13 @@
       "spec_path": "pilot/PILOT-061.spec.json",
       "created_at": "2026-11-02T11:21:38+08:00",
       "updated_at": "2026-11-02T13:14:03+08:00"
+    },
+    "PILOT-062": {
+      "title": "账本清债：ENVELOPE_ABANDON + 记录豁免 + PR 路径首验",
+      "status": "closed",
+      "spec_path": "pilot/PILOT-062.spec.json",
+      "created_at": "2026-11-02T14:45:38+08:00",
+      "updated_at": "2026-11-02T16:03:55+08:00"
     }
   }
 }
