@@ -29,7 +29,11 @@
     "pilot/worktrees/PILOT-062/tower-dsh/EVENT_CATALOG.json",
     "pilot/worktrees/PILOT-062/tower-dsh/tools/tower_merge.py",
     "pilot/worktrees/PILOT-062/tower-dsh/tools/tests/test_merge_head.py",
-    "pilot/worktrees/PILOT-062/tower-dsh/tools/tests/test_modules.py"
+    "pilot/worktrees/PILOT-062/tower-dsh/tools/tests/test_modules.py",
+    "tasks/PILOT-052/EXCEPTION.md",
+    "tasks/PILOT-056/BASELINE-MIGRATION.md",
+    "pilot/PILOT-060.spec.json",
+    "tasks/PILOT-060/TASK.md"
   ],
   "forbidden": [
     "network",

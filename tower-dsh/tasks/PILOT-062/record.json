@@ -2,7 +2,7 @@
   "schema": "tower/task@1",
   "id": "PILOT-062",
   "title": "账本清债：ENVELOPE_ABANDON + 记录豁免 + PR 路径首验",
-  "status": "dispatched",
+  "status": "delivered",
   "authority": "workspace_write",
   "scope": [
     "新增 towerctl envelope-abandon --envelope --reason [--by]：只允许 supervisor；源状态 WAITING/CORRECTION_REQUIRED/MERGE_BLOCKED/MERGING；置 envelope.status=ABANDONED、queue.status=ABANDONED、追加 ENVELOPE_ABANDON(supervision)；已 MERGED/POST_MERGE_VERIFIED 拒绝",
@@ -22,7 +22,11 @@
     "pilot/worktrees/PILOT-062/tower-dsh/EVENT_CATALOG.json",
     "pilot/worktrees/PILOT-062/tower-dsh/tools/tower_merge.py",
     "pilot/worktrees/PILOT-062/tower-dsh/tools/tests/test_merge_head.py",
-    "pilot/worktrees/PILOT-062/tower-dsh/tools/tests/test_modules.py"
+    "pilot/worktrees/PILOT-062/tower-dsh/tools/tests/test_modules.py",
+    "tasks/PILOT-052/EXCEPTION.md",
+    "tasks/PILOT-056/BASELINE-MIGRATION.md",
+    "pilot/PILOT-060.spec.json",
+    "tasks/PILOT-060/TASK.md"
   ],
   "forbidden": [
     "network",
@@ -49,24 +53,103 @@
   ],
   "worktree": "pilot/worktrees/PILOT-062",
   "spec_path": "pilot/PILOT-062.spec.json",
-  "spec_sha256": "1dcf6defac6dada11cfc3a1ce190c8bf94529eae44e1751603984d554b3c20e8",
+  "spec_sha256": "2f3757af2cd098190e2f0b97e2cb752c50a8cbdc417f3fa562790ccc0ce843ec",
   "spec_gate": "PASS",
   "executor": "subagent:e54a79fb-2ccc-49c9-95c0-03ad78b5d2d6",
   "dispatch": {
     "executor": "subagent:e54a79fb-2ccc-49c9-95c0-03ad78b5d2d6",
     "worktree": "pilot/worktrees/PILOT-062",
-    "at": "2026-11-02T14:59:44+08:00",
+    "at": "2026-11-02T15:30:13+08:00",
     "kind": "subagent",
     "model": null,
     "parent": null,
-    "base_sha": "9303f00170b3da644b3868d7e8d0378aaec82197",
+    "base_sha": "125cb4dfc8b17bc822fbfb6538bde078e7b2b95b",
     "campaign": "C-2026-Q4-04"
   },
-  "evidence": [],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-062/evidence/tower_ledger_replay.py",
+      "sha256": "80b8e0e3c0dfc8ef2b86254f43867952b778a3545b1f7d7bfb8dc0e49d13a90c",
+      "bytes": 19365,
+      "at": "2026-11-02T15:38:46+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-062/evidence/tower_cli.py",
+      "sha256": "7025892dea7739b501fa7a36a49c737555e26f7dd8f80f42f7038a492c5c9a56",
+      "bytes": 25733,
+      "at": "2026-11-02T15:38:46+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-062/evidence/test_envelope_abandon.py",
+      "sha256": "8cb492d0c93970b22459da41b23e7083f7fc6adf6cf7335e4a9169d4c5d6e83c",
+      "bytes": 15877,
+      "at": "2026-11-02T15:38:46+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-062/evidence/EVENT_CATALOG.json",
+      "sha256": "663267f502e165efb3ee7f8c9f2d901551863bf1c7ccaf442f8e100e4ac680f6",
+      "bytes": 12674,
+      "at": "2026-11-02T15:38:46+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-062/evidence/test_modules.py",
+      "sha256": "de9e3345f8078aaeac0ee370240a9c0cbc733cf991ee4c7b9353279e22d491e3",
+      "bytes": 5953,
+      "at": "2026-11-02T15:38:46+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-062/evidence/test-output.txt",
+      "sha256": "56209a27a9b2be15552116614b186f0b2a66077a3a80f37cfd6333a39b5638e1",
+      "bytes": 202084,
+      "at": "2026-11-02T15:38:46+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-062/evidence/abandon_probe.py",
+      "sha256": "33b0efbf16833157cb76694b718bda2485fc28a29388b13d9f0536d5592f4be4",
+      "bytes": 5179,
+      "at": "2026-11-02T15:38:46+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-062/evidence/probe.txt",
+      "sha256": "25cc6873d01c4414dd1c6f98ecccd4f4448ffc3f04fac5a879cf3fba7e452523",
+      "bytes": 2692,
+      "at": "2026-11-02T15:38:46+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-062/evidence/commit.txt",
+      "sha256": "223df79cbe1128697d55e65d06d87875d5133a82de4cc7a7be72bffde4e02672",
+      "bytes": 1032,
+      "at": "2026-11-02T15:38:46+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-062/evidence/diff.txt",
+      "sha256": "dd84ef66751d28068c0d3d7974bb343d62164e81bc406075d0f0f1172243c431",
+      "bytes": 58098,
+      "at": "2026-11-02T15:38:46+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-062/evidence/gates.txt",
+      "sha256": "256205754c936a35016539bb7d80edd1e270997bc91139cce34452621ad3c5a5",
+      "bytes": 3910,
+      "at": "2026-11-02T15:38:46+08:00",
+      "id": "E-011"
+    }
+  ],
   "review": null,
   "decision": null,
   "closeout": null,
   "created_at": "2026-11-02T14:45:38+08:00",
-  "updated_at": "2026-11-02T14:59:44+08:00",
-  "next": "等待 executor 交付"
+  "updated_at": "2026-11-02T15:38:46+08:00",
+  "next": "等待独立 reviewer",
+  "delivered_at": "2026-11-02T15:38:46+08:00"
 }

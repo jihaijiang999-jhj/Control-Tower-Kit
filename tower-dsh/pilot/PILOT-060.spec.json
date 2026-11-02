@@ -33,7 +33,7 @@
   "acceptance": [
     "cd pilot/worktrees/PILOT-060/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 683 + 新增用例数（main 基线 683）",
     "MERGE_START 源状态 = {WAITING, CORRECTION_REQUIRED, MERGING}；DRAFT/MERGED/POST_MERGE_VERIFIED 仍拒",
-    "真实塔 state-verify 0（056 的重复 MERGE_START 合法），59/59；profile 11/0；arch gates 18",
+    "真实塔 state-verify 0（056 的重复 MERGE_START 合法），60/59；profile 11/0；arch gates 18",
     "其它 055 re-dispatch/058 review/059 acceptance 测试不回归",
     "git -C pilot/worktrees/PILOT-060 diff --name-only main..HEAD 恰 2 个 allowed_paths"
   ],
