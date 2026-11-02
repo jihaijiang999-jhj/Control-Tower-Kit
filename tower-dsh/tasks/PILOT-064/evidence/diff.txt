@@ -1,0 +1,694 @@
+﻿=== PILOT-064 diff: 607224d..HEAD (must be exactly 5 paths) ===
+
+$ git diff --stat 607224d..HEAD
+ tower-dsh/tools/tests/test_envelope_base_side.py | 418 +++++++++++++++++++++++
+ tower-dsh/tools/tests/test_merge_head.py         |  19 ++
+ tower-dsh/tools/tower_cli.py                     |  23 +-
+ tower-dsh/tools/tower_envelope.py                | 106 ++++--
+ tower-dsh/tools/tower_merge.py                   |   4 +-
+ 5 files changed, 530 insertions(+), 40 deletions(-)
+
+$ git diff --name-status 607224d..HEAD
+A	tower-dsh/tools/tests/test_envelope_base_side.py
+M	tower-dsh/tools/tests/test_merge_head.py
+M	tower-dsh/tools/tower_cli.py
+M	tower-dsh/tools/tower_envelope.py
+M	tower-dsh/tools/tower_merge.py
+
+paths=5
+
+=== full diff ===
+diff --git a/tower-dsh/tools/tests/test_envelope_base_side.py b/tower-dsh/tools/tests/test_envelope_base_side.py
+new file mode 100644
+index 0000000..4a90439
+--- /dev/null
++++ b/tower-dsh/tools/tests/test_envelope_base_side.py
+@@ -0,0 +1,418 @@
++"""PILOT-063: base-side envelopes — the PR head is always the implementation.
++
++061 relaxed ``pr_remote_merge`` so a PR head could be the implementation plus
++one envelope-only commit, but ``envelope_checks`` still demanded that the
++implementation branch head equal the envelope head.  Any branch commit (even an
++empty one) therefore broke the head equality, and the PR path stayed unusable.
++
++A *base-side* envelope moves the envelope commit to the base branch:
++
++* ``envelope-new --base-side`` records the implementation branch head as
++  ``implementation_head_sha`` and the base head as ``head``/``envelope_head_sha``,
++  writes ``ENVELOPE_NEW``/``QUEUE_ADD`` and never requires an envelope commit on
++  the implementation branch;
++* ``envelope_checks`` requires ``branch head == implementation_head_sha`` and the
++  envelope file in base, and no longer compares the branch head to the envelope
++  head;
++* ``merge --mode pr`` pins ``--match-head-commit`` at the implementation head.
++
++Branch-side envelopes written before 063 keep the old checks unchanged.  ``gh``
++is an offline stub injected through ``TOWERCTL_GH``; the "remote" is a
++throw-away bare repository, so nothing here touches a network.
++
++Run from the tower root (``tower-dsh``)::
++
++    python -B -m unittest tools.tests.test_envelope_base_side -v
++"""
++from __future__ import annotations
++
++import argparse
++import hashlib
++import json
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++TOOLS_DIR = Path(__file__).resolve().parents[1]
++TESTS_DIR = Path(__file__).resolve().parent
++for _path in (str(TOOLS_DIR), str(TESTS_DIR)):
++    if _path not in sys.path:
++        sys.path.insert(0, _path)
++
++import tower_merge  # noqa: E402  (TOOLS_DIR must be on sys.path first)
++import test_merge_head as head_kit  # noqa: E402  (offline gh environment)
++import test_review_gate as kit  # noqa: E402  (offline gh stub + CLI/git helpers)
++
++TASK = "PILOT-063"
++ENVELOPE = "ENV-PILOT-063"
++ENVELOPE_PATH = f"merge-envelopes/{ENVELOPE}.json"
++WORKTREE = f"pilot/worktrees/{TASK}"
++BRANCH = "pilot/PILOT-063"
++BASE = "main"
++REVIEWER = "rev-063"
++SUPERVISOR = "sup-063"
++FIXED_TIME = "2026-11-01T00:00:00+08:00"
++PR_URL = kit.PR_URL
++
++run_cli = kit.run_cli
++run_git = kit.run_git
++write_json = kit.write_json
++read_json = kit.read_json
++ok = kit.ok
++
++
++class BaseSideKit(unittest.TestCase):
++    """One throw-away repository and tower root shared by the 063 cases.
++
++    ``base_side`` decides where the envelope commit lives: on the base branch
++    (main) or, for the legacy comparison, on the implementation branch.
++    ``create_envelope`` is off for the shape-refusal cases, which build their
++    own base history before invoking ``envelope-new``.
++    """
++
++    base_side = True
++    create_envelope = True
++
++    def setUp(self) -> None:
++        self._tmp = tempfile.TemporaryDirectory(
++            prefix="towerctl-base-side-", ignore_cleanup_errors=True)
++        self.tmp = Path(self._tmp.name)
++        self.kit = self.tmp / "kit"
++        self.root = self.kit / "tower-dsh"
++        self.gh = self.tmp / "gh_stub.py"
++        self.gh_log = self.tmp / "gh-argv.jsonl"
++        self.gh.write_text(kit.GH_STUB, encoding="utf-8")
++        self.envelope_head = ""
++        self.init_repo()
++        self.init_tower()
++
++    def tearDown(self) -> None:
++        self._tmp.cleanup()
++
++    # -- repository fixture ----------------------------------------------
++    def commit(self, message: str, *paths: str) -> str:
++        ok(run_git(self.kit, "add", "--", *paths))
++        ok(run_git(self.kit, "-c", "commit.gpgsign=false", "commit", "-m", message))
++        return run_git(self.kit, "rev-parse", "HEAD").stdout.strip()
++
++    def envelope_repo_path(self) -> str:
++        """Repo-relative envelope path: base-side lives under the tower root.
++
++        ``git diff`` names files from the repository root, so a base-side
++        envelope materialises as ``tower-dsh/merge-envelopes/<ENV>.json``
++        (PILOT-064).  A branch-side envelope keeps the pre-063 root path.
++        """
++        return f"tower-dsh/{ENVELOPE_PATH}" if self.base_side else ENVELOPE_PATH
++
++    def write_envelope_file(self) -> None:
++        write_json(self.kit / self.envelope_repo_path(), {"envelope_id": ENVELOPE})
++
++    def envelope_commit(self, *extra: str) -> str:
++        """Commit the envelope file (plus optional extras) where we stand."""
++        self.write_envelope_file()
++        for path in extra:
++            (self.kit / path).write_text("extra\n", encoding="utf-8")
++        return self.commit("envelope", self.envelope_repo_path(), *extra)
++
++    def init_repo(self) -> None:
++        self.kit.mkdir(parents=True, exist_ok=True)
++        ok(run_git(self.kit, "init"))
++        ok(run_git(self.kit, "symbolic-ref", "HEAD", "refs/heads/main"))
++        (self.kit / "README.md").write_text("base\n", encoding="utf-8")
++        self.base_sha = self.commit("base", "README.md")
++        ok(run_git(self.kit, "checkout", "-b", BRANCH))
++        (self.kit / "feature.txt").write_text("implementation\n", encoding="utf-8")
++        self.implementation_head = self.commit("implementation", "feature.txt")
++        ok(run_git(self.kit, "checkout", BASE))
++        if not self.create_envelope:
++            return
++        if self.base_side:
++            self.envelope_head = self.envelope_commit()
++            return
++        ok(run_git(self.kit, "checkout", BRANCH))
++        self.envelope_head = self.envelope_commit()
++        ok(run_git(self.kit, "checkout", BASE))
++
++    # -- tower fixture ----------------------------------------------------
++    def init_tower(self) -> None:
++        evidence = self.root / "tasks" / TASK / "evidence"
++        evidence.mkdir(parents=True)
++        proof = evidence / "proof.txt"
++        proof.write_text("base-side envelope evidence\n", encoding="utf-8")
++        write_json(self.root / "tasks" / TASK / "ACCEPTANCE.json", {
++            "schema": "tower/acceptance@1",
++            "items": [{"id": "A-01", "kind": "auto", "status": "passed",
++                       "note": "base-side envelope"}]})
++        write_json(self.root / "primary" / "CURRENT_STATE.json", {
++            "schema": "tower/current-state@1", "role": "primary",
++            "primary": {"id": "ctl-063"}, "owner": {"name": "mac"},
++            "phase": "TEST"})
++        write_json(self.root / "primary" / "TASK_BOARD.json",
++                   {"schema": "tower/task-board@1", "tasks": []})
++        write_json(self.root / "supervision" / "CURRENT_STATE.json", {
++            "schema": "tower/supervision-state@1", "role": "supervision",
++            "phase": "TEST", "supervisor": {"id": SUPERVISOR}})
++        (self.root / "ledger").mkdir(parents=True, exist_ok=True)
++        (self.root / "ledger" / "primary.jsonl").touch()
++        (self.root / "ledger" / "supervision.jsonl").touch()
++        write_json(self.root / "supervision" / "MERGE_QUEUE.json",
++                   {"schema": "tower/merge-queue@1", "entries": []})
++        write_json(self.root / "tasks" / TASK / "record.json", self.record())
++
++    def record(self) -> dict:
++        proof = (self.root / "tasks" / TASK / "evidence" / "proof.txt").read_bytes()
++        return {
++            "schema": "tower/task@1", "id": TASK, "title": "base-side envelope",
++            "status": "delivered", "authority": "workspace_write",
++            "scope": ["base-side envelope"],
++            "allowed_paths": [f"tower-dsh/tasks/{TASK}/REVIEW.json"],
++            "forbidden": ["merge"], "acceptance": ["tests pass"], "depends_on": [],
++            "worktree": WORKTREE, "executor": "exec-063",
++            "dispatch": {"executor": "exec-063", "worktree": WORKTREE,
++                         "base_sha": self.base_sha, "at": FIXED_TIME},
++            "evidence": [{"id": "E-001",
++                          "path": f"tasks/{TASK}/evidence/proof.txt",
++                          "sha256": hashlib.sha256(proof).hexdigest(),
++                          "bytes": len(proof), "at": FIXED_TIME}],
++            "review": None, "decision": None, "closeout": None,
++            "created_at": FIXED_TIME, "updated_at": FIXED_TIME,
++            "next": "waiting for independent reviewer",
++        }
++
++    def envelope_path(self) -> Path:
++        return self.root / "supervision" / "envelopes" / f"{ENVELOPE}.json"
++
++    def payload(self) -> dict:
++        return {
++            "schema": "tower/merge-envelope@1", "envelope_id": ENVELOPE,
++            "task": TASK, "repository": "..", "branch": BRANCH, "base": BASE,
++            "envelope_path": ENVELOPE_PATH,
++            "implementation_head_sha": self.implementation_head,
++            "tests_baseline": 1, "tower_tests_baseline": 1,
++        }
++
++    def supervision_events(self) -> list[dict]:
++        text = (self.root / "ledger" / "supervision.jsonl").read_text(
++            encoding="utf-8")
++        return [json.loads(line) for line in text.splitlines() if line.strip()]
++
++    # -- commands ---------------------------------------------------------
++    def cli(self, *args: str,
++            env_extra: dict | None = None) -> subprocess.CompletedProcess:
++        return run_cli(self.root, *args, env_extra=env_extra)
++
++    def accept_task(self, head: str | None = None) -> None:
++        cp = self.cli("checkback", "--task", TASK, "--reviewer", REVIEWER,
++                      "--verdict", "PASS", "--head",
++                      head or self.implementation_head, "--base", self.base_sha)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        cp = self.cli("accept", "--task", TASK, "--decision", "D-063")
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++
++    def envelope_new(self, *,
++                     base_side: bool | None = None) -> subprocess.CompletedProcess:
++        write_json(self.root / "envelope.json", self.payload())
++        side = self.base_side if base_side is None else base_side
++        args = ["envelope-new", "--task", TASK,
++                "--file", str(self.root / "envelope.json")]
++        if side:
++            args.append("--base-side")
++        return self.cli(*args)
++
++    def promote(self, *, head: str | None = None,
++                base_side: bool | None = None) -> None:
++        self.accept_task(head)
++        cp = self.envelope_new(base_side=base_side)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        cp = self.cli("queue-add", "--envelope", ENVELOPE)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++
++    def merge_check(self) -> subprocess.CompletedProcess:
++        return self.cli("merge-check", "--envelope", ENVELOPE)
++
++
++class BaseSideGateCase(BaseSideKit):
++    """The base-side happy path and the three refusals of ``envelope_checks``."""
++
++    def test_base_side_envelope_checks_clean(self) -> None:
++        self.assertNotEqual(self.envelope_head, self.implementation_head)
++        self.promote()
++        cp = self.merge_check()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        checks = json.loads(cp.stdout)["checks"]
++        self.assertTrue(all(c["ok"] for c in checks),
++                        [c for c in checks if not c["ok"]])
++        names = [c["name"] for c in checks]
++        self.assertIn("branch head == implementation head", names)
++        self.assertIn("envelope file in base", names)
++        self.assertNotIn("branch head == envelope head", names)
++        # The envelope record and its lifecycle events describe base-side.
++        envelope = read_json(self.envelope_path())
++        self.assertTrue(envelope["base_side"])
++        self.assertEqual(envelope["head"], self.envelope_head)
++        self.assertEqual(envelope["envelope_head_sha"], self.envelope_head)
++        self.assertEqual(envelope["implementation_head_sha"],
++                         self.implementation_head)
++        events = self.supervision_events()
++        created = next(e for e in events if e["type"] == "ENVELOPE_NEW")
++        self.assertEqual(created["payload"]["head"], self.envelope_head)
++        self.assertTrue(created["payload"]["base_side"])
++        self.assertIn("QUEUE_ADD", [e["type"] for e in events])
++        # The envelope commit is in main, under the tower prefix; the
++        # implementation branch has no envelope file at all.
++        present = run_git(self.kit, "cat-file", "-e",
++                          f"{BASE}:{self.envelope_repo_path()}")
++        self.assertEqual(present.returncode, 0, msg=present.stderr)
++        self.assertNotEqual(
++            run_git(self.kit, "cat-file", "-e",
++                    f"{BRANCH}:{self.envelope_repo_path()}").returncode,
++            0)
++
++    def test_envelope_commit_lives_under_the_tower_prefix(self) -> None:
++        """PILOT-064: the envelope commit is tower-root relative in the repo."""
++        self.promote()
++        tower_path = self.envelope_repo_path()
++        self.assertTrue(tower_path.startswith("tower-dsh/"))
++        self.assertEqual(run_git(self.kit, "cat-file", "-e",
++                                 f"{BASE}:{tower_path}").returncode, 0)
++        # ... and a repo-root copy is not what the check accepts.
++        self.assertNotEqual(run_git(self.kit, "cat-file", "-e",
++                                    f"{BASE}:{ENVELOPE_PATH}").returncode, 0)
++        self.assertNotEqual(run_git(self.kit, "cat-file", "-e",
++                                    f"{BRANCH}:{tower_path}").returncode, 0)
++
++    def test_repo_root_envelope_commit_is_refused(self) -> None:
++        """PILOT-064: without the tower prefix the envelope is in the wrong place."""
++        self.accept_task()
++        write_json(self.kit / ENVELOPE_PATH, {"envelope_id": ENVELOPE})
++        self.commit("root-level envelope", ENVELOPE_PATH)
++        cp = self.envelope_new()
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        self.assertIn("envelope commit only changes envelope path", cp.stdout)
++        self.assertIn("tower-dsh/merge-envelopes", cp.stdout)
++        self.assertFalse(self.envelope_path().exists())
++        self.assertEqual(len(self.supervision_events()), 0)
++
++    def test_branch_head_that_is_not_the_implementation_blocks(self) -> None:
++        self.promote()
++        ok(run_git(self.kit, "checkout", BRANCH))
++        (self.kit / "feature.txt").write_text("moved\n", encoding="utf-8")
++        moved = self.commit("extra implementation", "feature.txt")
++        ok(run_git(self.kit, "checkout", BASE))
++        cp = self.merge_check()
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        errors = json.loads(cp.stdout)["errors"]
++        detail = next(item["detail"] for item in errors
++                      if item["name"] == "branch head == implementation head")
++        self.assertIn(moved, detail)
++        self.assertIn(self.implementation_head, detail)
++
++    def test_review_bound_to_the_envelope_head_blocks(self) -> None:
++        self.promote(head=self.envelope_head)
++        cp = self.merge_check()
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        errors = json.loads(cp.stdout)["errors"]
++        detail = next(item["detail"] for item in errors
++                      if item["name"] == "review bound to head")
++        self.assertIn("stale review: head", detail)
++        self.assertIn(self.implementation_head, detail)
++
++    def test_envelope_missing_from_base_blocks(self) -> None:
++        self.promote()
++        ok(run_git(self.kit, "rm", "--quiet", self.envelope_repo_path()))
++        ok(run_git(self.kit, "-c", "commit.gpgsign=false", "commit",
++                   "-m", "drop envelope"))
++        cp = self.merge_check()
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        errors = json.loads(cp.stdout)["errors"]
++        failed = next(item for item in errors
++                      if item["name"] == "envelope file in base")
++        self.assertFalse(failed["ok"])
++        self.assertNotIn("MERGED", cp.stdout)
++
++
++class BaseSideShapeCase(BaseSideKit):
++    """``envelope-new --base-side`` refuses a base commit that is not envelope-only."""
++
++    create_envelope = False
++
++    def test_extra_file_in_the_base_commit_is_rejected(self) -> None:
++        self.accept_task()
++        self.envelope_commit("leak.txt")
++        cp = self.envelope_new()
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        self.assertIn("envelope commit only changes envelope path", cp.stdout)
++        self.assertFalse(self.envelope_path().exists())
++        self.assertEqual(len(self.supervision_events()), 0)
++
++    def test_non_envelope_commit_on_base_is_rejected(self) -> None:
++        self.accept_task()
++        (self.kit / "leak.txt").write_text("leak\n", encoding="utf-8")
++        self.commit("not an envelope", "leak.txt")
++        cp = self.envelope_new()
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        self.assertIn("envelope commit only changes envelope path", cp.stdout)
++        self.assertFalse(self.envelope_path().exists())
++        self.assertEqual(len(self.supervision_events()), 0)
++
++
++class LegacyBranchSideCase(BaseSideKit):
++    """A branch-side envelope (pre-063 layout) keeps the old checks and passes."""
++
++    base_side = False
++
++    def test_branch_side_envelope_still_checks_clean(self) -> None:
++        self.assertEqual(run_git(self.kit, "rev-parse", BRANCH).stdout.strip(),
++                         self.envelope_head)
++        self.promote(base_side=False)
++        cp = self.merge_check()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        checks = json.loads(cp.stdout)["checks"]
++        names = [c["name"] for c in checks]
++        self.assertIn("branch head == envelope head", names)
++        self.assertIn("envelope parent == implementation head", names)
++        self.assertNotIn("branch head == implementation head", names)
++        self.assertNotIn("base_side", read_json(self.envelope_path()))
++
++
++class BaseSidePrHeadCase(BaseSideKit):
++    """``merge --mode pr`` pins ``--match-head-commit`` at the implementation."""
++
++    def setUp(self) -> None:
++        super().setUp()
++        self.origin = self.tmp / "origin.git"
++        bare = subprocess.run(["git", "init", "--bare", str(self.origin)],
++                              capture_output=True, text=True, encoding="utf-8")
++        self.assertEqual(bare.returncode, 0, msg=bare.stderr)
++        ok(run_git(self.kit, "remote", "add", "origin",
++                   str(self.origin).replace("\\", "/")))
++        self.args = argparse.Namespace(
++            remote="origin", envelope=ENVELOPE, supervisor=SUPERVISOR,
++            check_timeout=10, check_interval=0.05)
++
++    def merge_argv(self) -> list[str]:
++        calls = [json.loads(line) for line in
++                 self.gh_log.read_text(encoding="utf-8").splitlines()
++                 if line.strip()]
++        return next(call for call in calls if call[:2] == ["pr", "merge"])
++
++    def test_pr_merge_pins_the_implementation_head(self) -> None:
++        env = self.payload()
++        env.update({"base_side": True, "envelope_head_sha": self.envelope_head})
++        with head_kit.gh_environment(
++                TOWERCTL_GH=f"{sys.executable} {self.gh}",
++                RG_GH_LOG=str(self.gh_log)):
++            identity = tower_merge.pr_remote_merge(self.kit, env, self.args)
++        self.assertEqual(identity["pr_url"], PR_URL)
++        argv = self.merge_argv()
++        self.assertIn("--merge", argv)
++        self.assertEqual(argv[argv.index("--match-head-commit") + 1],
++                         self.implementation_head)
++        self.assertNotEqual(argv[argv.index("--match-head-commit") + 1],
++                            self.envelope_head)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tower-dsh/tools/tests/test_merge_head.py b/tower-dsh/tools/tests/test_merge_head.py
+index d0eeeac..b965216 100644
+--- a/tower-dsh/tools/tests/test_merge_head.py
++++ b/tower-dsh/tools/tests/test_merge_head.py
+@@ -12,6 +12,10 @@ the flow fell back to a local merge.  The merge now:
+   non-descendant head, an empty diff with a different head) with a
+   ``MergeBlocked("pr-merge", "merge", ...)`` and no ``MERGED``.
+ 
++PILOT-063 adds the base-side envelope: its envelope commit lives on the base
++branch, so the PR branch carries only the implementation and even the
++envelope-only child is refused for it (``base_side: true``).
++
+ The review binding is untouched: ``merge-check`` still requires the reviewed
+ head to equal the envelope's implementation head (PILOT-058).
+ 
+@@ -228,6 +232,21 @@ class PrMergeHeadUnitCase(RepoKitCase):
+         self.assertIn("merge-envelopes", caught.exception.detail)
+         self.assertNotEqual(head, self.implementation_head)
+ 
++    # -- base-side (PILOT-063): the branch is exactly the implementation ---
++    def test_base_side_head_is_the_implementation(self) -> None:
++        self.assertEqual(tower_merge.pr_merge_head(self.kit, self.env(base_side=True)),
++                         self.implementation_head)
++
++    def test_base_side_envelope_child_is_blocked(self) -> None:
++        # The envelope commit is on base for a base-side envelope; an
++        # envelope-only child on the PR branch must never be pinned.
++        self.add_envelope()
++        with self.assertRaises(MergeBlocked) as caught:
++            tower_merge.pr_merge_head(self.kit, self.env(base_side=True))
++        self.assertEqual((caught.exception.phase, caught.exception.reason),
++                         ("pr-merge", "merge"))
++        self.assertIn("base-side PR head", caught.exception.detail)
++
+ 
+ class PrRemoteMergeUnitCase(RepoKitCase):
+     """``pr_remote_merge`` pins the head it resolved before any CI work."""
+diff --git a/tower-dsh/tools/tower_cli.py b/tower-dsh/tools/tower_cli.py
+index 8e4cc0a..d7d2f4b 100644
+--- a/tower-dsh/tools/tower_cli.py
++++ b/tower-dsh/tools/tower_cli.py
+@@ -526,6 +526,25 @@ def acceptance_layer_parsers(
+     return parser
+ 
+ 
++def envelope_base_side_layer_parsers(
++        parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
++    """PILOT-063: the ``--base-side`` flag on the existing ``envelope-new``.
++
++    The envelope commit lives on the base branch, so this layer registers only
++    the flag; ``build_parser`` keeps its PILOT-044 size.
++    """
++    for action in parser._actions:
++        if not isinstance(action, argparse._SubParsersAction):
++            continue
++        envelope_new = action.choices.get("envelope-new")
++        if envelope_new is not None:
++            envelope_new.add_argument(
++                "--base-side", dest="base_side", action="store_true",
++                help="envelope commit is on base; the implementation branch "
++                     "carries only code")
++    return parser
++
++
+ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+     """Register the PILOT-045 commands on the parser built by ``build_parser``.
+ 
+@@ -543,8 +562,8 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
+         action.add_parser("brief")
+     dispatch_campaign_parser(parser)
+     review_layer_parsers(parser)
+-    return envelope_abandon_layer_parsers(profile_layer_parsers(arch_layer_parsers(
+-        position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser)))))))
++    return envelope_base_side_layer_parsers(envelope_abandon_layer_parsers(profile_layer_parsers(
++        arch_layer_parsers(position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser))))))))
+ 
+ 
+ def cli_commands() -> list[str]:
+diff --git a/tower-dsh/tools/tower_envelope.py b/tower-dsh/tools/tower_envelope.py
+index f6ef790..53bdc09 100644
+--- a/tower-dsh/tools/tower_envelope.py
++++ b/tower-dsh/tools/tower_envelope.py
+@@ -50,13 +50,8 @@ def add_merge_ledger(root: Path, entry: dict) -> None:
+ 
+ 
+ def envelope_has_baselines(env: dict) -> bool:
+-    """True for a new-style envelope that declares both test-count baselines.
++    """True when both test-count baselines are declared as ints >= 1."""
+ 
+-    Both counts must be real integers >= 1 (``bool`` excluded).  The same
+-    predicate gates the new-style ledger checks in :func:`envelope_checks` and
+-    the legacy-only pre-merge chain check in ``merge-check`` (PILOT-039), so
+-    the two decisions cannot drift apart.
+-    """
+     tests_baseline = env.get("tests_baseline")
+     tower_tests_baseline = env.get("tower_tests_baseline")
+     return (isinstance(tests_baseline, int) and not isinstance(tests_baseline, bool)
+@@ -66,6 +61,61 @@ def envelope_has_baselines(env: dict) -> bool:
+             and tower_tests_baseline >= 1)
+ 
+ 
++def envelope_git_checks(repo: Path, env: dict,
++                        tower_root: Path | None = None) -> tuple[str, list[dict]]:
++    """The envelope commit's git shape, branch-side (pre-063) or base-side.
++
++    Branch-side: the envelope is one commit on the implementation branch.
++    Base-side: it is one commit on the base branch and the implementation
++    branch only carries code.  The envelope head is returned with the checks so
++    ``envelope-new`` and ``envelope_checks`` cannot drift apart.
++    """
++    def item(name: str, ok: bool, detail: str) -> dict:
++        return {"name": name, "ok": ok, "detail": detail}
++
++    base = str(env.get("base") or "main")
++    impl = str(env.get("implementation_head_sha") or "")
++    declared = str(env.get("envelope_head_sha") or "")
++    path = str(env.get("envelope_path") or "")
++    try:
++        head = git_ok(repo, "rev-parse", str(env.get("branch") or ""))
++        if env.get("base_side") is True:
++            b = git_ok(repo, "rev-parse", base)
++            parent = git_ok(repo, "rev-parse", f"{b}^")
++            # ``envelope_path`` is tower-root relative, ``git diff`` is
++            # repo-root relative: the tower's ``--show-prefix`` bridges them.
++            prefix = (git_ok(tower_root, "rev-parse", "--show-prefix").strip("/")
++                      if tower_root is not None else "")
++            repo_path = f"{prefix}/{path}" if prefix else path
++            changed = git(repo, "diff", "--name-only", f"{parent}..{b}").stdout.splitlines()
++            in_base = (git(repo, "merge-base", "--is-ancestor", b, base).returncode == 0
++                       and git(repo, "cat-file", "-e", f"{base}:{repo_path}").returncode == 0)
++            return b, [
++                item("branch head == implementation head", head == impl, f"{head} vs {impl}"),
++                item("envelope commit only changes envelope path",
++                     changed == [repo_path], f"{changed} vs [{repo_path}]"),
++                item("envelope file in base", in_base, f"{b} in {base}"),
++                item("envelope parent is ancestor of implementation",
++                     git(repo, "merge-base", "--is-ancestor", parent,
++                         impl).returncode == 0, f"{parent}..{impl}"),
++            ]
++        parent = git_ok(repo, "rev-parse", f"{head}^")
++        changed = git(repo, "diff", "--name-only", f"{impl}..{head}").stdout.splitlines()
++        return head, [
++            item("branch head == envelope head", head == declared,
++                 f"{head} vs {declared}"),
++            item("envelope parent == implementation head", parent == impl,
++                 f"{parent} vs {impl}"),
++            item("envelope commit only changes envelope path",
++                 changed == [path], f"{changed} vs [{path}]"),
++            item(f"base {base} is ancestor of implementation",
++                 git(repo, "merge-base", "--is-ancestor", base,
++                     impl).returncode == 0, f"{base}..{impl}"),
++        ]
++    except Exception as exc:
++        return "", [item("git checks", False, str(exc))]
++
++
+ def review_mismatches(root: Path, task: str, review: dict, head: str) -> list[str]:
+     """Field-level staleness between one ``REVIEW.json`` and the envelope.
+ 
+@@ -219,23 +269,9 @@ def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
+                 f"QUEUE_ADD event {'present' if backed else 'missing'}")
+     if not repo.exists():
+         return checks
+-    branch = env.get("branch", "")
+-    base = env.get("base", "main")
+-    a = env.get("implementation_head_sha", "")
+-    b = env.get("envelope_head_sha", "")
+-    envelope_path = env.get("envelope_path", "")
+-    try:
+-        head = git_ok(repo, "rev-parse", branch)
+-        add("branch head == envelope head", head == b, f"{head} vs {b}")
+-        parent = git_ok(repo, "rev-parse", f"{b}^")
+-        add("envelope parent == implementation head", parent == a, f"{parent} vs {a}")
+-        changed = git_ok(repo, "diff", "--name-only", f"{a}..{b}").splitlines()
+-        add("envelope commit only changes envelope path",
+-            changed == [envelope_path], f"{changed} vs [{envelope_path}]")
+-        ancestor = git(repo, "merge-base", "--is-ancestor", base, a).returncode == 0
+-        add(f"base {base} is ancestor of implementation", ancestor, f"{base}..{a}")
+-    except Exception as exc:
+-        add("git checks", False, str(exc))
++    _, git_checks = envelope_git_checks(repo, env, root)
++    for item in git_checks:
++        add(item["name"], item["ok"], item["detail"])
+     # Never call load_record() here: it emits a JSON object and raises
+     # SystemExit, which would print one payload from inside the check list and
+     # a second one from the caller.  A missing/invalid record is one failed
+@@ -458,6 +494,7 @@ def cmd_envelope_new(root: Path, args) -> None:
+     repo = resolve_repository(root, env.get("repository"))
+     if not repo.exists():
+         fail([f"repository missing: {repo}"])
++    base_side = bool(getattr(args, "base_side", False))
+     branch = env.get("branch")
+     base = env.get("base", "main")
+     a = env.get("implementation_head_sha")
+@@ -466,26 +503,21 @@ def cmd_envelope_new(root: Path, args) -> None:
+         fail(["branch, implementation_head_sha and envelope_path are required"])
+     try:
+         b = git_ok(repo, "rev-parse", branch)
+-        parent = git_ok(repo, "rev-parse", f"{b}^")
+-        changed = git_ok(repo, "diff", "--name-only", f"{a}..{b}").splitlines()
+-        ancestor = git(repo, "merge-base", "--is-ancestor", base, a).returncode == 0
++        b, checks = envelope_git_checks(repo, {
++            **env, "base_side": base_side, "envelope_head_sha": b}, root)
+     except Exception as exc:
+         fail([str(exc)])
+-    checks = [
+-        {"name": "envelope parent == implementation", "ok": parent == a,
+-         "detail": f"{parent} vs {a}"},
+-        {"name": "envelope commit only changes envelope path", "ok": changed == [envelope_path],
+-         "detail": f"{changed} vs [{envelope_path}]"},
+-        {"name": f"base {base} is ancestor of implementation", "ok": ancestor,
+-         "detail": f"{base}..{a}"},
+-    ]
+     if not all(c["ok"] for c in checks):
+         emit({"ok": False, "errors": [c for c in checks if not c["ok"]]}, 2)
+     record = dict(env)
+-    record.update({"envelope_head_sha": b, "status": status, "created_at": now()})
++    record.update({"envelope_head_sha": b, "head": b, "status": status,
++                   "created_at": now()})
++    payload = {"envelope": env_id, "task": task, "head": b}
++    if base_side:
++        record["base_side"] = True
++        payload.update({"base_side": True, "base": base})
+     jdump(env_path, record)
+-    append_supervision_ledger(root, "ENVELOPE_NEW", "primary",
+-                              {"envelope": env_id, "task": task, "head": b})
++    append_supervision_ledger(root, "ENVELOPE_NEW", "primary", payload)
+     emit({"ok": True, "envelope": env_id, "head": b, "checks": checks})
+ 
+ 
+diff --git a/tower-dsh/tools/tower_merge.py b/tower-dsh/tools/tower_merge.py
+index 8083ca1..67e92dd 100644
+--- a/tower-dsh/tools/tower_merge.py
++++ b/tower-dsh/tools/tower_merge.py
+@@ -226,11 +226,13 @@ def expected_merge_head(env: dict) -> str:
+ 
+ 
+ def pr_merge_head(repo: Path, env: dict) -> str:
+-    """Pin the merge at the implementation head or its one envelope-only child."""
++    """Pin the merge at the implementation head; a child is branch-side only."""
+     head = git_ok(repo, "rev-parse", str(env.get("branch") or ""))
+     impl = expected_merge_head(env)
+     if head == impl:
+         return head
++    if env.get("base_side") is True:
++        raise MergeBlocked("pr-merge", "merge", f"base-side PR head {head} != {impl}")
+     path = str(env.get("envelope_path") or "").replace("\\", "/")
+     if not path.startswith("merge-envelopes/") or not path.endswith(".json"):
+         raise MergeBlocked("pr-merge", "merge",
+

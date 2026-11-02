@@ -1,0 +1,48 @@
+PILOT-063 gates — base-side envelope (worktree pilot/worktrees/PILOT-063)
+head before commit: 21d8b1677cf87a04b7de454ca7e990386ed93095
+worktree: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-063
+
+[1] python -B tools/run_tests.py
+    exit 0
+    Ran 725 tests in 586.329s
+    OK (skipped=1)
+    (main baseline 715; +10 new tests: 8 base-side + 2 in test_merge_head)
+
+[2] python -B -m unittest tools.tests.test_envelope_base_side -v
+    exit 0
+    Ran 8 tests
+    OK
+    cases: happy path merge-check 0; branch head != implementation -> 2;
+           review.head != implementation -> 2; envelope missing from base -> 2;
+           extra file on base -> 2; non-envelope base commit -> 2;
+           branch-side legacy still 0; PR stub pins --match-head-commit impl
+
+[3] python -B tools/towerctl.py state-verify   (worktree tower)
+    exit 0
+    {"ok": true, "tasks": 62, "envelopes": 62, "drift": []}
+
+[4] python -B tools/towerctl.py arch-check
+    exit 0
+    {"ok": true, "counts": {"gates": 18, "invariants": 16, "events": 30,
+     "event_types_in_code": 30, "unresolved_event_calls": 1, "adrs": 8,
+     "sections": 6, "nodes": 74, "edges": 169}, "errors": []}
+
+[5] python -B tools/towerctl.py shape-check
+    exit 0
+    {"ok": true, "shape_check": "checked", "files": 74, "functions": 2039,
+     "duplicate_blocks": 169, "unused_imports": 1}
+    tower_envelope.py 599 lines (< 600 module cap); tower_merge.py 599;
+    tower_cli.py 616; no new debt over state/SHAPE-BASELINE.json.
+
+[6] real tower state-verify (read-only, NOT modified by this executor)
+    cd tower-dsh && python -B tools/towerctl.py state-verify
+    exit 0
+    {"ok": true, "tasks": 63, "envelopes": 62, "drift": []}
+
+[7] probe: python -B scratch/base_side_probe.py > scratch/probe.txt
+    exit 0, PROBE: PASS
+    checkback 0, accept 0, envelope-new --base-side 0, queue-add 0,
+    merge-check 0 with zero failing checks; record head == base envelope commit,
+    base_side true, implementation_head_sha == branch head;
+    after a branch-only commit merge-check exit 2 on
+    "branch head == implementation head", zero MERGED.

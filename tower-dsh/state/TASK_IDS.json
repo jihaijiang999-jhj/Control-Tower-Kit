@@ -434,6 +434,20 @@
       "spec_path": "pilot/PILOT-062.spec.json",
       "created_at": "2026-11-02T14:45:38+08:00",
       "updated_at": "2026-11-02T16:03:55+08:00"
+    },
+    "PILOT-063": {
+      "title": "base-side envelope：PR head 恒等于 implementation",
+      "status": "closed",
+      "spec_path": "pilot/PILOT-063.spec.json",
+      "created_at": "2026-11-02T17:02:33+08:00",
+      "updated_at": "2026-11-02T18:00:33+08:00"
+    },
+    "PILOT-064": {
+      "title": "base-side envelope 重建（tower 子目录前缀 + PR 首验）",
+      "status": "closed",
+      "spec_path": "pilot/PILOT-064.spec.json",
+      "created_at": "2026-11-02T18:03:03+08:00",
+      "updated_at": "2026-11-02T18:55:50+08:00"
     }
   }
 }

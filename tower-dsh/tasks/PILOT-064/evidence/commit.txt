@@ -1,0 +1,19 @@
+﻿=== PILOT-064 commit ===
+branch: pilot/PILOT-064
+HEAD:   5080a0dd4f5ba651067954cb5557516e5c0199bf
+base:   607224d9cc438eae8648eb629414cf40048e464e
+author: mac <mac@local>
+
+5080a0d PILOT-064: base-side envelope rebuild (tower prefix)
+ tower-dsh/tools/tests/test_envelope_base_side.py | 418 +++++++++++++++++++++++
+ tower-dsh/tools/tests/test_merge_head.py         |  19 ++
+ tower-dsh/tools/tower_cli.py                     |  23 +-
+ tower-dsh/tools/tower_envelope.py                | 106 ++++--
+ tower-dsh/tools/tower_merge.py                   |   4 +-
+ 5 files changed, 530 insertions(+), 40 deletions(-)
+
+=== status ===
+?? scratch/
+
+=== branch head vs base ===
+5080a0d PILOT-064: base-side envelope rebuild (tower prefix)

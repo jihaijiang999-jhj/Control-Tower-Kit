@@ -1,0 +1,165 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-064",
+  "title": "base-side envelope 重建（tower 子目录前缀 + PR 首验）",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "以 063 `c2a1cc5` 为起点（cherry-pick 50d1844 + c2a1cc5），保留 5 路径：tower_envelope/tower_merge/tower_cli/test_envelope_base_side/test_merge_head",
+    "base-side 路径必须用 git `--show-prefix`（tower-dsh/）+ envelope_path 比较；envelope 文件在 `tower-dsh/merge-envelopes/<ENV>.json`",
+    "envelope-new --base-side：main envelope-only commit（parent main）、branch head == implementation、review.head == implementation；写 ENVELOPE_NEW/QUEUE_ADD",
+    "envelope_checks：base-side 不要求 branch head == envelope head，要求 branch head==implementation/review.head==implementation/envelope 在 base；branch-side legacy 保持",
+    "merge --mode pr：--match-head-commit implementation；CI base 有信封事件；064 自身 PR merge 首验",
+    "测试：base-side 子目录 prefix happy path；branch head 偏移/review 偏移/额外文件拒绝；legacy 0；725+",
+    "不改 058 review / 059 acceptance / 060 MERGE_START / 062 abandon"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-064/tower-dsh/tools/tower_envelope.py",
+    "pilot/worktrees/PILOT-064/tower-dsh/tools/tower_merge.py",
+    "pilot/worktrees/PILOT-064/tower-dsh/tools/tower_cli.py",
+    "pilot/worktrees/PILOT-064/tower-dsh/tools/tests/test_envelope_base_side.py",
+    "pilot/worktrees/PILOT-064/tower-dsh/tools/tests/test_merge_head.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "reopening/rewriting PILOT-063",
+    "using local merge for 064",
+    "weakening review/acceptance gates"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-064/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 715 + 新增用例数（main 基线 715；064 采用 063 代码后应 725+）",
+    "base-side 子目录：main envelope commit + impl 分支，branch head==impl、review.head==impl，merge-check 0；envelope 文件在 tower-dsh/merge-envelopes",
+    "branch head 偏移/review 偏移/额外文件 → exit 2 零 MERGED；branch-side legacy 仍 0",
+    "064 自身 merge --mode pr 成功；PR head == implementation；GitHub merge commit 不是 local；post-merge 9/9",
+    "真实塔 64/64 drift []；arch gates 18；profile 11/0；shape 0"
+  ],
+  "depends_on": [
+    "PILOT-062"
+  ],
+  "worktree": "pilot/worktrees/PILOT-064",
+  "spec_path": "pilot/PILOT-064.spec.json",
+  "spec_sha256": "38e5e9023980698ec8c91e3aa77680452ce5f806ba7264ddbee1a8c2f3f40850",
+  "spec_gate": "PASS",
+  "executor": "subagent:049a91da-d2ef-4096-b276-4eb2989d4281",
+  "dispatch": {
+    "executor": "subagent:049a91da-d2ef-4096-b276-4eb2989d4281",
+    "worktree": "pilot/worktrees/PILOT-064",
+    "at": "2026-11-02T18:15:19+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "607224d9cc438eae8648eb629414cf40048e464e",
+    "campaign": "C-2026-Q4-04"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-064/evidence/tower_envelope.py",
+      "sha256": "b1294179400a51d590ef042e2bf4f62d8b7e3a7717efdca0f5833453b595b04d",
+      "bytes": 28637,
+      "at": "2026-11-02T18:55:42+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-064/evidence/tower_merge.py",
+      "sha256": "6936a85002a3df22dd55c300de96b1489903736d69eee9d25cfeb4e32628f4ba",
+      "bytes": 28717,
+      "at": "2026-11-02T18:55:42+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-064/evidence/tower_cli.py",
+      "sha256": "ab3cca3583fd97929abf1d20531a0f550bc825caf4d928275d4d53cc1db50250",
+      "bytes": 26559,
+      "at": "2026-11-02T18:55:42+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-064/evidence/test_envelope_base_side.py",
+      "sha256": "36eb5f0e66bb48095779f954fd18ced848d0d6626b10393117f949301707d6c6",
+      "bytes": 19519,
+      "at": "2026-11-02T18:55:42+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-064/evidence/test_merge_head.py",
+      "sha256": "a940dd2721cb705f5682595c35eb4353c9c9bc8c6189032707daf25a1eae1028",
+      "bytes": 25330,
+      "at": "2026-11-02T18:55:42+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-064/evidence/test-output.txt",
+      "sha256": "cc0b78fee9133e4f41bf9be08b4374a080f19f20e0e8770ee2286186fe751c40",
+      "bytes": 101414,
+      "at": "2026-11-02T18:55:42+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-064/evidence/base_side_probe.py",
+      "sha256": "2c9e368701acf7aea79fe5a1b297a3529a241f37b9b47b231a84af044436bd91",
+      "bytes": 7063,
+      "at": "2026-11-02T18:55:42+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-064/evidence/probe.txt",
+      "sha256": "bdc65e276af2c81540b5f561ca0e577704a22aee69a49ac67289d987d115a063",
+      "bytes": 5388,
+      "at": "2026-11-02T18:55:42+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-064/evidence/commit.txt",
+      "sha256": "1d408b51c9b60ba6fecf06603b75a9656ef64f08bfafbe3b27f4c180cb02e9b4",
+      "bytes": 734,
+      "at": "2026-11-02T18:55:42+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-064/evidence/diff.txt",
+      "sha256": "d0514c0a19b0003850550c7a48c5de7a81c04e9a7be1388ee5562f6d2bccde20",
+      "bytes": 34494,
+      "at": "2026-11-02T18:55:42+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-064/evidence/gates.txt",
+      "sha256": "bdc8923b869b38ef4f5f15d094925c050ed72d191df8b291ed199403971e6bc4",
+      "bytes": 1976,
+      "at": "2026-11-02T18:55:42+08:00",
+      "id": "E-011"
+    }
+  ],
+  "review": {
+    "schema": "tower/review@1",
+    "task": "PILOT-064",
+    "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+    "verdict": "PASS",
+    "head": "5080a0dd4f5ba651067954cb5557516e5c0199bf",
+    "base": "607224d9cc438eae8648eb629414cf40048e464e",
+    "scope": [],
+    "findings": [],
+    "note": "064 PASS（代码/复核）。5 paths；HEAD 5080a0dd（base 607224d）；11/11 证据；Ran 727 OK；base-side 子目录 prefix（tower-dsh/）正确；branch head==impl、review.head==impl；legacy 保留；064 自身 PR merge 待 controller。",
+    "at": "2026-11-02T18:55:50+08:00",
+    "structure": ""
+  },
+  "decision": {
+    "id": "D-PILOT-064",
+    "actor": "owner",
+    "text": "PASS; base-side",
+    "at": "2026-11-02T18:55:50+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-064/CLOSEOUT.md",
+    "at": "2026-11-02T18:55:50+08:00"
+  },
+  "created_at": "2026-11-02T18:03:03+08:00",
+  "updated_at": "2026-11-02T18:55:50+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-064/MERGE.md",
+  "delivered_at": "2026-11-02T18:55:42+08:00",
+  "accepted_at": "2026-11-02T18:55:50+08:00"
+}

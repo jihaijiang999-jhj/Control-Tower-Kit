@@ -1,0 +1,66 @@
+=== PILOT-064 base_side_probe (BEFORE fix) ===
+
+
+[A subdir base-side] head=5e8fb2abab expected=ok verdict=refused FAIL
+  repo_prefix='' tower_prefix='tower-dsh/' repo_path=tower-dsh/merge-envelopes/ENV-PILOT-064.json
+  ok   branch head == implementation head: c24300cccd06fb757ad242b508fcb8753c526a2a vs c24300cccd06fb757ad242b508fcb8753c526a2a
+  FAIL envelope commit only changes envelope path: ['tower-dsh/merge-envelopes/ENV-PILOT-064.json'] vs [merge-envelopes/ENV-PILOT-064.json]
+  FAIL envelope file in base: 5e8fb2ababe71c5dcc304fc22949018e2082cf57 in main
+  ok   envelope parent is ancestor of implementation: 17e666eecd159c0296c2c1302457a2fb2dc72deb..c24300cccd06fb757ad242b508fcb8753c526a2a
+
+[B subdir + leak] head=ffe980ce82 expected=refused verdict=refused PASS
+  repo_prefix='' tower_prefix='tower-dsh/' repo_path=tower-dsh/merge-envelopes/ENV-PILOT-064.json
+  ok   branch head == implementation head: d982d88103e73b41f2488a9d0cd117dad3d2bc39 vs d982d88103e73b41f2488a9d0cd117dad3d2bc39
+  FAIL envelope commit only changes envelope path: ['leak.txt', 'tower-dsh/merge-envelopes/ENV-PILOT-064.json'] vs [merge-envelopes/ENV-PILOT-064.json]
+  FAIL envelope file in base: ffe980ce824f2e41a85bc2db33bcf58f111e262f in main
+  ok   envelope parent is ancestor of implementation: a2c4692a0b20164b8534aa281d015a0e896e2359..d982d88103e73b41f2488a9d0cd117dad3d2bc39
+
+[C flat base-side] head=9d40117132 expected=ok verdict=ok PASS
+  repo_prefix='' tower_prefix='' repo_path=merge-envelopes/ENV-PILOT-064.json
+  ok   branch head == implementation head: fc9c200d082930cf4f255dff5d98a08018886567 vs fc9c200d082930cf4f255dff5d98a08018886567
+  ok   envelope commit only changes envelope path: ['merge-envelopes/ENV-PILOT-064.json'] vs [merge-envelopes/ENV-PILOT-064.json]
+  ok   envelope file in base: 9d401171325e91adf40f8a696873ab13cb75e95e in main
+  ok   envelope parent is ancestor of implementation: 86ee6a8237dd3ddce0fa3306daaf57c27d9653a3..fc9c200d082930cf4f255dff5d98a08018886567
+
+[D legacy branch-side] head=aa0266a5a5 expected=ok verdict=ok PASS
+  repo_prefix='' tower_prefix='' repo_path=merge-envelopes/ENV-PILOT-064.json
+  ok   branch head == envelope head: aa0266a5a55d9dd8a79f5d158c2b18c893ea8530 vs aa0266a5a55d9dd8a79f5d158c2b18c893ea8530
+  ok   envelope parent == implementation head: 623014f3fd70fb0f687b7150aa580abe7b2486e1 vs 623014f3fd70fb0f687b7150aa580abe7b2486e1
+  ok   envelope commit only changes envelope path: ['merge-envelopes/ENV-PILOT-064.json'] vs [merge-envelopes/ENV-PILOT-064.json]
+  ok   base main is ancestor of implementation: main..623014f3fd70fb0f687b7150aa580abe7b2486e1
+
+probe FAIL (3/4 layouts as expected)
+
+=== PILOT-064 base_side_probe (AFTER fix) ===
+
+
+[A subdir base-side] head=694bea63c6 expected=ok verdict=ok PASS
+  repo_prefix='' tower_prefix='tower-dsh/' repo_path=tower-dsh/merge-envelopes/ENV-PILOT-064.json
+  ok   branch head == implementation head: ced0a61fb0f52cea8a63f8fb1ba2a12bcb1dde14 vs ced0a61fb0f52cea8a63f8fb1ba2a12bcb1dde14
+  ok   envelope commit only changes envelope path: ['tower-dsh/merge-envelopes/ENV-PILOT-064.json'] vs [tower-dsh/merge-envelopes/ENV-PILOT-064.json]
+  ok   envelope file in base: 694bea63c6d2ae53f51a9d1ebffd4722a6ebe3be in main
+  ok   envelope parent is ancestor of implementation: 556800f2bcb7c9218c396774a40a9fe0f1615418..ced0a61fb0f52cea8a63f8fb1ba2a12bcb1dde14
+
+[B subdir + leak] head=d5ba108188 expected=refused verdict=refused PASS
+  repo_prefix='' tower_prefix='tower-dsh/' repo_path=tower-dsh/merge-envelopes/ENV-PILOT-064.json
+  ok   branch head == implementation head: 3de9d38b19bed3165089fe6e0b69f3a770370f69 vs 3de9d38b19bed3165089fe6e0b69f3a770370f69
+  FAIL envelope commit only changes envelope path: ['leak.txt', 'tower-dsh/merge-envelopes/ENV-PILOT-064.json'] vs [tower-dsh/merge-envelopes/ENV-PILOT-064.json]
+  ok   envelope file in base: d5ba108188ba16c8d1d0d8aa34a0980fd4b9daec in main
+  ok   envelope parent is ancestor of implementation: 447055fdd29135acba06fefb8da2773975272d4c..3de9d38b19bed3165089fe6e0b69f3a770370f69
+
+[C flat base-side] head=d5eb072e95 expected=ok verdict=ok PASS
+  repo_prefix='' tower_prefix='' repo_path=merge-envelopes/ENV-PILOT-064.json
+  ok   branch head == implementation head: a38055a7007bd45ae412c621c551488bbccf6612 vs a38055a7007bd45ae412c621c551488bbccf6612
+  ok   envelope commit only changes envelope path: ['merge-envelopes/ENV-PILOT-064.json'] vs [merge-envelopes/ENV-PILOT-064.json]
+  ok   envelope file in base: d5eb072e9521679d0e20fa44ef7b6db7f09eb861 in main
+  ok   envelope parent is ancestor of implementation: c1355b756b142b4f87f90efa083b7e0242803eea..a38055a7007bd45ae412c621c551488bbccf6612
+
+[D legacy branch-side] head=7ca78cbb40 expected=ok verdict=ok PASS
+  repo_prefix='' tower_prefix='' repo_path=merge-envelopes/ENV-PILOT-064.json
+  ok   branch head == envelope head: 7ca78cbb405f63ab47a4b6792abcebaed9938c89 vs 7ca78cbb405f63ab47a4b6792abcebaed9938c89
+  ok   envelope parent == implementation head: df859fcfc8f0b8c446a5ffb1bdf4cebffd9a4c50 vs df859fcfc8f0b8c446a5ffb1bdf4cebffd9a4c50
+  ok   envelope commit only changes envelope path: ['merge-envelopes/ENV-PILOT-064.json'] vs [merge-envelopes/ENV-PILOT-064.json]
+  ok   base main is ancestor of implementation: main..df859fcfc8f0b8c446a5ffb1bdf4cebffd9a4c50
+
+probe PASS (4/4 layouts as expected)
+probe_exit=0

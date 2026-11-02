@@ -1,0 +1,98 @@
+﻿=== PILOT-064 gates (worktree 5080a0d) ===
+
+$ python tools/towerctl.py state-verify
+{
+  "ok": true,
+  "tasks": 62,
+  "envelopes": 62,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-039-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-041-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-043-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-044-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-053-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID2",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID2",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 10,
+  "evidence_checked": 587
+}
+exit=0
+
+$ python tools/towerctl.py arch-check
+{
+  "ok": true,
+  "counts": {
+    "gates": 18,
+    "invariants": 16,
+    "events": 30,
+    "event_types_in_code": 30,
+    "unresolved_event_calls": 1,
+    "adrs": 8,
+    "sections": 6,
+    "nodes": 74,
+    "edges": 169
+  },
+  "errors": []
+}
+exit=0
+
+=== real tower (read-only, primary working tree) ===
+$ python tools/towerctl.py state-verify
+  "ok": true,
+  "tasks": 64,
+  "envelopes": 62,
+  "drift": [],
+  "skipped_count": 10,
+  "evidence_checked": 598
+exit=0
+
+$ python tools/towerctl.py arch-check
+  "ok": true,
+    "gates": 18,
+  "errors": []
+exit=0
