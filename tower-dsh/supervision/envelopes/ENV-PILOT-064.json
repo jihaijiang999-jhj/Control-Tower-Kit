@@ -64,6 +64,6 @@
   ],
   "envelope_head_sha": "638932eaff6460645b4c08c91762fe1a7a653ea2",
   "head": "638932eaff6460645b4c08c91762fe1a7a653ea2",
-  "status": "CORRECTION_REQUIRED",
+  "status": "ABANDONED",
   "base_side": true
 }

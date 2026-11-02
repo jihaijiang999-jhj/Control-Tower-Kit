@@ -563,9 +563,9 @@
       "task": "PILOT-064",
       "branch": "pilot/PILOT-064",
       "base": "main",
-      "status": "WAITING",
+      "status": "ABANDONED",
       "added_at": "2026-11-02T18:56:28+08:00"
     }
   ],
-  "updated_at": "2026-11-02T18:56:28+08:00"
+  "updated_at": "2026-11-02T20:26:04+08:00"
 }
