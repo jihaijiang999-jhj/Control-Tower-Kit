@@ -40,8 +40,10 @@
     "base-side envelope 在 tower-dsh/merge-envelopes/ 下 post-merge 检查 0；repo 根无副本仍 0",
     "legacy branch-side envelope 仍按 repo 根 0；额外/缺失路径拒绝",
     "删除 repo 根 shim 后，065 的 envelope 文件仍可在 base 找到；066 自身 post-merge 9/9",
-    "066 merge --mode pr 成功；真实塔 66/66 drift []（066 envelope 后）；arch 18；profile 11/0；shape 0"
+    "066 merge --mode pr 成功；真实塔 66/65 drift []（066 envelope 后）；arch 18；profile 11/0；shape 0"
   ],
-  "depends_on": ["PILOT-065"],
+  "depends_on": [
+    "PILOT-065"
+  ],
   "worktree": "pilot/worktrees/PILOT-066"
 }
