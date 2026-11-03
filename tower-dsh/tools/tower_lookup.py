@@ -5,12 +5,13 @@ from pathlib import Path
 from tower_common import emit, emit_sorted, fail, jload, sha256_file
 from tower_ledger import append_ledger, spec_registry_errors, task_dir
 from tower_task import (
-    _optional_task_record, ledger_has_task_event, load_record, resolve_input,
-    save_record, spec_gate_errors, validate_spec,
+    _optional_task_record, ledger_has_task_event, load_record, read_task_records,
+    resolve_input, save_record, spec_gate_errors, validate_spec,
 )
 from tower_command import command_card_exists
 from tower_campaign import (
     POSITION_GLYPHS, PositionUnavailable, campaign_heading, position_context,
+    position_index, position_next,
 )
 from tower_dispatch import scheduling_dependency_errors
 from tower_delivery import check_evidence
@@ -150,10 +151,34 @@ def position_human_lines(root: Path, position: dict, doc: dict) -> list[str]:
             f"建议：{advice}"]
 
 
+def where_position(root: Path) -> tuple[dict, dict]:
+    """Position context with superseded cards counted as terminal done.
+
+    ``tower_campaign.position_status`` maps only ``closed`` to ``done``; a
+    superseded card never merges (no envelope, no ``MERGE``) but is terminal,
+    so ``where`` projects it as done at this view boundary.  The campaign
+    module is outside PILOT-071's allowed paths, and the projection must not
+    rewrite the record status the campaign model reads.
+    """
+    position, doc = position_context(root)
+    superseded = {record.get("id") for record in read_task_records(root)
+                  if record.get("status") == "superseded"}
+    if not superseded:
+        return position, doc
+    nodes = [{**node, "status": "done"} if node["id"] in superseded else node
+             for node in position["nodes"]]
+    projected = {**position, "nodes": nodes,
+                 "index": position_index(nodes),
+                 "next": position_next(nodes, position["current"]),
+                 "blocked": [node["id"] for node in nodes
+                             if node["status"] == "blocked"]}
+    return projected, doc
+
+
 def cmd_where(root: Path, args) -> None:
     """Print the position map: ``--json`` machine view or the human view."""
     try:
-        position, doc = position_context(root)
+        position, doc = where_position(root)
     except PositionUnavailable as exc:
         fail([str(exc)])
     if args.json:

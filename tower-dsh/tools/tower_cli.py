@@ -21,6 +21,7 @@ from tower_ledger_replay import (
 )
 from tower_task import (
     ACCEPTANCE_KINDS, ACCEPTANCE_STATUSES, cmd_spec_approve, cmd_task_new,
+    cmd_task_supersede,
 )
 from tower_authority_cmd import (
     authority_state_check, cmd_authority_check, cmd_authority_require,
@@ -198,6 +199,24 @@ def envelope_abandon_layer_parsers(
     return parser
 
 
+def supersede_layer_parsers(
+        parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """PILOT-071: the owner-only ``task-supersede`` lifecycle exit.
+
+    Registered through the command-layer chain like the abandon/review layers,
+    so ``build_parser`` keeps its frozen PILOT-044 shape.
+    """
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        supersede = action.add_parser("task-supersede")
+        supersede.add_argument("--task", required=True)
+        supersede.add_argument("--by-task", dest="by_task", required=True)
+        supersede.add_argument("--reason", required=True)
+        supersede.add_argument("--by", required=True)
+    return parser
+
+
 def status_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Register the PILOT-046 status commands on the PILOT-045 parser."""
     for action in parser._actions:
@@ -263,7 +282,8 @@ COMMAND_LAYER_HANDLERS = {
     "where": cmd_where, "arch-check": cmd_arch_check,
     "arch-graph": cmd_arch_graph, "profile-check": cmd_profile_check,
     "acceptance-add": cmd_acceptance_add,
-    "envelope-abandon": cmd_envelope_abandon}
+    "envelope-abandon": cmd_envelope_abandon,
+    "task-supersede": cmd_task_supersede}
 
 
 TASK_IDS_HANDLERS = {"task-ids-init": cmd_task_ids_init,
@@ -760,8 +780,8 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         action.add_parser("brief")
     dispatch_campaign_parser(parser)
     review_layer_parsers(parser)
-    return base_sync_layer_parsers(envelope_base_side_layer_parsers(envelope_abandon_layer_parsers(profile_layer_parsers(
-        arch_layer_parsers(position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser)))))))))
+    return base_sync_layer_parsers(envelope_base_side_layer_parsers(envelope_abandon_layer_parsers(supersede_layer_parsers(profile_layer_parsers(
+        arch_layer_parsers(position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser))))))))))
 
 
 def cli_commands() -> list[str]:
