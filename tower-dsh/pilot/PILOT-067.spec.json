@@ -1,0 +1,47 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-067",
+  "title": "base 同步策略：state-only 可审计 admin，code 变更必须 rebase + 重审",
+  "objective": {
+    "problem": "065/066 的 PR 在 base 前进后报 head branch not up to date；为保留 review head 连续用 --admin，绕过 up-to-date 保护且无审计。没有策略区分“base 只多了 state”与“base 改了代码”。",
+    "outcome": "merge --mode pr 检测 base 是否前进，并把 base-only 变更分类：仅 state/ledger/tasks/primary/supervision/state 时，显式 --allow-state-ahead 才允许 admin，并写审计；任何 code/docs/arch/spec 变更则 exit 2，要求 rebase 到新 base、更新 envelope implementation + review head、重新 review。默认不允许 admin。",
+    "approach": "在 pr_remote_merge 前计算 merge-base..origin/main 的 changed paths；state-only 白名单；flag 显式；审计写 merge ledger/envelope payload；code 变更拒绝并给 rebase 指引；补测试。",
+    "non_goals_and_done": "不自动 rebase、不自动改 REVIEW、不删除 review 绑定；736+ tests；067 自身走 PR；state-only admin 有审计且 code 路径永不 admin。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0009 / 065-066 admin bypass",
+  "why_now": "连续两卡 admin 是流程债；外证前必须让“过期 branch”有明确、可审计的出口。",
+  "scope": [
+    "merge --mode pr 前检测 origin/main 是否含 HEAD 未包含的提交；base 前进才进入策略",
+    "base-only 变更分类：仅 `ledger/**`、`primary/**`、`supervision/**`、`tasks/**`、`state/**` 视为 state-only；任何 `tools/**`、`arch/**`、`EVENT_CATALOG.json`、`pilot/**`、`*.md` 根文档视为 code/docs",
+    "state-only + `--allow-state-ahead`：允许 `gh pr merge --admin --match-head-commit <PR head>`，写审计（merge ledger/ envelope payload: base_sync=state-only, base_ahead_paths, admin=true）；无 flag exit 2",
+    "code/docs 变更：exit 2，要求 `git rebase origin/main`、更新 envelope implementation_head_sha + review head + 重新 review；绝不允许 admin",
+    "测试：state-only+flag 0 且审计；state-only 无 flag 2；code 变更 2；base 未前进正常 0；review head 仍绑 implementation",
+    "不改 local merge；不放宽 review/acceptance"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-067/tower-dsh/tools/tower_merge.py",
+    "pilot/worktrees/PILOT-067/tower-dsh/tools/tower_cli.py",
+    "pilot/worktrees/PILOT-067/tower-dsh/tools/tests/test_base_sync.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "automatic admin without flag",
+    "admin on code/docs base changes",
+    "weakening review head/base"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-067/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 736 + 新增用例数（main 基线 736）",
+    "base 未前进：正常 merge 0，不写 admin 审计",
+    "base 仅 state 前进 + --allow-state-ahead：merge 0，admin=true 审计含 base_ahead_paths",
+    "base 仅 state 前进无 flag：exit 2；base 含 code/docs：exit 2，提示 rebase/re-review",
+    "review head 仍 == envelope implementation；rebase 后旧 review 必须 stale",
+    "067 自身 merge --mode pr 成功；真实塔 67/66 drift []；arch 18；profile 11/0；shape 0"
+  ],
+  "depends_on": ["PILOT-066"],
+  "worktree": "pilot/worktrees/PILOT-067"
+}
