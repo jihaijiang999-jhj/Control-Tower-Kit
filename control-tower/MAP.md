@@ -759,6 +759,24 @@ SteerLine 评估后只取三条做法，全部重写为木塔的小门：
 - **PR merge 的 head pin 要配 base 状态**：CI 的 base 必须有 `ENVELOPE_NEW/QUEUE_ADD`，否则 `state-verify` 报 unbacked/DRAFT。
 - **admin bypass 只能作为最后一次例外**：它绕过的正是“base 前进后 branch 过期”的保护；下一次应先补 base 同步策略，而不是继续 admin。
 
+
+### 6.37 判例：post-merge 也要认 tower 前缀；shim 不是兼容层，是债（PILOT-066）
+
+065 让 base-side envelope 过了 merge，但 post-merge 仍按 repo 根找 `merge-envelopes/<ENV>.json`，而 base-side 文件在 `tower-dsh/merge-envelopes/`。065 用了一个 repo-root 副本 shim 才过 post-merge；066 把 `envelope_repo_path` 改成：
+
+- `env.base_side` → `git --show-prefix`（`tower-dsh/`）+ `envelope_path`；
+- legacy branch-side → 仍 repo 根；
+- 错误信息带实际 `repo_path`。
+
+066 自身 base-side envelope，删除 `merge-envelopes/ENV-PILOT-065.json` shim，PR #50 MERGED `713d709`，post-merge 9/9（736 tests，66/65，where 6/6）。
+
+可复用判断：
+
+- **同一个路径语义要在所有 gate 一致**：merge 认 tower 前缀，post-merge 不认，就会逼出 shim；shim 是重复状态，不是兼容层。
+- **base-side 与 branch-side 必须显式分叉**：不靠“文件在哪”猜；`base_side` 是记录字段。
+- **删除 shim 要有测试**：base-side 只在 repo 根时必须拒绝，否则 shim 会悄悄复活。
+- **PR #50 仍是 admin bypass**：连续 065/066 都因 base 前进后 branch 过期；admin 不是常规路径，外证前应补 base 同步策略。
+
 ## 7. 与 K3 塔的能力对照（一页）
 
 | 维度 | K3 / SeeMake 塔 | tower-dsh | 谁更强 |

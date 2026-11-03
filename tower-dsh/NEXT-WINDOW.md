@@ -10,16 +10,16 @@
 |---|---|
 | 代号 | 应县木塔 / Yingxian（`YX-001`） |
 | 任务 | `PILOT-001` – `PILOT-065`；65 张 closed；**64 个信封** |
-| 测试 | `Ran 730 tests / OK (skipped=1)`（715 + 065 新增 15） |
-| 状态自洽 | `state-verify` → 65 任务 / 64 信封 / drift `[]` |
+| 测试 | `Ran 736 tests / OK (skipped=1)`（730 + 066 新增 15） |
+| 状态自洽 | `state-verify` → 66 任务 / 65 信封 / drift `[]` |
 | 账本 | primary/supervision 链无 error；证据 620 |
 | 权威性 | `authority-check` → configured + requirement=required；13 checks；pin `sup-phase2-pilot` |
 | 形状 | `shape-check` → 0；23 模块 <600；`towerctl.py` 246 行 |
 | 架构 | `arch-check` → gates 18 / invariants 16 / events 30 / adrs 8 |
 | 对象层 | `profile-check` → 11/0 |
-| 命令层 | `campaign-check` → 0；C-2026-Q4-04 5/5 |
-| 位置图 | `where --json` → **5/5**；current `PILOT-065`；next `null` |
-| CI | main `3e79ce2` success（run `41459174048`） |
+| 命令层 | `campaign-check` → 0；C-2026-Q4-04 6/6 |
+| 位置图 | `where --json` → **6/6**；current `PILOT-066`；next `null` |
+| CI | main `b4d809a` success（run `41567499312`） |
 | 阶段 | `HANDOFF_ACTIVE`；工作树干净；`HEAD=origin/main` |
 
 ## 061–065 结果
@@ -31,11 +31,12 @@
 | 063 | closed，无 envelope | base-side 首版；prefix 在 repository 根取错，卡关闭后无法追 head |
 | 064 | closed，`ENV-PILOT-064` ABANDONED | 重建并修 tower 前缀；`envelope_head_sha` 未用于形状检查，信封后 state 导致 base tip 变化 |
 | 065 | **PR #48 MERGED `c199928` + POST_MERGE_VERIFIED** | 形状检查改用 `envelope_head_sha`；730；65/64；where 5/5 |
+| 066 | **PR #50 MERGED `713d709` + POST_MERGE_VERIFIED** | post-merge base-side 路径；065 shim 删除；736；66/65；where 6/6 |
 
 **PR 路径首次真实走通**，但有三个 deviation：
 
-1. **admin bypass**：`gh pr merge 48 --merge --admin --match-head-commit 78b04df`。base 在 branch 之后又有 state，GitHub 报“head branch is not up to date”；为保留 review head 未 rebase。
-2. **repo-root shim**：post-merge 仍按 repo 根找 `merge-envelopes/ENV-PILOT-065.json`，实际 base-side 文件在 `tower-dsh/merge-envelopes/`；加了 repo-root 副本才过。
+1. **admin bypass**：065 PR #48 与 066 PR #50 都用 `gh pr merge --admin`。base 在 branch 之后又有 state，GitHub 报“head branch is not up to date”；为保留 review head 未 rebase。admin 不是常规路径。
+2. **065 shim 已删**：066 修 post-merge base-side 路径后，删除 `merge-envelopes/ENV-PILOT-065.json`，post-merge 9/9；根目录仍有 002–062 legacy 信封。
 3. **063/064 处置**：063 closed 无 envelope；064 ABANDONED；065 取代两者。
 
 ## 硬约束（不要忘）
@@ -48,8 +49,8 @@
 
 ## 下一步建议
 
-1. **收口 061–065 文档**（本文件 + MAP §6.36）并在 push 后看 CI。
-2. **小卡清 shim**：修 `post-merge` 的 envelope 路径（base-side 用 `tower-dsh/`），删除 repo-root shim；`PILOT-065` 的 spec 文案 65/65→65/64。
+1. **收口 066 文档**（本文件 + MAP §6.37）并在 push 后看 CI。
+2. **base 同步策略小卡**：处理 base 前进后 branch 过期（admin bypass 的根因），让普通 PR merge 不再需要 admin。
 3. **小卡清 063**：063 closed 无 envelope，标注 superseded by 065；不伪造 envelope。
 4. **然后开外证**：真实外部项目 1 个 feature，完整跑 spec→dispatch→review→envelope→PR merge→post-merge→owner 验收；先写 RUN 章程 + owner 批准。
 
@@ -77,14 +78,14 @@
 cd tower-dsh
 python tools/towerctl.py startup
 python tools/towerctl.py wiring
-python tools/towerctl.py state-verify          # 65/64；drift=[]
+python tools/towerctl.py state-verify          # 66/65；drift=[]
 python tools/towerctl.py authority-check       # exit 0 / configured / required
 python tools/towerctl.py arch-check            # gates 18
 python tools/towerctl.py profile-check         # 11/0
-python tools/towerctl.py where --json          # 5/5；next null
+python tools/towerctl.py where --json          # 6/6；next null
 python tools/towerctl.py campaign-check        # exit 0
 python tools/towerctl.py shape-check           # exit 0
-python -B tools/run_tests.py                   # 730 / OK (skipped=1)
+python -B tools/run_tests.py                   # 736 / OK (skipped=1)
 ```
 
 `wiring` 不通过 = ORPHANED；`state-verify` drift = 先停；`authority-check` 失败 = 不能 merge。
@@ -94,12 +95,12 @@ python -B tools/run_tests.py                   # 730 / OK (skipped=1)
 
 ## 已知残余
 
-- **065 repo-root shim**：`merge-envelopes/ENV-PILOT-065.json` 是兼容副本；应修 post-merge 路径后删除。
-- **065 admin bypass**：PR #48 绕过 up-to-date；后续需补 base 同步策略，不能复用 admin。
+- **066 post-merge 路径**：已修；base-side 用 tower 前缀，legacy 仍 repo 根；065 shim 已删除。
+- **065/066 admin bypass**：PR #48、#50 都绕过 up-to-date；后续需补 base 同步策略，不能复用 admin。
 - **063 closed 无 envelope**：标注 superseded by 065，不补 envelope。
 - **064 ABANDONED**：`ENV-PILOT-064` tombstone，保留历史。
 - **043 ABANDONED**：`ENV-PILOT-043` 已 tombstone；052 为受控例外；056 baseline 迁移有记录。
-- **065 spec 文案**：仍写 65/65；实际 pre-envelope 65/64。
+- **065 spec 文案**：已改 65/64；066 spec 66/65。
 - **056 baseline 迁移**：root 复制是受控状态更新；见 `tasks/PILOT-056/BASELINE-MIGRATION.md`。
 - **未知**：真实外部项目 pilot 未接；PR #48 是 admin 路径，不是普通保护路径。
 
