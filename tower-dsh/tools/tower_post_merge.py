@@ -31,6 +31,25 @@ from tower_arch import ARCH_GATES_REL
 from tower_arch_check import arch_check_payload
 
 
+def envelope_repo_path(root: Path, env: dict) -> str:
+    """Repository-relative path of the envelope file that post-merge probes.
+
+    A base-side envelope is committed on the base branch *inside* the tower
+    root, so in the repository it lives under the tower root's
+    ``git rev-parse --show-prefix`` (``tower-dsh/merge-envelopes/<ENV>.json``).
+    A legacy branch-side envelope keeps the repository-root ``envelope_path``
+    and never consults git.  A tower root outside any repository has no prefix
+    to prepend, so the legacy path is then the only one that can be checked --
+    the check still fails on it instead of crashing post-merge.
+    """
+    path = str(env.get("envelope_path") or "").replace("\\", "/")
+    if env.get("base_side") is not True:
+        return path
+    cp = git(root, "rev-parse", "--show-prefix")
+    prefix = cp.stdout.strip().strip("/") if cp.returncode == 0 else ""
+    return f"{prefix}/{path}" if prefix else path
+
+
 def cmd_accept(root: Path, args) -> None:
     """Owner accept (PILOT-059 adds the A/M gate; see ``accept_card``)."""
     accept_card(root, args)
@@ -332,7 +351,7 @@ def cmd_post_merge(root: Path, args) -> None:
     repo = resolve_repository(root, env.get("repository"))
     base = env.get("base", "main")
     a = env.get("implementation_head_sha")
-    envelope_path = env.get("envelope_path")
+    envelope_path = envelope_repo_path(root, env)
     tests = run_test_suite(
         [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
         repo)

@@ -371,7 +371,7 @@ def build_parser() -> argparse.ArgumentParser:
                          "checks yet, within --check-timeout (default: 10)")
 
     pm = sub.add_parser("post-merge")
-    pm.add_argument("--envelope", required=True)
+    pm.add_argument("--envelope", required=True, help="envelope id; the file is looked up at the repository root for a branch-side envelope and under the tower root for a base-side one")
     pm.add_argument("--result", default="PASS", choices=["PASS", "FAIL"])
     pm.add_argument("--note")
 

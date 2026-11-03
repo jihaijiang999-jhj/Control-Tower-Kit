@@ -76,7 +76,7 @@ def envelope_git_checks(repo: Path, env: dict,
     base = str(env.get("base") or "main")
     impl = str(env.get("implementation_head_sha") or "")
     declared = str(env.get("envelope_head_sha") or "")
-    path = str(env.get("envelope_path") or "")
+    path = str(env.get("envelope_path") or "").replace("\\", "/")
     try:
         head = git_ok(repo, "rev-parse", str(env.get("branch") or ""))
         if env.get("base_side") is True:
