@@ -35,8 +35,7 @@ def cmd_merge_check(root: Path, args) -> None:
     declared = env.get("envelope_id")
     if declared != envelope_id:
         fail([f"envelope identity matches request: file declares "
-              f"{declared if declared is not None else '(missing)'!r}, "
-              f"request {envelope_id!r}"])
+              f"{declared if declared is not None else '(missing)'!r}, request {envelope_id!r}"])
     checks = envelope_checks(root, env, expected_id=envelope_id)
     # Authority state is reported on every merge-check, including the legacy
     # case: a tower without AUTHORITY state must keep passing (old fixtures),
@@ -47,21 +46,16 @@ def cmd_merge_check(root: Path, args) -> None:
     # legacy.
     authority = authority_state_check(root)
     if authority["errors"]:
-        checks.append({"name": "merge authority", "ok": False,
-                       "detail": "; ".join(authority["errors"])})
+        checks.append({"name": "merge authority", "ok": False, "detail": "; ".join(authority["errors"])})
     elif authority["status"] == "legacy":
-        checks.append({"name": "merge authority", "ok": True,
-                       "detail": "legacy: no AUTHORITY_SET"})
+        checks.append({"name": "merge authority", "ok": True, "detail": "legacy: no AUTHORITY_SET"})
     elif authority["required"]:
         checks.append({"name": "merge authority requirement pinned", "ok": True,
-                       "detail": f"authority requirement pinned: "
-                                 f"{AUTHORITY_POLICY_FILE} + "
-                                 f"{AUTHORITY_REQUIRED_EVENT}, merge authority "
-                                 f"pinned: {authority['merge_authority']}"})
+                       "detail": f"authority requirement pinned: {AUTHORITY_POLICY_FILE} + "
+                       f"{AUTHORITY_REQUIRED_EVENT}, merge authority pinned: {authority['merge_authority']}"})
     else:
         checks.append({"name": "merge authority pinned", "ok": True,
-                       "detail": f"merge authority pinned: "
-                                 f"{authority['merge_authority']}"})
+                       "detail": f"merge authority pinned: {authority['merge_authority']}"})
     # PILOT-039: a legacy envelope has no lifecycle events, so
     # ``envelope_checks`` never verifies the ledgers for it.  Without this
     # independent check a forged ledger row would only be caught by ``merge``.
@@ -71,12 +65,9 @@ def cmd_merge_check(root: Path, args) -> None:
     if not envelope_has_baselines(env):
         breaks = ledger_precondition_breaks(root)
         checks.append({
-            "name": "pre-merge ledger chains verified",
-            "ok": not breaks,
+            "name": "pre-merge ledger chains verified", "ok": not breaks,
             "detail": "ok" if not breaks else "; ".join(
-                ledger_break_phrase(name, first)
-                for name, first in breaks),
-        })
+                ledger_break_phrase(name, first) for name, first in breaks)})
     # PILOT-040: the empty-ledger guard is reported only when it fires.  An
     # always-present ok=True item here would change the check list of every
     # existing configured/required fixture (036/037/038/039 assert exact
@@ -84,13 +75,11 @@ def cmd_merge_check(root: Path, args) -> None:
     # the item names the same condition ``merge`` fails closed on.
     empty_ledger = ledger_empty_guard(root)
     if empty_ledger:
-        checks.append({"name": "ledger history present", "ok": False,
-                       "detail": "; ".join(empty_ledger)})
+        checks.append({"name": "ledger history present", "ok": False, "detail": "; ".join(empty_ledger)})
     queue = load_queue(root)
     entry = next((e for e in queue.get("entries", [])
                   if e.get("envelope_id") == envelope_id), None)
-    checks.append({"name": "queued", "ok": entry is not None,
-                   "detail": entry.get("status") if entry else "missing"})
+    checks.append({"name": "queued", "ok": entry is not None, "detail": entry.get("status") if entry else "missing"})
     if not all(c["ok"] for c in checks):
         emit({"ok": False, "envelope": args.envelope,
               "errors": [c for c in checks if not c["ok"]]}, 2)
@@ -130,8 +119,7 @@ def run_gh(repo: Path, argv: list[str], *, phase: str,
     try:
         return subprocess.run(
             [*gh_command(), *argv], cwd=str(repo), capture_output=True,
-            text=True, encoding="utf-8", timeout=timeout,
-        )
+            text=True, encoding="utf-8", timeout=timeout)
     except subprocess.TimeoutExpired:
         raise MergeBlocked(
             phase, "timeout",
@@ -250,6 +238,19 @@ def pr_merge_head(repo: Path, env: dict) -> str:
     return head
 
 
+def pr_merge_argv(number: int, match_head: str, args) -> list[str]:
+    """The ``gh pr merge`` argv; ``--admin`` only for an audited state-only base."""
+    audit = getattr(args, "base_sync_audit", None) or {}
+    return ["pr", "merge", str(number), "--merge", "--match-head-commit",
+            match_head] + (["--admin"] if audit.get("admin") is True else [])
+
+
+def pr_merge_ledger_keys(env: dict) -> tuple[str, ...]:
+    """PR merge ledger fields, plus the base-sync audit when it was recorded."""
+    audit = ("base_sync", "base_ahead_paths", "admin")
+    return ("merge_mode", "pr_number", "pr_url") + tuple(k for k in audit if k in env)
+
+
 def pr_remote_merge(repo: Path, env: dict, args) -> dict:
     """Steps 1-4 of a ``--mode pr`` merge: push, create, checks, merge the PR.
 
@@ -313,8 +314,7 @@ def pr_remote_merge(repo: Path, env: dict, args) -> dict:
 
     # 4. merge the PR once the checks are green.  ``--match-head-commit`` pins
     #    the real PR head resolved above; any other shape was already refused.
-    cp = run_gh(repo, ["pr", "merge", str(number), "--merge",
-                       "--match-head-commit", match_head],
+    cp = run_gh(repo, pr_merge_argv(number, match_head, args),
                 phase="pr-merge", timeout=timeout)
     if cp.returncode != 0:
         raise MergeBlocked("pr-merge", "merge", command_failure(cp))
@@ -454,8 +454,7 @@ def cmd_merge(root: Path, args) -> None:
             "checkout the envelope.base branch before merging"
         ])
     checks = envelope_checks(root, env, expected_id=envelope_id)
-    checks.append({"name": "queued", "ok": entry is not None,
-                   "detail": entry.get("status") if entry else "missing"})
+    checks.append({"name": "queued", "ok": entry is not None, "detail": entry.get("status") if entry else "missing"})
     if not all(c["ok"] for c in checks):
         entry["status"] = "CORRECTION_REQUIRED"
         save_queue(root, queue)
@@ -502,6 +501,7 @@ def cmd_merge(root: Path, args) -> None:
                     "pr_url": identity["pr_url"],
                     "remote_merged": True,
                     "remote_merged_at": now(),
+                    **(getattr(args, "base_sync_audit", None) or {}),
                 })
                 # Persist the remote half before touching the local branch: if
                 # the fast-forward fails, the retry knows the PR is merged and
@@ -555,7 +555,7 @@ def cmd_merge(root: Path, args) -> None:
     }
     merge_payload = {"envelope": args.envelope, "merge_commit": merge_commit}
     if mode == "pr":
-        for key in ("merge_mode", "pr_number", "pr_url"):
+        for key in pr_merge_ledger_keys(env):
             ledger_entry[key] = env[key]
             merge_payload[key] = env[key]
     add_merge_ledger(root, ledger_entry)
