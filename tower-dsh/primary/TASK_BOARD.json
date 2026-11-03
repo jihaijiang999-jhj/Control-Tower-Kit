@@ -695,13 +695,13 @@
     {
       "id": "PILOT-070",
       "title": "base-ahead 以 envelope implementation head 为基准；070 审计 admin",
-      "status": "ready",
+      "status": "closed",
       "authority": "workspace_write",
-      "executor": null,
-      "reviewer": null,
-      "next": "spec 审批：owner 或独立 reviewer 运行 spec-approve，然后 check --phase spec",
-      "updated_at": "2026-11-04T00:05:11+08:00"
+      "executor": "subagent:f704eaa9-c78e-40a8-9dcf-fb361e6e0b7c",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-070/MERGE.md",
+      "updated_at": "2026-11-04T01:14:30+08:00"
     }
   ],
-  "updated_at": "2026-11-04T00:05:11+08:00"
+  "updated_at": "2026-11-04T01:14:30+08:00"
 }

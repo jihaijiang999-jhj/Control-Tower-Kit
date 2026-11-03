@@ -2,7 +2,7 @@
   "schema": "tower/task@1",
   "id": "PILOT-070",
   "title": "base-ahead 以 envelope implementation head 为基准；070 审计 admin",
-  "status": "ready",
+  "status": "closed",
   "authority": "workspace_write",
   "scope": [
     "base_ahead_paths(root, impl_head)：fetch origin/main；mb=merge-base(impl_head, origin/main)；changed=git diff --name-only mb..origin/main；mb==tip → []",
@@ -41,13 +41,101 @@
   "spec_path": "pilot/PILOT-070.spec.json",
   "spec_sha256": "a918b916b5ea82e89ce456896cfdb6e54767f4148a322233b4581fb149625edb",
   "spec_gate": "PASS",
-  "executor": null,
-  "dispatch": null,
-  "evidence": [],
-  "review": null,
-  "decision": null,
-  "closeout": null,
+  "executor": "subagent:f704eaa9-c78e-40a8-9dcf-fb361e6e0b7c",
+  "dispatch": {
+    "executor": "subagent:f704eaa9-c78e-40a8-9dcf-fb361e6e0b7c",
+    "worktree": "pilot/worktrees/PILOT-070",
+    "at": "2026-11-04T00:46:14+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "47b034775e45b507a3bdbfabc7d2324a7eafb3e4",
+    "campaign": "C-2026-Q4-04"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-070/evidence/tower_cli.py",
+      "sha256": "12882cd43bed179cfd6fe74dd0b6ea890b907d83dab691e0e5ee2f12efdadbdf",
+      "bytes": 36042,
+      "at": "2026-11-04T00:58:11+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-070/evidence/test_base_sync.py",
+      "sha256": "402cdcce6bd4e2fbbf67881af0f442033669ffab6e30d1a40e13da3cd798afa3",
+      "bytes": 26699,
+      "at": "2026-11-04T00:58:11+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-070/evidence/test-output.txt",
+      "sha256": "0e88ae8c05fc0c942271eac8ef1c703a3a40fa550fdaa7b148a741fa0cccb1de",
+      "bytes": 213830,
+      "at": "2026-11-04T00:58:11+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-070/evidence/impl_ahead_probe.py",
+      "sha256": "f9830a19c0220e1f401e3470b869a515c2543fbdcfb95a1854e419320474383d",
+      "bytes": 5337,
+      "at": "2026-11-04T00:58:11+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-070/evidence/probe.txt",
+      "sha256": "5a64930b8a5708505795fae7cd5db2b5371a9a7a821b4eee2bdb65c112739f56",
+      "bytes": 1234,
+      "at": "2026-11-04T00:58:11+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-070/evidence/commit.txt",
+      "sha256": "03eab866800b2e7509346d011a25174bc9a8b6f4987fee5afa80f59b09eaf5b1",
+      "bytes": 704,
+      "at": "2026-11-04T00:58:11+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-070/evidence/diff.txt",
+      "sha256": "0a38c055d2ae5caf69a9affde9c54f97db02b8040a8e1ab251072ea09d317e12",
+      "bytes": 32066,
+      "at": "2026-11-04T00:58:11+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-070/evidence/gates.txt",
+      "sha256": "8a51ae681d1cd20668e5e47a061c4e481d6c0ab229c66140f6adf9e7139536a6",
+      "bytes": 3649,
+      "at": "2026-11-04T00:58:11+08:00",
+      "id": "E-008"
+    }
+  ],
+  "review": {
+    "schema": "tower/review@1",
+    "task": "PILOT-070",
+    "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+    "verdict": "PASS",
+    "head": "3707e0b5215e711e3907efca723a46c7f3e342a2",
+    "base": "47b034775e45b507a3bdbfabc7d2324a7eafb3e4",
+    "scope": [],
+    "findings": [],
+    "note": "070 PASS。2 paths；HEAD 3707e0b（base 47b0347）；8/8 证据；Ran 753 OK；base-ahead 用 envelope implementation head；当前 HEAD 不参与；base state/envelope + flag → 审计 admin；code 拒绝；070 PR 待 controller。",
+    "at": "2026-11-04T01:14:29+08:00",
+    "structure": ""
+  },
+  "decision": {
+    "id": "D-PILOT-070",
+    "actor": "owner",
+    "text": "PASS; impl-head base-ahead",
+    "at": "2026-11-04T01:14:30+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-070/CLOSEOUT.md",
+    "at": "2026-11-04T01:14:30+08:00"
+  },
   "created_at": "2026-11-04T00:05:11+08:00",
-  "updated_at": "2026-11-04T00:05:11+08:00",
-  "next": "spec 审批：owner 或独立 reviewer 运行 spec-approve，然后 check --phase spec"
+  "updated_at": "2026-11-04T01:14:30+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-070/MERGE.md",
+  "delivered_at": "2026-11-04T00:58:11+08:00",
+  "accepted_at": "2026-11-04T01:14:30+08:00"
 }
