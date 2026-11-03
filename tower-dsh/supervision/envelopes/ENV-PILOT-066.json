@@ -60,6 +60,10 @@
   ],
   "envelope_head_sha": "5e2c0a922b9322590fde20eb341575f4ff76967c",
   "head": "5e2c0a922b9322590fde20eb341575f4ff76967c",
-  "status": "CORRECTION_REQUIRED",
-  "base_side": true
+  "status": "POST_MERGE_VERIFIED",
+  "base_side": true,
+  "tests_count": 2,
+  "tower_tests_count": 736,
+  "post_merge_at": "2026-11-03T10:39:40+08:00",
+  "post_merge_note": "PR #50 admin merge 713d709; shim removed"
 }
