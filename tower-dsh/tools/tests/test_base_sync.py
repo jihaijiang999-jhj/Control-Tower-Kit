@@ -52,14 +52,19 @@ import tower_merge  # noqa: E402
 ENVELOPE = review_gate.ENVELOPE
 TASK = review_gate.TASK
 BASE = review_gate.BASE
+BRANCH = review_gate.BRANCH
 STATE_PATH = "tower-dsh/ledger/BASE-SYNC-STATE.json"
 CODE_PATH = "tower-dsh/tools/base_sync_probe.py"
 TOOLS_PATH = "tower-dsh/tools/tower_cli.py"
 ENVELOPE_PATH = "tower-dsh/merge-envelopes/ENV-PILOT-068.json"
 ROOT_ENVELOPE_PATH = "merge-envelopes/ENV-PILOT-068.json"
+# The base-side envelope sits under the tower prefix of the kit repository.
+ENVELOPE_REPO_PATH = "tower-dsh/merge-envelopes/ENV-REVIEW-058.json"
+BRANCH_CODE_PATH = "feature.txt"
 REVIEW_CHECK = review_gate.REVIEW_CHECK
 ok = review_gate.ok
 read_json = review_gate.read_json
+write_json = review_gate.write_json
 run_git = review_gate.run_git
 
 
@@ -72,8 +77,12 @@ def merge_event_types(root: Path) -> list[str]:
             path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
-class BaseSyncKitCase(review_gate.ReviewGateKitCase):
-    """The 058/061 kit plus a bare origin whose ``main`` can move ahead."""
+class _BaseSyncKit(review_gate.ReviewGateKitCase):
+    """The 058/061 kit plus a bare origin whose ``main`` can move ahead.
+
+    Only helpers live here; the concrete cases below inherit them so a new
+    scenario never re-runs (or duplicates) the PILOT-067/068 tests.
+    """
 
     def setUp(self) -> None:
         super().setUp()
@@ -147,6 +156,10 @@ class BaseSyncKitCase(review_gate.ReviewGateKitCase):
 
     def promote_reviewed_envelope(self) -> None:
         self.promote("--head", self.implementation_head, "--base", self.base_sha)
+
+
+class BaseSyncKitCase(_BaseSyncKit):
+    """PILOT-067/068 cases: branch-side envelope, base still behind."""
 
     # -- 1. unchanged base ------------------------------------------------
     def test_unchanged_base_merges_without_admin_audit(self) -> None:
@@ -298,6 +311,180 @@ class BaseSyncKitCase(review_gate.ReviewGateKitCase):
         problems = tower_envelope.review_problems(self.root, moved, TASK)
         self.assertTrue(any(problem.startswith("stale review: head")
                             for problem in problems), problems)
+
+
+class EnvelopeHeadBaseCase(_BaseSyncKit):
+    """PILOT-070: the real merge shape -- ``HEAD`` *is* the base tip.
+
+    At merge time the checkout is ``main`` and ``main`` already equals
+    ``origin/main``; only the envelope's ``implementation_head_sha`` is behind.
+    A ``HEAD``-based merge-base therefore equals the tip and the old policy saw
+    ``[]`` forever.  These cases build that shape (a base-side envelope, as in
+    063/065/066/067/068/070) and drive the real ``merge --mode pr``.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        # The base-side envelope lives on main and the implementation branch
+        # carries code only, so drop the 058 branch-side envelope commit.
+        ok(run_git(self.kit, "checkout", BRANCH))
+        ok(run_git(self.kit, "reset", "--hard", self.implementation_head))
+        ok(run_git(self.kit, "checkout", BASE))
+        self.merge_preview_sha = ""
+
+    # -- fixture ----------------------------------------------------------
+    def gh_env(self) -> dict:
+        env = super().gh_env()
+        if self.merge_preview_sha:
+            env["RG_BRANCH_SHA"] = self.merge_preview_sha
+        return env
+
+    def promote_base_side(self) -> None:
+        """checkback -> accept -> base-side envelope -> queue (063 + 058)."""
+        cp = self.checkback("--head", self.implementation_head,
+                            "--base", self.base_sha)
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        cp = self.cli("accept", "--task", TASK, "--decision", "D-070")
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        write_json(self.kit / ENVELOPE_REPO_PATH, {"envelope_id": ENVELOPE})
+        ok(run_git(self.kit, "add", "--", ENVELOPE_REPO_PATH))
+        ok(run_git(self.kit, "-c", "commit.gpgsign=false", "commit",
+                   "-m", "base-side envelope"))
+        self.envelope_head = run_git(self.kit, "rev-parse", "HEAD").stdout.strip()
+        write_json(self.root / "envelope.json", self.payload())
+        cp = self.cli("envelope-new", "--task", TASK,
+                      "--file", str(self.root / "envelope.json"), "--base-side")
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        cp = self.cli("queue-add", "--envelope", ENVELOPE)
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+
+    def state_ahead(self) -> str:
+        """Publish a state-only base commit and catch local ``main`` up to it."""
+        ahead = self.advance_base_paths([STATE_PATH])
+        ok(run_git(self.kit, "reset", "--hard", ahead))
+        self.assertEqual(run_git(self.kit, "rev-parse", "main").stdout.strip(),
+                         ahead)
+        self.assertEqual(
+            run_git(self.origin, "rev-parse", "refs/heads/main").stdout.strip(),
+            ahead)
+        return ahead
+
+    def preview_merge(self, ahead: str) -> str:
+        """The merge commit GitHub would create, pushed so the ff can find it."""
+        ok(run_git(self.kit, "checkout", "-b", "merge-preview", ahead))
+        ok(run_git(self.kit, "-c", "commit.gpgsign=false", "merge", "--no-ff",
+                   BRANCH, "-m", "preview merge"))
+        self.merge_preview_sha = run_git(
+            self.kit, "rev-parse", "HEAD").stdout.strip()
+        ok(run_git(self.kit, "push", "origin",
+                   f"{self.merge_preview_sha}:refs/heads/merge-preview"))
+        ok(run_git(self.kit, "checkout", BASE))
+        return self.merge_preview_sha
+
+    def assert_refused(self, cp: subprocess.CompletedProcess,
+                       needle: str) -> list[str]:
+        """The common refusal shape: exit 2, no event, no gh, nothing written."""
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        errors = json.loads(cp.stdout)["errors"]
+        self.assertTrue(any(needle in error for error in errors), errors)
+        self.assertEqual(self.envelope_state()["status"], "DRAFT")
+        self.assertEqual(self.queue_status(), "WAITING")
+        events = merge_event_types(self.root)
+        self.assertFalse([event for event in events
+                          if event.startswith("MERGE")], events)
+        self.assertFalse(self.gh_log.exists())
+        return errors
+
+    # -- 1. HEAD at the base tip, implementation behind -------------------
+    def test_base_tip_head_impl_behind_state_base_is_audited_admin(self) -> None:
+        self.promote_base_side()
+        ahead = self.state_ahead()
+        self.assertNotEqual(ahead, self.implementation_head)
+        tip = run_git(self.origin, "rev-parse",
+                      "refs/heads/main").stdout.strip()
+        head = run_git(self.kit, "rev-parse", "HEAD").stdout.strip()
+        # The premise of the bug: HEAD and origin/main are the same commit, so
+        # a merge-base of HEAD..tip is the tip itself (base-ahead was []).
+        self.assertEqual(head, tip)
+        self.assertEqual(run_git(self.kit, "merge-base", "HEAD", tip)
+                         .stdout.strip(), tip)
+        # ... while the implementation head still sees the base-only commits.
+        self.assertEqual(
+            tower_cli.base_ahead_paths(self.kit, self.implementation_head),
+            [STATE_PATH, ENVELOPE_REPO_PATH])
+        merge_commit = self.preview_merge(ahead)
+        cp = self.run_merge("--allow-state-ahead")
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        argv = self.merge_argv()
+        self.assertIn("--admin", argv)
+        self.assertEqual(argv[argv.index("--match-head-commit") + 1],
+                         self.implementation_head)
+        envelope = self.envelope_state()
+        self.assertEqual(envelope["status"], "MERGED")
+        self.assertEqual(envelope["merge_commit"], merge_commit)
+        self.assertEqual(envelope["base_sync"], "state-only")
+        self.assertIn(STATE_PATH, envelope["base_ahead_paths"])
+        self.assertIn(ENVELOPE_REPO_PATH, envelope["base_ahead_paths"])
+        self.assertNotIn(BRANCH_CODE_PATH, envelope["base_ahead_paths"])
+        self.assertIs(envelope["admin"], True)
+        entry = self.merge_ledger_entry()
+        self.assertEqual(entry["base_sync"], "state-only")
+        self.assertEqual(entry["base_ahead_paths"],
+                         envelope["base_ahead_paths"])
+        self.assertIs(entry["admin"], True)
+        payload = self.merge_payload()
+        self.assertEqual(payload["base_sync"], "state-only")
+        self.assertEqual(payload["base_ahead_paths"],
+                         envelope["base_ahead_paths"])
+        self.assertIs(payload["admin"], True)
+
+    # -- 2. a real code path on the base is still refused ------------------
+    def test_base_code_ahead_is_refused_even_with_the_flag(self) -> None:
+        self.promote_base_side()
+        ahead = self.advance_base_paths([CODE_PATH])
+        ok(run_git(self.kit, "reset", "--hard", ahead))
+        cp = self.run_merge("--allow-state-ahead")
+        errors = self.assert_refused(cp, CODE_PATH)
+        self.assertIn("--admin is never allowed", errors[0])
+        self.assertIn("git rebase origin/main", cp.stdout)
+
+    # -- 3. without the flag even state-only is refused --------------------
+    def test_state_ahead_without_the_flag_is_refused(self) -> None:
+        self.promote_base_side()
+        self.state_ahead()
+        cp = self.run_merge()
+        errors = self.assert_refused(cp, "--allow-state-ahead")
+        self.assertIn(STATE_PATH, errors[0])
+
+    # -- 4. the implementation head is required (no HEAD fallback) ---------
+    def test_missing_implementation_head_is_refused(self) -> None:
+        self.promote_base_side()
+        self.state_ahead()
+        env_path = self.envelope_path()
+        env = read_json(env_path)
+        env.pop("implementation_head_sha", None)
+        write_json(env_path, env)
+        cp = self.run_merge("--allow-state-ahead")
+        self.assert_refused(cp, "implementation_head_sha")
+        self.assertIn("never falls back to HEAD", cp.stdout)
+
+    def test_unresolvable_implementation_head_is_refused(self) -> None:
+        self.promote_base_side()
+        self.state_ahead()
+        env_path = self.envelope_path()
+        env = read_json(env_path)
+        env["implementation_head_sha"] = "0" * 40
+        write_json(env_path, env)
+        cp = self.run_merge("--allow-state-ahead")
+        self.assert_refused(cp, "not a resolvable commit")
+
+    def test_missing_envelope_is_refused(self) -> None:
+        self.promote_base_side()
+        self.envelope_path().unlink()
+        cp = self.run_merge("--allow-state-ahead")
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        self.assertIn("envelope not found", cp.stdout)
+        self.assertFalse(self.gh_log.exists())
 
 
 class BasePathClassificationCase(unittest.TestCase):

@@ -563,21 +563,33 @@ def classify_base_paths(paths: list[str], prefix: str) -> tuple[list[str], list[
     return state, code
 
 
-def base_ahead_paths(repo: Path, base: str, remote: str) -> list[str]:
-    """Repo-relative paths ``<remote>/<base>`` gained after its merge-base.
+def base_ahead_paths(repo: Path, impl_head: str, base: str = "main",
+                     remote: str = "origin") -> list[str]:
+    """Repo-relative paths ``<remote>/<base>`` gained after the fork point.
+
+    PILOT-070: the fork point is ``merge-base(impl_head, tip)`` of the
+    envelope's *implementation* head, never the current ``HEAD``.  At merge time
+    the checkout is the base branch, so ``HEAD`` and ``origin/main`` are usually
+    the same commit: a ``HEAD``-based merge-base makes ``mb == tip`` and the
+    base-ahead policy can never see (or audit) the base-only state commits it
+    exists for.  Using the implementation head instead answers the real
+    question -- what did the base gain after the implementation forked? -- and
+    branch-only code stays out of the diff by construction.
 
     The fetch is what makes the answer current: a stale remote-tracking ref
     could hide a code change and wrongly classify the base as state-only.  Any
-    failure (offline remote, no such branch) yields ``[]``: the policy stays
-    dormant and the merge keeps its original up-to-date semantics, so an
-    unverified base can never earn ``--admin``.
+    git failure (offline remote, no such branch, unknown implementation head)
+    yields ``[]``: the policy stays dormant and the merge keeps its original
+    up-to-date semantics, so an unverified base can never earn ``--admin``.
     """
+    if not impl_head:
+        return []
     if git(repo, "fetch", "--quiet", remote, base).returncode != 0:
         return []
     try:
         tip = git_ok(repo, "rev-parse", "FETCH_HEAD")
-        common = git_ok(repo, "merge-base", "HEAD", tip)
-        if git_ok(repo, "rev-list", "--count", f"HEAD..{tip}") in ("", "0"):
+        common = git_ok(repo, "merge-base", impl_head, tip)
+        if common == tip:
             return []
         changed = git_ok(repo, "diff", "--name-only", common, tip)
     except Exception:
@@ -624,7 +636,14 @@ def base_sync_env(root: Path, args) -> dict | None:
 
 
 def base_sync_audit(root: Path, args) -> dict:
-    """PILOT-067: refuse or audit ``merge --mode pr`` when the base advanced.
+    """PILOT-067/070: refuse or audit ``merge --mode pr`` when the base advanced.
+
+    The base-ahead comparison starts at the envelope's
+    ``implementation_head_sha`` (PILOT-070): the current checkout is the base
+    branch, so ``HEAD`` describes the base tip, not the implementation.  A
+    missing or unresolvable implementation head is a fail-closed exit 2 -- never
+    a silent fallback to ``HEAD``, which is exactly the bug that made
+    ``base_ahead_paths`` return ``[]`` for every real merge.
 
     Returns the audit payload (``{}`` when the base did not move) that
     ``cmd_merge`` persists into the envelope and both merge records, and that
@@ -639,7 +658,19 @@ def base_sync_audit(root: Path, args) -> dict:
     base = str(env.get("base", "main"))
     remote = getattr(args, "remote", None) or "origin"
     repo = resolve_repository(root, env.get("repository"))
-    ahead = base_ahead_paths(repo, base, remote)
+    impl_head = env.get("implementation_head_sha")
+    if not isinstance(impl_head, str) or not impl_head.strip():
+        fail([f"envelope {args.envelope} has no implementation_head_sha; "
+              "base-ahead is computed from the envelope implementation head "
+              "and never falls back to HEAD"])
+    impl_head = impl_head.strip()
+    try:
+        git_ok(repo, "rev-parse", "--verify", f"{impl_head}^{{commit}}")
+    except Exception:
+        fail([f"envelope implementation_head_sha {impl_head!r} is not a "
+              f"resolvable commit in {repo}; base-ahead is computed from the "
+              "envelope implementation head and never falls back to HEAD"])
+    ahead = base_ahead_paths(repo, impl_head, base, remote)
     if not ahead:
         return {}
     state, code = classify_base_paths(ahead, tower_repo_prefix(root, repo))
