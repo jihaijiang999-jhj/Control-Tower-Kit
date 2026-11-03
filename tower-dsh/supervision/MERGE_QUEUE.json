@@ -587,9 +587,9 @@
       "task": "PILOT-067",
       "branch": "pilot/PILOT-067",
       "base": "main",
-      "status": "CORRECTION_REQUIRED",
+      "status": "POST_MERGE_VERIFIED",
       "added_at": "2026-11-03T13:06:31+08:00"
     }
   ],
-  "updated_at": "2026-11-03T13:51:24+08:00"
+  "updated_at": "2026-11-03T14:12:46+08:00"
 }
