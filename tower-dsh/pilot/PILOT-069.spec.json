@@ -1,0 +1,45 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-069",
+  "title": "base-ahead 用 merge-base..origin/main；069 自身审计 admin",
+  "objective": {
+    "problem": "068 的 base-sync 仍拒绝 `--allow-state-ahead`：base-ahead 用了 HEAD..origin/main 的全部差异，把分支自己的 `tools/tower_cli.py`、`test_base_sync.py` 算进 base-only，误判为 code；069 因此必须修 diff 基准，而不是白名单。",
+    "outcome": "base-ahead = `git merge-base HEAD origin/main`..`origin/main`，只含 base 相对分叉点新增/修改的路径；分支自己的 code 不计入。state-only + envelope + flag 时 069 走审计 admin；base 真正新增 code 仍拒绝。",
+    "approach": "在 tower_cli 的 base_ahead_paths 用 merge-base；补测试：分支有 code、base 只有 state/envelope → admin+审计；base 真有 code → 2；base 无前进；无 flag；069 自身 base-side envelope + `--allow-state-ahead`，合并后读审计。",
+    "non_goals_and_done": "不放宽 code/docs 分类；不改审计结构；747+ tests；069 审计 admin 成功才完成。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0009 / 068 base-ahead diff",
+  "why_now": "067/068 连续直接 admin，根因是 base-only 计算把分支代码算进去；不修则审计路径永远走不通。",
+  "scope": [
+    "base_ahead_paths：mb = merge-base HEAD origin/main；changed = git diff --name-only mb..origin/main；mb == origin/main 即未前进",
+    "分类逻辑不变：state-only + merge-envelopes/** 可 flag admin；tools/arch/EVENT_CATALOG/pilot/根 md 仍 code",
+    "test_base_sync：分支自带 code + base 仅 state/envelope → flag 0、admin 审计、base_ahead_paths 不含分支 code；base 真新增 tools/ → 2；base 未前进；无 flag；review 仍绑 impl",
+    "069 自身 base-side envelope；merge 必须 --allow-state-ahead；读取 envelope/merge ledger/MERGE payload 的 base_sync=state-only、base_ahead_paths、admin=true",
+    "不直接 gh admin；不改 065/066/067/068 历史"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-069/tower-dsh/tools/tower_cli.py",
+    "pilot/worktrees/PILOT-069/tower-dsh/tools/tests/test_base_sync.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "direct gh admin bypass",
+    "using HEAD..origin/main for base-ahead",
+    "weakening review/acceptance"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-069/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 747 + 新增用例数（main 基线 747）",
+    "分支自带 code + base 仅 state/envelope + flag → merge 0，admin argv，base_ahead_paths 不含分支 code",
+    "base 真新增 tools/ + flag → exit 2；state-only 无 flag → 2；base 未前进正常",
+    "069 自身 merge --mode pr --allow-state-ahead 成功；无直接 gh admin",
+    "069 审计：base_sync=state-only、base_ahead_paths 仅 envelope/state、admin=true",
+    "真实塔 69/68 drift []；arch 18；profile 11/0；shape 0"
+  ],
+  "depends_on": ["PILOT-068"],
+  "worktree": "pilot/worktrees/PILOT-069"
+}
