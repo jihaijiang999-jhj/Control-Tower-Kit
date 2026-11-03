@@ -1,0 +1,25 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-070",
+  "task": "PILOT-070",
+  "repository": "..",
+  "branch": "pilot/PILOT-070",
+  "base": "main",
+  "implementation_head_sha": "3707e0b5215e711e3907efca723a46c7f3e342a2",
+  "envelope_path": "merge-envelopes/ENV-PILOT-070.json",
+  "created_at": "2026-11-04T01:15:00+08:00",
+  "scope": "PILOT-070: base-ahead uses envelope implementation head; audited admin",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 747,
+  "forbidden": ["production", "external_call", "deploy"],
+  "evidence": [
+    {"path": "tasks/PILOT-070/evidence/tower_cli.py", "sha256": "12882cd43bed179cfd6fe74dd0b6ea890b907d83dab691e0e5ee2f12efdadbdf"},
+    {"path": "tasks/PILOT-070/evidence/test_base_sync.py", "sha256": "402cdcce6bd4e2fbbf67881af0f442033669ffab6e30d1a40e13da3cd798afa3"},
+    {"path": "tasks/PILOT-070/evidence/test-output.txt", "sha256": "0e88ae8c05fc0c942271eac8ef1c703a3a40fa550fdaa7b148a741fa0cccb1de"},
+    {"path": "tasks/PILOT-070/evidence/impl_ahead_probe.py", "sha256": "f9830a19c0220e1f401e3470b869a515c2543fbdcfb95a1854e419320474383d"},
+    {"path": "tasks/PILOT-070/evidence/probe.txt", "sha256": "5a64930b8a5708505795fae7cd5db2b5371a9a7a821b4eee2bdb65c112739f56"},
+    {"path": "tasks/PILOT-070/evidence/commit.txt", "sha256": "03eab866800b2e7509346d011a25174bc9a8b6f4987fee5afa80f59b09eaf5b1"},
+    {"path": "tasks/PILOT-070/evidence/diff.txt", "sha256": "0a38c055d2ae5caf69a9affde9c54f97db02b8040a8e1ab251072ea09d317e12"},
+    {"path": "tasks/PILOT-070/evidence/gates.txt", "sha256": "8a51ae681d1cd20668e5e47a061c4e481d6c0ab229c66140f6adf9e7139536a6"}
+  ]
+}
