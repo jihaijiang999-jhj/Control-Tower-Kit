@@ -7,8 +7,9 @@ import spec_coverage
 import spec_lint
 from pathlib import Path
 from tower_common import (
-    DEFAULT_ROOT, _force_utf8_stdio, check_package_id, emit, fail, jdump,
-    jload, now,
+    DEFAULT_ROOT, PACKAGE_ID_RE, _force_utf8_stdio, check_package_id, emit,
+    fail, git, git_ok, is_safe_id, jdump, jload, now, repo_relative,
+    resolve_repository,
 )
 from tower_ledger import (
     LedgerLockTimeout, append_supervision_ledger, cmd_task_ids_init,
@@ -499,6 +500,165 @@ def review_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
     return parser
 
 
+def base_sync_layer_parsers(
+        parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """PILOT-067: the ``--allow-state-ahead`` flag on the existing ``merge``.
+
+    Same layering as the review flags: ``build_parser`` keeps its PILOT-044
+    size, and this layer owns only the one explicit, audited escape hatch for a
+    base branch that advanced with state-only changes.
+    """
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        merge = action.choices.get("merge")
+        if merge is not None:
+            merge.add_argument(
+                "--allow-state-ahead", dest="allow_state_ahead",
+                action="store_true",
+                help="allow an audited --admin merge when the base advanced "
+                     "with state-only paths only (ledger/primary/supervision/"
+                     "tasks/state)")
+    return parser
+
+
+# PILOT-067: the base-sync policy behind ``merge --mode pr``.  The tower root
+# usually lives in a sub-directory of the merge repository ("repository": ".."),
+# so base-only paths are classified after stripping that prefix; anything
+# outside it is code/docs by default.
+STATE_ONLY_PREFIXES = ("ledger/", "primary/", "supervision/", "tasks/", "state/")
+
+
+def tower_repo_prefix(root: Path, repo: Path) -> str:
+    """Repo-relative prefix of the tower root (``""`` when they coincide)."""
+    relative = repo_relative(repo, root)
+    return f"{relative}/" if relative else ""
+
+
+def classify_base_paths(paths: list[str], prefix: str) -> tuple[list[str], list[str]]:
+    """Split base-only paths into ``(state_only, code_docs)``.
+
+    A path is state-only only when it sits under the tower prefix and its
+    tower-relative spelling starts with :data:`STATE_ONLY_PREFIXES`; every other
+    path -- tools, arch, EVENT_CATALOG.json, pilot, root docs, or anything
+    outside the tower -- is code/docs.  The default is the strict side, so an
+    unclassifiable path can never earn ``--admin``.
+    """
+    state: list[str] = []
+    code: list[str] = []
+    for raw in paths:
+        path = str(raw).replace("\\", "/")
+        inside = path[len(prefix):] if path.startswith(prefix) else ""
+        if any(inside.startswith(name) for name in STATE_ONLY_PREFIXES):
+            state.append(path)
+        else:
+            code.append(path)
+    return state, code
+
+
+def base_ahead_paths(repo: Path, base: str, remote: str) -> list[str]:
+    """Repo-relative paths ``<remote>/<base>`` gained after its merge-base.
+
+    The fetch is what makes the answer current: a stale remote-tracking ref
+    could hide a code change and wrongly classify the base as state-only.  Any
+    failure (offline remote, no such branch) yields ``[]``: the policy stays
+    dormant and the merge keeps its original up-to-date semantics, so an
+    unverified base can never earn ``--admin``.
+    """
+    if git(repo, "fetch", "--quiet", remote, base).returncode != 0:
+        return []
+    try:
+        tip = git_ok(repo, "rev-parse", "FETCH_HEAD")
+        common = git_ok(repo, "merge-base", "HEAD", tip)
+        if git_ok(repo, "rev-list", "--count", f"HEAD..{tip}") in ("", "0"):
+            return []
+        changed = git_ok(repo, "diff", "--name-only", common, tip)
+    except Exception:
+        return []
+    return [line.strip() for line in changed.splitlines() if line.strip()]
+
+
+def merge_envelope_for_gate(root: Path, args) -> dict | None:
+    """The envelope a ``merge --mode pr`` request names, or ``None``.
+
+    Only a request that ``cmd_merge`` could actually merge qualifies: same
+    envelope id, not already resumed or merged.  Anything else is left for
+    ``cmd_merge`` to report, so the preflight never replaces the merge gate's
+    own verdict.
+    """
+    if (getattr(args, "mode", "local") or "local") != "pr":
+        return None
+    envelope_id = str(getattr(args, "envelope", "") or "")
+    path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
+    if not is_safe_id(envelope_id, PACKAGE_ID_RE) or not path.is_file():
+        return None
+    try:
+        env = jload(path)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(env, dict) or env.get("envelope_id") != envelope_id:
+        return None
+    if env.get("remote_merged") is True or env.get("status") in ENVELOPE_TERMINAL_STATUSES:
+        return None
+    return env
+
+
+def base_sync_env(root: Path, args) -> dict | None:
+    """The envelope to classify, when the checkout is its base branch too."""
+    env = merge_envelope_for_gate(root, args)
+    if env is None:
+        return None
+    try:
+        current = git_ok(resolve_repository(root, env.get("repository")),
+                         "rev-parse", "--abbrev-ref", "HEAD")
+    except Exception:
+        return None
+    return env if current == str(env.get("base", "main")) else None
+
+
+def base_sync_audit(root: Path, args) -> dict:
+    """PILOT-067: refuse or audit ``merge --mode pr`` when the base advanced.
+
+    Returns the audit payload (``{}`` when the base did not move) that
+    ``cmd_merge`` persists into the envelope and both merge records, and that
+    ``pr_merge_argv`` requires before it may add ``--admin``.  A base that moved
+    with code/docs exits 2 even with ``--allow-state-ahead``; a state-only base
+    without the flag exits 2 too.  Nothing is written before either refusal, so
+    the queue, the envelope and both ledgers stay untouched.
+    """
+    env = base_sync_env(root, args)
+    if env is None:
+        return {}
+    base = str(env.get("base", "main"))
+    remote = getattr(args, "remote", None) or "origin"
+    repo = resolve_repository(root, env.get("repository"))
+    ahead = base_ahead_paths(repo, base, remote)
+    if not ahead:
+        return {}
+    state, code = classify_base_paths(ahead, tower_repo_prefix(root, repo))
+    if code:
+        fail([f"base {remote}/{base} advanced with code/docs changes: "
+              f"{', '.join(code)}; run 'git rebase {remote}/{base}', update the "
+              f"envelope implementation_head_sha and the review head, and "
+              f"re-run review; --admin is never allowed for code/docs"])
+    if not getattr(args, "allow_state_ahead", False):
+        fail([f"base {remote}/{base} advanced with state-only changes: "
+              f"{', '.join(state)}; pass --allow-state-ahead to merge with an "
+              f"audited --admin, or rebase onto {remote}/{base}"])
+    return {"base_sync": "state-only", "base_ahead_paths": state, "admin": True}
+
+
+def cmd_merge_with_base_sync(root: Path, args) -> None:
+    """PILOT-067: run the base-sync preflight, then the real merge.
+
+    The preflight is read-only, so a refusal leaves the queue, the envelope and
+    both ledgers exactly as it found them.  The audit it hands over through
+    ``args`` is the only thing that can make ``gh pr merge`` use ``--admin``.
+    """
+    args.base_sync_audit = base_sync_audit(root, args)
+    cmd_merge(root, args)
+
+
 def acceptance_layer_parsers(
         parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """PILOT-059: the ``acceptance-add`` command and accept's manual flag.
@@ -562,8 +722,8 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         action.add_parser("brief")
     dispatch_campaign_parser(parser)
     review_layer_parsers(parser)
-    return envelope_base_side_layer_parsers(envelope_abandon_layer_parsers(profile_layer_parsers(
-        arch_layer_parsers(position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser))))))))
+    return base_sync_layer_parsers(envelope_base_side_layer_parsers(envelope_abandon_layer_parsers(profile_layer_parsers(
+        arch_layer_parsers(position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser)))))))))
 
 
 def cli_commands() -> list[str]:
@@ -596,7 +756,7 @@ def main() -> None:
         "handoff-receipt": cmd_handoff_receipt, "handoff-activate": cmd_handoff_activate,
         "handoff-status": cmd_handoff_status,
         "envelope-new": cmd_envelope_new, "queue-add": cmd_queue_add,
-        "merge-check": cmd_merge_check, "merge": cmd_merge, "post-merge": cmd_post_merge,
+        "merge-check": cmd_merge_check, "merge": cmd_merge_with_base_sync, "post-merge": cmd_post_merge,
         "verify-ledger": cmd_verify_ledger,
         "state-verify": cmd_state_verify,
         "authority-check": cmd_authority_check,
