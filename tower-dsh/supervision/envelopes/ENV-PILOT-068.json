@@ -52,8 +52,10 @@
   ],
   "envelope_head_sha": "58f4146cffba48be96d6ed58e51316365dde9435",
   "head": "58f4146cffba48be96d6ed58e51316365dde9435",
-  "status": "CORRECTION_REQUIRED",
+  "status": "POST_MERGE_VERIFIED",
   "base_side": true,
   "tests_count": 2,
-  "tower_tests_count": 747
+  "tower_tests_count": 747,
+  "post_merge_at": "2026-11-03T16:50:36+08:00",
+  "post_merge_note": "PR #53 admin merge 969acdb"
 }
