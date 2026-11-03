@@ -573,7 +573,15 @@
       "base": "main",
       "status": "POST_MERGE_VERIFIED",
       "added_at": "2026-11-02T20:52:48+08:00"
+    },
+    {
+      "envelope_id": "ENV-PILOT-066",
+      "task": "PILOT-066",
+      "branch": "pilot/PILOT-066",
+      "base": "main",
+      "status": "WAITING",
+      "added_at": "2026-11-03T09:58:26+08:00"
     }
   ],
-  "updated_at": "2026-11-02T22:08:46+08:00"
+  "updated_at": "2026-11-03T09:58:26+08:00"
 }

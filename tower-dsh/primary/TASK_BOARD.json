@@ -651,7 +651,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-065/MERGE.md",
       "updated_at": "2026-11-02T20:52:32+08:00"
+    },
+    {
+      "id": "PILOT-066",
+      "title": "post-merge base-side envelope 路径 + 删除 repo-root shim",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:06e39300-891d-4add-b63d-5d3a2a49b8a0",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-066/MERGE.md",
+      "updated_at": "2026-11-03T09:58:15+08:00"
     }
   ],
-  "updated_at": "2026-11-02T20:52:32+08:00"
+  "updated_at": "2026-11-03T09:58:15+08:00"
 }

@@ -1,0 +1,11 @@
+{
+  "schema": "tower/acceptance@1",
+  "items": [
+    {
+      "id": "A-01",
+      "kind": "auto",
+      "status": "passed",
+      "note": "736; 4 paths; path tests"
+    }
+  ]
+}
