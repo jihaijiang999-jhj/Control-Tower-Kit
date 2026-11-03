@@ -1,0 +1,17 @@
+﻿PILOT-067 commit
+HEAD: 5f2d064096dd91984a50689b7ea573fdac0567f0
+parent: c4322af99ac5c50f913fb003a9c8eb57e6a254da
+branch: pilot/PILOT-067
+
+commit 5f2d064096dd91984a50689b7ea573fdac0567f0
+Author:     mac <mac@local>
+AuthorDate: Tue Nov 3 12:46:09 2026 +0800
+Commit:     mac <mac@local>
+CommitDate: Tue Nov 3 12:46:09 2026 +0800
+
+    PILOT-067: audited base-sync policy (state-only admin, code rebase)
+
+ tower-dsh/tools/tests/test_base_sync.py | 278 ++++++++++++++++++++++++++++++++
+ tower-dsh/tools/tower_cli.py            | 170 ++++++++++++++++++-
+ tower-dsh/tools/tower_merge.py          |  56 +++----
+ 3 files changed, 471 insertions(+), 33 deletions(-)

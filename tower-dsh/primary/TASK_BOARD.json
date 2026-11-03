@@ -661,7 +661,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-066/MERGE.md",
       "updated_at": "2026-11-03T09:58:15+08:00"
+    },
+    {
+      "id": "PILOT-067",
+      "title": "base 同步策略：state-only 可审计 admin，code 变更必须 rebase + 重审",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:830426d6-a56a-4c00-8ffa-f2b778e0c212",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-067/MERGE.md",
+      "updated_at": "2026-11-03T13:06:19+08:00"
     }
   ],
-  "updated_at": "2026-11-03T09:58:15+08:00"
+  "updated_at": "2026-11-03T13:06:19+08:00"
 }

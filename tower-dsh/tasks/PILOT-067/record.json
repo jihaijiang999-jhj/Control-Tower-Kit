@@ -1,0 +1,149 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-067",
+  "title": "base 同步策略：state-only 可审计 admin，code 变更必须 rebase + 重审",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "merge --mode pr 前检测 origin/main 是否含 HEAD 未包含的提交；base 前进才进入策略",
+    "base-only 变更分类：仅 `ledger/**`、`primary/**`、`supervision/**`、`tasks/**`、`state/**` 视为 state-only；任何 `tools/**`、`arch/**`、`EVENT_CATALOG.json`、`pilot/**`、`*.md` 根文档视为 code/docs",
+    "state-only + `--allow-state-ahead`：允许 `gh pr merge --admin --match-head-commit <PR head>`，写审计（merge ledger/ envelope payload: base_sync=state-only, base_ahead_paths, admin=true）；无 flag exit 2",
+    "code/docs 变更：exit 2，要求 `git rebase origin/main`、更新 envelope implementation_head_sha + review head + 重新 review；绝不允许 admin",
+    "测试：state-only+flag 0 且审计；state-only 无 flag 2；code 变更 2；base 未前进正常 0；review head 仍绑 implementation",
+    "不改 local merge；不放宽 review/acceptance"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-067/tower-dsh/tools/tower_merge.py",
+    "pilot/worktrees/PILOT-067/tower-dsh/tools/tower_cli.py",
+    "pilot/worktrees/PILOT-067/tower-dsh/tools/tests/test_base_sync.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "automatic admin without flag",
+    "admin on code/docs base changes",
+    "weakening review head/base"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-067/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 736 + 新增用例数（main 基线 736）",
+    "base 未前进：正常 merge 0，不写 admin 审计",
+    "base 仅 state 前进 + --allow-state-ahead：merge 0，admin=true 审计含 base_ahead_paths",
+    "base 仅 state 前进无 flag：exit 2；base 含 code/docs：exit 2，提示 rebase/re-review",
+    "review head 仍 == envelope implementation；rebase 后旧 review 必须 stale",
+    "067 自身 merge --mode pr 成功；真实塔 67/66 drift []；arch 18；profile 11/0；shape 0"
+  ],
+  "depends_on": [
+    "PILOT-066"
+  ],
+  "worktree": "pilot/worktrees/PILOT-067",
+  "spec_path": "pilot/PILOT-067.spec.json",
+  "spec_sha256": "da95189af9ba319fa4dcde6abae1d5994e96ac7164148b2d409ca4d4da45d9f6",
+  "spec_gate": "PASS",
+  "executor": "subagent:830426d6-a56a-4c00-8ffa-f2b778e0c212",
+  "dispatch": {
+    "executor": "subagent:830426d6-a56a-4c00-8ffa-f2b778e0c212",
+    "worktree": "pilot/worktrees/PILOT-067",
+    "at": "2026-11-03T12:09:34+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "c4322af99ac5c50f913fb003a9c8eb57e6a254da",
+    "campaign": "C-2026-Q4-04"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-067/evidence/tower_merge.py",
+      "sha256": "59f80c24bb29fa01967c23c039d7992ab5ad18e7e0ec57ef75316d355af9a93f",
+      "bytes": 29068,
+      "at": "2026-11-03T12:49:53+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-067/evidence/tower_cli.py",
+      "sha256": "833dcd20e8182089f3526b4b57f1f9000c339bcd0d2dc922e5604c1826bb85dd",
+      "bytes": 33777,
+      "at": "2026-11-03T12:49:53+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-067/evidence/test_base_sync.py",
+      "sha256": "4019e9a73ca9765bf6bad3dc4a1c23c668cf713863aab6ef763e339d81beafeb",
+      "bytes": 12968,
+      "at": "2026-11-03T12:49:53+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-067/evidence/test-output.txt",
+      "sha256": "8a40ae669ec382b57fdfc36b6acfa2cc44ae7114aee766856ebb84c4a036b7bd",
+      "bytes": 211208,
+      "at": "2026-11-03T12:49:53+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-067/evidence/base_sync_probe.py",
+      "sha256": "54ac01673d6810f2a1160d69eed325a7612d5a3ef36e6a8bb2d216bc706423b1",
+      "bytes": 4292,
+      "at": "2026-11-03T12:49:53+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-067/evidence/probe.txt",
+      "sha256": "ab9e8a3207663a6f8b2b38623ac626089c319d143292a0f9c92e46fc8cea4d66",
+      "bytes": 2134,
+      "at": "2026-11-03T12:49:53+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-067/evidence/commit.txt",
+      "sha256": "30e0686bf676b8857487f6ed1f217875375578ce7f40650f3b3a8629b01679a6",
+      "bytes": 675,
+      "at": "2026-11-03T12:49:53+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-067/evidence/diff.txt",
+      "sha256": "0285d6627b31ae20fd42b3e8e5d0e1615978fbb0cf5e7fd3651b7cf6b3c760f2",
+      "bytes": 31454,
+      "at": "2026-11-03T12:49:53+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-067/evidence/gates.txt",
+      "sha256": "8e31c5080aa297fb5de17d4bd4b8fd064e99db1fdc8998c4b3f99ed0c27a8101",
+      "bytes": 2263,
+      "at": "2026-11-03T12:49:53+08:00",
+      "id": "E-009"
+    }
+  ],
+  "review": {
+    "schema": "tower/review@1",
+    "task": "PILOT-067",
+    "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+    "verdict": "PASS",
+    "head": "5f2d064096dd91984a50689b7ea573fdac0567f0",
+    "base": "c4322af99ac5c50f913fb003a9c8eb57e6a254da",
+    "scope": [],
+    "findings": [],
+    "note": "067 PASS。3 paths；HEAD 5f2d064（base c4322af）；9/9 证据；Ran 744 OK；base 未前进正常；state-only+flag admin+审计；无 flag/code 拒绝；review 绑 impl；067 base-side envelope + PR 待 controller。",
+    "at": "2026-11-03T13:06:18+08:00",
+    "structure": ""
+  },
+  "decision": {
+    "id": "D-PILOT-067",
+    "actor": "owner",
+    "text": "PASS; base sync",
+    "at": "2026-11-03T13:06:19+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-067/CLOSEOUT.md",
+    "at": "2026-11-03T13:06:19+08:00"
+  },
+  "created_at": "2026-11-03T11:57:30+08:00",
+  "updated_at": "2026-11-03T13:06:19+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-067/MERGE.md",
+  "delivered_at": "2026-11-03T12:49:53+08:00",
+  "accepted_at": "2026-11-03T13:06:19+08:00"
+}
