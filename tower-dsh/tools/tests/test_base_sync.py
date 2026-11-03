@@ -15,6 +15,12 @@ touches ``gh``:
   rebase and the re-review, and never allows ``--admin``;
 * the review head stays bound to the envelope implementation head throughout.
 
+PILOT-068 adds the base-side ``merge-envelopes/`` directory to that whitelist:
+the envelope is committed to the base branch before the PR exists, so a base
+that only gained ``tower-dsh/merge-envelopes/ENV-*.json`` plus tower state is
+still the audited state-only case, while ``tools/``, ``arch/``,
+``EVENT_CATALOG.json``, ``pilot/`` and root docs stay code/docs.
+
 The fixture is the PILOT-058 kit (a throw-away repository, a bare origin and an
 offline ``gh`` stub injected through ``TOWERCTL_GH``), so no network, token or
 real GitHub repository is involved.
@@ -48,6 +54,9 @@ TASK = review_gate.TASK
 BASE = review_gate.BASE
 STATE_PATH = "tower-dsh/ledger/BASE-SYNC-STATE.json"
 CODE_PATH = "tower-dsh/tools/base_sync_probe.py"
+TOOLS_PATH = "tower-dsh/tools/tower_cli.py"
+ENVELOPE_PATH = "tower-dsh/merge-envelopes/ENV-PILOT-068.json"
+ROOT_ENVELOPE_PATH = "merge-envelopes/ENV-PILOT-068.json"
 REVIEW_CHECK = review_gate.REVIEW_CHECK
 ok = review_gate.ok
 read_json = review_gate.read_json
@@ -72,19 +81,25 @@ class BaseSyncKitCase(review_gate.ReviewGateKitCase):
 
     # -- fixture ---------------------------------------------------------
     def advance_base(self, path: str, text: str = "base advance\n") -> str:
-        """Publish one base-only commit as ``origin/main``, then rewind local.
+        """Publish one base-only commit as ``origin/main``, then rewind local."""
+        return self.advance_base_paths([path], text)
+
+    def advance_base_paths(self, paths: list[str],
+                           text: str = "base advance\n") -> str:
+        """Publish one base-only commit touching ``paths``, then rewind local.
 
         The commit is built on a throw-away branch, pushed straight to the bare
         origin's ``main`` and the local checkout returned to the old base, which
         is exactly the "base moved after the branch was cut" shape.
         """
         ok(run_git(self.kit, "checkout", "-b", "base-ahead"))
-        target = self.kit / path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(text, encoding="utf-8")
-        ok(run_git(self.kit, "add", "--", path))
+        for path in paths:
+            target = self.kit / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text, encoding="utf-8")
+        ok(run_git(self.kit, "add", "--", *paths))
         ok(run_git(self.kit, "-c", "commit.gpgsign=false",
-                   "commit", "-m", f"base advance: {path}"))
+                   "commit", "-m", f"base advance: {', '.join(paths)}"))
         sha = run_git(self.kit, "rev-parse", "HEAD").stdout.strip()
         ok(run_git(self.kit, "push", "origin", "base-ahead:main"))
         ok(run_git(self.kit, "checkout", BASE))
@@ -210,7 +225,62 @@ class BaseSyncKitCase(review_gate.ReviewGateKitCase):
                           if event.startswith("MERGE")], events)
         self.assertFalse(self.gh_log.exists())
 
-    # -- 5. the review stays bound to the implementation ------------------
+    # -- 5. base-side envelope joins state-only (PILOT-068) ---------------
+    def test_envelope_and_state_base_with_flag_is_audited_admin(self) -> None:
+        self.promote_reviewed_envelope()
+        self.advance_base_paths([STATE_PATH, ENVELOPE_PATH])
+        cp = self.run_merge("--allow-state-ahead")
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        argv = self.merge_argv()
+        self.assertIn("--admin", argv)
+        self.assertEqual(argv[argv.index("--match-head-commit") + 1],
+                         self.envelope_head)
+        envelope = self.envelope_state()
+        self.assertEqual(envelope["status"], "MERGED")
+        self.assertEqual(envelope["base_sync"], "state-only")
+        self.assertEqual(envelope["base_ahead_paths"], [STATE_PATH, ENVELOPE_PATH])
+        self.assertIn(ENVELOPE_PATH, envelope["base_ahead_paths"])
+        self.assertIs(envelope["admin"], True)
+        entry = self.merge_ledger_entry()
+        self.assertEqual(entry["base_sync"], "state-only")
+        self.assertEqual(entry["base_ahead_paths"], [STATE_PATH, ENVELOPE_PATH])
+        self.assertIs(entry["admin"], True)
+        payload = self.merge_payload()
+        self.assertEqual(payload["base_sync"], "state-only")
+        self.assertEqual(payload["base_ahead_paths"], [STATE_PATH, ENVELOPE_PATH])
+        self.assertIs(payload["admin"], True)
+
+    # -- 6. envelope-only base without the flag (PILOT-068) ---------------
+    def test_envelope_only_base_without_flag_is_refused(self) -> None:
+        self.promote_reviewed_envelope()
+        self.advance_base(ENVELOPE_PATH)
+        cp = self.run_merge()
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        errors = json.loads(cp.stdout)["errors"]
+        self.assertTrue(any("--allow-state-ahead" in error for error in errors),
+                        errors)
+        self.assertTrue(any(ENVELOPE_PATH in error for error in errors), errors)
+        self.assertEqual(self.envelope_state()["status"], "DRAFT")
+        self.assertEqual(self.queue_status(), "WAITING")
+        self.assertFalse(self.gh_log.exists())
+
+    # -- 7. tools/ stays code even with the flag (PILOT-068) --------------
+    def test_tools_code_base_is_refused_even_with_the_flag(self) -> None:
+        self.promote_reviewed_envelope()
+        self.advance_base_paths([TOOLS_PATH, ENVELOPE_PATH])
+        cp = self.run_merge("--allow-state-ahead")
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        errors = json.loads(cp.stdout)["errors"]
+        self.assertTrue(any(TOOLS_PATH in error for error in errors), errors)
+        self.assertFalse(any(ENVELOPE_PATH in error for error in errors), errors)
+        blob = cp.stdout + cp.stderr
+        self.assertIn("git rebase origin/main", blob)
+        self.assertIn("--admin is never allowed", blob)
+        self.assertEqual(self.envelope_state()["status"], "DRAFT")
+        self.assertEqual(self.queue_status(), "WAITING")
+        self.assertFalse(self.gh_log.exists())
+
+    # -- 8. the review stays bound to the implementation ------------------
     def test_review_head_stays_bound_to_the_envelope_implementation(self) -> None:
         self.promote_reviewed_envelope()
         self.advance_base(STATE_PATH)
@@ -234,20 +304,23 @@ class BasePathClassificationCase(unittest.TestCase):
     """The whitelist is exact; anything unrecognised falls to code/docs."""
 
     def test_state_paths_and_code_paths_split_by_prefix(self) -> None:
-        paths = ["tower-dsh/ledger/primary.jsonl",
-                 "tower-dsh/primary/CURRENT_STATE.json",
-                 "tower-dsh/supervision/CURRENT_STATE.json",
-                 "tower-dsh/tasks/PILOT-067/TASK.md",
-                 "tower-dsh/state/PROFILE-TOWER-DSH.md",
-                 "tower-dsh/tools/tower_merge.py",
-                 "tower-dsh/arch/ADR-0009-delivery-trust.md",
-                 "tower-dsh/EVENT_CATALOG.json",
-                 "tower-dsh/pilot/PILOT-067.spec.json",
-                 "tower-dsh/README.md",
-                 "control-tower/README.md"]
-        state, code = tower_cli.classify_base_paths(paths, "tower-dsh/")
-        self.assertEqual(state, paths[:5])
-        self.assertEqual(code, paths[5:])
+        state_paths = ["tower-dsh/ledger/primary.jsonl",
+                       "tower-dsh/primary/CURRENT_STATE.json",
+                       "tower-dsh/supervision/CURRENT_STATE.json",
+                       "tower-dsh/tasks/PILOT-067/TASK.md",
+                       "tower-dsh/state/PROFILE-TOWER-DSH.md",
+                       "tower-dsh/merge-envelopes/ENV-PILOT-068.json"]
+        code_paths = ["tower-dsh/tools/tower_merge.py",
+                      "tower-dsh/arch/ADR-0009-delivery-trust.md",
+                      "tower-dsh/EVENT_CATALOG.json",
+                      "tower-dsh/pilot/PILOT-067.spec.json",
+                      "tower-dsh/README.md",
+                      "control-tower/README.md",
+                      "merge-envelopes/ENV-PILOT-068.json"]
+        state, code = tower_cli.classify_base_paths(state_paths + code_paths,
+                                                    "tower-dsh/")
+        self.assertEqual(state, state_paths)
+        self.assertEqual(code, code_paths)
 
     def test_whitelist_wins_only_inside_the_tower_prefix(self) -> None:
         # A ``ledger/`` directory outside the tower root is not tower state.
@@ -260,6 +333,13 @@ class BasePathClassificationCase(unittest.TestCase):
             ["control-tower/ledger/primary.jsonl"], "tower-dsh/")
         self.assertEqual(state, [])
         self.assertEqual(code, ["control-tower/ledger/primary.jsonl"])
+        # ... and neither is a ``merge-envelopes/`` directory outside the tower.
+        state, code = tower_cli.classify_base_paths(
+            [ROOT_ENVELOPE_PATH, "control-tower/merge-envelopes/ENV.json"],
+            "tower-dsh/")
+        self.assertEqual(state, [])
+        self.assertEqual(code, [ROOT_ENVELOPE_PATH,
+                                "control-tower/merge-envelopes/ENV.json"])
 
 
 class PrMergeArgvCase(unittest.TestCase):

@@ -518,7 +518,7 @@ def base_sync_layer_parsers(
                 action="store_true",
                 help="allow an audited --admin merge when the base advanced "
                      "with state-only paths only (ledger/primary/supervision/"
-                     "tasks/state)")
+                     "tasks/state/merge-envelopes)")
     return parser
 
 
@@ -526,7 +526,12 @@ def base_sync_layer_parsers(
 # usually lives in a sub-directory of the merge repository ("repository": ".."),
 # so base-only paths are classified after stripping that prefix; anything
 # outside it is code/docs by default.
-STATE_ONLY_PREFIXES = ("ledger/", "primary/", "supervision/", "tasks/", "state/")
+# PILOT-068: ``merge-envelopes/`` joins the whitelist.  A base-side envelope is
+# committed straight to the base branch before the PR exists (063/065/066/067),
+# so its appearance is state, not a code change; without this entry the
+# audited ``--allow-state-ahead`` path could never be used for its own envelope.
+STATE_ONLY_PREFIXES = ("ledger/", "primary/", "supervision/", "tasks/", "state/",
+                       "merge-envelopes/")
 
 
 def tower_repo_prefix(root: Path, repo: Path) -> str:
@@ -539,10 +544,12 @@ def classify_base_paths(paths: list[str], prefix: str) -> tuple[list[str], list[
     """Split base-only paths into ``(state_only, code_docs)``.
 
     A path is state-only only when it sits under the tower prefix and its
-    tower-relative spelling starts with :data:`STATE_ONLY_PREFIXES`; every other
-    path -- tools, arch, EVENT_CATALOG.json, pilot, root docs, or anything
-    outside the tower -- is code/docs.  The default is the strict side, so an
-    unclassifiable path can never earn ``--admin``.
+    tower-relative spelling starts with :data:`STATE_ONLY_PREFIXES` (the
+    primary/supervision ledgers and state, plus the base-side
+    ``merge-envelopes/``); every other path -- tools, arch, EVENT_CATALOG.json,
+    pilot, root docs, or anything outside the tower -- is code/docs.  The
+    default is the strict side, so an unclassifiable path can never earn
+    ``--admin``.
     """
     state: list[str] = []
     code: list[str] = []
