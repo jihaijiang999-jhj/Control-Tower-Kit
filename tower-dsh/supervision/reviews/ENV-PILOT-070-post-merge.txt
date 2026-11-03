@@ -4,7 +4,7 @@
 - implementation: 3707e0b5215e711e3907efca723a46c7f3e342a2
 - merge_commit: 269e629bf608551616619ae7d933c359407b9df6
 - result: PASS
-- working_tree_clean: False
+- working_tree_clean: True
 - tool_owned_paths_ignored: []
 - test_exit: 0
 - tests_count: 2
@@ -19,7 +19,7 @@ test_non_utf8_child_output_is_replaced_not_raised (test_tower_gates.NonUtf8Child
 test_tower_gate_suite (test_tower_gates.TowerGateSuite.test_tower_gate_suite) ... ok
 
 ----------------------------------------------------------------------
-Ran 2 tests in 633.090s
+Ran 2 tests in 766.666s
 
 OK
 
