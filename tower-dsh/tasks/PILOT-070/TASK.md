@@ -1,0 +1,39 @@
+# PILOT-070 — base-ahead 以 envelope implementation head 为基准；070 审计 admin
+
+- Status: `ready`
+- Authority: `workspace_write`
+- Worktree: `pilot/worktrees/PILOT-070`
+
+## Scope
+
+- base_ahead_paths(root, impl_head)：fetch origin/main；mb=merge-base(impl_head, origin/main)；changed=git diff --name-only mb..origin/main；mb==tip → []
+- merge preflight 从 envelope.implementation_head_sha 取 impl_head；缺失/不可解析 fail closed（2），不回退 HEAD
+- 分类/审计不变：state-only + merge-envelopes/** + flag → admin；tools/arch/EVENT_CATALOG/pilot/根 md code；无 flag 2
+- test_base_sync：本地 main==origin/main、impl 落后、base 仅 state/envelope → flag 0 + admin + 审计；base 真 code → 2；当前 HEAD 路径不再参与；无 envelope/impl 缺失 → 2
+- 070 自身 base-side envelope；merge 用 --allow-state-ahead；断言 envelope/merge ledger/MERGE payload 的 base_sync=state-only、base_ahead_paths、admin=true
+- 不直接 gh admin；069 保持 delivered 未 merge，070 完成后 069 标 superseded
+
+## Allowed paths
+
+- `pilot/worktrees/PILOT-070/tower-dsh/tools/tower_cli.py`
+- `pilot/worktrees/PILOT-070/tower-dsh/tools/tests/test_base_sync.py`
+
+## Forbidden
+
+- network
+- external dependencies
+- changes outside the task worktree
+- merge
+- production access
+- direct gh admin bypass
+- falling back to HEAD for base-ahead
+- weakening review/acceptance
+
+## Acceptance
+
+- cd pilot/worktrees/PILOT-070/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 747 + 新增用例数（main 基线 747）
+- 本地 main==origin/main、impl 落后、base 仅 state/envelope + flag → merge 0、admin、base_ahead_paths 不含分支 code
+- base 真新增 tools/ + flag → 2；无 flag → 2；impl/envelope 缺失 → 2；当前 HEAD 不再参与
+- 070 自身 merge --mode pr --allow-state-ahead 成功；无直接 gh admin
+- 070 审计：base_sync=state-only、base_ahead_paths 仅 envelope/state、admin=true
+- 真实塔 70/68 drift []；arch 18；profile 11/0；shape 0

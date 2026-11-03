@@ -681,7 +681,27 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-068/MERGE.md",
       "updated_at": "2026-11-03T15:54:13+08:00"
+    },
+    {
+      "id": "PILOT-069",
+      "title": "base-ahead 用 merge-base..origin/main；069 自身审计 admin",
+      "status": "dispatched",
+      "authority": "workspace_write",
+      "executor": "subagent:7a9c5089-da2b-4d0a-9507-f63580912f11",
+      "reviewer": null,
+      "next": "等待 executor 交付",
+      "updated_at": "2026-11-03T21:50:40+08:00"
+    },
+    {
+      "id": "PILOT-070",
+      "title": "base-ahead 以 envelope implementation head 为基准；070 审计 admin",
+      "status": "ready",
+      "authority": "workspace_write",
+      "executor": null,
+      "reviewer": null,
+      "next": "spec 审批：owner 或独立 reviewer 运行 spec-approve，然后 check --phase spec",
+      "updated_at": "2026-11-04T00:05:11+08:00"
     }
   ],
-  "updated_at": "2026-11-03T15:54:13+08:00"
+  "updated_at": "2026-11-04T00:05:11+08:00"
 }
