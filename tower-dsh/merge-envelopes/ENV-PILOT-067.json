@@ -1,0 +1,26 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-067",
+  "task": "PILOT-067",
+  "repository": "..",
+  "branch": "pilot/PILOT-067",
+  "base": "main",
+  "implementation_head_sha": "5f2d064096dd91984a50689b7ea573fdac0567f0",
+  "envelope_path": "merge-envelopes/ENV-PILOT-067.json",
+  "created_at": "2026-11-03T13:20:00+08:00",
+  "scope": "PILOT-067: audited base-sync policy",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 736,
+  "forbidden": ["production", "external_call", "deploy"],
+  "evidence": [
+    {"path": "tasks/PILOT-067/evidence/tower_merge.py", "sha256": "59f80c24bb29fa01967c23c039d7992ab5ad18e7e0ec57ef75316d355af9a93f"},
+    {"path": "tasks/PILOT-067/evidence/tower_cli.py", "sha256": "833dcd20e8182089f3526b4b57f1f9000c339bcd0d2dc922e5604c1826bb85dd"},
+    {"path": "tasks/PILOT-067/evidence/test_base_sync.py", "sha256": "4019e9a73ca9765bf6bad3dc4a1c23c668cf713863aab6ef763e339d81beafeb"},
+    {"path": "tasks/PILOT-067/evidence/test-output.txt", "sha256": "8a40ae669ec382b57fdfc36b6acfa2cc44ae7114aee766856ebb84c4a036b7bd"},
+    {"path": "tasks/PILOT-067/evidence/base_sync_probe.py", "sha256": "54ac01673d6810f2a1160d69eed325a7612d5a3ef36e6a8bb2d216bc706423b1"},
+    {"path": "tasks/PILOT-067/evidence/probe.txt", "sha256": "ab9e8a3207663a6f8b2b38623ac626089c319d143292a0f9c92e46fc8cea4d66"},
+    {"path": "tasks/PILOT-067/evidence/commit.txt", "sha256": "30e0686bf676b8857487f6ed1f217875375578ce7f40650f3b3a8629b01679a6"},
+    {"path": "tasks/PILOT-067/evidence/diff.txt", "sha256": "0285d6627b31ae20fd42b3e8e5d0e1615978fbb0cf5e7fd3651b7cf6b3c760f2"},
+    {"path": "tasks/PILOT-067/evidence/gates.txt", "sha256": "8e31c5080aa297fb5de17d4bd4b8fd064e99db1fdc8998c4b3f99ed0c27a8101"}
+  ]
+}
