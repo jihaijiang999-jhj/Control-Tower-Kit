@@ -603,9 +603,10 @@
       "task": "PILOT-070",
       "branch": "pilot/PILOT-070",
       "base": "main",
-      "status": "WAITING",
-      "added_at": "2026-11-04T01:14:45+08:00"
+      "status": "CORRECTION_REQUIRED",
+      "added_at": "2026-11-04T01:14:45+08:00",
+      "merge_commit": "269e629bf608551616619ae7d933c359407b9df6"
     }
   ],
-  "updated_at": "2026-11-04T01:14:45+08:00"
+  "updated_at": "2026-11-04T01:50:13+08:00"
 }
