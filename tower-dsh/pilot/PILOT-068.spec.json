@@ -1,0 +1,46 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-068",
+  "title": "base-sync 白名单补 merge-envelopes/**；068 自身审计 admin",
+  "objective": {
+    "problem": "067 把 state-only 白名单限定在 ledger/primary/supervision/tasks/state，漏了 base-side envelope 的 `merge-envelopes/**`。067 自己合并时 base 前进含 `tower-dsh/merge-envelopes/ENV-PILOT-067.json`，被分类为 code，`--allow-state-ahead` 拒绝，最后直接 `gh pr merge --admin`，没有审计。",
+    "outcome": "`tower-dsh/merge-envelopes/**` 加入 state-only；base-only 仅 envelope/state 时 `--allow-state-ahead` 走审计 admin；068 自身用该路径合并，merge ledger/envelope/MERGE payload 含 `base_sync=state-only`、`base_ahead_paths`、`admin=true`；不再直接 admin。",
+    "approach": "在 tower_cli 的 state-only 分类加 `merge-envelopes/`；test_base_sync 补 envelope-only base ahead 用例；068 用 base-side envelope + `--allow-state-ahead`，合并后读审计字段。",
+    "non_goals_and_done": "不放宽 code/docs；不删除审计；744+ tests；068 PR 合并审计含 admin=true 才完成。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0009 / 067 whitelist gap",
+  "why_now": "067 的策略在真实场景漏了 envelope 路径，导致最后一次直接 admin；外证前必须闭合。",
+  "scope": [
+    "base-sync state-only 白名单增加 `merge-envelopes/**`（tower 前缀内）",
+    "其余分类不变：tools/arch/EVENT_CATALOG/pilot/根 md 仍是 code/docs，带 flag 也拒绝",
+    "test_base_sync：base 仅 merge-envelopes/ENV-PILOT-068.json + state → flag 0、admin 审计；仅 code 仍 2；无 flag 2",
+    "068 自身 base-side envelope；合并用 `--allow-state-ahead`，不直接 gh admin",
+    "合并后审计断言：merge ledger/envelope/MERGE payload 均有 base_sync=state-only、base_ahead_paths 含 merge-envelopes、admin=true",
+    "不改 065/066/067 历史"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-068/tower-dsh/tools/tower_cli.py",
+    "pilot/worktrees/PILOT-068/tower-dsh/tools/tests/test_base_sync.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "direct gh admin bypass",
+    "allowing tools/arch/docs in state-only",
+    "weakening review/acceptance"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-068/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 744 + 新增用例数（main 基线 744）",
+    "base 仅 merge-envelopes/ENV-PILOT-068.json + state + flag → merge 0，admin argv，审计字段齐全",
+    "base 仅 code/docs + flag → exit 2；state-only 无 flag → exit 2",
+    "068 自身 merge --mode pr --allow-state-ahead 成功；不出现直接 gh admin 调用",
+    "068 合并审计：base_sync=state-only、base_ahead_paths 含 merge-envelopes、admin=true",
+    "真实塔 68/67 drift []；arch 18；profile 11/0；shape 0"
+  ],
+  "depends_on": ["PILOT-067"],
+  "worktree": "pilot/worktrees/PILOT-068"
+}
