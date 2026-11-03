@@ -671,7 +671,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-067/MERGE.md",
       "updated_at": "2026-11-03T13:06:19+08:00"
+    },
+    {
+      "id": "PILOT-068",
+      "title": "base-sync 白名单补 merge-envelopes/**；068 自身审计 admin",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:5da277d4-5748-4165-8c9c-8551e1edca87",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-068/MERGE.md",
+      "updated_at": "2026-11-03T15:54:13+08:00"
     }
   ],
-  "updated_at": "2026-11-03T13:06:19+08:00"
+  "updated_at": "2026-11-03T15:54:13+08:00"
 }

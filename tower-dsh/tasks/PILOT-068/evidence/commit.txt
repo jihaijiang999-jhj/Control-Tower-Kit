@@ -1,0 +1,12 @@
+﻿HEAD 433963e1241fe126dd34391607f9ba29c1f8edfa
+BRANCH pilot/PILOT-068
+PARENT 115d74b
+SUBJECT PILOT-068: merge-envelopes in state-only whitelist
+AUTHOR mac <mac@local>
+
+FILES
+tower-dsh/tools/tests/test_base_sync.py
+tower-dsh/tools/tower_cli.py
+
+STATUS
+?? scratch/

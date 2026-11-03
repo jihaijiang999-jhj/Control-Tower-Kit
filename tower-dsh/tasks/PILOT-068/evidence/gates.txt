@@ -1,0 +1,86 @@
+﻿== HEAD 433963e
+== python -B tools/run_tests.py
+Ran 747 tests in 582.664s
+OK (skipped=1)
+exit 0 (full log: scratch/test-output.txt)
+
+== python tools/towerctl.py state-verify
+{
+  "ok": true,
+  "tasks": 67,
+  "envelopes": 66,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-039-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-041-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-043-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-044-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-053-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID2",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID2",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 10,
+  "evidence_checked": 639
+}
+exit 0
+
+== python tools/towerctl.py arch-check
+{
+  "ok": true,
+  "counts": {
+    "gates": 18,
+    "invariants": 16,
+    "events": 30,
+    "event_types_in_code": 30,
+    "unresolved_event_calls": 1,
+    "adrs": 8,
+    "sections": 6,
+    "nodes": 76,
+    "edges": 174
+  },
+  "errors": []
+}
+exit 0

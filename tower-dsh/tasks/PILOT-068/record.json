@@ -1,0 +1,141 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-068",
+  "title": "base-sync 白名单补 merge-envelopes/**；068 自身审计 admin",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "base-sync state-only 白名单增加 `merge-envelopes/**`（tower 前缀内）",
+    "其余分类不变：tools/arch/EVENT_CATALOG/pilot/根 md 仍是 code/docs，带 flag 也拒绝",
+    "test_base_sync：base 仅 merge-envelopes/ENV-PILOT-068.json + state → flag 0、admin 审计；仅 code 仍 2；无 flag 2",
+    "068 自身 base-side envelope；合并用 `--allow-state-ahead`，不直接 gh admin",
+    "合并后审计断言：merge ledger/envelope/MERGE payload 均有 base_sync=state-only、base_ahead_paths 含 merge-envelopes、admin=true",
+    "不改 065/066/067 历史"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-068/tower-dsh/tools/tower_cli.py",
+    "pilot/worktrees/PILOT-068/tower-dsh/tools/tests/test_base_sync.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "direct gh admin bypass",
+    "allowing tools/arch/docs in state-only",
+    "weakening review/acceptance"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-068/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 744 + 新增用例数（main 基线 744）",
+    "base 仅 merge-envelopes/ENV-PILOT-068.json + state + flag → merge 0，admin argv，审计字段齐全",
+    "base 仅 code/docs + flag → exit 2；state-only 无 flag → exit 2",
+    "068 自身 merge --mode pr --allow-state-ahead 成功；不出现直接 gh admin 调用",
+    "068 合并审计：base_sync=state-only、base_ahead_paths 含 merge-envelopes、admin=true",
+    "真实塔 68/67 drift []；arch 18；profile 11/0；shape 0"
+  ],
+  "depends_on": [
+    "PILOT-067"
+  ],
+  "worktree": "pilot/worktrees/PILOT-068",
+  "spec_path": "pilot/PILOT-068.spec.json",
+  "spec_sha256": "7fc16fdc9ce5a77cd06995ffa12985dd92ea13e00ecaeb36377cccc2112b79be",
+  "spec_gate": "PASS",
+  "executor": "subagent:5da277d4-5748-4165-8c9c-8551e1edca87",
+  "dispatch": {
+    "executor": "subagent:5da277d4-5748-4165-8c9c-8551e1edca87",
+    "worktree": "pilot/worktrees/PILOT-068",
+    "at": "2026-11-03T15:07:30+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "115d74bab1e92fc9bcaf7ddc71aec62ef4b5b7aa",
+    "campaign": "C-2026-Q4-04"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-068/evidence/tower_cli.py",
+      "sha256": "7f3f413524bdd5e0933b52d1081526e06dd5f80943c0d521756a87c52b4398ce",
+      "bytes": 34242,
+      "at": "2026-11-03T15:37:49+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-068/evidence/test_base_sync.py",
+      "sha256": "c0454ce9d71102568fb5ea73a490bde1be713a20b560d7fab71d56f75809acee",
+      "bytes": 17488,
+      "at": "2026-11-03T15:37:49+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-068/evidence/test-output.txt",
+      "sha256": "428c93ef70ef20cd1584821eb1a36cb27a547c44ec757aa3b8ef302551ed8416",
+      "bytes": 212134,
+      "at": "2026-11-03T15:37:49+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-068/evidence/whitelist_probe.py",
+      "sha256": "d8391ce65bf6226368494efaff0408fbe6ed6ab3e22f0d6aa5e84430045eb02f",
+      "bytes": 4382,
+      "at": "2026-11-03T15:37:49+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-068/evidence/probe.txt",
+      "sha256": "fbf67db1eb5915a6d734bd5d2e94107833973b4d87e9cade5529a6a2d15b70fb",
+      "bytes": 3236,
+      "at": "2026-11-03T15:37:49+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-068/evidence/commit.txt",
+      "sha256": "4ef9739ad94d9e2fe404624d0451baa0b3f619df826d28e846a501c933d525f6",
+      "bytes": 277,
+      "at": "2026-11-03T15:37:49+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-068/evidence/diff.txt",
+      "sha256": "787c017696b676aefca6e72f990619ec9391fc5ba3604dfad8fe40760a82c6ae",
+      "bytes": 12429,
+      "at": "2026-11-03T15:37:49+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-068/evidence/gates.txt",
+      "sha256": "c12d070d033be06ae0150c8b18bc7c19586e45f93a6e782112334eba1b231bc9",
+      "bytes": 1765,
+      "at": "2026-11-03T15:37:49+08:00",
+      "id": "E-008"
+    }
+  ],
+  "review": {
+    "schema": "tower/review@1",
+    "task": "PILOT-068",
+    "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+    "verdict": "PASS",
+    "head": "433963e1241fe126dd34391607f9ba29c1f8edfa",
+    "base": "115d74bab1e92fc9bcaf7ddc71aec62ef4b5b7aa",
+    "scope": [],
+    "findings": [],
+    "note": "068 PASS。2 paths；HEAD 433963e（base 115d74b）；8/8 证据；Ran 747 OK；merge-envelopes/** 进 state-only；envelope+state+flag admin+审计；code 拒绝；068 base-side envelope + PR 待 controller。",
+    "at": "2026-11-03T15:54:13+08:00",
+    "structure": ""
+  },
+  "decision": {
+    "id": "D-PILOT-068",
+    "actor": "owner",
+    "text": "PASS; envelope whitelist",
+    "at": "2026-11-03T15:54:13+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-068/CLOSEOUT.md",
+    "at": "2026-11-03T15:54:13+08:00"
+  },
+  "created_at": "2026-11-03T15:03:22+08:00",
+  "updated_at": "2026-11-03T15:54:13+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-068/MERGE.md",
+  "delivered_at": "2026-11-03T15:37:49+08:00",
+  "accepted_at": "2026-11-03T15:54:13+08:00"
+}

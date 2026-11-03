@@ -469,6 +469,13 @@
       "spec_path": "pilot/PILOT-067.spec.json",
       "created_at": "2026-11-03T11:57:30+08:00",
       "updated_at": "2026-11-03T13:06:19+08:00"
+    },
+    "PILOT-068": {
+      "title": "base-sync 白名单补 merge-envelopes/**；068 自身审计 admin",
+      "status": "closed",
+      "spec_path": "pilot/PILOT-068.spec.json",
+      "created_at": "2026-11-03T15:03:22+08:00",
+      "updated_at": "2026-11-03T15:54:13+08:00"
     }
   }
 }

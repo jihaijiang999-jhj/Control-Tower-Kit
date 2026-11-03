@@ -1,0 +1,57 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-068",
+  "task": "PILOT-068",
+  "repository": "..",
+  "branch": "pilot/PILOT-068",
+  "base": "main",
+  "implementation_head_sha": "433963e1241fe126dd34391607f9ba29c1f8edfa",
+  "envelope_path": "merge-envelopes/ENV-PILOT-068.json",
+  "created_at": "2026-11-03T15:54:26+08:00",
+  "scope": "PILOT-068: merge-envelopes state-only whitelist; audited admin",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 744,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-068/evidence/tower_cli.py",
+      "sha256": "7f3f413524bdd5e0933b52d1081526e06dd5f80943c0d521756a87c52b4398ce"
+    },
+    {
+      "path": "tasks/PILOT-068/evidence/test_base_sync.py",
+      "sha256": "c0454ce9d71102568fb5ea73a490bde1be713a20b560d7fab71d56f75809acee"
+    },
+    {
+      "path": "tasks/PILOT-068/evidence/test-output.txt",
+      "sha256": "428c93ef70ef20cd1584821eb1a36cb27a547c44ec757aa3b8ef302551ed8416"
+    },
+    {
+      "path": "tasks/PILOT-068/evidence/whitelist_probe.py",
+      "sha256": "d8391ce65bf6226368494efaff0408fbe6ed6ab3e22f0d6aa5e84430045eb02f"
+    },
+    {
+      "path": "tasks/PILOT-068/evidence/probe.txt",
+      "sha256": "fbf67db1eb5915a6d734bd5d2e94107833973b4d87e9cade5529a6a2d15b70fb"
+    },
+    {
+      "path": "tasks/PILOT-068/evidence/commit.txt",
+      "sha256": "4ef9739ad94d9e2fe404624d0451baa0b3f619df826d28e846a501c933d525f6"
+    },
+    {
+      "path": "tasks/PILOT-068/evidence/diff.txt",
+      "sha256": "787c017696b676aefca6e72f990619ec9391fc5ba3604dfad8fe40760a82c6ae"
+    },
+    {
+      "path": "tasks/PILOT-068/evidence/gates.txt",
+      "sha256": "c12d070d033be06ae0150c8b18bc7c19586e45f93a6e782112334eba1b231bc9"
+    }
+  ],
+  "envelope_head_sha": "58f4146cffba48be96d6ed58e51316365dde9435",
+  "head": "58f4146cffba48be96d6ed58e51316365dde9435",
+  "status": "WAITING",
+  "base_side": true
+}
