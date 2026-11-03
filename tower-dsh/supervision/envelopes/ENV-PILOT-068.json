@@ -52,6 +52,8 @@
   ],
   "envelope_head_sha": "58f4146cffba48be96d6ed58e51316365dde9435",
   "head": "58f4146cffba48be96d6ed58e51316365dde9435",
-  "status": "WAITING",
-  "base_side": true
+  "status": "CORRECTION_REQUIRED",
+  "base_side": true,
+  "tests_count": 2,
+  "tower_tests_count": 747
 }
