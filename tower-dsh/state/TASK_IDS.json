@@ -507,10 +507,10 @@
     },
     "PILOT-074": {
       "title": "verified 必须有 MERGE 事实；回填 065–068；新增 verified_without_merge drift",
-      "status": "active",
+      "status": "closed",
       "spec_path": "pilot/PILOT-074.spec.json",
       "created_at": "2026-11-04T20:47:09+08:00",
-      "updated_at": "2026-11-04T20:47:09+08:00"
+      "updated_at": "2026-11-04T23:27:29+08:00"
     }
   }
 }

@@ -1,0 +1,77 @@
+PILOT-074 gates @ 9b23d6851de971f192ec705a591ffcba85339946
+
+=== python -B tools/run_tests.py ===
+ok
+ok
+ok
+ok
+ok
+ok
+ok
+ok
+ok
+ok
+ok
+ok
+ok
+Ran 807 tests in 772.472s
+OK (skipped=1)
+FULL_SUITE_EXIT=0
+
+=== python -B -m unittest tools.tests.test_verified_merge_fact -v ===
+test_both_sides_empty_merge_commit_are_refused (tools.tests.test_verified_merge_fact.NewCardPostMergeCase.test_both_sides_empty_merge_commit_are_refused) ... ok
+test_envelope_side_empty_merge_commit_is_refused (tools.tests.test_verified_merge_fact.NewCardPostMergeCase.test_envelope_side_empty_merge_commit_is_refused) ... ok
+test_landed_merge_is_verified (tools.tests.test_verified_merge_fact.NewCardPostMergeCase.test_landed_merge_is_verified) ... ok
+test_ledger_side_empty_merge_commit_is_refused (tools.tests.test_verified_merge_fact.NewCardPostMergeCase.test_ledger_side_empty_merge_commit_is_refused) ... ok
+test_merge_commit_without_second_parent_is_refused (tools.tests.test_verified_merge_fact.NewCardPostMergeCase.test_merge_commit_without_second_parent_is_refused) ... ok
+test_merged_without_merge_event_is_refused (tools.tests.test_verified_merge_fact.NewCardPostMergeCase.test_merged_without_merge_event_is_refused) ... ok
+test_new_card_correction_required_is_refused (tools.tests.test_verified_merge_fact.NewCardPostMergeCase.test_new_card_correction_required_is_refused) ... ok
+test_two_different_merge_commits_are_refused (tools.tests.test_verified_merge_fact.NewCardPostMergeCase.test_two_different_merge_commits_are_refused) ... ok
+test_074_correction_to_verified_is_an_illegal_transition (tools.tests.test_verified_merge_fact.ReplayCompatibilityCase.test_074_correction_to_verified_is_an_illegal_transition) ... ok
+test_legacy_correction_to_verified_still_replays (tools.tests.test_verified_merge_fact.ReplayCompatibilityCase.test_legacy_correction_to_verified_still_replays) ... ok
+test_both_sides_empty_merge_commit_are_drift (tools.tests.test_verified_merge_fact.VerifiedWithoutMergeDriftCase.test_both_sides_empty_merge_commit_are_drift) ... ok
+test_envelope_side_empty_merge_commit_is_drift (tools.tests.test_verified_merge_fact.VerifiedWithoutMergeDriftCase.test_envelope_side_empty_merge_commit_is_drift) ... ok
+test_historical_backfill_rejects_074_plus (tools.tests.test_verified_merge_fact.VerifiedWithoutMergeDriftCase.test_historical_backfill_rejects_074_plus) ... ok
+test_historical_backfill_rejects_commit_not_on_origin (tools.tests.test_verified_merge_fact.VerifiedWithoutMergeDriftCase.test_historical_backfill_rejects_commit_not_on_origin) ... ok
+test_historical_backfill_rejects_wrong_second_parent (tools.tests.test_verified_merge_fact.VerifiedWithoutMergeDriftCase.test_historical_backfill_rejects_wrong_second_parent) ... ok
+test_ledger_side_empty_merge_commit_is_drift (tools.tests.test_verified_merge_fact.VerifiedWithoutMergeDriftCase.test_ledger_side_empty_merge_commit_is_drift) ... ok
+test_two_different_merge_commits_are_drift (tools.tests.test_verified_merge_fact.VerifiedWithoutMergeDriftCase.test_two_different_merge_commits_are_drift) ... ok
+test_verified_without_merge_drifts_then_backfill_clears (tools.tests.test_verified_merge_fact.VerifiedWithoutMergeDriftCase.test_verified_without_merge_drifts_then_backfill_clears) ... ok
+Ran 19 tests in 33.289s
+OK
+test_verified_merge_fact_exit=0
+
+=== python tools/towerctl.py state-verify ===
+{
+  "ok": true,
+  "tasks": 73,
+  "envelopes": 70,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+state_verify_exit=0
+
+=== python tools/towerctl.py arch-check / shape-check / profile-check / campaign-check ===
+  "ok": true,
+    "gates": 18,
+    "events": 32,
+  "errors": []
+arch_check_exit=0
+  "ok": true,
+  "shape_check": "checked",
+  "files": 79,
+shape_check_exit=0
+  "ok": true,
+  "checked": 11,
+  "findings": []
+profile_check_exit=0
+{
+  "ok": true,
+  "strict": false,
+campaign_check_exit=0
+
+=== module line counts (< 600) ===
+tower_ledger_replay.py=599
+tower_envelope.py=592
+tower_post_merge.py=592
