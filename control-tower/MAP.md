@@ -777,6 +777,24 @@ SteerLine 评估后只取三条做法，全部重写为木塔的小门：
 - **删除 shim 要有测试**：base-side 只在 repo 根时必须拒绝，否则 shim 会悄悄复活。
 - **PR #50 仍是 admin bypass**：连续 065/066 都因 base 前进后 branch 过期；admin 不是常规路径，外证前应补 base 同步策略。
 
+
+### 6.38 判例：恢复不是“补一条 MERGE”，是先 fetch 再解析（PILOT-069/071/073）
+
+071 用 direct `gh --admin` 合并后 envelope 仍 WAITING；073 的 `envelope-recover` 必须同时解决三件事：
+
+1. **fetch 顺序**：先 `git fetch origin <base>`，以 FETCH_HEAD 为唯一远端事实，再解析/校验 `--merge-commit`。先解析会把“只在远端、本地对象库没有”的 admin merge commit 误拒。
+2. **半写幂等**：queue/envelope 先写 MERGED、ledger 后写；崩溃/失败后允许从 MERGED 状态补齐缺失的 MERGE_START/MERGE，完整 tombstone 才 duplicate 拒绝，不同 merge_commit 拒绝。
+3. **不伪造 verified**：recover 只到 MERGED；post-merge 独立跑 9/9 才 verified。
+
+069 的收口用 `task-supersede`：delivered→superseded，写 TASK_SUPERSEDE、ID→void，不建 envelope、不写 MERGE；072 的 task-reopen spec 因 071 卡已随回滚消失而 parked。
+
+可复用判断：
+
+- **恢复命令的第一动作是 fetch**，不是 resolve；remote-only 是常态，不是边角。
+- **文件状态与 ledger 的写序要能重试**：MERGED 但没有 MERGE 必须可修复，否则一条半写永久锁死。
+- **recover 与 verify 分离**：恢复只补 merge 事实，post-merge 才能给 verified。
+- **supersede 是独立生命周期**：不是 close、不是 void ID 的别名；它保留 record/REVIEW，只是不再 active。
+
 ## 7. 与 K3 塔的能力对照（一页）
 
 | 维度 | K3 / SeeMake 塔 | tower-dsh | 谁更强 |
