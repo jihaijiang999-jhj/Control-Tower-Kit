@@ -1,0 +1,83 @@
+{
+  "branch_code_state_base": {
+    "scenario": "branch owns tools/tower_cli.py; base only state + envelope",
+    "checkout": "pilot/PILOT-069",
+    "base_ahead_paths": [
+      "tower-dsh/ledger/BASE-SYNC-PROBE.json",
+      "tower-dsh/merge-envelopes/ENV-PILOT-069.json"
+    ],
+    "state_only": [
+      "tower-dsh/ledger/BASE-SYNC-PROBE.json",
+      "tower-dsh/merge-envelopes/ENV-PILOT-069.json"
+    ],
+    "code_docs": [],
+    "branch_code_in_tip_diff": true,
+    "tip_diff": [
+      "tower-dsh/ledger/BASE-SYNC-PROBE.json",
+      "tower-dsh/merge-envelopes/ENV-PILOT-069.json",
+      "tower-dsh/tools/tower_cli.py"
+    ],
+    "verdict": "state-only: --allow-state-ahead required"
+  },
+  "base_added_tools": {
+    "scenario": "base really adds tools/x.py",
+    "checkout": "main",
+    "base_ahead_paths": [
+      "tower-dsh/ledger/BASE-SYNC-PROBE.json",
+      "tower-dsh/tools/x.py"
+    ],
+    "state_only": [
+      "tower-dsh/ledger/BASE-SYNC-PROBE.json"
+    ],
+    "code_docs": [
+      "tower-dsh/tools/x.py"
+    ],
+    "branch_code_in_tip_diff": false,
+    "tip_diff": [
+      "tower-dsh/ledger/BASE-SYNC-PROBE.json",
+      "tower-dsh/tools/x.py"
+    ],
+    "verdict": "code-docs: refuse (rebase + re-review)"
+  },
+  "unchanged_base": {
+    "scenario": "base did not advance",
+    "checkout": "main",
+    "base_ahead_paths": [],
+    "state_only": [],
+    "code_docs": [],
+    "branch_code_in_tip_diff": false,
+    "tip_diff": [],
+    "verdict": "no base advance: normal merge"
+  },
+  "local_base_ahead": {
+    "scenario": "local main carries an unpublished commit (069's own shape)",
+    "checkout": "main",
+    "base_ahead_paths": [],
+    "state_only": [],
+    "code_docs": [],
+    "branch_code_in_tip_diff": false,
+    "tip_diff": [
+      "local-only.txt"
+    ],
+    "verdict": "no base advance: normal merge"
+  },
+  "pr_merge_argv": {
+    "without_audit": [
+      "pr",
+      "merge",
+      "69",
+      "--merge",
+      "--match-head-commit",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ],
+    "with_audit": [
+      "pr",
+      "merge",
+      "69",
+      "--merge",
+      "--match-head-commit",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "--admin"
+    ]
+  }
+}

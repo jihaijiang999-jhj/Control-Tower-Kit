@@ -1,0 +1,121 @@
+== HEAD cd9a8019768d5c99f60a48da882cfa193aa6abab
+== python -B tools/run_tests.py
+ok
+ok
+ok
+ok
+ok
+ok
+ok
+error_is_not_swallowed) ... ok
+ok
+ok
+ok
+ok
+ok
+Ran 751 tests in 788.184s
+OK (skipped=1)
+exit 0 (full log: scratch/test-output.txt)
+
+== python tools/towerctl.py state-verify
+{
+  "ok": true,
+  "tasks": 68,
+  "envelopes": 67,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-039-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-041-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-043-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-044-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-053-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID2",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID2",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 10,
+  "evidence_checked": 647
+}
+exit 0
+
+== python tools/towerctl.py arch-check
+{
+  "ok": true,
+  "counts": {
+    "gates": 18,
+    "invariants": 16,
+    "events": 30,
+    "event_types_in_code": 30,
+    "unresolved_event_calls": 1,
+    "adrs": 8,
+    "sections": 6,
+    "nodes": 76,
+    "edges": 174
+  },
+  "errors": []
+}
+exit 0
+
+== python tools/towerctl.py profile-check
+{
+  "ok": true,
+  "object": "TOWER-DSH",
+  "checked": 11,
+  "findings": []
+}
+exit 0
+
+== python tools/towerctl.py shape-check
+{
+  "ok": true,
+  "shape_check": "checked",
+  "shape_checked": true,
+  "files": 76,
+  "functions": 2109,
+  "duplicate_blocks": 169,
+  "unused_imports": 1
+}
+exit 0
+

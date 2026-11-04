@@ -1,0 +1,13 @@
+HEAD fa438d964bdd7e089b5e99c7b70ec8f320ce4ecc
+BRANCH pilot/PILOT-069
+PARENT cd9a8019768d5c99f60a48da882cfa193aa6abab
+SUBJECT PILOT-069: base-ahead uses merge-base
+AUTHOR mac <mac@local>
+
+FILES
+tower-dsh/tools/tests/test_base_sync.py
+tower-dsh/tools/tower_cli.py
+
+STATUS
+?? scratch/
+

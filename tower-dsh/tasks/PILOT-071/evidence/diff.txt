@@ -1,0 +1,848 @@
+﻿diff --git a/tower-dsh/EVENT_CATALOG.json b/tower-dsh/EVENT_CATALOG.json
+index 9ba45df..83d11d5 100644
+--- a/tower-dsh/EVENT_CATALOG.json
++++ b/tower-dsh/EVENT_CATALOG.json
+@@ -306,6 +306,27 @@
+       "state_verify": false,
+       "type": "TASK_NEXT"
+     },
++    {
++      "drift_kinds": [
++        "record_missing",
++        "record_unreadable",
++        "task_status",
++        "board_status",
++        "illegal_transition"
++      ],
++      "ledger": "primary",
++      "note": "owner-only tombstone: delivered/rework -> superseded; no envelope, no MERGE",
++      "payload_required": [
++        "task",
++        "by",
++        "reason",
++        "superseded_by",
++        "at"
++      ],
++      "producer": "task-supersede",
++      "state_verify": true,
++      "type": "TASK_SUPERSEDE"
++    },
+     {
+       "drift_kinds": [
+         "envelope_missing",
+diff --git a/tower-dsh/tools/tests/test_modules.py b/tower-dsh/tools/tests/test_modules.py
+index b6c841c..2f212a1 100644
+--- a/tower-dsh/tools/tests/test_modules.py
++++ b/tower-dsh/tools/tests/test_modules.py
+@@ -98,7 +98,7 @@ class ModulesSplitCase(unittest.TestCase):
+         import towerctl  # noqa: E402  (import after sys.path setup)
+         self.assertTrue(callable(towerctl.main))
+         self.assertTrue(hasattr(towerctl, "build_parser"))
+-        self.assertEqual(len(towerctl.cli_commands()), 53)
++        self.assertEqual(len(towerctl.cli_commands()), 54)
+ 
+     def test_import_dag_is_one_way_and_acyclic(self) -> None:
+         edges = {name: imports_of(module_path(name)) for name in MODULES}
+diff --git a/tower-dsh/tools/tests/test_task_supersede.py b/tower-dsh/tools/tests/test_task_supersede.py
+new file mode 100644
+index 0000000..8f38e29
+--- /dev/null
++++ b/tower-dsh/tools/tests/test_task_supersede.py
+@@ -0,0 +1,477 @@
++"""PILOT-071: ``task-supersede`` — the owner-only non-merge terminal state.
++
++Each case builds a throw-away tower under the runner's ``TMP`` sandbox (ledger
++rows are appended through the real ``towerctl`` helpers, hash chain included)
++and drives the command through ``subprocess``, so exit codes and written bytes
++are exactly what an operator observes::
++
++    python -B tools/run_tests.py --pattern test_task_supersede.py
++
++The contract under test: a ``delivered``/``rework`` card becomes
++``superseded`` with one ``TASK_SUPERSEDE`` primary-ledger event, the record and
++board agree, the id is voided, no envelope/MERGE appears, ``state-verify``
++stays clean, ``where`` counts the card as terminal done, and every illegal
++request (repeat, closed, accepted, non-owner, missing target) exits 2 without
++writing a byte.
++"""
++from __future__ import annotations
++
++import json
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++TOOLS_DIR = Path(__file__).resolve().parents[1]
++TCLI = TOOLS_DIR / "towerctl.py"
++sys.path.insert(0, str(TOOLS_DIR))
++import towerctl  # noqa: E402  (TOOLS_DIR must be on sys.path first)
++
++CURRENT_STATE = {"schema": "tower/current-state@1", "owner": {"name": "mac"},
++                 "next_action": "", "blockers": []}
++STAMP = "2026-11-04T00:00:00+08:00"
++BASE_STATUSES = {"PILOT-069": "delivered", "PILOT-070": "closed",
++                 "PILOT-071": "ready"}
++ROADMAP_TEN = tuple(f"PILOT-{number:03d}" for number in range(61, 71))
++
++
++def campaign_text(roadmap: tuple[str, ...], current: str) -> str:
++    """A minimal active campaign whose roadmap drives ``where``."""
++    lines = ["---", "schema: tower/campaign@1", "id: C-2026-Q4-04",
++             "goal: G2", "status: active", "owner: mac",
++             'objective: "交付硬化"', "key_results:", '  - "TASK_SUPERSEDE"',
++             "roadmap:"]
++    lines += [f"  - {task_id}" for task_id in roadmap]
++    lines += [f"current: {current}", "task_forces:"]
++    lines += [f"  - {task_id}" for task_id in roadmap if task_id != "PILOT-069"]
++    lines += ['sequence: "061 → 070"', "stop_conditions:",
++              '  - "drift != 0 立即停"', 'budget: "12 张卡 / 12 周"',
++              "wip_limit: 1", "review_by: 2026-11-20", "---",
++              "# C-2026-Q4-04 — 交付硬化", ""]
++    return "\n".join(lines)
++
++
++class SupersedeCase(unittest.TestCase):
++    """A tower shaped like the live 069/070 hand-off."""
++
++    def setUp(self) -> None:
++        self._tmp = tempfile.TemporaryDirectory(
++            prefix="towerctl-supersede-", ignore_cleanup_errors=True)
++        self.base = Path(self._tmp.name)
++        self.root = self.base / "tower"
++        self.build_tower(self.root)
++
++    def tearDown(self) -> None:
++        self._tmp.cleanup()
++
++    # -- fixture ----------------------------------------------------------
++    def fresh(self, name: str, statuses: dict[str, str] | None = None) -> Path:
++        """A brand-new tower for one refusal case (no cross-contamination)."""
++        root = self.base / name
++        self.build_tower(root, statuses)
++        return root
++
++    def build_tower(self, root: Path, statuses: dict[str, str] | None = None
++                    ) -> None:
++        statuses = {**BASE_STATUSES, **(statuses or {})}
++        for name in ("primary", "ledger", "state", "supervision/envelopes"):
++            (root / name).mkdir(parents=True, exist_ok=True)
++        (root / "ledger" / "primary.jsonl").touch()
++        (root / "ledger" / "supervision.jsonl").touch()
++        self.write_json(root, "primary/CURRENT_STATE.json", CURRENT_STATE)
++        self.write_json(root, "supervision/MERGE_QUEUE.json", {
++            "schema": "tower/merge-queue@1", "entries": []})
++        self.events(root, "PILOT-069", delivered=True)
++        self.events(root, "PILOT-070", delivered=True, closed=True)
++        for task_id, status in statuses.items():
++            self.write_card(root, task_id, status)
++
++    def events(self, root: Path, task_id: str, *, delivered: bool,
++               closed: bool = False) -> None:
++        """Hash-chained lifecycle rows that fold to the card's base status."""
++        def add(event_type: str, **payload) -> None:
++            towerctl.append_ledger(root, event_type, "primary",
++                                   {"task": task_id, **payload})
++
++        add("TASK_NEW", title=f"{task_id} card")
++        add("DISPATCH", executor=f"exec-{task_id[-3:]}",
++            worktree=f"pilot/worktrees/{task_id}")
++        if delivered:
++            add("DELIVER", evidence=0)
++        if closed:
++            add("CHECKBACK", reviewer="rev-070", verdict="PASS")
++            add("ACCEPT", decision="D-PILOT-070")
++            add("CLOSEOUT", closeout="tasks/PILOT-070/CLOSEOUT.md")
++
++    def write_card(self, root: Path, task_id: str, status: str) -> None:
++        """Write the record and its board row at the same status."""
++        self.write_json(root, f"tasks/{task_id}/record.json", {
++            "schema": "tower/task@1", "id": task_id, "title": f"{task_id} card",
++            "status": status, "next": "test fixture"})
++        board_path = root / "primary" / "TASK_BOARD.json"
++        board = (json.loads(board_path.read_text(encoding="utf-8"))
++                 if board_path.is_file() else {"schema": "tower/task-board@1",
++                                               "tower_id": "tower-dsh",
++                                               "tasks": []})
++        tasks = [entry for entry in board["tasks"] if entry["id"] != task_id]
++        tasks.append({"id": task_id, "title": f"{task_id} card",
++                      "status": status})
++        board["tasks"] = tasks
++        self.write_json(root, "primary/TASK_BOARD.json", board)
++
++    def write_json(self, root: Path, relpath: str, data) -> None:
++        path = root / relpath
++        path.parent.mkdir(parents=True, exist_ok=True)
++        path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
++                        encoding="utf-8")
++
++    def write_campaign(self, root: Path,
++                       roadmap: tuple[str, ...], current: str) -> None:
++        path = root / "command" / "campaigns" / "C-2026-Q4-04.md"
++        path.parent.mkdir(parents=True, exist_ok=True)
++        path.write_text(campaign_text(roadmap, current), encoding="utf-8")
++
++    # -- helpers ----------------------------------------------------------
++    def cli(self, root: Path, *args: str) -> subprocess.CompletedProcess:
++        return subprocess.run(
++            [sys.executable, "-B", str(TCLI), "--root", str(root), *args],
++            capture_output=True, text=True, encoding="utf-8")
++
++    def supersede(self, root: Path, task: str = "PILOT-069",
++                  target: str = "PILOT-070", by: str = "mac",
++                  reason: str = "070 replaces 069") -> subprocess.CompletedProcess:
++        return self.cli(root, "task-supersede", "--task", task,
++                        "--by-task", target, "--reason", reason, "--by", by)
++
++    def record(self, root: Path, task_id: str) -> dict:
++        return json.loads((root / "tasks" / task_id / "record.json")
++                          .read_text(encoding="utf-8"))
++
++    def board_entry(self, root: Path, task_id: str) -> dict:
++        board = json.loads((root / "primary" / "TASK_BOARD.json")
++                           .read_text(encoding="utf-8"))
++        return next(entry for entry in board["tasks"] if entry["id"] == task_id)
++
++    def ledger_events(self, root: Path, name: str) -> list[dict]:
++        path = root / "ledger" / f"{name}.jsonl"
++        return [json.loads(line) for line in
++                path.read_text(encoding="utf-8").splitlines() if line.strip()]
++
++    def registry(self, root: Path) -> dict:
++        path = root / "state" / "TASK_IDS.json"
++        return json.loads(path.read_text(encoding="utf-8"))["ids"]
++
++    def snapshot(self, root: Path) -> dict[str, bytes]:
++        return {path.relative_to(root).as_posix(): path.read_bytes()
++                for path in sorted(root.rglob("*")) if path.is_file()}
++
++    def assert_refused(self, root: Path, args: tuple[str, ...],
++                       *needles: str) -> dict:
++        before = self.snapshot(root)
++        cp = self.cli(root, *args)
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        self.assertNotIn("Traceback", cp.stdout + cp.stderr)
++        payload = json.loads(cp.stdout)
++        self.assertFalse(payload["ok"])
++        blob = " ".join(payload["errors"]).lower()
++        for needle in needles:
++            self.assertIn(needle.lower(), blob, msg=str(payload["errors"]))
++        self.assertEqual(self.snapshot(root), before,
++                         msg="a refusal must write nothing")
++        return payload
++
++    def where_json(self, root: Path) -> tuple[subprocess.CompletedProcess, dict]:
++        cp = self.cli(root, "where", "--json")
++        return cp, json.loads(cp.stdout) if cp.stdout.strip() else {}
++
++    def mark_superseded(self, root: Path, task_id: str = "PILOT-069",
++                        target: str = "PILOT-070") -> None:
++        """Simulate a crash after record/board but before the ledger event."""
++        self.write_card(root, task_id, "superseded")
++        record = self.record(root, task_id)
++        record.update({"superseded_by": target, "superseded_at": STAMP})
++        self.write_json(root, f"tasks/{task_id}/record.json", record)
++
++    def set_registry_status(self, root: Path, task_id: str, status: str) -> None:
++        path = root / "state" / "TASK_IDS.json"
++        data = json.loads(path.read_text(encoding="utf-8"))
++        data["ids"][task_id]["status"] = status
++        self.write_json(root, "state/TASK_IDS.json", data)
++
++
++class SupersedeTransitionCase(SupersedeCase):
++    """delivered -> superseded: record, board, ledger, id, no envelope/MERGE."""
++
++    def test_delivered_card_becomes_superseded_everywhere(self) -> None:
++        cp = self.supersede(self.root)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        payload = json.loads(cp.stdout)
++        self.assertTrue(payload["ok"])
++        self.assertEqual(payload["status"], "superseded")
++        self.assertEqual(payload["superseded_by"], "PILOT-070")
++        self.assertFalse(payload["repaired"])
++
++        record = self.record(self.root, "PILOT-069")
++        self.assertEqual(record["status"], "superseded")
++        self.assertEqual(record["superseded_by"], "PILOT-070")
++        self.assertEqual(self.board_entry(self.root, "PILOT-069")["status"],
++                         "superseded")
++
++        events = [event for event in self.ledger_events(self.root, "primary")
++                  if event["type"] == "TASK_SUPERSEDE"]
++        self.assertEqual(len(events), 1)
++        self.assertEqual(events[0]["actor"], "owner")
++        self.assertEqual(sorted(events[0]["payload"]),
++                         ["at", "by", "reason", "superseded_by", "task"])
++        self.assertEqual(events[0]["payload"]["task"], "PILOT-069")
++        self.assertEqual(events[0]["payload"]["by"], "mac")
++        self.assertEqual(events[0]["payload"]["superseded_by"], "PILOT-070")
++        self.assertEqual(events[0]["payload"]["reason"], "070 replaces 069")
++
++        registry = self.registry(self.root)
++        self.assertEqual(registry["PILOT-069"]["status"], "void")
++        # The target and other cards keep their registry status.
++        self.assertEqual(registry["PILOT-070"]["status"], "closed")
++
++        # No envelope, no MERGE: the card is retired, never merged.
++        envelopes = list((self.root / "supervision" / "envelopes").glob("*.json"))
++        self.assertEqual(envelopes, [])
++        for name in ("primary", "supervision"):
++            types = [event["type"]
++                     for event in self.ledger_events(self.root, name)]
++            self.assertNotIn("MERGE", types)
++        self.assertEqual(self.ledger_events(self.root, "supervision"), [])
++
++        verify = self.cli(self.root, "state-verify")
++        self.assertEqual(verify.returncode, 0, msg=verify.stdout + verify.stderr)
++        result = json.loads(verify.stdout)
++        self.assertEqual(result["drift"], [])
++        self.assertTrue(result["ok"])
++
++    def test_supersede_never_fakes_review_or_acceptance(self) -> None:
++        record_before = self.record(self.root, "PILOT-069")
++        self.supersede(self.root)
++        record = self.record(self.root, "PILOT-069")
++        for field in ("review", "decision", "closeout", "evidence", "executor"):
++            self.assertEqual(record.get(field), record_before.get(field),
++                             msg=field)
++        self.assertIsNone(record.get("accepted_at"))
++        # PILOT-069 gains no ACCEPT/CLOSEOUT event; 070 keeps its own ACCEPT.
++        accepted = [event["payload"]["task"]
++                    for event in self.ledger_events(self.root, "primary")
++                    if event["type"] == "ACCEPT"]
++        self.assertEqual(accepted, ["PILOT-070"])
++        closed = [event["payload"]["task"]
++                  for event in self.ledger_events(self.root, "primary")
++                  if event["type"] == "CLOSEOUT"]
++        self.assertEqual(closed, ["PILOT-070"])
++
++    def test_rework_card_can_be_superseded(self) -> None:
++        root = self.fresh("rework", {"PILOT-071": "rework"})
++        cp = self.supersede(root, task="PILOT-071", target="PILOT-070")
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.record(root, "PILOT-071")["status"],
++                         "superseded")
++        self.assertEqual(self.registry(root)["PILOT-071"]["status"], "void")
++
++    def test_superseded_card_is_terminal_for_accept_and_close(self) -> None:
++        root = self.fresh("terminal")
++        cp = self.supersede(root)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        before = self.snapshot(root)
++        accept = self.cli(root, "accept", "--task", "PILOT-069",
++                          "--decision", "D-069")
++        self.assertEqual(accept.returncode, 2, msg=accept.stdout + accept.stderr)
++        self.assertNotIn("Traceback", accept.stdout + accept.stderr)
++        close = self.cli(root, "close", "--task", "PILOT-069")
++        self.assertEqual(close.returncode, 2, msg=close.stdout + close.stderr)
++        self.assertNotIn("Traceback", close.stdout + close.stderr)
++        check = self.cli(root, "check", "--task", "PILOT-069",
++                         "--phase", "accept")
++        self.assertEqual(check.returncode, 2, msg=check.stdout + check.stderr)
++        self.assertEqual(self.snapshot(root), before,
++                         msg="terminal refusals must write nothing")
++
++
++class SupersedeRefusalCase(SupersedeCase):
++    """Every illegal request exits 2 with zero writes."""
++
++    def test_repeat_supersede_is_refused(self) -> None:
++        first = self.supersede(self.root)
++        self.assertEqual(first.returncode, 0, msg=first.stdout + first.stderr)
++        self.assert_refused(
++            self.root,
++            ("task-supersede", "--task", "PILOT-069", "--by-task",
++             "PILOT-070", "--reason", "again", "--by", "mac"),
++            "already superseded")
++
++    def test_closed_card_is_refused(self) -> None:
++        root = self.fresh("closed")
++        self.assert_refused(
++            root,
++            ("task-supersede", "--task", "PILOT-070", "--by-task",
++             "PILOT-071", "--reason", "x", "--by", "mac"),
++            "cannot be superseded", "closed")
++
++    def test_accepted_card_is_refused(self) -> None:
++        root = self.fresh("accepted", {"PILOT-071": "accepted"})
++        self.assert_refused(
++            root,
++            ("task-supersede", "--task", "PILOT-071", "--by-task",
++             "PILOT-069", "--reason", "x", "--by", "mac"),
++            "cannot be superseded", "accepted")
++
++    def test_non_owner_is_refused(self) -> None:
++        root = self.fresh("intruder")
++        self.assert_refused(
++            root,
++            ("task-supersede", "--task", "PILOT-069", "--by-task",
++             "PILOT-070", "--reason", "x", "--by", "intruder"),
++            "owner", "intruder")
++
++    def test_missing_target_card_is_refused(self) -> None:
++        root = self.fresh("missing-target")
++        self.assert_refused(
++            root,
++            ("task-supersede", "--task", "PILOT-069", "--by-task",
++             "PILOT-999", "--reason", "x", "--by", "mac"),
++            "target card missing", "PILOT-999")
++
++    def test_self_supersede_is_refused(self) -> None:
++        root = self.fresh("self")
++        self.assert_refused(
++            root,
++            ("task-supersede", "--task", "PILOT-069", "--by-task",
++             "PILOT-069", "--reason", "x", "--by", "mac"),
++            "itself")
++
++    def test_empty_reason_is_refused(self) -> None:
++        root = self.fresh("reason")
++        self.assert_refused(
++            root,
++            ("task-supersede", "--task", "PILOT-069", "--by-task",
++             "PILOT-070", "--reason", "  ", "--by", "mac"),
++            "reason")
++
++
++class SupersedeRepairCase(SupersedeCase):
++    """A crash between the tombstone's halves is completed by the next retry."""
++
++    TASK = "PILOT-069"
++
++    def supersede_events(self, root: Path) -> list[dict]:
++        return [event for event in self.ledger_events(root, "primary")
++                if event["type"] == "TASK_SUPERSEDE"]
++
++    def assert_converged(self, root: Path) -> None:
++        record = self.record(root, self.TASK)
++        self.assertEqual(record["status"], "superseded")
++        self.assertEqual(record["superseded_by"], "PILOT-070")
++        self.assertEqual(self.board_entry(root, self.TASK)["status"],
++                         "superseded")
++        self.assertEqual(self.registry(root)[self.TASK]["status"], "void")
++        self.assertEqual(len(self.supersede_events(root)), 1)
++        verify = self.cli(root, "state-verify")
++        self.assertEqual(verify.returncode, 0, msg=verify.stdout + verify.stderr)
++        self.assertEqual(json.loads(verify.stdout)["drift"], [])
++
++    def test_record_first_crash_is_repaired(self) -> None:
++        root = self.fresh("record-first")
++        self.mark_superseded(root)
++        self.assertEqual(self.supersede_events(root), [])
++        cp = self.supersede(root)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertTrue(json.loads(cp.stdout)["repaired"])
++        self.assert_converged(root)
++        before = self.snapshot(root)
++        again = self.supersede(root)
++        self.assertEqual(again.returncode, 2, msg=again.stdout + again.stderr)
++        self.assertEqual(self.snapshot(root), before)
++
++    def test_ledger_first_crash_is_repaired_without_a_second_event(self) -> None:
++        root = self.fresh("ledger-first")
++        towerctl.append_ledger(root, "TASK_SUPERSEDE", "owner", {
++            "task": self.TASK, "by": "mac", "reason": "070 replaces 069",
++            "superseded_by": "PILOT-070", "at": STAMP})
++        cp = self.supersede(root)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertTrue(json.loads(cp.stdout)["repaired"])
++        self.assert_converged(root)
++
++    def test_void_gap_is_repaired_without_a_second_event(self) -> None:
++        root = self.fresh("void-gap")
++        first = self.supersede(root)
++        self.assertEqual(first.returncode, 0, msg=first.stdout + first.stderr)
++        self.assertFalse(json.loads(first.stdout)["repaired"])
++        self.set_registry_status(root, self.TASK, "active")
++        retry = self.supersede(root)
++        self.assertEqual(retry.returncode, 0, msg=retry.stdout + retry.stderr)
++        self.assertTrue(json.loads(retry.stdout)["repaired"])
++        self.assert_converged(root)
++
++
++class WhereTerminalCase(SupersedeCase):
++    """``where`` counts a superseded roadmap node as terminal done."""
++
++    def test_where_counts_superseded_as_done(self) -> None:
++        root = self.fresh("where")
++        self.write_campaign(root, ("PILOT-061", "PILOT-069", "PILOT-070"),
++                            "PILOT-070")
++        self.write_card(root, "PILOT-061", "closed")
++        cp = self.supersede(root)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++
++        run, data = self.where_json(root)
++        self.assertEqual(run.returncode, 0, msg=run.stdout + run.stderr)
++        statuses = {node["id"]: node["status"] for node in data["nodes"]}
++        self.assertEqual(statuses["PILOT-069"], "done")
++        self.assertEqual(data["index"], 3)
++        self.assertEqual(data["total"], 3)
++        self.assertIsNone(data["next"])
++        self.assertEqual(data["blocked"], [])
++
++        human = self.cli(root, "where")
++        self.assertEqual(human.returncode, 0, msg=human.stdout + human.stderr)
++        self.assertIn("[✅069]", human.stdout)
++        self.assertIn("位置 3/3", human.stdout)
++
++    def test_where_still_reads_a_delivered_node_as_active(self) -> None:
++        root = self.fresh("where-delivered")
++        self.write_campaign(root, ("PILOT-061", "PILOT-069", "PILOT-070"),
++                            "PILOT-069")
++        self.write_card(root, "PILOT-061", "closed")
++        _, data = self.where_json(root)
++        statuses = {node["id"]: node["status"] for node in data["nodes"]}
++        self.assertEqual(statuses["PILOT-069"], "active")
++        self.assertEqual(data["next"], "PILOT-069")
++
++
++class RealFixtureCase(SupersedeCase):
++    """The real 069/070 shape: a ten-node C-04 roadmap reaches 10/10."""
++
++    def test_real_069_070_fixture_reaches_ten_of_ten(self) -> None:
++        root = self.fresh("real")
++        self.write_campaign(root, ROADMAP_TEN, "PILOT-070")
++        for task_id in ROADMAP_TEN[:-2]:          # 061..068
++            self.write_card(root, task_id, "closed")
++        cp = self.supersede(root)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++
++        run, data = self.where_json(root)
++        self.assertEqual(run.returncode, 0, msg=run.stdout + run.stderr)
++        self.assertEqual(data["total"], 10)
++        self.assertEqual(data["index"], 10)
++        self.assertIsNone(data["next"])
++        self.assertEqual([node["id"] for node in data["nodes"]],
++                         list(ROADMAP_TEN))
++        self.assertTrue(all(node["status"] == "done" for node in data["nodes"]))
++        self.assertEqual(data["wip"], {"in_flight": 0, "limit": 1})
++
++        verify = self.cli(root, "state-verify")
++        self.assertEqual(verify.returncode, 0, msg=verify.stdout + verify.stderr)
++        self.assertEqual(json.loads(verify.stdout)["drift"], [])
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tower-dsh/tools/tower_cli.py b/tower-dsh/tools/tower_cli.py
+index 7250ab4..fca0137 100644
+--- a/tower-dsh/tools/tower_cli.py
++++ b/tower-dsh/tools/tower_cli.py
+@@ -21,6 +21,7 @@ from tower_ledger_replay import (
+ )
+ from tower_task import (
+     ACCEPTANCE_KINDS, ACCEPTANCE_STATUSES, cmd_spec_approve, cmd_task_new,
++    cmd_task_supersede,
+ )
+ from tower_authority_cmd import (
+     authority_state_check, cmd_authority_check, cmd_authority_require,
+@@ -198,6 +199,24 @@ def envelope_abandon_layer_parsers(
+     return parser
+ 
+ 
++def supersede_layer_parsers(
++        parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
++    """PILOT-071: the owner-only ``task-supersede`` lifecycle exit.
++
++    Registered through the command-layer chain like the abandon/review layers,
++    so ``build_parser`` keeps its frozen PILOT-044 shape.
++    """
++    for action in parser._actions:
++        if not isinstance(action, argparse._SubParsersAction):
++            continue
++        supersede = action.add_parser("task-supersede")
++        supersede.add_argument("--task", required=True)
++        supersede.add_argument("--by-task", dest="by_task", required=True)
++        supersede.add_argument("--reason", required=True)
++        supersede.add_argument("--by", required=True)
++    return parser
++
++
+ def status_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+     """Register the PILOT-046 status commands on the PILOT-045 parser."""
+     for action in parser._actions:
+@@ -263,7 +282,8 @@ COMMAND_LAYER_HANDLERS = {
+     "where": cmd_where, "arch-check": cmd_arch_check,
+     "arch-graph": cmd_arch_graph, "profile-check": cmd_profile_check,
+     "acceptance-add": cmd_acceptance_add,
+-    "envelope-abandon": cmd_envelope_abandon}
++    "envelope-abandon": cmd_envelope_abandon,
++    "task-supersede": cmd_task_supersede}
+ 
+ 
+ TASK_IDS_HANDLERS = {"task-ids-init": cmd_task_ids_init,
+@@ -760,8 +780,8 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
+         action.add_parser("brief")
+     dispatch_campaign_parser(parser)
+     review_layer_parsers(parser)
+-    return base_sync_layer_parsers(envelope_base_side_layer_parsers(envelope_abandon_layer_parsers(profile_layer_parsers(
+-        arch_layer_parsers(position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser)))))))))
++    return base_sync_layer_parsers(envelope_base_side_layer_parsers(envelope_abandon_layer_parsers(supersede_layer_parsers(profile_layer_parsers(
++        arch_layer_parsers(position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser))))))))))
+ 
+ 
+ def cli_commands() -> list[str]:
+diff --git a/tower-dsh/tools/tower_ledger_replay.py b/tower-dsh/tools/tower_ledger_replay.py
+index da4426b..f8da8b6 100644
+--- a/tower-dsh/tools/tower_ledger_replay.py
++++ b/tower-dsh/tools/tower_ledger_replay.py
+@@ -196,6 +196,10 @@ TASK_LIFECYCLE_STATUS = {
+     "DELIVER": "delivered",
+     "ACCEPT": "accepted",
+     "CLOSEOUT": "closed",
++    # PILOT-071: an owner-only tombstone for a card that will never merge.  It
++    # is a terminal task state (no envelope, no MERGE) but deliberately not
++    # "closed": the card was not accepted, so review/acceptance stay untouched.
++    "TASK_SUPERSEDE": "superseded",
+ }
+ 
+ 
+@@ -254,6 +258,11 @@ TASK_TRANSITIONS = {
+     "CHECKBACK": frozenset(CHECKBACK_STATUSES),
+     "ACCEPT": frozenset({"reviewed"}),
+     "CLOSEOUT": frozenset({"accepted"}),
++    # PILOT-071: only a delivered or rework card may be superseded.  The
++    # tombstone is terminal: ``superseded`` is not a source state here, so a
++    # second TASK_SUPERSEDE is an illegal transition and no later lifecycle
++    # event (accept/close) can leave it.
++    "TASK_SUPERSEDE": frozenset({"delivered", "rework"}),
+ }
+ 
+ 
+diff --git a/tower-dsh/tools/tower_lookup.py b/tower-dsh/tools/tower_lookup.py
+index 2941ade..40691cd 100644
+--- a/tower-dsh/tools/tower_lookup.py
++++ b/tower-dsh/tools/tower_lookup.py
+@@ -5,12 +5,13 @@ from pathlib import Path
+ from tower_common import emit, emit_sorted, fail, jload, sha256_file
+ from tower_ledger import append_ledger, spec_registry_errors, task_dir
+ from tower_task import (
+-    _optional_task_record, ledger_has_task_event, load_record, resolve_input,
+-    save_record, spec_gate_errors, validate_spec,
++    _optional_task_record, ledger_has_task_event, load_record, read_task_records,
++    resolve_input, save_record, spec_gate_errors, validate_spec,
+ )
+ from tower_command import command_card_exists
+ from tower_campaign import (
+     POSITION_GLYPHS, PositionUnavailable, campaign_heading, position_context,
++    position_index, position_next,
+ )
+ from tower_dispatch import scheduling_dependency_errors
+ from tower_delivery import check_evidence
+@@ -150,10 +151,34 @@ def position_human_lines(root: Path, position: dict, doc: dict) -> list[str]:
+             f"建议：{advice}"]
+ 
+ 
++def where_position(root: Path) -> tuple[dict, dict]:
++    """Position context with superseded cards counted as terminal done.
++
++    ``tower_campaign.position_status`` maps only ``closed`` to ``done``; a
++    superseded card never merges (no envelope, no ``MERGE``) but is terminal,
++    so ``where`` projects it as done at this view boundary.  The campaign
++    module is outside PILOT-071's allowed paths, and the projection must not
++    rewrite the record status the campaign model reads.
++    """
++    position, doc = position_context(root)
++    superseded = {record.get("id") for record in read_task_records(root)
++                  if record.get("status") == "superseded"}
++    if not superseded:
++        return position, doc
++    nodes = [{**node, "status": "done"} if node["id"] in superseded else node
++             for node in position["nodes"]]
++    projected = {**position, "nodes": nodes,
++                 "index": position_index(nodes),
++                 "next": position_next(nodes, position["current"]),
++                 "blocked": [node["id"] for node in nodes
++                             if node["status"] == "blocked"]}
++    return projected, doc
++
++
+ def cmd_where(root: Path, args) -> None:
+     """Print the position map: ``--json`` machine view or the human view."""
+     try:
+-        position, doc = position_context(root)
++        position, doc = where_position(root)
+     except PositionUnavailable as exc:
+         fail([str(exc)])
+     if args.json:
+diff --git a/tower-dsh/tools/tower_task.py b/tower-dsh/tools/tower_task.py
+index 9704412..a993045 100644
+--- a/tower-dsh/tools/tower_task.py
++++ b/tower-dsh/tools/tower_task.py
+@@ -1,16 +1,20 @@
+ """Task cards, ids, specs and the board (owning records)."""
+ from __future__ import annotations
+ 
+-import json
+ import re
+ import spec_lint
+ from datetime import datetime
+ from pathlib import Path
+ from tower_common import (
+-    COMMAND_ARCHIVE_SUFFIX, TASK_ID_RE, emit, ensure_within, fail, is_safe_id,
+-    jdump, jload, now, rel, resolve_input_within, sha256_file,
++    COMMAND_ARCHIVE_SUFFIX, TASK_ID_RE, _read_json_object, check_task_id, emit,
++    ensure_within, fail, is_safe_id, jdump, jload, now, rel,
++    resolve_input_within, sha256_file,
+ )
+-from tower_ledger import activate_task_id, append_ledger, task_dir, task_id_view
++from tower_ledger import (
++    activate_task_id, append_ledger, task_dir, task_id_entry, task_ids_lock,
++    task_ids_save, task_id_view,
++)
++from tower_ledger_replay import ledger_events_in_seq_order
+ 
+ 
+ def task_record_path(root: Path, tid: str) -> Path:
+@@ -251,20 +255,136 @@ def cmd_task_new(root: Path, args) -> None:
+     task_new_card(root, args)
+ 
+ 
++def ledger_task_event_payloads(root: Path, event_type: str,
++                               task: str) -> list[dict]:
++    """Every payload of ``event_type`` for ``task`` in the primary ledger."""
++    return [event["payload"]
++            for event in ledger_events_in_seq_order(root, "primary")
++            if event.get("type") == event_type
++            and isinstance(event.get("payload"), dict)
++            and event["payload"].get("task") == task]
++
++
+ def ledger_has_task_event(root: Path, event_type: str, task: str) -> bool:
+-    ledger = root / "ledger" / "primary.jsonl"
+-    if not ledger.exists():
+-        return False
+-    for line in ledger.read_text(encoding="utf-8").splitlines():
+-        if not line.strip():
+-            continue
+-        try:
+-            ev = json.loads(line)
+-        except Exception:
+-            continue
+-        if ev.get("type") == event_type and (ev.get("payload") or {}).get("task") == task:
+-            return True
+-    return False
++    return bool(ledger_task_event_payloads(root, event_type, task))
++
++
++SUPERSEDE_SOURCE_STATUSES = ("delivered", "rework")
++
++
++def last_supersede_event(root: Path, task: str) -> dict | None:
++    """The latest ``TASK_SUPERSEDE`` payload for ``task``, or ``None``."""
++    payloads = ledger_task_event_payloads(root, "TASK_SUPERSEDE", task)
++    return payloads[-1] if payloads else None
++
++
++def task_id_status(root: Path, task: str) -> str | None:
++    """The id registry's status for ``task``, or ``None`` when absent."""
++    entry = task_id_view(root).get(task)
++    return entry.get("status") if isinstance(entry, dict) else None
++
++
++def board_task_status(root: Path, task: str) -> str | None:
++    """The board row's status for ``task``, or ``None`` when absent."""
++    return next((entry.get("status")
++                 for entry in load_board(root).get("tasks") or []
++                 if isinstance(entry, dict) and entry.get("id") == task), None)
++
++
++def supersede_request_errors(root: Path, rec: dict, target: str, by: str,
++                             reason: str) -> list[str]:
++    """Owner/reason/target half of the refusal set; read-only."""
++    tid = str(rec.get("id") or "")
++    _, state = _read_json_object(root / "primary" / "CURRENT_STATE.json")
++    owner = state.get("owner") if isinstance(state, dict) else None
++    owner = owner.get("name") if isinstance(owner, dict) else None
++    errors: list[str] = []
++    if not owner:
++        errors.append("primary/CURRENT_STATE.json has no owner.name")
++    elif by != owner:
++        errors.append(f"only the registered owner may supersede a task: "
++                      f"--by {by!r} != owner {owner!r}")
++    if not reason:
++        errors.append("--reason must be a non-empty string")
++    if target == tid:
++        errors.append(f"task {tid} cannot supersede itself")
++    if _optional_task_record(root, target) is None:
++        errors.append(f"target card missing: {target}")
++    return errors
++
++
++def supersede_state_errors(root: Path, rec: dict, target: str,
++                           event: dict | None) -> list[str]:
++    """Source-state half; a partial tombstone is repairable, not refused."""
++    tid = str(rec.get("id") or "")
++    errors: list[str] = []
++    event_target = event.get("superseded_by") if event else None
++    if event_target and event_target != target:
++        errors.append(f"ledger records {tid} superseded by {event_target!r}, "
++                      f"not {target!r}")
++    status = rec.get("status")
++    if status == "superseded":
++        recorded = rec.get("superseded_by") or event_target
++        if recorded and recorded != target:
++            errors.append(f"task {tid} is already superseded by {recorded}")
++    elif status not in SUPERSEDE_SOURCE_STATUSES:
++        errors.append(f"task status {status} cannot be superseded "
++                      f"(allowed: {', '.join(SUPERSEDE_SOURCE_STATUSES)})")
++    complete = (status == "superseded" and event is not None
++                and rec.get("superseded_by") == target
++                and board_task_status(root, tid) == "superseded"
++                and task_id_status(root, tid) == "void")
++    if complete:
++        errors.append(f"task {tid} is already superseded")
++    return errors
++
++
++def void_task_id(root: Path, record: dict) -> None:
++    """Void the card's id so ``task-new`` can never reuse it."""
++    tid = str(record["id"])
++    with task_ids_lock(root):
++        ids = task_id_view(root)
++        entry = ids.get(tid) or task_id_entry(root, tid, record, "void")
++        entry["status"] = "void"
++        entry["updated_at"] = now()
++        ids[tid] = entry
++        task_ids_save(root, ids, f"task {tid} is superseded but its id "
++                                 "registry entry was not voided")
++
++
++def cmd_task_supersede(root: Path, args) -> None:
++    """Owner-only tombstone, idempotent across a half-written crash.
++
++    The primary-ledger event is written first; record/board and the void id
++    follow.  A crash between any two writes is repaired by the next retry
++    (never a second event); only a fully applied tombstone is refused.
++    """
++    tid = check_task_id(args.task)
++    target = check_task_id(args.by_task, "by-task")
++    rec = load_record(root, tid)
++    by = (args.by or "").strip()
++    reason = (args.reason or "").strip()
++    event = last_supersede_event(root, tid)
++    errors = (supersede_request_errors(root, rec, target, by, reason)
++              + supersede_state_errors(root, rec, target, event))
++    if errors:
++        fail(errors)
++    repairing = event is not None or rec.get("status") == "superseded"
++    at = str((event or {}).get("at") or rec.get("superseded_at") or now())
++    if event is None:
++        append_ledger(root, "TASK_SUPERSEDE", "owner",
++                      {"task": tid, "by": by, "reason": reason,
++                       "superseded_by": target, "at": at})
++    rec["status"] = "superseded"
++    rec["superseded_by"] = target
++    rec["superseded_at"] = at
++    rec["next"] = f"superseded by {target}; no merge, see ledger TASK_SUPERSEDE"
++    save_record(root, rec)
++    update_board(root, rec)
++    if task_id_status(root, tid) != "void":
++        void_task_id(root, rec)
++    emit({"ok": True, "task": tid, "status": rec["status"],
++          "superseded_by": target, "by": by, "repaired": repairing})
+ 
+ 
+ def cmd_spec_approve(root: Path, args) -> None:

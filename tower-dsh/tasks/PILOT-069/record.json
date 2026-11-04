@@ -2,7 +2,7 @@
   "schema": "tower/task@1",
   "id": "PILOT-069",
   "title": "base-ahead 用 merge-base..origin/main；069 自身审计 admin",
-  "status": "dispatched",
+  "status": "delivered",
   "authority": "workspace_write",
   "scope": [
     "base_ahead_paths：mb = merge-base HEAD origin/main；changed = git diff --name-only mb..origin/main；mb == origin/main 即未前进",
@@ -51,11 +51,69 @@
     "base_sha": "cd9a8019768d5c99f60a48da882cfa193aa6abab",
     "campaign": "C-2026-Q4-04"
   },
-  "evidence": [],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-069/evidence/tower_cli.py",
+      "sha256": "bd878951de197a22bea6588abc6bdcf7292eee8a225be07f6d73390f42ac3eb5",
+      "bytes": 34708,
+      "at": "2026-11-04T12:24:24+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-069/evidence/test_base_sync.py",
+      "sha256": "464a7a30eab04236238296ce2b110550388bd2fb5a305a1f1da9d9934a70b6e8",
+      "bytes": 23868,
+      "at": "2026-11-04T12:24:24+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-069/evidence/test-output.txt",
+      "sha256": "dabc091a6f864df300c968659db89804d3bc5a37ed1c8dabd78d4b80836b6f84",
+      "bytes": 106673,
+      "at": "2026-11-04T12:24:24+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-069/evidence/base_ahead_probe.py",
+      "sha256": "bacb613e2792b73c2da058948282dd32c6956a80d2685b70cf73a5d5574eb0b7",
+      "bytes": 6069,
+      "at": "2026-11-04T12:24:24+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-069/evidence/probe.txt",
+      "sha256": "51c79fca4ba93c44518a99edd9cd4ed8817ce6d669a03090780a2a0dbe64a377",
+      "bytes": 2274,
+      "at": "2026-11-04T12:24:24+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-069/evidence/commit.txt",
+      "sha256": "74998f7e77d35f89439232bdf33a6e1fa3e18d703c323416bc16c5d52eb6bedb",
+      "bytes": 283,
+      "at": "2026-11-04T12:24:24+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-069/evidence/diff.txt",
+      "sha256": "a0b8a57b3d9de8ec6c74f1882951c6648249e97155cc4461e5ebd1255f9eee38",
+      "bytes": 10429,
+      "at": "2026-11-04T12:24:24+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-069/evidence/gates.txt",
+      "sha256": "628a6d6c24df4a44f284b6b40341b1b5fdd9273c99fc9587d19ae1c37ea424b5",
+      "bytes": 2229,
+      "at": "2026-11-04T12:24:24+08:00",
+      "id": "E-008"
+    }
+  ],
   "review": null,
   "decision": null,
   "closeout": null,
   "created_at": "2026-11-03T21:47:01+08:00",
-  "updated_at": "2026-11-03T21:50:40+08:00",
-  "next": "等待 executor 交付"
+  "updated_at": "2026-11-04T12:24:24+08:00",
+  "next": "等待独立 reviewer",
+  "delivered_at": "2026-11-04T12:24:24+08:00"
 }

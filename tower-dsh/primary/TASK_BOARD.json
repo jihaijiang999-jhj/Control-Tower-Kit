@@ -683,16 +683,6 @@
       "updated_at": "2026-11-03T15:54:13+08:00"
     },
     {
-      "id": "PILOT-069",
-      "title": "base-ahead 用 merge-base..origin/main；069 自身审计 admin",
-      "status": "dispatched",
-      "authority": "workspace_write",
-      "executor": "subagent:7a9c5089-da2b-4d0a-9507-f63580912f11",
-      "reviewer": null,
-      "next": "等待 executor 交付",
-      "updated_at": "2026-11-03T21:50:40+08:00"
-    },
-    {
       "id": "PILOT-070",
       "title": "base-ahead 以 envelope implementation head 为基准；070 审计 admin",
       "status": "closed",
@@ -701,7 +691,27 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-070/MERGE.md",
       "updated_at": "2026-11-04T01:14:30+08:00"
+    },
+    {
+      "id": "PILOT-071",
+      "title": "task-supersede：owner 授权、写 ledger、不伪造 merge",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:194c8e77-e9e7-442d-b326-9c359de4d360",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-071/MERGE.md",
+      "updated_at": "2026-11-04T12:24:18+08:00"
+    },
+    {
+      "id": "PILOT-069",
+      "title": "base-ahead 用 merge-base..origin/main；069 自身审计 admin",
+      "status": "delivered",
+      "authority": "workspace_write",
+      "executor": "subagent:7a9c5089-da2b-4d0a-9507-f63580912f11",
+      "reviewer": null,
+      "next": "等待独立 reviewer",
+      "updated_at": "2026-11-04T12:24:24+08:00"
     }
   ],
-  "updated_at": "2026-11-04T01:14:30+08:00"
+  "updated_at": "2026-11-04T12:24:24+08:00"
 }

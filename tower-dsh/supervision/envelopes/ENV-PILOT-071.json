@@ -1,0 +1,77 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-071",
+  "task": "PILOT-071",
+  "repository": "..",
+  "branch": "pilot/PILOT-071",
+  "base": "main",
+  "implementation_head_sha": "a4db86c6423a19936ae6ba543adb2b93e41a135b",
+  "envelope_path": "merge-envelopes/ENV-PILOT-071.json",
+  "created_at": "2026-11-04T12:25:00+08:00",
+  "scope": "PILOT-071 rebuilt: task-supersede (owner, ledger, no merge); audited admin",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 753,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-071/evidence/EVENT_CATALOG.json",
+      "sha256": "4ee150b1884e8a4ed227b427048881169ccaa33106fdb495b67ef236b0318ddd"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/test_modules.py",
+      "sha256": "646e9bb4ab154e080dcef52b730ce418873d63f41e3c8f42b036cf9a96a47835"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/test_task_supersede.py",
+      "sha256": "11844b1b6de547c86b7aefc894a3cb8c382fefeb90bcc1a68d263fdad5b6a061"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/tower_cli.py",
+      "sha256": "93a00002b6e51c9fe3cb97f4dc90ef72203c11be414f62b8ff29fddb3aab5709"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/tower_ledger_replay.py",
+      "sha256": "64df9383b7f1c8381a86bb3c3a72519762525ab3f0f95f4983322e111c312d8b"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/tower_lookup.py",
+      "sha256": "23c2eb0e7e273456efd6812941d37edcd043763078ed72c5ca6dd4f77588a586"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/tower_task.py",
+      "sha256": "0a9d12308a9012942829b9179dd4332bbd8963665b9dd6f30fdcca5480f95d9d"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/test-output.txt",
+      "sha256": "4ea52be74d68e99b4f86062820b095841e3a43f8f62d3adfeedba8b9b187c693"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/supersede_probe.py",
+      "sha256": "ad64c9d666f10c636a9f2c28048df0bb2160e646d83125b362ec690c37b5f913"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/probe.txt",
+      "sha256": "3223c033fcfcf1b286697ec16a461edbb97ddba910d952fd912510eba88a6dbb"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/commit.txt",
+      "sha256": "12c46abf19d9c3b86d2500299b071f20339498cdb041c0be98342d17d7323631"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/diff.txt",
+      "sha256": "3b6f0ca2c47a072eefb83e46fb98ff20cf6d5f0b2d81b6ec91fb2bc6fdee7f2c"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/gates.txt",
+      "sha256": "fc2ac947e5e44d53ea87286a1cff98b20591888e41dcd61ed1f164489f50dd27"
+    }
+  ],
+  "envelope_head_sha": "d6ce1f005312690e7922c69bae45a2118c279bc7",
+  "head": "d6ce1f005312690e7922c69bae45a2118c279bc7",
+  "status": "WAITING",
+  "base_side": true
+}

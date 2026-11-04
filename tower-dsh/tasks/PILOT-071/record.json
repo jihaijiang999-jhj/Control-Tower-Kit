@@ -1,0 +1,182 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-071",
+  "title": "task-supersede：owner 授权、写 ledger、不伪造 merge",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "task-supersede --task --by-task --reason --by：仅 owner（by == owner）、源 delivered/rework、目标卡存在；refuse accepted/closed/already superseded",
+    "写 TASK_SUPERSEDE（primary，payload task/by/reason/superseded_by/at）；record.status=superseded、superseded_by；board.status=superseded；TASK_IDS 对应 ID 置 void；不建 envelope、不写 MERGE",
+    "TASK_LIFECYCLE_STATUS 加 TASK_SUPERSEDE→superseded；TASK_TRANSITIONS 允许 delivered/rework→superseded；state-verify fold；不接受 →superseded 后再 accept/close",
+    "position/where：superseded 视为 terminal（done），不要求 envelope；C-04 069 节点不再 active",
+    "EVENT_CATALOG 加 TASK_SUPERSEDE（primary）",
+    "tests：delivered→superseded；重复/closed/accepted 拒绝；owner-only；state-verify 0；where 10/10；069 真实 superseded",
+    "不改 058 review/059 acceptance/060 MERGE_START/070 base-sync"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-071/tower-dsh/tools/tower_ledger_replay.py",
+    "pilot/worktrees/PILOT-071/tower-dsh/tools/tower_task.py",
+    "pilot/worktrees/PILOT-071/tower-dsh/tools/tower_cli.py",
+    "pilot/worktrees/PILOT-071/tower-dsh/tools/tower_views.py",
+    "pilot/worktrees/PILOT-071/tower-dsh/tools/tower_lookup.py",
+    "pilot/worktrees/PILOT-071/tower-dsh/EVENT_CATALOG.json",
+    "pilot/worktrees/PILOT-071/tower-dsh/tools/tests/test_task_supersede.py",
+    "pilot/worktrees/PILOT-071/tower-dsh/tools/tests/test_modules.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "creating envelope or MERGE for superseded task",
+    "allowing non-owner supersede",
+    "weakening review/acceptance"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-071/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 753 + 新增用例数（main 基线 753）",
+    "delivered→superseded：record/board/ledger 同步、superseded_by 记录、无 envelope、无 MERGE、state-verify 0",
+    "重复 supersede、closed/accepted、非 owner、缺失目标 → exit 2 零写入/明确拒绝",
+    "where：superseded 计 terminal done；069 真实 superseded by 070 后 10/10",
+    "071 自身 merge --mode pr 成功（base-side envelope）；真实塔 71/68 drift []；arch 18；profile 11/0；shape 0"
+  ],
+  "depends_on": [
+    "PILOT-070"
+  ],
+  "worktree": "pilot/worktrees/PILOT-071",
+  "spec_path": "pilot/PILOT-071.spec.json",
+  "spec_sha256": "ef672afbe5ac5abe7cf2e8ac69b3a4900d083a510ab20a0f958426d08b3e4088",
+  "spec_gate": "PASS",
+  "executor": "subagent:194c8e77-e9e7-442d-b326-9c359de4d360",
+  "dispatch": {
+    "executor": "subagent:194c8e77-e9e7-442d-b326-9c359de4d360",
+    "worktree": "pilot/worktrees/PILOT-071",
+    "at": "2026-11-04T12:24:07+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "e0f05b3c15373306194891052a6d9e7de76cee89",
+    "campaign": "C-2026-Q4-04"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-071/evidence/EVENT_CATALOG.json",
+      "sha256": "4ee150b1884e8a4ed227b427048881169ccaa33106fdb495b67ef236b0318ddd",
+      "bytes": 13188,
+      "at": "2026-11-04T12:24:09+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/test_modules.py",
+      "sha256": "646e9bb4ab154e080dcef52b730ce418873d63f41e3c8f42b036cf9a96a47835",
+      "bytes": 5953,
+      "at": "2026-11-04T12:24:09+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/test_task_supersede.py",
+      "sha256": "11844b1b6de547c86b7aefc894a3cb8c382fefeb90bcc1a68d263fdad5b6a061",
+      "bytes": 22410,
+      "at": "2026-11-04T12:24:09+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/tower_cli.py",
+      "sha256": "93a00002b6e51c9fe3cb97f4dc90ef72203c11be414f62b8ff29fddb3aab5709",
+      "bytes": 36883,
+      "at": "2026-11-04T12:24:09+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/tower_ledger_replay.py",
+      "sha256": "64df9383b7f1c8381a86bb3c3a72519762525ab3f0f95f4983322e111c312d8b",
+      "bytes": 19961,
+      "at": "2026-11-04T12:24:09+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/tower_lookup.py",
+      "sha256": "23c2eb0e7e273456efd6812941d37edcd043763078ed72c5ca6dd4f77588a586",
+      "bytes": 8533,
+      "at": "2026-11-04T12:24:09+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/tower_task.py",
+      "sha256": "0a9d12308a9012942829b9179dd4332bbd8963665b9dd6f30fdcca5480f95d9d",
+      "bytes": 22579,
+      "at": "2026-11-04T12:24:09+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/test-output.txt",
+      "sha256": "4ea52be74d68e99b4f86062820b095841e3a43f8f62d3adfeedba8b9b187c693",
+      "bytes": 218308,
+      "at": "2026-11-04T12:24:09+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/supersede_probe.py",
+      "sha256": "ad64c9d666f10c636a9f2c28048df0bb2160e646d83125b362ec690c37b5f913",
+      "bytes": 9244,
+      "at": "2026-11-04T12:24:09+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/probe.txt",
+      "sha256": "3223c033fcfcf1b286697ec16a461edbb97ddba910d952fd912510eba88a6dbb",
+      "bytes": 7674,
+      "at": "2026-11-04T12:24:09+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/commit.txt",
+      "sha256": "12c46abf19d9c3b86d2500299b071f20339498cdb041c0be98342d17d7323631",
+      "bytes": 652,
+      "at": "2026-11-04T12:24:09+08:00",
+      "id": "E-011"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/diff.txt",
+      "sha256": "3b6f0ca2c47a072eefb83e46fb98ff20cf6d5f0b2d81b6ec91fb2bc6fdee7f2c",
+      "bytes": 39605,
+      "at": "2026-11-04T12:24:09+08:00",
+      "id": "E-012"
+    },
+    {
+      "path": "tasks/PILOT-071/evidence/gates.txt",
+      "sha256": "fc2ac947e5e44d53ea87286a1cff98b20591888e41dcd61ed1f164489f50dd27",
+      "bytes": 4629,
+      "at": "2026-11-04T12:24:09+08:00",
+      "id": "E-013"
+    }
+  ],
+  "review": {
+    "schema": "tower/review@1",
+    "task": "PILOT-071",
+    "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+    "verdict": "PASS",
+    "head": "a4db86c6423a19936ae6ba543adb2b93e41a135b",
+    "base": "e0f05b3c15373306194891052a6d9e7de76cee89",
+    "scope": [],
+    "findings": [],
+    "note": "071 rebuild checkback: code unchanged (7 paths), HEAD a4db86c on e0f05b3; reviewer PASS at 5697f31; rebase-only re-bind; 770 tests.",
+    "at": "2026-11-04T12:24:18+08:00",
+    "structure": ""
+  },
+  "decision": {
+    "id": "D-PILOT-071",
+    "actor": "owner",
+    "text": "PASS; rebuild rebase",
+    "at": "2026-11-04T12:24:18+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-071/CLOSEOUT.md",
+    "at": "2026-11-04T12:24:18+08:00"
+  },
+  "created_at": "2026-11-04T12:23:45+08:00",
+  "updated_at": "2026-11-04T12:24:18+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-071/MERGE.md",
+  "delivered_at": "2026-11-04T12:24:09+08:00",
+  "accepted_at": "2026-11-04T12:24:18+08:00"
+}

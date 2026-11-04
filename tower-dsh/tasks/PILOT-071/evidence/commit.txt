@@ -1,0 +1,14 @@
+﻿commit 5697f315103ee65341bf0c54bf176813d5e3f551
+Author: mac <mac@local>
+Date: Wed Nov 4 04:03:28 2026 +0800
+
+    PILOT-071: task-supersede (owner, ledger, no merge)
+
+ tower-dsh/EVENT_CATALOG.json                 |  21 ++
+ tower-dsh/tools/tests/test_modules.py        |   2 +-
+ tower-dsh/tools/tests/test_task_supersede.py | 477 +++++++++++++++++++++++++++
+ tower-dsh/tools/tower_cli.py                 |  26 +-
+ tower-dsh/tools/tower_ledger_replay.py       |   9 +
+ tower-dsh/tools/tower_lookup.py              |  31 +-
+ tower-dsh/tools/tower_task.py                | 154 ++++++++-
+ 7 files changed, 696 insertions(+), 24 deletions(-)

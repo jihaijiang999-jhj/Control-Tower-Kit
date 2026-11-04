@@ -1,0 +1,84 @@
+﻿PILOT-071 gates @ HEAD 5697f31
+
+== git diff paths (main..HEAD; expect 7 code paths, no spec/record):
+M	tower-dsh/EVENT_CATALOG.json
+M	tower-dsh/tools/tests/test_modules.py
+A	tower-dsh/tools/tests/test_task_supersede.py
+M	tower-dsh/tools/tower_cli.py
+M	tower-dsh/tools/tower_ledger_replay.py
+M	tower-dsh/tools/tower_lookup.py
+M	tower-dsh/tools/tower_task.py
+count=7
+
+== git status --porcelain (expect only ?? scratch/):
+?? scratch/
+
+== worktree: python -B -m unittest tools.tests.test_task_supersede -v
+test_real_069_070_fixture_reaches_ten_of_ten (tools.tests.test_task_supersede.RealFixtureCase.test_real_069_070_fixture_reaches_ten_of_ten) ... ok
+test_accepted_card_is_refused (tools.tests.test_task_supersede.SupersedeRefusalCase.test_accepted_card_is_refused) ... ok
+test_closed_card_is_refused (tools.tests.test_task_supersede.SupersedeRefusalCase.test_closed_card_is_refused) ... ok
+test_empty_reason_is_refused (tools.tests.test_task_supersede.SupersedeRefusalCase.test_empty_reason_is_refused) ... ok
+test_missing_target_card_is_refused (tools.tests.test_task_supersede.SupersedeRefusalCase.test_missing_target_card_is_refused) ... ok
+test_non_owner_is_refused (tools.tests.test_task_supersede.SupersedeRefusalCase.test_non_owner_is_refused) ... ok
+test_repeat_supersede_is_refused (tools.tests.test_task_supersede.SupersedeRefusalCase.test_repeat_supersede_is_refused) ... ok
+test_self_supersede_is_refused (tools.tests.test_task_supersede.SupersedeRefusalCase.test_self_supersede_is_refused) ... ok
+test_ledger_first_crash_is_repaired_without_a_second_event (tools.tests.test_task_supersede.SupersedeRepairCase.test_ledger_first_crash_is_repaired_without_a_second_event) ... ok
+test_record_first_crash_is_repaired (tools.tests.test_task_supersede.SupersedeRepairCase.test_record_first_crash_is_repaired) ... ok
+test_void_gap_is_repaired_without_a_second_event (tools.tests.test_task_supersede.SupersedeRepairCase.test_void_gap_is_repaired_without_a_second_event) ... ok
+test_delivered_card_becomes_superseded_everywhere (tools.tests.test_task_supersede.SupersedeTransitionCase.test_delivered_card_becomes_superseded_everywhere) ... ok
+test_rework_card_can_be_superseded (tools.tests.test_task_supersede.SupersedeTransitionCase.test_rework_card_can_be_superseded) ... ok
+test_supersede_never_fakes_review_or_acceptance (tools.tests.test_task_supersede.SupersedeTransitionCase.test_supersede_never_fakes_review_or_acceptance) ... ok
+test_superseded_card_is_terminal_for_accept_and_close (tools.tests.test_task_supersede.SupersedeTransitionCase.test_superseded_card_is_terminal_for_accept_and_close) ... ok
+test_where_counts_superseded_as_done (tools.tests.test_task_supersede.WhereTerminalCase.test_where_counts_superseded_as_done) ... ok
+test_where_still_reads_a_delivered_node_as_active (tools.tests.test_task_supersede.WhereTerminalCase.test_where_still_reads_a_delivered_node_as_active) ... ok
+----------------------------------------------------------------------
+Ran 17 tests in 5.239s
+OK
+exit=0
+
+== worktree: python -B -m unittest tools.tests.test_modules -v
+test_cli_smoke_is_read_only_and_single_json (tools.tests.test_modules.ModulesSplitCase.test_cli_smoke_is_read_only_and_single_json) ... ok
+test_import_dag_is_one_way_and_acyclic (tools.tests.test_modules.ModulesSplitCase.test_import_dag_is_one_way_and_acyclic) ... ok
+test_modules_present_and_small (tools.tests.test_modules.ModulesSplitCase.test_modules_present_and_small) ... ok
+test_towerctl_entry_is_thin_and_reexports (tools.tests.test_modules.ModulesSplitCase.test_towerctl_entry_is_thin_and_reexports) ... ok
+----------------------------------------------------------------------
+Ran 4 tests in 1.295s
+OK
+exit=0
+
+== worktree: python tools/towerctl.py state-verify
+  "ok": true,
+  "tasks": 70,
+  "envelopes": 68,
+  "drift": [],
+  "skipped_count": 11,
+exit=0 (verbatim in worktree-state-verify.json)
+
+== worktree: python tools/towerctl.py arch-check
+  "ok": true,
+    "gates": 18,
+    "events": 31,
+    "nodes": 77,
+    "edges": 176
+  "errors": []
+exit=0 (verbatim in worktree-arch-check.json)
+
+== worktree: python tools/towerctl.py shape-check
+  "ok": true,
+  "files": 77,
+  "functions": 2166,
+  "duplicate_blocks": 169,
+exit=0 (verbatim in worktree-shape-check.json)
+
+== real tower (read-only): python tools/towerctl.py state-verify
+  "ok": true,
+  "tasks": 71,
+  "envelopes": 68,
+  "drift": [],
+  "skipped_count": 10,
+exit=0
+
+== worktree: python -B tools/run_tests.py (full suite; raw output in test-output.txt)
+Ran 770 tests in 817.398s
+OK (skipped=1)
+EXIT=0

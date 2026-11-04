@@ -490,6 +490,13 @@
       "spec_path": "pilot/PILOT-070.spec.json",
       "created_at": "2026-11-04T00:05:11+08:00",
       "updated_at": "2026-11-04T01:14:30+08:00"
+    },
+    "PILOT-071": {
+      "title": "task-supersede：owner 授权、写 ledger、不伪造 merge",
+      "status": "closed",
+      "spec_path": "pilot/PILOT-071.spec.json",
+      "created_at": "2026-11-04T12:23:45+08:00",
+      "updated_at": "2026-11-04T12:24:18+08:00"
     }
   }
 }
