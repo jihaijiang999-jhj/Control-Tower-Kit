@@ -703,16 +703,6 @@
       "updated_at": "2026-11-04T12:24:18+08:00"
     },
     {
-      "id": "PILOT-069",
-      "title": "base-ahead 用 merge-base..origin/main；069 自身审计 admin",
-      "status": "delivered",
-      "authority": "workspace_write",
-      "executor": "subagent:7a9c5089-da2b-4d0a-9507-f63580912f11",
-      "reviewer": null,
-      "next": "等待独立 reviewer",
-      "updated_at": "2026-11-04T12:24:24+08:00"
-    },
-    {
       "id": "PILOT-073",
       "title": "spec/campaign 入 state/docs + 直接 admin 合并后的 envelope 恢复",
       "status": "closed",
@@ -721,7 +711,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-073/MERGE.md",
       "updated_at": "2026-11-04T16:03:09+08:00"
+    },
+    {
+      "id": "PILOT-069",
+      "title": "base-ahead 用 merge-base..origin/main；069 自身审计 admin",
+      "status": "superseded",
+      "authority": "workspace_write",
+      "executor": "subagent:7a9c5089-da2b-4d0a-9507-f63580912f11",
+      "reviewer": null,
+      "next": "superseded by PILOT-070; no merge, see ledger TASK_SUPERSEDE",
+      "updated_at": "2026-11-04T17:05:04+08:00"
     }
   ],
-  "updated_at": "2026-11-04T16:03:09+08:00"
+  "updated_at": "2026-11-04T17:05:04+08:00"
 }

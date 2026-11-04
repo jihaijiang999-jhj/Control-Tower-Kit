@@ -2,7 +2,7 @@
   "schema": "tower/task@1",
   "id": "PILOT-069",
   "title": "base-ahead 用 merge-base..origin/main；069 自身审计 admin",
-  "status": "delivered",
+  "status": "superseded",
   "authority": "workspace_write",
   "scope": [
     "base_ahead_paths：mb = merge-base HEAD origin/main；changed = git diff --name-only mb..origin/main；mb == origin/main 即未前进",
@@ -113,7 +113,9 @@
   "decision": null,
   "closeout": null,
   "created_at": "2026-11-03T21:47:01+08:00",
-  "updated_at": "2026-11-04T12:24:24+08:00",
-  "next": "等待独立 reviewer",
-  "delivered_at": "2026-11-04T12:24:24+08:00"
+  "updated_at": "2026-11-04T17:05:04+08:00",
+  "next": "superseded by PILOT-070; no merge, see ledger TASK_SUPERSEDE",
+  "delivered_at": "2026-11-04T12:24:24+08:00",
+  "superseded_by": "PILOT-070",
+  "superseded_at": "2026-11-04T17:05:04+08:00"
 }

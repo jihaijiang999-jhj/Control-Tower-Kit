@@ -621,10 +621,10 @@
       "task": "PILOT-073",
       "branch": "pilot/PILOT-073",
       "base": "main",
-      "status": "MERGED",
+      "status": "CORRECTION_REQUIRED",
       "added_at": "2026-11-04T16:03:25+08:00",
       "merge_commit": "1042265296b674c39c2b13458be5d82f3bec475b"
     }
   ],
-  "updated_at": "2026-11-04T17:04:59+08:00"
+  "updated_at": "2026-11-04T17:28:34+08:00"
 }
