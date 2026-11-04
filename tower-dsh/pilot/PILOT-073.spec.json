@@ -1,0 +1,47 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-073",
+  "title": "spec/campaign 入 state/docs + 直接 admin 合并后的 envelope 恢复",
+  "objective": {
+    "problem": "071 的 base-ahead 含 `pilot/PILOT-071.spec.json` 与 `command/campaigns/C-2026-Q4-04.md`，被 070 分类为 code/docs，审计 admin 拒绝；为收口直接 gh admin 后 envelope 仍 WAITING、无 MERGE 事件，post-merge/069 supersede 全卡。",
+    "outcome": "state-only 白名单加入 `pilot/*.spec.json` 与 `command/campaigns/**`（tower 前缀内）；新增 envelope-recover（supervisor-only）：对已实际合并但仍 WAITING/CORRECTION 的 envelope，校验 merge commit 在 origin/main 且含 implementation，补 MERGE 事件、置 MERGED、写 recovery 审计；不写 POST_MERGE_VERIFIED。",
+    "approach": "tower_cli 白名单加两类；tower_envelope 加 recover 命令/校验；补测试；073 自身走审计 admin；恢复 071 后 post-merge 与 069 supersede。",
+    "non_goals_and_done": "不放宽 code tools/arch；不伪造 merge；必须校验 commit 在 origin/main；770+ tests；071 post-merge 9/9、069 superseded、11/11 才完成。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0009 / 071 direct-admin recovery",
+  "why_now": "071 已实际合并但 envelope 卡 WAITING；没有恢复出口，C-04 无法收 11/11。",
+  "scope": [
+    "base-sync state-only 增加 `pilot/*.spec.json`、`command/campaigns/**`（tower 前缀内）；tools/arch/EVENT_CATALOG/其它 pilot 仍 code",
+    "envelope-recover --envelope --merge-commit --reason --by：仅 pinned supervisor；源 WAITING/CORRECTION_REQUIRED；merge_commit 必须可解析、在 origin/main 且 implementation 是其祖先/父；拒绝未合并/错 commit/非 supervisor",
+    "成功：append MERGE（payload merge_commit/recovered=true/by/reason）、envelope.status=MERGED、queue MERGED；不写 POST_MERGE_VERIFIED",
+    "test：state/campaign 分类 admin；tools 仍 2；WAITING+已合并→recover 0 + MERGE 1 条 + state-verify 0；未合并/错 commit/非 supervisor/重复 → 2 零写入",
+    "073 自身审计 admin；合并后恢复 071、post-merge 9/9、task-supersede 069、11/11",
+    "不改 058/059/060/065/070"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-073/tower-dsh/tools/tower_cli.py",
+    "pilot/worktrees/PILOT-073/tower-dsh/tools/tower_envelope.py",
+    "pilot/worktrees/PILOT-073/tower-dsh/tools/tests/test_envelope_recover.py",
+    "pilot/worktrees/PILOT-073/tower-dsh/tools/tests/test_base_sync.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "recovering a commit not in origin/main",
+    "writing POST_MERGE_VERIFIED",
+    "weakening review/acceptance"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-073/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 770 + 新增用例数（main 基线 770）",
+    "state-only 分类：pilot/*.spec.json、command/campaigns/** 可 flag admin；tools/arch 仍 code",
+    "envelope-recover：已合并 WAITING→MERGED + 1 条 MERGE + 审计；未合并/错 commit/非 supervisor/重复 2 零写入",
+    "073 自身审计 admin 合并；071 recover 后 post-merge 9/9；069 superseded；where 11/11",
+    "真实塔 73/70 drift []；arch 18；profile 11/0；shape 0"
+  ],
+  "depends_on": ["PILOT-070"],
+  "worktree": "pilot/worktrees/PILOT-073"
+}
