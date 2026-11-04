@@ -98,7 +98,7 @@ class ModulesSplitCase(unittest.TestCase):
         import towerctl  # noqa: E402  (import after sys.path setup)
         self.assertTrue(callable(towerctl.main))
         self.assertTrue(hasattr(towerctl, "build_parser"))
-        self.assertEqual(len(towerctl.cli_commands()), 54)
+        self.assertEqual(len(towerctl.cli_commands()), 55)
 
     def test_import_dag_is_one_way_and_acyclic(self) -> None:
         edges = {name: imports_of(module_path(name)) for name in MODULES}
