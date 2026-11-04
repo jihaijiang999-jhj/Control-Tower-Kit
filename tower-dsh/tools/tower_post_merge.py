@@ -25,11 +25,15 @@ from tower_authority import authority_drift
 from tower_authority_cmd import authority_state_check
 from tower_campaign import campaign_check_report, with_position
 from tower_delivery import check_evidence
-from tower_envelope import load_queue, load_supervision, save_queue
+from tower_envelope import (
+    load_queue, load_supervision, merge_commit_errors, save_queue,
+)
+from tower_ledger_replay import (
+    MERGE_HISTORICAL_EVENT, is_legacy_envelope, ledger_events_naming,
+)
 from tower_merge import write_task_merge_record
 from tower_arch import ARCH_GATES_REL
 from tower_arch_check import arch_check_payload
-
 
 def envelope_repo_path(root: Path, env: dict) -> str:
     """Repository-relative path of the envelope file that post-merge probes.
@@ -49,11 +53,9 @@ def envelope_repo_path(root: Path, env: dict) -> str:
     prefix = cp.stdout.strip().strip("/") if cp.returncode == 0 else ""
     return f"{prefix}/{path}" if prefix else path
 
-
 def cmd_accept(root: Path, args) -> None:
     """Owner accept (PILOT-059 adds the A/M gate; see ``accept_card``)."""
     accept_card(root, args)
-
 
 def cmd_close(root: Path, args) -> None:
     rec = load_record(root, args.task)
@@ -90,7 +92,6 @@ def cmd_close(root: Path, args) -> None:
     emit(with_position(root, {"ok": True, "task": args.task, "status": rec["status"],
           "closeout": rel(root, closeout)}))
 
-
 def acceptance_item_errors(items) -> list[str]:
     """Structural errors for an acceptance item list; empty means valid."""
     if not isinstance(items, list):
@@ -115,7 +116,6 @@ def acceptance_item_errors(items) -> list[str]:
             errors.append(f"acceptance {item_id} note must be a string")
     return errors
 
-
 def load_acceptance(root: Path, tid: str) -> list[dict] | None:
     """Read one card's acceptance list; ``None`` when the file is absent."""
     path = acceptance_json_path(root, tid)
@@ -133,7 +133,6 @@ def load_acceptance(root: Path, tid: str) -> list[dict] | None:
         fail(errors)
     return items
 
-
 def acceptance_legacy_ok(rec: dict) -> bool:
     """True for cards that predate PILOT-059 (no list, never retrofitted).
 
@@ -143,7 +142,6 @@ def acceptance_legacy_ok(rec: dict) -> bool:
     """
     match = re.search(r"(\d+)$", str(rec.get("id") or ""))
     return bool(match and int(match.group(1)) <= ACCEPTANCE_LEGACY_MAX)
-
 
 def acceptance_gate_errors(root: Path, rec: dict, args) -> list[str]:
     """The A/M gate: auto all passed, nothing failed, manual pending by flag."""
@@ -169,7 +167,6 @@ def acceptance_gate_errors(root: Path, rec: dict, args) -> list[str]:
             elif not str(item.get("note") or "").strip():
                 errors.append(f"{label} is manual pending without a note")
     return errors
-
 
 def cmd_acceptance_add(root: Path, args) -> None:
     """Add or update one acceptance item, keeping JSON and Markdown in sync."""
@@ -198,7 +195,6 @@ def cmd_acceptance_add(root: Path, args) -> None:
           "acceptance_json": rel(root, acceptance_json_path(root, rec["id"])),
           "acceptance_md": rel(root, acceptance_md_path(root, rec["id"]))})
 
-
 def accept_card(root: Path, args) -> None:
     """The accept checks, plus the PILOT-059 A/M gate before ACCEPT is written."""
     rec = load_record(root, args.task)
@@ -225,7 +221,6 @@ def accept_card(root: Path, args) -> None:
                   {"task": args.task, "decision": args.decision})
     emit({"ok": True, "task": args.task, "status": rec["status"],
           "decision": args.decision})
-
 
 def cmd_supervision_init(root: Path, args) -> None:
     for d in ["supervision/envelopes", "supervision/reviews", "supervision/outbox/corrections",
@@ -255,7 +250,6 @@ def cmd_supervision_init(root: Path, args) -> None:
 
 TEST_COUNT_RE = re.compile(r"Ran (\d+) tests?\b")
 
-
 def parse_test_count(stdout: str | None, stderr: str | None) -> int | None:
     """Last ``Ran N tests`` count in the combined child output, or None."""
     output = f"{stdout or ''}\n{stderr or ''}"
@@ -263,7 +257,6 @@ def parse_test_count(stdout: str | None, stderr: str | None) -> int | None:
     if not matches:
         return None
     return int(matches[-1])
-
 
 def run_test_suite(argv: list[str], cwd: Path) -> subprocess.CompletedProcess:
     """Run a test-suite child process with the tower's pinned env contract.
@@ -278,7 +271,6 @@ def run_test_suite(argv: list[str], cwd: Path) -> subprocess.CompletedProcess:
         argv, cwd=str(cwd), capture_output=True, text=True, encoding="utf-8",
         errors="replace", env=child_env,
     )
-
 
 def max_verified_tower_tests(root: Path) -> int | None:
     """Highest tower count ever verified in the supervision ledger.
@@ -307,11 +299,9 @@ def max_verified_tower_tests(root: Path) -> int | None:
             highest = count
     return highest
 
-
 def valid_baseline(value) -> bool:
     """True for a positive integer count baseline (``bool`` is not a count)."""
     return isinstance(value, int) and not isinstance(value, bool) and value >= 1
-
 
 def wiring_checks(root: Path) -> list[dict]:
     """PILOT-050 post-merge gates, added only when their input exists.
@@ -331,6 +321,40 @@ def wiring_checks(root: Path) -> list[dict]:
                        "detail": f"{len(report['errors'])} findings"})
     return checks
 
+def merge_fact_gate(root: Path, env: dict, envelope_id: str, repo: Path,
+                    base: str) -> None:
+    """PILOT-074: refuse a new envelope that cannot prove a landed merge.
+
+    The source status must be ``MERGED`` -- a ``CORRECTION_REQUIRED`` retry has
+    to be recovered to ``MERGED`` first -- and the supervision ledger must name
+    the envelope with a ``MERGE``/``MERGE_HISTORICAL`` event.  The envelope's
+    ``merge_commit`` must then be the same landed merge: non-empty, resolvable,
+    on ``origin/<base>`` and carrying the implementation head as its second
+    parent (see :func:`tower_envelope.merge_commit_errors`).  Every refusal is
+    exit 2 with zero writes, so no ``POST_MERGE_VERIFIED`` can be written.
+    """
+    status = env.get("status")
+    if status != "MERGED":
+        fail([f"envelope {envelope_id} status {status} cannot post-merge; only "
+              "MERGED may be verified (recover the correction to MERGED first)"])
+    events = (ledger_events_naming(root, "supervision", "MERGE", envelope_id)
+              + ledger_events_naming(root, "supervision",
+                                     MERGE_HISTORICAL_EVENT, envelope_id))
+    if not events:
+        fail([f"envelope {envelope_id} has no MERGE or MERGE_HISTORICAL "
+              "supervision event; verified requires a recorded merge"])
+    env_commit = env.get("merge_commit")
+    env_commit = env_commit.strip() if isinstance(env_commit, str) else ""
+    recorded = [payload.get("merge_commit") for payload in events]
+    committed = [value.strip() if isinstance(value, str) else ""
+                 for value in recorded]
+    if not env_commit or any(value != env_commit for value in committed):
+        fail([f"envelope {envelope_id} and its ledger MERGE event must both "
+              "record the same non-empty merge_commit; "
+              f"envelope={env_commit or 'empty'!r}, ledger={recorded!r}"])
+    errors = merge_commit_errors(repo, env, env_commit, base)
+    if errors:
+        fail(errors)
 
 def cmd_post_merge(root: Path, args) -> None:
     envelope_id = check_package_id(args.envelope, "envelope")
@@ -351,6 +375,8 @@ def cmd_post_merge(root: Path, args) -> None:
     repo = resolve_repository(root, env.get("repository"))
     base = env.get("base", "main")
     a = env.get("implementation_head_sha")
+    if not is_legacy_envelope(env):
+        merge_fact_gate(root, env, envelope_id, repo, base)
     envelope_path = envelope_repo_path(root, env)
     tests = run_test_suite(
         [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
@@ -502,7 +528,6 @@ def cmd_post_merge(root: Path, args) -> None:
           "status": "CORRECTION_REQUIRED", "checks": checks,
           "tests_count": tests_count, "review": rel(root, review_file)}), 2)
 
-
 def cmd_supervision_status(root: Path, args) -> None:
     state = load_supervision(root)
     queue = load_queue(root)
@@ -518,7 +543,6 @@ def cmd_supervision_status(root: Path, args) -> None:
           "supervisor": state.get("supervisor"), "queue": queue.get("entries", []),
           "envelopes": envelopes})
 
-
 def cmd_supervision_phase(root: Path, args) -> None:
     path = root / "supervision" / "CURRENT_STATE.json"
     state = jload(path)
@@ -533,7 +557,6 @@ def cmd_supervision_phase(root: Path, args) -> None:
                                "next": state.get("next_action")})
     emit({"ok": True, "phase": args.phase, "next_action": state.get("next_action")})
 
-
 def cmd_task_next(root: Path, args) -> None:
     rec = load_record(root, args.task)
     rec["next"] = args.next
@@ -541,7 +564,6 @@ def cmd_task_next(root: Path, args) -> None:
     update_board(root, rec)
     append_ledger(root, "TASK_NEXT", "primary", {"task": args.task, "next": args.next})
     emit({"ok": True, "task": args.task, "next": args.next})
-
 
 def cmd_phase(root: Path, args) -> None:
     path = root / "primary" / "CURRENT_STATE.json"
@@ -556,7 +578,6 @@ def cmd_phase(root: Path, args) -> None:
     append_ledger(root, "PHASE", "primary", {"from": old, "to": args.phase,
                                              "next": state.get("next_action")})
     emit({"ok": True, "phase": args.phase, "next_action": state.get("next_action")})
-
 
 def cmd_status(root: Path, args) -> None:
     state = jload(root / "primary" / "CURRENT_STATE.json")

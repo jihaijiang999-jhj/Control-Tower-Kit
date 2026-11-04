@@ -20,13 +20,11 @@ from tower_campaign import position_review_lines, with_position
 from tower_dispatch import _dispatch_base_sha
 from tower_delivery import check_evidence
 
-
 def load_supervision(root: Path) -> dict:
     path = root / "supervision" / "CURRENT_STATE.json"
     if not path.exists():
         fail([f"supervision state missing: {rel(root, path)}"])
     return jload(path)
-
 
 def load_queue(root: Path) -> dict:
     path = root / "supervision" / "MERGE_QUEUE.json"
@@ -34,11 +32,9 @@ def load_queue(root: Path) -> dict:
         return jload(path)
     return {"schema": "tower/merge-queue@1", "entries": []}
 
-
 def save_queue(root: Path, queue: dict) -> None:
     queue["updated_at"] = now()
     jdump(root / "supervision" / "MERGE_QUEUE.json", queue)
-
 
 def add_merge_ledger(root: Path, entry: dict) -> None:
     path = root / "supervision" / "registries" / "merge-ledger.json"
@@ -49,7 +45,6 @@ def add_merge_ledger(root: Path, entry: dict) -> None:
     ledger.setdefault("entries", []).append(entry)
     jdump(path, ledger)
 
-
 def envelope_has_baselines(env: dict) -> bool:
     """True when both test-count baselines are declared as ints >= 1."""
     tests_baseline = env.get("tests_baseline")
@@ -59,7 +54,6 @@ def envelope_has_baselines(env: dict) -> bool:
             and isinstance(tower_tests_baseline, int)
             and not isinstance(tower_tests_baseline, bool)
             and tower_tests_baseline >= 1)
-
 
 def envelope_git_checks(repo: Path, env: dict,
                         tower_root: Path | None = None) -> tuple[str, list[dict]]:
@@ -110,7 +104,6 @@ def envelope_git_checks(repo: Path, env: dict,
     except Exception as exc:
         return "", [item("git checks", False, str(exc))]
 
-
 def review_mismatches(root: Path, task: str, review: dict, head: str) -> list[str]:
     """Field-level staleness between one ``REVIEW.json`` and the envelope.
 
@@ -123,7 +116,6 @@ def review_mismatches(root: Path, task: str, review: dict, head: str) -> list[st
                 ("base", review.get("base"), base))
     return [f"stale review: {name} {actual!r} != {want!r}"
             for name, actual, want in expected if want is not None and actual != want]
-
 
 def review_problems(root: Path, env: dict, task: str) -> list[str]:
     """Why this envelope's structured review does not bind it (``[]`` = bound):
@@ -138,7 +130,6 @@ def review_problems(root: Path, env: dict, task: str) -> list[str]:
         return [f"stale review: {rel(root, path)} missing or not a JSON object; "
                 f"checkback must bind the review to head {head}"]
     return review_mismatches(root, task, review, head)
-
 
 def review_binding_check(root: Path, env: dict, task: str) -> tuple[bool, str]:
     """The ``review bound to head`` check: a pre-058 ``CHECKBACK`` has no
@@ -164,7 +155,6 @@ def review_binding_check(root: Path, env: dict, task: str) -> tuple[bool, str]:
         return True, "legacy: no structured CHECKBACK event (pre-058 review)"
     problems = review_problems(root, env, task)
     return not problems, "; ".join(problems) or "ok"
-
 
 def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
     checks: list[dict] = []
@@ -267,7 +257,6 @@ STRUCTURE_QUESTIONS = (
 
 STRUCTURE_PENDING = "未提供（044 起建议填写，暂不阻塞）"
 
-
 def structure_review_lines(structure: str) -> list[str]:
     """The fixed ``## Structure review（五问）`` block (PILOT-044)."""
     lines = ["", "## Structure review（五问）", ""]
@@ -275,7 +264,6 @@ def structure_review_lines(structure: str) -> list[str]:
               for index, question in enumerate(STRUCTURE_QUESTIONS, start=1)]
     lines += ["", f"reviewer 回答：{structure or STRUCTURE_PENDING}"]
     return lines
-
 
 def write_review_md(root: Path, task_id: str, rec: dict, reviewer: str,
                     verdict: str, note: str, structure: str) -> None:
@@ -290,7 +278,6 @@ def write_review_md(root: Path, task_id: str, rec: dict, reviewer: str,
     lines += structure_review_lines(structure) + position_review_lines(root, task_id)
     (task_dir(root, task_id) / "REVIEW.md").write_text(
         "\n".join(lines) + "\n", encoding="utf-8")
-
 
 def checkback_reviewer(rec: dict, raw) -> str:
     """Validate and normalise the reviewer identity (non-empty, not executor)."""
@@ -307,11 +294,9 @@ REVIEW_SCHEMA = "tower/review@1"
 
 REVIEW_CHECK = "review bound to head"
 
-
 def review_json_path(root: Path, task_id: str) -> Path:
     """``tasks/<id>/REVIEW.json``: the structured review (PILOT-058)."""
     return task_dir(root, task_id) / "REVIEW.json"
-
 
 def worktree_review_head(root: Path, rec: dict) -> str:
     """The task worktree's ``HEAD``, or ``""`` when it cannot be read.
@@ -334,7 +319,6 @@ def worktree_review_head(root: Path, rec: dict) -> str:
     cp = git(path, "rev-parse", "HEAD")
     return cp.stdout.strip() if cp.returncode == 0 else ""
 
-
 def write_review_json(root: Path, rec: dict, reviewer: str, args) -> dict:
     """Write ``tasks/<id>/REVIEW.json`` for one checkback (PASS or FAIL):
     ``--head`` defaults to the worktree HEAD, ``--base`` to ``dispatch.base_sha``."""
@@ -351,7 +335,6 @@ def write_review_json(root: Path, rec: dict, reviewer: str, args) -> dict:
     }
     jdump(review_json_path(root, task), review)
     return review
-
 
 def cmd_checkback(root: Path, args) -> None:
     rec = load_record(root, args.task)
@@ -376,7 +359,6 @@ def cmd_checkback(root: Path, args) -> None:
           "verdict": args.verdict, "structure": bool(structure),
           "head": review["head"], "base": review["base"]}))
 
-
 def select_envelope(queue: dict, envelope_id: str | None = None) -> dict:
     """Pick the merge-queue entry a handoff is about (explicit id, lone entry,
     else newest ``added_at``)."""
@@ -386,7 +368,6 @@ def select_envelope(queue: dict, envelope_id: str | None = None) -> dict:
     if len(entries) == 1:
         return entries[0]
     return _latest_by(entries, "added_at")
-
 
 def envelope_new_status(env_path: Path) -> str:
     """Status ``envelope-new`` writes: ``DRAFT`` for a first record, the live
@@ -403,7 +384,6 @@ def envelope_new_status(env_path: Path) -> str:
     if status in ENVELOPE_REOPEN_STATUSES:
         return status
     return "DRAFT"
-
 
 def cmd_envelope_new(root: Path, args) -> None:
     task_id = check_task_id(args.task, "task")
@@ -461,7 +441,6 @@ def cmd_envelope_new(root: Path, args) -> None:
     append_supervision_ledger(root, "ENVELOPE_NEW", "primary", payload)
     emit({"ok": True, "envelope": env_id, "head": b, "checks": checks})
 
-
 def cmd_queue_add(root: Path, args) -> None:
     envelope_id = check_package_id(args.envelope, "envelope")
     env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
@@ -498,7 +477,6 @@ def cmd_queue_add(root: Path, args) -> None:
                               {"envelope": args.envelope, "task": env.get("task")})
     emit({"ok": True, "envelope": args.envelope, "status": "WAITING"})
 
-
 def recover_actor(root: Path, args) -> str:
     """The pinned merge authority -- the only identity that may recover."""
     authority = authority_state_check(root)
@@ -520,14 +498,12 @@ def recover_actor(root: Path, args) -> str:
               f"primary.id {primary!r}"])
     return by
 
-
 def resolve_recovered_commit(repo: Path, ref: str, label: str) -> str:
     """Resolve ``ref`` to a commit, or refuse naming what ``label`` is."""
     try:
         return git_ok(repo, "rev-parse", "--verify", f"{ref}^{{commit}}")
     except Exception:
         fail([f"{label} is not a resolvable commit in {repo}"])
-
 
 def recover_merge_commit(repo: Path, env: dict, merge_commit: str,
                          base: str) -> str:
@@ -564,6 +540,39 @@ def recover_merge_commit(repo: Path, env: dict, merge_commit: str,
         fail([f"merge commit {resolved} does not contain implementation head {impl}"])
     return resolved
 
+def merge_commit_errors(repo: Path, env: dict, merge_commit, base: str) -> list[str]:
+    """PILOT-074: why a claimed merge commit is not a landed merge.
+
+    It must be non-empty, resolve locally, sit on ``origin/<base>`` (the
+    remote-tracking ref only -- no fetch, so no network) and carry the envelope's
+    implementation head as its second parent.  Every envelope the merge gate
+    still admits is base-side, where the branch head *is* the implementation, so
+    a root/one-parent commit refuses exactly like a different second parent.
+    """
+    sha = merge_commit.strip() if isinstance(merge_commit, str) else ""
+    if not sha:
+        return ["merge_commit is empty; only a landed merge may be verified"]
+    resolved = git(repo, "rev-parse", "--verify", f"{sha}^{{commit}}")
+    if resolved.returncode != 0:
+        return [f"merge_commit {sha!r} is not a resolvable commit in {repo}"]
+    commit = resolved.stdout.strip()
+    origin = f"refs/remotes/origin/{base}"
+    if git(repo, "rev-parse", "--verify", f"{origin}^{{commit}}").returncode != 0:
+        return [f"origin/{base} is missing; cannot prove {commit} landed"]
+    if git(repo, "merge-base", "--is-ancestor", commit, origin).returncode != 0:
+        return [f"merge commit {commit} is not on origin/{base}"]
+    impl = env.get("implementation_head_sha")
+    if not isinstance(impl, str) or not impl.strip():
+        return [f"envelope {env.get('envelope_id')} has no implementation_head_sha"]
+    impl_sha = git(repo, "rev-parse", "--verify", f"{impl.strip()}^{{commit}}")
+    if impl_sha.returncode != 0:
+        return [f"implementation head {impl!r} is not a resolvable commit"]
+    parents = git(repo, "rev-list", "--parents", "-n", "1", commit).stdout.split()
+    if len(parents) < 3:
+        return [f"merge commit {commit} has no second parent"]
+    if parents[2] != impl_sha.stdout.strip():
+        return [f"merge commit {commit} second parent {parents[2]} != implementation head {impl_sha.stdout.strip()}"]
+    return []
 
 def envelope_remerge_errors(root: Path, env: dict, envelope_id: str) -> list[str]:
     """Refuse a ``DRAFT`` envelope that a re-envelope reset (the 052 drift).

@@ -1,8 +1,12 @@
 """Ledger verification and event replay into lifecycle state."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
-from tower_common import _read_json_object, emit, rel
+from tower_common import (
+    PACKAGE_ID_RE, _read_json_object, emit, git, is_safe_id, rel,
+    resolve_repository,
+)
 from tower_ledger import (
     GENESIS_PREV_HASH, LEDGER_FILES, event_hash, ledger_rows, legacy_anchor,
     parse_ledger_row,
@@ -242,6 +246,46 @@ ENVELOPE_ABANDONABLE_STATUSES = frozenset({
     "WAITING", "CORRECTION_REQUIRED", "MERGE_BLOCKED", ENVELOPE_MERGING_STATUS})
 
 
+# PILOT-074: verified is not "the merge landed".  The strict MERGED-only
+# transition and verified_without_merge start at card 074; earlier envelopes
+# keep their lifecycle and are backfilled with MERGE_HISTORICAL instead.
+PILOT_074 = 74
+MERGE_FACT_EVENTS = ("MERGE", "MERGE_HISTORICAL")
+MERGE_HISTORICAL_EVENT = "MERGE_HISTORICAL"
+VERIFIED_WITHOUT_MERGE = "verified_without_merge"
+
+
+def card_number(value) -> int | None:
+    """Trailing integer of a task/envelope id (``PILOT-074`` -> ``74``)."""
+    match = re.search(r"(\d+)$", str(value or ""))
+    return int(match.group(1)) if match else None
+
+
+def envelope_number(env: dict) -> int | None:
+    """Highest card number the envelope claims; the max blocks a re-label."""
+    numbers = [number for number in
+               (card_number((env or {}).get("task")),
+                card_number((env or {}).get("envelope_id")))
+               if number is not None]
+    return max(numbers) if numbers else None
+
+
+def is_legacy_envelope(env: dict) -> bool:
+    """True for a pre-074 (or unnumbered legacy) envelope."""
+    number = envelope_number(env)
+    return number is None or number < PILOT_074
+
+
+def envelope_transition_allowed(event_type: str, envelope_id) -> frozenset | None:
+    """Legal from-states; 074+ verified may only come from ``MERGED``."""
+    allowed = ENVELOPE_TRANSITIONS.get(event_type)
+    number = card_number(envelope_id)
+    if (event_type == "POST_MERGE_VERIFIED" and number is not None
+            and number >= PILOT_074):
+        return frozenset({"MERGED"})
+    return allowed
+
+
 TASK_TRANSITIONS = {
     "TASK_NEW": frozenset({None, "ready", "dispatched", "delivered",
                            "reviewed", "rework"}),
@@ -451,10 +495,105 @@ def replay_envelope_statuses(root: Path,
             # Unknown / non-lifecycle event: ignored, exactly as before.
             continue
         if transitions is not None:
-            allowed = ENVELOPE_TRANSITIONS.get(event_type)
+            allowed = envelope_transition_allowed(event_type, envelope)
             previous = internal.get(envelope)
             if allowed is not None and previous not in allowed:
                 transitions.append(
                     _illegal_transition(envelope, event_type, allowed, previous))
         _fold_envelope_state(states, internal, envelope, event_type, next_state)
+    verified_without_merge_drift(root, states, transitions)
     return states
+
+
+def _merge_fact_row(envelope_id, expected, actual) -> dict:
+    """One ``verified_without_merge`` drift row (same shape as other drifts)."""
+    return {"kind": VERIFIED_WITHOUT_MERGE, "target": envelope_id,
+            "expected": expected, "actual": actual}
+
+
+def verified_without_merge_drift(root: Path, states: dict[str, str],
+                                 issues: list[dict] | None = None) -> list[dict]:
+    """PILOT-074: verified envelopes that carry no landed merge fact.
+
+    A verified envelope needs a ``MERGE``/``MERGE_HISTORICAL`` event whose
+    ``merge_commit`` agrees with the envelope (base-side and 074+ need both
+    halves), and the base-side commit must have the implementation as second
+    parent.  Rows are appended to ``issues`` when passed.
+    """
+    rows = _verified_merge_fact_rows(root, states)
+    if issues is not None:
+        issues.extend(rows)
+    return rows
+
+
+def _verified_merge_fact_rows(root: Path, states: dict[str, str]) -> list[dict]:
+    facts: dict[str, list[dict]] = {}
+    for event in ledger_events_in_seq_order(root, "supervision"):
+        payload = event.get("payload")
+        if not isinstance(payload, dict) or event.get("type") not in MERGE_FACT_EVENTS:
+            continue
+        envelope = payload.get("envelope")
+        if isinstance(envelope, str) and envelope:
+            facts.setdefault(envelope, []).append(payload)
+    rows: list[dict] = []
+    for envelope_id in sorted(states):
+        if states[envelope_id] != "POST_MERGE_VERIFIED":
+            continue
+        rows.extend(_merge_fact_errors(
+            root, envelope_id, facts.get(envelope_id) or []))
+    return rows
+
+
+def _merge_fact_errors(root: Path, envelope_id, payloads: list[dict]) -> list[dict]:
+    if not is_safe_id(envelope_id, PACKAGE_ID_RE):
+        return []
+    _, envelope = _read_json_object(root / "supervision" / "envelopes" / f"{envelope_id}.json")
+    env = envelope if isinstance(envelope, dict) else {}
+    commits = [payload["merge_commit"].strip() for payload in payloads
+               if isinstance(payload.get("merge_commit"), str) and payload["merge_commit"].strip()]
+    event_commit = commits[-1] if commits else ""
+    env_commit = env.get("merge_commit")
+    env_commit = env_commit.strip() if isinstance(env_commit, str) else ""
+    if not payloads:
+        return [_merge_fact_row(envelope_id, "MERGE or MERGE_HISTORICAL event", "no merge event")]
+    if _strict_merge_fact(env, envelope_id):
+        fact_ok = (all(commit == env_commit for commit in commits)
+                   and event_commit == env_commit != "")
+    else:
+        fact_ok = bool(event_commit) != bool(env_commit) or event_commit == env_commit != ""
+    if not fact_ok:
+        return [_merge_fact_row(envelope_id, "ledger merge_commit == envelope merge_commit",
+                                f"ledger={event_commit!r} envelope={env_commit!r}")]
+    return _merge_parent_errors(root, envelope_id, env, event_commit or env_commit)
+
+
+def _strict_merge_fact(env: dict, envelope_id) -> bool:
+    """True when both halves must name the same commit (base-side / 074+)."""
+    return (env.get("base_side") is True
+            or (card_number(envelope_id) or 0) >= PILOT_074)
+
+
+def _merge_parent_errors(root: Path, envelope_id, env: dict, commit: str) -> list[dict]:
+    if env.get("base_side") is not True:
+        return []
+    try:
+        repo = resolve_repository(root, env.get("repository"))
+    except SystemExit:
+        return []
+    if not repo.exists():
+        return []
+    resolved = git(repo, "rev-parse", "--verify", f"{commit}^{{commit}}")
+    if resolved.returncode != 0:
+        return [_merge_fact_row(envelope_id, "resolvable merge commit", "unresolvable")]
+    impl = env.get("implementation_head_sha")
+    if not isinstance(impl, str) or not impl.strip():
+        return [_merge_fact_row(envelope_id, "implementation_head_sha", "missing")]
+    impl_sha = git(repo, "rev-parse", "--verify", f"{impl.strip()}^{{commit}}")
+    if impl_sha.returncode != 0:
+        return []
+    parents = git(repo, "rev-list", "--parents", "-n", "1", resolved.stdout.strip()).stdout.split()
+    if len(parents) < 3:
+        return [_merge_fact_row(envelope_id, "merge commit with a second parent", "no second parent")]
+    if parents[2] != impl_sha.stdout.strip():
+        return [_merge_fact_row(envelope_id, impl_sha.stdout.strip(), parents[2])]
+    return []
