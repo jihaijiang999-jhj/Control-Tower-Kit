@@ -75,7 +75,7 @@
   "supervisor": "sup-phase2-pilot",
   "recovered": true,
   "recovered_by": "sup-phase2-pilot",
-  "recovery_reason": "074 admin merge after CI shallow-history failure",
+  "recovery_reason": "074 re-recover after failed post-merge",
   "tests_count": 2,
   "tower_tests_count": 807
 }
