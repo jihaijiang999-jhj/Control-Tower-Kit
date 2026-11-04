@@ -497,6 +497,13 @@
       "spec_path": "pilot/PILOT-071.spec.json",
       "created_at": "2026-11-04T12:23:45+08:00",
       "updated_at": "2026-11-04T12:24:18+08:00"
+    },
+    "PILOT-073": {
+      "title": "spec/campaign 入 state/docs + 直接 admin 合并后的 envelope 恢复",
+      "status": "closed",
+      "spec_path": "pilot/PILOT-073.spec.json",
+      "created_at": "2026-11-04T13:13:19+08:00",
+      "updated_at": "2026-11-04T16:03:09+08:00"
     }
   }
 }

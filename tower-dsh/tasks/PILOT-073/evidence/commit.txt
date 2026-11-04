@@ -1,0 +1,20 @@
+﻿branch=pilot/PILOT-073
+base_sha=f29f114a1dc3a6b5f0130e1a76e3c33a8dda2d91
+head=19eb94bca245104d5f57ab7f3c1679666163296c
+== git show --stat
+19eb94bca245104d5f57ab7f3c1679666163296c PILOT-073: spec/campaign state + envelope-recover
+
+ tower-dsh/tools/tests/test_base_sync.py        |  85 ++++-
+ tower-dsh/tools/tests/test_envelope_recover.py | 484 +++++++++++++++++++++++++
+ tower-dsh/tools/tests/test_modules.py          |   2 +-
+ tower-dsh/tools/tower_cli.py                   | 175 ++++++++-
+ tower-dsh/tools/tower_envelope.py              | 244 ++++++-------
+ 5 files changed, 832 insertions(+), 158 deletions(-)
+== git status --porcelain
+?? tower-dsh/scratch/
+== files changed
+tower-dsh/tools/tests/test_base_sync.py
+tower-dsh/tools/tests/test_envelope_recover.py
+tower-dsh/tools/tests/test_modules.py
+tower-dsh/tools/tower_cli.py
+tower-dsh/tools/tower_envelope.py

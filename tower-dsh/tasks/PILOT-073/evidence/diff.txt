@@ -1,0 +1,1299 @@
+﻿diff --git a/tower-dsh/tools/tests/test_base_sync.py b/tower-dsh/tools/tests/test_base_sync.py
+index df31a8e..fc115ab 100644
+--- a/tower-dsh/tools/tests/test_base_sync.py
++++ b/tower-dsh/tools/tests/test_base_sync.py
+@@ -21,6 +21,12 @@ that only gained ``tower-dsh/merge-envelopes/ENV-*.json`` plus tower state is
+ still the audited state-only case, while ``tools/``, ``arch/``,
+ ``EVENT_CATALOG.json``, ``pilot/`` and root docs stay code/docs.
+ 
++PILOT-073 narrows "``pilot/`` stays code/docs": the two *bookkeeping* inputs of
++a card -- ``pilot/<card>.spec.json`` (top level only) and
++``command/campaigns/**`` -- are state.  They were the 071 base-ahead that forced
++a direct ``gh --admin``; every other ``pilot/`` path (worktrees, evidence,
++deeper spec copies) and ``tools/``/``arch/`` stay code/docs even with the flag.
++
+ The fixture is the PILOT-058 kit (a throw-away repository, a bare origin and an
+ offline ``gh`` stub injected through ``TOWERCTL_GH``), so no network, token or
+ real GitHub repository is involved.
+@@ -56,6 +62,8 @@ BRANCH = review_gate.BRANCH
+ STATE_PATH = "tower-dsh/ledger/BASE-SYNC-STATE.json"
+ CODE_PATH = "tower-dsh/tools/base_sync_probe.py"
+ TOOLS_PATH = "tower-dsh/tools/tower_cli.py"
++SPEC_PATH = "tower-dsh/pilot/PILOT-073.spec.json"
++CAMPAIGN_PATH = "tower-dsh/command/campaigns/C-2026-Q4-04.md"
+ ENVELOPE_PATH = "tower-dsh/merge-envelopes/ENV-PILOT-068.json"
+ ROOT_ENVELOPE_PATH = "merge-envelopes/ENV-PILOT-068.json"
+ # The base-side envelope sits under the tower prefix of the kit repository.
+@@ -157,6 +165,23 @@ class _BaseSyncKit(review_gate.ReviewGateKitCase):
+     def promote_reviewed_envelope(self) -> None:
+         self.promote("--head", self.implementation_head, "--base", self.base_sha)
+ 
++    def assert_state_ahead_refused(self, path: str) -> list[str]:
++        """A state-only base-ahead without the flag: exit 2, nothing written."""
++        self.promote_reviewed_envelope()
++        self.advance_base(path)
++        cp = self.run_merge()
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        errors = json.loads(cp.stdout)["errors"]
++        self.assertTrue(any("--allow-state-ahead" in error for error in errors),
++                        errors)
++        self.assertTrue(any(path in error for error in errors), errors)
++        self.assertEqual(self.envelope_state()["status"], "DRAFT")
++        self.assertEqual(self.queue_status(), "WAITING")
++        self.assertFalse([event for event in merge_event_types(self.root)
++                          if event.startswith("MERGE")])
++        self.assertFalse(self.gh_log.exists())
++        return errors
++
+ 
+ class BaseSyncKitCase(_BaseSyncKit):
+     """PILOT-067/068 cases: branch-side envelope, base still behind."""
+@@ -205,19 +230,7 @@ class BaseSyncKitCase(_BaseSyncKit):
+ 
+     # -- 3. state-only base without the flag ------------------------------
+     def test_state_only_base_without_flag_is_refused(self) -> None:
+-        self.promote_reviewed_envelope()
+-        self.advance_base(STATE_PATH)
+-        cp = self.run_merge()
+-        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+-        errors = json.loads(cp.stdout)["errors"]
+-        self.assertTrue(any("--allow-state-ahead" in error for error in errors),
+-                        errors)
+-        self.assertEqual(self.envelope_state()["status"], "DRAFT")
+-        self.assertEqual(self.queue_status(), "WAITING")
+-        events = merge_event_types(self.root)
+-        self.assertFalse([event for event in events
+-                          if event.startswith("MERGE")], events)
+-        self.assertFalse(self.gh_log.exists())
++        self.assert_state_ahead_refused(STATE_PATH)
+ 
+     # -- 4. code/docs base change -----------------------------------------
+     def test_code_base_change_is_refused_even_with_the_flag(self) -> None:
+@@ -293,7 +306,24 @@ class BaseSyncKitCase(_BaseSyncKit):
+         self.assertEqual(self.queue_status(), "WAITING")
+         self.assertFalse(self.gh_log.exists())
+ 
+-    # -- 8. the review stays bound to the implementation ------------------
++    # -- 8. spec + campaign base advance is state, not code (PILOT-073) ----
++    def test_spec_and_campaign_base_with_flag_is_audited_admin(self) -> None:
++        self.promote_reviewed_envelope()
++        self.advance_base_paths([SPEC_PATH, CAMPAIGN_PATH])
++        cp = self.run_merge("--allow-state-ahead")
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertIn("--admin", self.merge_argv())
++        envelope = self.envelope_state()
++        self.assertEqual(envelope["status"], "MERGED")
++        self.assertEqual(envelope["base_sync"], "state-only")
++        self.assertEqual(envelope["base_ahead_paths"],
++                         [CAMPAIGN_PATH, SPEC_PATH])
++        self.assertIs(envelope["admin"], True)
++
++    def test_spec_base_advance_without_the_flag_is_refused(self) -> None:
++        self.assert_state_ahead_refused(SPEC_PATH)
++
++    # -- 9. the review stays bound to the implementation ------------------
+     def test_review_head_stays_bound_to_the_envelope_implementation(self) -> None:
+         self.promote_reviewed_envelope()
+         self.advance_base(STATE_PATH)
+@@ -496,11 +526,17 @@ class BasePathClassificationCase(unittest.TestCase):
+                        "tower-dsh/supervision/CURRENT_STATE.json",
+                        "tower-dsh/tasks/PILOT-067/TASK.md",
+                        "tower-dsh/state/PROFILE-TOWER-DSH.md",
+-                       "tower-dsh/merge-envelopes/ENV-PILOT-068.json"]
++                       "tower-dsh/merge-envelopes/ENV-PILOT-068.json",
++                       "tower-dsh/pilot/PILOT-071.spec.json",
++                       "tower-dsh/pilot/PILOT-073.spec.json",
++                       "tower-dsh/command/campaigns/C-2026-Q4-04.md"]
+         code_paths = ["tower-dsh/tools/tower_merge.py",
+                       "tower-dsh/arch/ADR-0009-delivery-trust.md",
+                       "tower-dsh/EVENT_CATALOG.json",
+-                      "tower-dsh/pilot/PILOT-067.spec.json",
++                      "tower-dsh/pilot/PILOT-067.md",
++                      "tower-dsh/pilot/PILOT-073.spec.json.bak",
++                      "tower-dsh/pilot/worktrees/PILOT-071/tower-dsh/tools/tower_cli.py",
++                      "tower-dsh/command/campaigns.md",
+                       "tower-dsh/README.md",
+                       "control-tower/README.md",
+                       "merge-envelopes/ENV-PILOT-068.json"]
+@@ -528,6 +564,23 @@ class BasePathClassificationCase(unittest.TestCase):
+         self.assertEqual(code, [ROOT_ENVELOPE_PATH,
+                                 "control-tower/merge-envelopes/ENV.json"])
+ 
++    def test_pilot_spec_and_campaign_are_state_only_inside_the_tower(self) -> None:
++        # PILOT-073: the spec/campaign pair is exactly what 071 lost.
++        state, code = tower_cli.classify_base_paths(
++            ["tower-dsh/pilot/PILOT-071.spec.json",
++             "tower-dsh/command/campaigns/C-2026-Q4-04.md"], "tower-dsh/")
++        self.assertEqual(state, ["tower-dsh/pilot/PILOT-071.spec.json",
++                                 "tower-dsh/command/campaigns/C-2026-Q4-04.md"])
++        self.assertEqual(code, [])
++        # Only the top-level ``pilot/<card>.spec.json`` spelling is state: a
++        # second level or another suffix stays code (the flag never widens it).
++        state, code = tower_cli.classify_base_paths(
++            ["tower-dsh/pilot/nested/PILOT-071.spec.json",
++             "tower-dsh/pilot/PILOT-071.spec.json.orig"], "tower-dsh/")
++        self.assertEqual(state, [])
++        self.assertEqual(code, ["tower-dsh/pilot/nested/PILOT-071.spec.json",
++                                "tower-dsh/pilot/PILOT-071.spec.json.orig"])
++
+ 
+ class PrMergeArgvCase(unittest.TestCase):
+     """``--admin`` is emitted only when the guard recorded an audit."""
+diff --git a/tower-dsh/tools/tests/test_envelope_recover.py b/tower-dsh/tools/tests/test_envelope_recover.py
+new file mode 100644
+index 0000000..bd29d97
+--- /dev/null
++++ b/tower-dsh/tools/tests/test_envelope_recover.py
+@@ -0,0 +1,484 @@
++"""PILOT-073: ``envelope-recover`` -- adopt an already-landed out-of-band merge.
++
++071 hit the gap this file pins: the code was merged by a direct owner
++``gh --admin``, so ``origin/main`` contains the implementation, but the envelope
++stayed ``WAITING`` with no ``MERGE`` event.  Nothing may be merged, re-reviewed
++or fabricated, so the only honest exit is an audited recovery::
++
++    towerctl envelope-recover --envelope <ENV> --merge-commit <sha> \
++        --reason <text> [--by <pinned-supervisor>]
++
++The command is supervisor-only (the pinned merge authority, never the primary)
++and fail-closed: the named commit must resolve, sit on ``origin/<base>`` and
++contain the envelope's implementation head.  Success appends ``MERGE`` with
++``merge_commit`` / ``recovered=true`` / ``by`` / ``reason``, moves the envelope
++and queue to ``MERGED`` and never writes ``POST_MERGE_VERIFIED`` (that stays the
++post-merge gate's verdict).  Every refusal is exit 2 with zero writes, and a
++recovery that already happened is refused the same way.
++
++The fixture is a throw-away git repository plus a bare ``origin``, both under
++``%TEMP%``, so no network or real repository is involved.
++
++Run from the tower root (``tower-dsh``)::
++
++    python -B -m unittest tools.tests.test_envelope_recover -v
++"""
++from __future__ import annotations
++
++import json
++import os
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++TOOLS_DIR = Path(__file__).resolve().parents[1]
++if str(TOOLS_DIR) not in sys.path:
++    sys.path.insert(0, str(TOOLS_DIR))
++
++import tower_envelope  # noqa: E402  (needs TOOLS_DIR on sys.path)
++
++TCLI = TOOLS_DIR / "towerctl.py"
++TASK = "PILOT-071"
++ENVELOPE = "ENV-PILOT-071"
++SUPERVISOR = "sup-073"
++PRIMARY = "ctl-073"
++BRANCH = "feature/recover"
++BASE = "main"
++LEDGER = ("ledger", "supervision.jsonl")
++QUEUE = ("supervision", "MERGE_QUEUE.json")
++GIT_IDENTITY = {
++    "GIT_AUTHOR_NAME": "Tower Test",
++    "GIT_AUTHOR_EMAIL": "tower@example.invalid",
++    "GIT_COMMITTER_NAME": "Tower Test",
++    "GIT_COMMITTER_EMAIL": "tower@example.invalid",
++}
++
++
++def write_json(path: Path, payload: dict) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
++                    encoding="utf-8")
++
++
++def run_git(repo: Path, *args: str) -> subprocess.CompletedProcess:
++    env = {**dict(os.environ), **GIT_IDENTITY}
++    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True,
++                          text=True, encoding="utf-8", env=env)
++
++
++def ok(cp: subprocess.CompletedProcess) -> subprocess.CompletedProcess:
++    if cp.returncode != 0:
++        raise AssertionError(f"git exit {cp.returncode}: {cp.stdout}{cp.stderr}")
++    return cp
++
++
++class _RecoverKit(unittest.TestCase):
++    """A tower whose ``main`` already contains an out-of-band merge."""
++
++    REMOTE_ONLY = False
++
++    def setUp(self) -> None:
++        self._tmp = tempfile.TemporaryDirectory(
++            prefix="towerctl-recover-", ignore_cleanup_errors=True)
++        self.tmp = Path(self._tmp.name)
++        self.kit = self.tmp / "kit"
++        self.root = self.kit / "tower-dsh"
++        self.origin = self.tmp / "origin.git"
++        self.gh_log = self.tmp / "gh-argv.jsonl"
++        for directory in ("primary", "supervision/envelopes", "ledger"):
++            (self.root / directory).mkdir(parents=True, exist_ok=True)
++        for name in ("primary.jsonl", "supervision.jsonl"):
++            (self.root / "ledger" / name).write_text("", encoding="utf-8")
++        self.write_state()
++        self.build_repo()
++        self.write_envelope()
++
++    def tearDown(self) -> None:
++        self._tmp.cleanup()
++
++    # -- fixture ---------------------------------------------------------
++    def write_state(self) -> None:
++        write_json(self.root / "primary" / "CURRENT_STATE.json", {
++            "schema": "tower/current-state@1", "tower_id": "tower-dsh",
++            "role": "primary", "phase": "TEST", "owner": {"name": "mac"},
++            "primary": {"id": PRIMARY}})
++        write_json(self.root / "supervision" / "CURRENT_STATE.json", {
++            "schema": "tower/supervision-state@1", "tower_id": "tower-dsh",
++            "role": "supervision", "phase": "TEST",
++            "supervisor": {"id": SUPERVISOR}})
++        write_json(self.root / "primary" / "TASK_BOARD.json",
++                   {"schema": "tower/task-board@1", "tasks": []})
++        write_json(self.root / "supervision" / "MERGE_QUEUE.json",
++                   {"schema": "tower/merge-queue@1", "entries": []})
++
++    def commit(self, message: str) -> str:
++        ok(run_git(self.kit, "add", "-A"))
++        ok(run_git(self.kit, "-c", "commit.gpgsign=false", "commit", "-m",
++                   message))
++        return run_git(self.kit, "rev-parse", "HEAD").stdout.strip()
++
++    def build_repo(self) -> None:
++        """``main`` gains the implementation through a real no-ff merge.
++
++        ``REMOTE_ONLY`` builds that merge in a throw-away clone instead, so the
++        merge commit exists only on the origin and the local object database
++        has never seen it -- the shape the fetch-order bug refused.
++        """
++        self.kit.mkdir(parents=True, exist_ok=True)
++        ok(run_git(self.kit, "init"))
++        ok(run_git(self.kit, "symbolic-ref", "HEAD", "refs/heads/main"))
++        (self.kit / "README.md").write_text("base\n", encoding="utf-8")
++        self.base_sha = self.commit("base")
++        ok(run_git(self.kit, "checkout", "-b", BRANCH))
++        (self.kit / "feature.txt").write_text("implementation\n", encoding="utf-8")
++        self.implementation_head = self.commit("implementation")
++        ok(run_git(self.kit, "checkout", BASE))
++        bare = subprocess.run(["git", "init", "--bare", str(self.origin)],
++                              capture_output=True, text=True, encoding="utf-8")
++        self.assertEqual(bare.returncode, 0, msg=bare.stderr)
++        ok(run_git(self.kit, "remote", "add", "origin",
++                   str(self.origin).replace("\\", "/")))
++        if self.REMOTE_ONLY:
++            ok(run_git(self.kit, "push", "origin", BASE, BRANCH))
++            builder = self.tmp / "builder"
++            ok(run_git(self.tmp, "clone", "--quiet", str(self.origin),
++                       str(builder)))
++            ok(run_git(builder, "checkout", "-b", BRANCH, f"origin/{BRANCH}"))
++            ok(run_git(builder, "checkout", BASE))
++            ok(run_git(builder, "-c", "commit.gpgsign=false", "merge", "--no-ff",
++                       BRANCH, "-m", "merge feature"))
++            self.merge_commit = run_git(builder, "rev-parse",
++                                        "HEAD").stdout.strip()
++            ok(run_git(builder, "push", "origin", BASE))
++            self.assertNotEqual(
++                run_git(self.kit, "cat-file", "-e",
++                        self.merge_commit).returncode, 0,
++                msg="the merge commit must not exist locally")
++            return
++        ok(run_git(self.kit, "-c", "commit.gpgsign=false", "merge", "--no-ff",
++                   BRANCH, "-m", "merge feature"))
++        self.merge_commit = run_git(self.kit, "rev-parse", "HEAD").stdout.strip()
++        self.assertEqual(run_git(self.kit, "rev-parse",
++                                 "HEAD^2").stdout.strip(),
++                         self.implementation_head)
++        ok(run_git(self.kit, "push", "origin", BASE))
++
++    def write_envelope(self) -> None:
++        tower_envelope.append_supervision_ledger(
++            self.root, "ENVELOPE_NEW", "primary",
++            {"envelope": ENVELOPE, "task": TASK,
++             "head": self.implementation_head})
++        tower_envelope.append_supervision_ledger(
++            self.root, "QUEUE_ADD", "primary",
++            {"envelope": ENVELOPE, "task": TASK})
++        write_json(self.envelope_path(), {
++            "schema": "tower/merge-envelope@1", "envelope_id": ENVELOPE,
++            "task": TASK, "repository": "..", "branch": BRANCH, "base": BASE,
++            "envelope_path": f"merge-envelopes/{ENVELOPE}.json",
++            "implementation_head_sha": self.implementation_head,
++            "tests_baseline": 770, "tower_tests_baseline": 900,
++            "status": "WAITING"})
++        write_json(self.queue_path(), {
++            "schema": "tower/merge-queue@1", "entries": [{
++                "envelope_id": ENVELOPE, "task": TASK, "branch": BRANCH,
++                "base": BASE, "status": "WAITING",
++                "added_at": "2026-11-04T00:00:00+08:00"}]})
++
++    def authorize(self) -> None:
++        """Pin the merge authority through the real ``authority-set``."""
++        cp = self.cli("authority-set", "--supervisor", SUPERVISOR,
++                      "--decision", "D-073", "--by", "mac")
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++
++    # -- commands and accessors ------------------------------------------
++    def cli(self, *args: str) -> subprocess.CompletedProcess:
++        env = {**dict(os.environ), **GIT_IDENTITY}
++        env["PYTHONIOENCODING"] = "utf-8"
++        return subprocess.run(
++            [sys.executable, "-B", str(TCLI), "--root", str(self.root), *args],
++            capture_output=True, text=True, encoding="utf-8", env=env,
++            timeout=120)
++
++    def recover(self, *extra: str) -> subprocess.CompletedProcess:
++        return self.cli("envelope-recover", "--envelope", ENVELOPE,
++                        "--merge-commit", self.merge_commit,
++                        "--reason", "071 direct owner admin", *extra)
++
++    def envelope_path(self) -> Path:
++        return self.root / "supervision" / "envelopes" / f"{ENVELOPE}.json"
++
++    def queue_path(self) -> Path:
++        return self.root.joinpath(*QUEUE)
++
++    def ledger_path(self) -> Path:
++        return self.root.joinpath(*LEDGER)
++
++    def state_verify(self) -> tuple[subprocess.CompletedProcess, dict]:
++        cp = self.cli("state-verify")
++        return cp, json.loads(cp.stdout)
++
++    def envelope(self) -> dict:
++        return json.loads(self.envelope_path().read_text(encoding="utf-8"))
++
++    def entry(self) -> dict:
++        queue = json.loads(self.queue_path().read_text(encoding="utf-8"))
++        return next(item for item in queue["entries"]
++                    if item["envelope_id"] == ENVELOPE)
++
++    def events(self, event_type: str | None = None) -> list[dict]:
++        rows = [json.loads(line) for line in
++                self.ledger_path().read_text(encoding="utf-8").splitlines()
++                if line.strip()]
++        return [row for row in rows
++                if event_type is None or row.get("type") == event_type]
++
++    def snapshot(self) -> tuple[bytes, bytes, bytes]:
++        return (self.envelope_path().read_bytes(), self.queue_path().read_bytes(),
++                self.ledger_path().read_bytes())
++
++    def assert_refused(self, cp: subprocess.CompletedProcess,
++                       before: tuple[bytes, bytes, bytes]) -> None:
++        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
++        self.assertFalse(json.loads(cp.stdout)["ok"])
++        self.assertEqual(self.snapshot(), before)
++
++    # -- crash injection --------------------------------------------------
++    def write_half_state(self, merge_start: bool) -> None:
++        """Inject the shape a crash leaves between the files and the ledger.
++
++        ``recover`` writes the queue, then the envelope, then ``MERGE_START``,
++        then ``MERGE``.  A crash after step 1/2 leaves both files ``MERGED``
++        with an empty ledger; a crash after step 3 leaves the recovered
++        ``MERGE_START`` only.  Both must be completable by a retry.
++        """
++        if merge_start:
++            tower_envelope.append_supervision_ledger(
++                self.root, "MERGE_START", "supervision",
++                {"envelope": ENVELOPE, "supervisor": SUPERVISOR,
++                 "recovered": True})
++        env = self.envelope()
++        env.update({"status": "MERGED", "merge_commit": self.merge_commit})
++        write_json(self.envelope_path(), env)
++        queue = json.loads(self.queue_path().read_text(encoding="utf-8"))
++        entry = next(item for item in queue["entries"]
++                     if item["envelope_id"] == ENVELOPE)
++        entry.update({"status": "MERGED", "merge_commit": self.merge_commit})
++        write_json(self.queue_path(), queue)
++
++    def stale_local_ref(self, sha: str) -> None:
++        """Move the local ``origin/main`` ref without touching the origin."""
++        ok(run_git(self.kit, "update-ref", "refs/remotes/origin/main", sha))
++
++    def rewind_origin(self, sha: str) -> None:
++        ok(run_git(self.origin, "update-ref", "refs/heads/main", sha))
++
++
++class EnvelopeRecoverCase(_RecoverKit):
++    """The recovery contract: identity, freshness, repair and refusals."""
++
++    # -- 1. the 071 shape: landed merge, WAITING envelope -----------------
++    def test_waiting_envelope_with_landed_merge_is_recovered(self) -> None:
++        self.authorize()
++        cp = self.recover()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        out = json.loads(cp.stdout)
++        self.assertTrue(out["ok"], out)
++        self.assertEqual(out["status"], "MERGED")
++        self.assertEqual(out["merge_commit"], self.merge_commit)
++        self.assertIs(out["recovered"], True)
++        self.assertIs(out["repaired"], False)
++        self.assertEqual(self.envelope()["status"], "MERGED")
++        self.assertEqual(self.envelope()["merge_commit"], self.merge_commit)
++        self.assertEqual(self.envelope()["implementation_head_sha"],
++                         self.implementation_head)
++        self.assertIs(self.envelope()["recovered"], True)
++        self.assertEqual(self.entry()["status"], "MERGED")
++        self.assertEqual(self.entry()["merge_commit"], self.merge_commit)
++        merges = self.events("MERGE")
++        self.assertEqual(len(merges), 1)
++        payload = merges[0]["payload"]
++        self.assertEqual(payload["envelope"], ENVELOPE)
++        self.assertEqual(payload["merge_commit"], self.merge_commit)
++        self.assertIs(payload["recovered"], True)
++        self.assertEqual(payload["by"], SUPERVISOR)
++        self.assertEqual(payload["reason"], "071 direct owner admin")
++        # The recovery is visible in the ledger, but never claims verification.
++        starts = self.events("MERGE_START")
++        self.assertEqual(len(starts), 1)
++        self.assertIs(starts[0]["payload"]["recovered"], True)
++        self.assertEqual(self.events("POST_MERGE_VERIFIED"), [])
++        cp, verify = self.state_verify()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(verify["drift"], [])
++
++    def test_by_defaults_to_the_pinned_supervisor(self) -> None:
++        self.authorize()
++        cp = self.recover("--by", SUPERVISOR)
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.events("MERGE")[0]["payload"]["by"], SUPERVISOR)
++
++    # -- 2. the commit must really be on origin/<base> --------------------
++    def test_unmerged_commit_is_refused_with_zero_writes(self) -> None:
++        self.authorize()
++        ok(run_git(self.kit, "checkout", "-b", "side", BASE))
++        (self.kit / "side.txt").write_text("side\n", encoding="utf-8")
++        # Stage only the side file: the tower state must stay untracked so the
++        # checkout back to main cannot remove the envelope/queue fixture.
++        ok(run_git(self.kit, "add", "--", "side.txt"))
++        ok(run_git(self.kit, "-c", "commit.gpgsign=false", "commit", "-m",
++                   "side only"))
++        side = run_git(self.kit, "rev-parse", "HEAD").stdout.strip()
++        ok(run_git(self.kit, "checkout", BASE))
++        before = self.snapshot()
++        cp = self.cli("envelope-recover", "--envelope", ENVELOPE,
++                      "--merge-commit", side, "--reason", "not landed")
++        self.assert_refused(cp, before)
++        self.assertIn("is not on freshly fetched origin/main", cp.stdout)
++        self.assertEqual(self.events("MERGE"), [])
++
++    # -- 3. a commit on origin/main but not this envelope's merge ---------
++    def test_wrong_commit_is_refused_with_zero_writes(self) -> None:
++        self.authorize()
++        before = self.snapshot()
++        cp = self.cli("envelope-recover", "--envelope", ENVELOPE,
++                      "--merge-commit", self.base_sha, "--reason", "wrong sha")
++        self.assert_refused(cp, before)
++        self.assertIn("does not contain implementation head", cp.stdout)
++
++    # -- 4. only the pinned supervisor (never the primary) ----------------
++    def test_non_supervisor_is_refused_with_zero_writes(self) -> None:
++        self.authorize()
++        before = self.snapshot()
++        cp = self.recover("--by", "sup-rogue")
++        self.assert_refused(cp, before)
++        self.assertIn("only the pinned merge authority", cp.stdout)
++
++    def test_primary_cannot_recover(self) -> None:
++        self.authorize()
++        before = self.snapshot()
++        cp = self.recover("--by", PRIMARY)
++        self.assert_refused(cp, before)
++        self.assertIn("only the pinned merge authority", cp.stdout)
++
++    # -- 5. no authority configured: fail closed ---------------------------
++    def test_unconfigured_authority_is_refused_with_zero_writes(self) -> None:
++        before = self.snapshot()
++        cp = self.recover()
++        self.assert_refused(cp, before)
++        self.assertIn("envelope-recover requires a configured", cp.stdout)
++
++    # -- 6. a second recovery is refused, not duplicated -------------------
++    def test_repeat_recovery_is_refused_with_zero_writes(self) -> None:
++        self.authorize()
++        cp = self.recover()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        before = self.snapshot()
++        cp = self.recover()
++        self.assert_refused(cp, before)
++        self.assertIn("already records a MERGE", cp.stdout)
++        self.assertEqual(len(self.events("MERGE")), 1)
++        self.assertEqual(self.envelope()["status"], "MERGED")
++        cp, verify = self.state_verify()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(verify["drift"], [])
++
++    # -- 7. half-write repair: files MERGED, ledger empty -----------------
++    def test_half_written_files_without_ledger_are_repaired(self) -> None:
++        self.authorize()
++        self.write_half_state(merge_start=False)
++        self.assertEqual(self.envelope()["status"], "MERGED")
++        self.assertEqual(self.events("MERGE"), [])
++        cp = self.recover()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        out = json.loads(cp.stdout)
++        self.assertIs(out["repaired"], True)
++        self.assertEqual(len(self.events("MERGE_START")), 1)
++        self.assertEqual(len(self.events("MERGE")), 1)
++        self.assertEqual(self.events("MERGE")[0]["payload"]["merge_commit"],
++                         self.merge_commit)
++        cp, verify = self.state_verify()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(verify["drift"], [])
++
++    # -- 8. half-write repair: recovered MERGE_START, MERGE missing -------
++    def test_half_written_merge_start_is_completed(self) -> None:
++        self.authorize()
++        self.write_half_state(merge_start=True)
++        self.assertEqual(len(self.events("MERGE_START")), 1)
++        self.assertEqual(self.events("MERGE"), [])
++        cp = self.recover()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        out = json.loads(cp.stdout)
++        self.assertIs(out["repaired"], True)
++        self.assertEqual(len(self.events("MERGE_START")), 1)  # not duplicated
++        self.assertEqual(len(self.events("MERGE")), 1)
++        cp, verify = self.state_verify()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(verify["drift"], [])
++
++    def test_half_written_other_commit_is_refused(self) -> None:
++        self.authorize()
++        self.write_half_state(merge_start=True)
++        env = self.envelope()
++        env["merge_commit"] = "f" * 40
++        write_json(self.envelope_path(), env)
++        before = self.snapshot()
++        cp = self.recover()
++        self.assert_refused(cp, before)
++        self.assertIn("cannot rewrite a merge", cp.stdout)
++
++    # -- 9. fetch, not the stale local remote-tracking ref ----------------
++    def test_fetch_refreshes_a_stale_local_origin_ref(self) -> None:
++        self.authorize()
++        # The local ref has not seen the merge yet; a fetch must find it.
++        self.stale_local_ref(self.base_sha)
++        cp = self.recover()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.envelope()["status"], "MERGED")
++        self.assertEqual(len(self.events("MERGE")), 1)
++
++    def test_origin_without_the_merge_is_refused_despite_local_ref(self) -> None:
++        self.authorize()
++        # The local remote-tracking ref still says merged, origin does not.
++        self.rewind_origin(self.base_sha)
++        before = self.snapshot()
++        cp = self.recover()
++        self.assert_refused(cp, before)
++        self.assertIn("freshly fetched origin/main", cp.stdout)
++        self.assertIn("stale remote-tracking ref", cp.stdout)
++
++
++class RemoteOnlyRecoverCase(_RecoverKit):
++    """The 071 shape literally: the merge commit exists only on the origin."""
++
++    REMOTE_ONLY = True
++
++    def test_remote_only_merge_commit_is_fetched_then_resolved(self) -> None:
++        self.authorize()
++        # The premise: the local object database has never seen the merge, so
++        # resolving before the fetch would refuse a landed merge.
++        self.assertNotEqual(
++            run_git(self.kit, "cat-file", "-e", self.merge_commit).returncode, 0)
++        cp = self.recover()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(self.envelope()["status"], "MERGED")
++        self.assertEqual(self.envelope()["merge_commit"], self.merge_commit)
++        self.assertEqual(len(self.events("MERGE")), 1)
++        cp, verify = self.state_verify()
++        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
++        self.assertEqual(verify["drift"], [])
++
++    def test_remote_only_commit_absent_from_origin_still_refuses(self) -> None:
++        self.authorize()
++        # Rewind origin: the commit is neither local nor on the origin now.
++        self.rewind_origin(self.base_sha)
++        before = self.snapshot()
++        cp = self.recover()
++        self.assert_refused(cp, before)
++        self.assertIn("is not a resolvable commit", cp.stdout)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tower-dsh/tools/tests/test_modules.py b/tower-dsh/tools/tests/test_modules.py
+index 2f212a1..6f864f8 100644
+--- a/tower-dsh/tools/tests/test_modules.py
++++ b/tower-dsh/tools/tests/test_modules.py
+@@ -98,7 +98,7 @@ class ModulesSplitCase(unittest.TestCase):
+         import towerctl  # noqa: E402  (import after sys.path setup)
+         self.assertTrue(callable(towerctl.main))
+         self.assertTrue(hasattr(towerctl, "build_parser"))
+-        self.assertEqual(len(towerctl.cli_commands()), 54)
++        self.assertEqual(len(towerctl.cli_commands()), 55)
+ 
+     def test_import_dag_is_one_way_and_acyclic(self) -> None:
+         edges = {name: imports_of(module_path(name)) for name in MODULES}
+diff --git a/tower-dsh/tools/tower_cli.py b/tower-dsh/tools/tower_cli.py
+index fca0137..433e491 100644
+--- a/tower-dsh/tools/tower_cli.py
++++ b/tower-dsh/tools/tower_cli.py
+@@ -17,7 +17,8 @@ from tower_ledger import (
+ )
+ from tower_ledger_replay import (
+     ENVELOPE_ABANDONABLE_STATUSES, ENVELOPE_ABANDONED_STATUS,
+-    ENVELOPE_TERMINAL_STATUSES, cmd_verify_ledger, ledger_has_event,
++    ENVELOPE_MERGEABLE_STATUSES, ENVELOPE_TERMINAL_STATUSES,
++    cmd_verify_ledger, ledger_events_naming, ledger_has_event,
+ )
+ from tower_task import (
+     ACCEPTANCE_KINDS, ACCEPTANCE_STATUSES, cmd_spec_approve, cmd_task_new,
+@@ -34,7 +35,7 @@ from tower_dispatch import cmd_dispatch
+ from tower_delivery import cmd_completion_add, cmd_deliver
+ from tower_envelope import (
+     cmd_checkback, cmd_envelope_new, cmd_queue_add, load_queue,
+-    load_supervision, save_queue,
++    load_supervision, recover_actor, recover_merge_commit, save_queue,
+ )
+ from tower_handoff import (
+     cmd_handoff_accept, cmd_handoff_activate, cmd_handoff_check, cmd_handoff_claim,
+@@ -89,6 +90,10 @@ def cmd_spec_coverage(root: Path, args) -> None:
+ 
+ ENVELOPE_ABANDON_EVENT = "ENVELOPE_ABANDON"
+ 
++# PILOT-073: a recovery starts from a live envelope and may also *finish* a
++# half-written one (the files already MERGED); nothing else can be recovered.
++RECOVERABLE_STATUSES = frozenset(ENVELOPE_MERGEABLE_STATUSES | {"MERGED"})
++
+ 
+ def abandon_actor(root: Path, args) -> str:
+     """The supervisor allowed to tombstone an envelope: mirrors ``merge``.
+@@ -181,6 +186,135 @@ def cmd_envelope_abandon(root: Path, args) -> None:
+           "repaired": bool(recorded)})
+ 
+ 
++def envelope_recover_layer_parsers(
++        parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
++    """PILOT-073: the ``envelope-recover`` surface for an out-of-band merge.
++
++    Registered through the command-layer chain like abandon/review, so
++    ``build_parser`` keeps its frozen PILOT-044 shape.
++    """
++    for action in parser._actions:
++        if not isinstance(action, argparse._SubParsersAction):
++            continue
++        recover = action.add_parser("envelope-recover")
++        recover.add_argument("--envelope", required=True)
++        recover.add_argument("--merge-commit", dest="merge_commit", required=True,
++                             help="commit that landed on origin/<base>")
++        recover.add_argument("--reason", required=True,
++                             help="why the merge bypassed the merge gate")
++        recover.add_argument("--by", default=None,
++                             help="pinned supervisor id (default: the pin)")
++    return parser
++
++
++def cmd_envelope_recover(root: Path, args) -> None:
++    """PILOT-073: record an out-of-band merge the ledger never saw.
++
++    071's code landed on ``origin/main`` through a direct owner ``gh --admin``
++    while the envelope stayed ``WAITING``: no ``MERGE`` event exists, so
++    post-merge and the 069 supersede dead-ended.  Only the pinned merge
++    authority may recover, and the named commit must resolve, be on the
++    *freshly fetched* ``origin/<base>`` and contain the envelope's
++    implementation head.  Success appends ``MERGE_START`` (when still missing)
++    and ``MERGE`` (``merge_commit``, ``recovered=true``, ``by``, ``reason``),
++    sets the envelope and queue to ``MERGED`` and never writes
++    ``POST_MERGE_VERIFIED``.
++
++    A crash between those writes leaves a half state (files ``MERGED`` with no
++    ledger, or only the recovered ``MERGE_START``); a retry finishes it with
++    ``repaired=true`` and never duplicates an event.  Only the complete shape
++    (files ``MERGED`` plus ``MERGE``) is refused as a duplicate.  Every refusal
++    is read-only: exit 2 with zero writes.
++    """
++    envelope_id = check_package_id(args.envelope, "envelope")
++    reason = (args.reason or "").strip()
++    if not reason:
++        fail(["--reason must be a non-empty string"])
++    by = recover_actor(root, args)
++    path, env, queue, entry, starts, merges = recover_target(root, envelope_id)
++    base = str(env.get("base") or "main")
++    repo = resolve_repository(root, env.get("repository"))
++    merge_commit = recover_merge_commit(repo, env, args.merge_commit, base)
++    # A half state may already name the commit; a different one is not a repair
++    # but a rewrite of history, and is refused before any write.
++    recorded = [env.get("merge_commit"), entry.get("merge_commit")]
++    recorded += [event.get("merge_commit") for event in merges]
++    for value in recorded:
++        if value not in (None, "") and value != merge_commit:
++            fail([f"envelope {envelope_id} already records merge commit "
++                  f"{value!r}, not {merge_commit!r}; recovery cannot rewrite "
++                  "a merge"])
++    if (env.get("status") == "MERGED" and entry.get("status") == "MERGED"
++            and merges):
++        fail([f"envelope {envelope_id} already records a MERGE; nothing to "
++              "recover"])
++    repaired = bool(env.get("status") == "MERGED"
++                    or entry.get("status") == "MERGED" or starts or merges)
++    # The file writes are idempotent: a retry rewrites the same MERGED shape.
++    entry["status"] = "MERGED"
++    entry["merge_commit"] = merge_commit
++    save_queue(root, queue)
++    env.update({"status": "MERGED", "merge_commit": merge_commit})
++    env.setdefault("merged_at", now())
++    env.setdefault("supervisor", by)
++    env.update({"recovered": True, "recovered_by": by, "recovery_reason": reason})
++    jdump(path, env)
++    # The envelope transition table only admits MERGE from the internal MERGING
++    # state (tower_ledger_replay, out of this card's scope), so the recovered
++    # merge is preceded by its own MERGE_START, marked recovered: without it
++    # state-verify reports illegal_transition on the merged envelope.  A retry
++    # appends only what the half state is still missing.
++    if not starts and not merges:
++        append_supervision_ledger(root, "MERGE_START", "supervision",
++                                  {"envelope": envelope_id, "supervisor": by,
++                                   "recovered": True})
++    if not merges:
++        append_supervision_ledger(root, "MERGE", "supervision",
++                                  {"envelope": envelope_id,
++                                   "merge_commit": merge_commit,
++                                   "recovered": True, "by": by,
++                                   "reason": reason})
++    emit({"ok": True, "envelope": envelope_id, "status": "MERGED",
++          "merge_commit": merge_commit, "recovered": True, "by": by,
++          "repaired": repaired})
++
++
++def recover_target(root: Path, envelope_id: str):
++    """Envelope/queue pair plus its recovered events; read-only refusals.
++
++    ``WAITING``/``CORRECTION_REQUIRED`` is a fresh recovery, ``MERGED`` is the
++    half-write a retry completes.  A second ``MERGE`` event is ambiguous and is
++    refused rather than guessed at.
++    """
++    path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
++    if not path.exists():
++        fail([f"envelope not found: {envelope_id}"])
++    env = jload(path)
++    declared = env.get("envelope_id")
++    if declared != envelope_id:
++        fail([f"envelope identity matches request: file declares {declared!r}, "
++              f"request {envelope_id!r}"])
++    queue = load_queue(root)
++    entry = next((e for e in queue.get("entries") or []
++                  if isinstance(e, dict)
++                  and e.get("envelope_id") == envelope_id), None)
++    if entry is None:
++        fail([f"envelope not queued: {envelope_id}"])
++    for label, status in (("envelope", env.get("status")),
++                          ("queue", entry.get("status"))):
++        if status not in RECOVERABLE_STATUSES:
++            fail([f"{label} status {status!r} cannot be recovered (only "
++                  "WAITING/CORRECTION_REQUIRED, or MERGED to finish a "
++                  "half-write)"])
++    starts = ledger_events_naming(root, "supervision", "MERGE_START",
++                                  envelope_id)
++    merges = ledger_events_naming(root, "supervision", "MERGE", envelope_id)
++    if len(merges) > 1:
++        fail([f"envelope {envelope_id} has {len(merges)} MERGE events; "
++              "refusing to guess which one to trust"])
++    return path, env, queue, entry, starts, merges
++
++
+ def envelope_abandon_layer_parsers(
+         parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+     """PILOT-062: the ``envelope-abandon`` tombstone surface.
+@@ -283,6 +417,7 @@ COMMAND_LAYER_HANDLERS = {
+     "arch-graph": cmd_arch_graph, "profile-check": cmd_profile_check,
+     "acceptance-add": cmd_acceptance_add,
+     "envelope-abandon": cmd_envelope_abandon,
++    "envelope-recover": cmd_envelope_recover,
+     "task-supersede": cmd_task_supersede}
+ 
+ 
+@@ -538,7 +673,8 @@ def base_sync_layer_parsers(
+                 action="store_true",
+                 help="allow an audited --admin merge when the base advanced "
+                      "with state-only paths only (ledger/primary/supervision/"
+-                     "tasks/state/merge-envelopes)")
++                     "tasks/state/merge-envelopes, plus pilot/*.spec.json and "
++                     "command/campaigns/**)")
+     return parser
+ 
+ 
+@@ -550,8 +686,15 @@ def base_sync_layer_parsers(
+ # committed straight to the base branch before the PR exists (063/065/066/067),
+ # so its appearance is state, not a code change; without this entry the
+ # audited ``--allow-state-ahead`` path could never be used for its own envelope.
++# PILOT-073: the two *bookkeeping* inputs of a card join it as well --
++# ``pilot/*.spec.json`` (exactly one level below ``pilot/``) and
++# ``command/campaigns/**``.  They are card metadata, not code: rejecting them
++# forced the 071 direct-admin bypass.  ``pilot/`` itself is not widened:
++# worktrees, evidence, task cards and any deeper spec copy stay code/docs.
+ STATE_ONLY_PREFIXES = ("ledger/", "primary/", "supervision/", "tasks/", "state/",
+-                       "merge-envelopes/")
++                       "merge-envelopes/", "command/campaigns/")
++STATE_ONLY_PILOT_DIR = "pilot/"
++STATE_ONLY_SPEC_SUFFIX = ".spec.json"
+ 
+ 
+ def tower_repo_prefix(root: Path, repo: Path) -> str:
+@@ -560,16 +703,24 @@ def tower_repo_prefix(root: Path, repo: Path) -> str:
+     return f"{relative}/" if relative else ""
+ 
+ 
++def pilot_spec_base_path(inside: str) -> bool:
++    """True for ``pilot/<card>.spec.json`` only -- never a deeper copy."""
++    if not inside.startswith(STATE_ONLY_PILOT_DIR):
++        return False
++    name = inside[len(STATE_ONLY_PILOT_DIR):]
++    return "/" not in name and name.endswith(STATE_ONLY_SPEC_SUFFIX)
++
++
+ def classify_base_paths(paths: list[str], prefix: str) -> tuple[list[str], list[str]]:
+     """Split base-only paths into ``(state_only, code_docs)``.
+ 
+     A path is state-only only when it sits under the tower prefix and its
+     tower-relative spelling starts with :data:`STATE_ONLY_PREFIXES` (the
+-    primary/supervision ledgers and state, plus the base-side
+-    ``merge-envelopes/``); every other path -- tools, arch, EVENT_CATALOG.json,
+-    pilot, root docs, or anything outside the tower -- is code/docs.  The
+-    default is the strict side, so an unclassifiable path can never earn
+-    ``--admin``.
++    primary/supervision ledgers and state, the base-side ``merge-envelopes/``,
++    the campaign files) or is exactly ``pilot/<card>.spec.json``; every other
++    path -- tools, arch, EVENT_CATALOG.json, deeper pilot content, root docs,
++    or anything outside the tower -- is code/docs.  The default is the strict
++    side, so an unclassifiable path can never earn ``--admin``.
+     """
+     state: list[str] = []
+     code: list[str] = []
+@@ -578,6 +729,8 @@ def classify_base_paths(paths: list[str], prefix: str) -> tuple[list[str], list[
+         inside = path[len(prefix):] if path.startswith(prefix) else ""
+         if any(inside.startswith(name) for name in STATE_ONLY_PREFIXES):
+             state.append(path)
++        elif pilot_spec_base_path(inside):
++            state.append(path)
+         else:
+             code.append(path)
+     return state, code
+@@ -780,8 +933,8 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
+         action.add_parser("brief")
+     dispatch_campaign_parser(parser)
+     review_layer_parsers(parser)
+-    return base_sync_layer_parsers(envelope_base_side_layer_parsers(envelope_abandon_layer_parsers(supersede_layer_parsers(profile_layer_parsers(
+-        arch_layer_parsers(position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser))))))))))
++    return base_sync_layer_parsers(envelope_recover_layer_parsers(envelope_base_side_layer_parsers(envelope_abandon_layer_parsers(supersede_layer_parsers(profile_layer_parsers(
++        arch_layer_parsers(position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser)))))))))))
+ 
+ 
+ def cli_commands() -> list[str]:
+diff --git a/tower-dsh/tools/tower_envelope.py b/tower-dsh/tools/tower_envelope.py
+index fc3c825..35bf44d 100644
+--- a/tower-dsh/tools/tower_envelope.py
++++ b/tower-dsh/tools/tower_envelope.py
+@@ -8,10 +8,11 @@ from tower_common import (
+ )
+ from tower_ledger import append_ledger, append_supervision_ledger, task_dir
+ from tower_ledger_replay import (
+-    CHECKBACK_STATUSES, ENVELOPE_REOPEN_STATUSES, ENVELOPE_TERMINAL_STATUSES,
+-    ledger_events_naming, ledger_has_queue_add, ledger_payloads_by_task,
+-    verify_ledger_file,
++    CHECKBACK_STATUSES, ENVELOPE_REOPEN_STATUSES,
++    ENVELOPE_TERMINAL_STATUSES, ledger_events_naming, ledger_has_queue_add,
++    ledger_payloads_by_task, verify_ledger_file,
+ )
++from tower_authority_cmd import authority_state_check
+ from tower_task import (
+     _latest_by, _optional_task_record, load_record, save_record, update_board,
+ )
+@@ -51,7 +52,6 @@ def add_merge_ledger(root: Path, entry: dict) -> None:
+ 
+ def envelope_has_baselines(env: dict) -> bool:
+     """True when both test-count baselines are declared as ints >= 1."""
+-
+     tests_baseline = env.get("tests_baseline")
+     tower_tests_baseline = env.get("tower_tests_baseline")
+     return (isinstance(tests_baseline, int) and not isinstance(tests_baseline, bool)
+@@ -63,13 +63,8 @@ def envelope_has_baselines(env: dict) -> bool:
+ 
+ def envelope_git_checks(repo: Path, env: dict,
+                         tower_root: Path | None = None) -> tuple[str, list[dict]]:
+-    """The envelope commit's git shape, branch-side (pre-063) or base-side.
+-
+-    Branch-side: the envelope is one commit on the implementation branch.
+-    Base-side: it is one commit on the base branch and the implementation
+-    branch only carries code.  The envelope head is returned with the checks so
+-    ``envelope-new`` and ``envelope_checks`` cannot drift apart.
+-    """
++    """The envelope commit's git shape: one commit on the branch (pre-063) or
++    on the base (base-side); the head is returned so callers cannot drift."""
+     def item(name: str, ok: bool, detail: str) -> dict:
+         return {"name": name, "ok": ok, "detail": detail}
+ 
+@@ -119,9 +114,7 @@ def envelope_git_checks(repo: Path, env: dict,
+ def review_mismatches(root: Path, task: str, review: dict, head: str) -> list[str]:
+     """Field-level staleness between one ``REVIEW.json`` and the envelope.
+ 
+-    ``base`` is only compared when the record still carries a
+-    ``dispatch.base_sha``; a legacy record has nothing to compare against, and
+-    an absent field is ``None`` (never an accidental match).
++    ``base`` only matters when the record still carries ``dispatch.base_sha``.
+     """
+     base = _dispatch_base_sha(_optional_task_record(root, task) or {})
+     expected = (("schema", review.get("schema"), REVIEW_SCHEMA),
+@@ -133,14 +126,8 @@ def review_mismatches(root: Path, task: str, review: dict, head: str) -> list[st
+ 
+ 
+ def review_problems(root: Path, env: dict, task: str) -> list[str]:
+-    """Why this envelope's structured review does not bind it (``[]`` = bound).
+-
+-    ``REVIEW.json`` is the authority: it must declare the schema, a PASS
+-    verdict, the envelope's ``implementation_head_sha`` and — when the record
+-    still carries one — the recorded ``dispatch.base_sha``.  A mismatch is
+-    reported as *stale*: the review was written for other code and must be
+-    re-run, never silently accepted.
+-    """
++    """Why this envelope's structured review does not bind it (``[]`` = bound):
++    a mismatch (schema, PASS, head, base) is *stale* -- re-run, never accept."""
+     path = review_json_path(root, task)
+     head = str(env.get("implementation_head_sha") or "")
+     try:
+@@ -154,22 +141,16 @@ def review_problems(root: Path, env: dict, task: str) -> list[str]:
+ 
+ 
+ def review_binding_check(root: Path, env: dict, task: str) -> tuple[bool, str]:
+-    """The ``review bound to head`` check: is a structured review in force?
+-
+-    Cards checked back before PILOT-058 have a ``CHECKBACK`` ledger event with
+-    no ``head`` field; those keep the old review gate (record verdict only) and
+-    are reported as legacy instead of being retro-fitted.  Every checkback from
+-    this version on writes the head into that event, so the card is bound and
+-    :func:`review_problems` decides.
+-    """
++    """The ``review bound to head`` check: a pre-058 ``CHECKBACK`` has no
++    ``head`` and keeps the old gate; every newer one is decided by
++    :func:`review_problems`."""
+     if not is_safe_id(task, TASK_ID_RE):
+         return True, "legacy: no task record to bind a review to"
+     try:
+         payloads = ledger_payloads_by_task(root, "CHECKBACK").get(task, [])
+     except OSError:
+         # An unreadable primary ledger is already a failing gate of its own
+-        # (``ledger chain intact`` / ``verify-ledger``); never a second error or
+-        # a traceback here.
++        # (``ledger chain intact`` / ``verify-ledger``), never a second error.
+         return True, "legacy: CHECKBACK ledger unreadable"
+     if not any("head" in payload for payload in payloads):
+         review_path = task_dir(root, task) / "REVIEW.json"
+@@ -191,26 +172,18 @@ def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
+     def add(name: str, ok: bool, detail: str) -> None:
+         checks.append({"name": name, "ok": bool(ok), "detail": detail})
+ 
+-    # The envelope file's id is not authoritative on its own: a copy of a
+-    # merged envelope saved under another name would otherwise inherit its
+-    # history.  The CLI callers also compare the id before running any check
+-    # (so a mismatch cannot leak a partial verdict); this check exists so
+-    # ``envelope_checks`` is self-contained when called directly with an
+-    # expected id.  Callers that do not know the requested id skip it.
++    # The envelope file's id is not authoritative: a copy saved under another
++    # name would inherit its history.  CLI callers compare the id first.
+     if expected_id is not None:
+         declared = env.get("envelope_id")
+         add("envelope identity matches request", declared == expected_id,
+             f"file={declared!r} request={expected_id!r}")
+     repo = resolve_repository(root, env.get("repository"))
+     add("repository exists", repo.exists(), str(repo))
+-    # A new-style envelope (both count baselines declared) must have reached
+-    # the merge queue through ``queue-add``.  A hand-edited
+-    # ``MERGE_QUEUE.json`` leaves no ``QUEUE_ADD`` event, so the queue entry
+-    # would otherwise be accepted purely on the strength of the file.
+-    # Envelopes predating the baseline requirement keep the old behaviour.
++    # A new-style envelope must reach the queue through ``queue-add``; a
++    # hand-edited MERGE_QUEUE.json leaves no ``QUEUE_ADD`` event.
+     if envelope_has_baselines(env):
+-        # Both ledger files must verify end-to-end: a forged row can name the
+-        # envelope and still be detected here as a broken hash chain.
++        # A forged row naming the envelope is still caught as a broken chain.
+         chain_errors: list[str] = []
+         reports: dict[str, dict] = {}
+         for ledger_name in ("primary", "supervision"):
+@@ -221,23 +194,14 @@ def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
+                 for error in report["errors"])
+         add("ledger chain intact", not chain_errors,
+             chain_errors[0] if chain_errors else "ok")
+-        # The two lifecycle checks below read ``ledger/supervision.jsonl``; when
+-        # that file is missing or unreadable they cannot tell "no event" from
+-        # "no ledger" and would report a misleading ``ENVELOPE_NEW event
+-        # missing``.  The chain check above already fails the envelope and
+-        # blocks the merge, so they are skipped in exactly that one case; a
+-        # readable ledger with a broken chain still runs them.
++        # The lifecycle checks cannot tell "no event" from "no ledger"; the
++        # chain check already fails and blocks then.
+         supervision = reports["supervision"]
+         supervision_available = supervision["exists"] and not any(
+             error.startswith("ledger unreadable:")
+             for error in supervision["errors"])
+         if supervision_available:
+-            # ``ENVELOPE_NEW`` is the only event that brings an envelope into
+-            # existence.  Requiring it (not just ``QUEUE_ADD``) stops a
+-            # hand-written envelope from being queued by appending a single
+-            # valid queue event.  The event must also bind the envelope's
+-            # task and head: an event that names the id but a different
+-            # task/head does not belong to this envelope.
++            # ``ENVELOPE_NEW`` creates an envelope; it must bind task and head.
+             created = ledger_events_naming(
+                 root, "supervision", "ENVELOPE_NEW", env.get("envelope_id"))
+             if not created:
+@@ -272,10 +236,8 @@ def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
+     _, git_checks = envelope_git_checks(repo, env, root)
+     for item in git_checks:
+         add(item["name"], item["ok"], item["detail"])
+-    # Never call load_record() here: it emits a JSON object and raises
+-    # SystemExit, which would print one payload from inside the check list and
+-    # a second one from the caller.  A missing/invalid record is one failed
+-    # check instead, so merge-check always emits exactly one JSON object.
++    # Never call load_record() here: it emits a payload and raises SystemExit, so
++    # a missing/invalid record would print twice.  One failed check instead.
+     task = str(env.get("task") or "")
+     rec = _optional_task_record(root, task)
+     if rec is None:
+@@ -323,8 +285,7 @@ def write_review_md(root: Path, task_id: str, rec: dict, reviewer: str,
+              f"- At: {rec['review']['at']}",
+              f"- Head: `{rec['review'].get('head') or ''}`",
+              f"- Base: `{rec['review'].get('base') or ''}`", "",
+-             "## Note", "", note or "(none)", "",
+-             "## Evidence checked", ""]
++             "## Note", "", note or "(none)", "", "## Evidence checked", ""]
+     lines += [f"- `{e['path']}` `{e['sha256']}`" for e in rec.get("evidence", [])]
+     lines += structure_review_lines(structure) + position_review_lines(root, task_id)
+     (task_dir(root, task_id) / "REVIEW.md").write_text(
+@@ -355,11 +316,9 @@ def review_json_path(root: Path, task_id: str) -> Path:
+ def worktree_review_head(root: Path, rec: dict) -> str:
+     """The task worktree's ``HEAD``, or ``""`` when it cannot be read.
+ 
+-    A review binds to the code the reviewer actually saw, so the default head
+-    is read from the worktree, never supplied by the caller.  A card without a
+-    worktree (fixture or legacy) records an empty head; only a CHECKBACK event
+-    that carries a head arms the merge-check gate (see
+-    :func:`review_binding_check`).
++    The default head is read from the worktree, never supplied by the caller; a
++    card without one records ``""`` and only a CHECKBACK with a head arms the
++    gate (see :func:`review_binding_check`).
+     """
+     worktree = rec.get("worktree")
+     if not isinstance(worktree, str) or not worktree.strip():
+@@ -377,13 +336,8 @@ def worktree_review_head(root: Path, rec: dict) -> str:
+ 
+ 
+ def write_review_json(root: Path, rec: dict, reviewer: str, args) -> dict:
+-    """Write ``tasks/<id>/REVIEW.json`` for one checkback (PASS or FAIL).
+-
+-    ``--head`` defaults to the worktree HEAD and ``--base`` to the recorded
+-    ``dispatch.base_sha``, so the structured review names the exact code and
+-    baseline the verdict covers.  FAIL is written as well: a failed review is
+-    evidence, not an absence of one.
+-    """
++    """Write ``tasks/<id>/REVIEW.json`` for one checkback (PASS or FAIL):
++    ``--head`` defaults to the worktree HEAD, ``--base`` to ``dispatch.base_sha``."""
+     task = str(rec.get("id") or args.task)
+     head = (getattr(args, "head", None) or "").strip() or worktree_review_head(root, rec)
+     base = ((getattr(args, "base", None) or "").strip()
+@@ -424,11 +378,8 @@ def cmd_checkback(root: Path, args) -> None:
+ 
+ 
+ def select_envelope(queue: dict, envelope_id: str | None = None) -> dict:
+-    """Pick the merge-queue entry a handoff is about.
+-
+-    An explicit ``envelope_id`` wins; a single queued entry is used as-is;
+-    otherwise the entry with the newest ``added_at`` wins.
+-    """
++    """Pick the merge-queue entry a handoff is about (explicit id, lone entry,
++    else newest ``added_at``)."""
+     entries = [e for e in (queue.get("entries") or []) if isinstance(e, dict)]
+     if envelope_id:
+         return next((e for e in entries if e.get("envelope_id") == envelope_id), {})
+@@ -438,13 +389,8 @@ def select_envelope(queue: dict, envelope_id: str | None = None) -> dict:
+ 
+ 
+ def envelope_new_status(env_path: Path) -> str:
+-    """Status ``envelope-new`` writes for a first or repeated envelope record.
+-
+-    A first envelope starts ``DRAFT``.  Re-enveloping after a failed merge
+-    keeps ``WAITING``/``CORRECTION_REQUIRED`` so the file, the replay fold and
+-    the merge gate agree; a terminal envelope cannot be reopened (only a new
+-    card can), so it is refused before any file or ledger write.
+-    """
++    """Status ``envelope-new`` writes: ``DRAFT`` for a first record, the live
++    status on a re-envelope; a terminal envelope is refused before any write."""
+     if not env_path.exists():
+         return "DRAFT"
+     try:
+@@ -473,16 +419,11 @@ def cmd_envelope_new(root: Path, args) -> None:
+     task = check_task_id(task, "task")
+     if task != task_id:
+         fail([f"envelope task {task} != --task {task_id}"])
+-    # Resolve the status before any git/record work: reopening a merged
+-    # envelope is a semantic refusal, not a repository-shape failure.
++    # Resolve the status before any git/record work: reopening is semantic.
+     env_path = root / "supervision" / "envelopes" / f"{env_id}.json"
+     status = envelope_new_status(env_path)
+-    # Both count baselines are mandatory for a *new* envelope.  The post-merge
+-    # gates treat them as opt-in, so an envelope that simply omitted them used
+-    # to downgrade its own count checks silently; requiring them here (before
+-    # any file, ledger or record write) closes that hole.  Legacy envelopes
+-    # already on disk keep the old opt-in semantics in ``merge-check`` and
+-    # ``post-merge``.
++    # Both count baselines are mandatory for a new envelope (post-merge treats
++    # them as opt-in, so an omission would silently skip its count check).
+     if not envelope_has_baselines(env):
+         fail(["envelope tests_baseline and tower_tests_baseline must be positive "
+               "integers (int >= 1)"])
+@@ -528,30 +469,14 @@ def cmd_queue_add(root: Path, args) -> None:
+         fail([f"envelope not found: {args.envelope}"])
+     env = jload(env_path)
+     queue = load_queue(root)
+-    # ``envelope-new`` requires both count baselines, but a hand-written
+-    # ``supervision/envelopes/<id>.json`` never passes through it, so queueing
+-    # it used to be the bypass: the post-merge gates treat the baselines as
+-    # opt-in and an omitted field silently skipped its count check.  Enforce
+-    # the same rule here, before any queue/ledger write, so the invariant holds
+-    # for every envelope that can reach the merge queue.  Legacy envelopes
+-    # already in the queue are untouched; only new additions are gated.
+-    tests_baseline = env.get("tests_baseline")
+-    tower_tests_baseline = env.get("tower_tests_baseline")
+-    if not (isinstance(tests_baseline, int) and not isinstance(tests_baseline, bool)
+-            and tests_baseline >= 1
+-            and isinstance(tower_tests_baseline, int)
+-            and not isinstance(tower_tests_baseline, bool)
+-            and tower_tests_baseline >= 1):
++    # ``envelope-new`` gates the baselines, but a hand-written envelope file
++    # never passes through it: enforce the same rule before any queue/ledger write.
++    if not envelope_has_baselines(env):
+         fail(["envelope tests_baseline and tower_tests_baseline must be positive "
+               "integers (int >= 1)"])
+-    # The queue entry is written before the ledger event, so a crash between
+-    # the two leaves a WAITING entry with no ``QUEUE_ADD``: a persistent
+-    # ``queue_unbacked`` that a retry used to refuse as "already queued".
+-    # After the baseline gate has admitted the envelope, an existing entry is
+-    # a half-write iff the ledger never recorded its ``QUEUE_ADD``; finish
+-    # that one write (event only, entry untouched) instead of dead-ending.
+-    # A ledger-backed entry is a real duplicate and still fails.  The repair
+-    # never runs for an envelope the baseline gate rejects, above.
++    # The queue entry is written before its ledger event, so an existing entry
++    # without ``QUEUE_ADD`` is a half-write (finish that event); a ledger-backed
++    # entry is a real duplicate and still fails.
+     existing = next((e for e in queue.get("entries", [])
+                      if e.get("envelope_id") == envelope_id), None)
+     if existing is not None:
+@@ -564,12 +489,9 @@ def cmd_queue_add(root: Path, args) -> None:
+               "repaired": True})
+         return
+     queue.setdefault("entries", []).append({
+-        "envelope_id": envelope_id,
+-        "task": env.get("task"),
+-        "branch": env.get("branch"),
+-        "base": env.get("base", "main"),
+-        "status": "WAITING",
+-        "added_at": now(),
++        "envelope_id": envelope_id, "task": env.get("task"),
++        "branch": env.get("branch"), "base": env.get("base", "main"),
++        "status": "WAITING", "added_at": now(),
+     })
+     save_queue(root, queue)
+     append_supervision_ledger(root, "QUEUE_ADD", "primary",
+@@ -577,16 +499,78 @@ def cmd_queue_add(root: Path, args) -> None:
+     emit({"ok": True, "envelope": args.envelope, "status": "WAITING"})
+ 
+ 
++def recover_actor(root: Path, args) -> str:
++    """The pinned merge authority -- the only identity that may recover."""
++    authority = authority_state_check(root)
++    if authority["errors"]:
++        fail(authority["errors"])
++    pinned = authority["merge_authority"]
++    if (authority["status"] != "configured" or not isinstance(pinned, str)
++            or not pinned):
++        fail(["envelope-recover requires a configured state/AUTHORITY.json; "
++              "only the pinned merge authority may recover an envelope"])
++    by = (getattr(args, "by", None) or "").strip() or pinned
++    primary = (jload(root / "primary" / "CURRENT_STATE.json").get("primary")
++               or {}).get("id")
++    if by != pinned:
++        fail([f"only the pinned merge authority {pinned!r} may recover "
++              f"envelopes, request {by!r}"])
++    if by == primary:
++        fail([f"primary cannot recover an envelope: --by {by!r} equals "
++              f"primary.id {primary!r}"])
++    return by
++
++
++def resolve_recovered_commit(repo: Path, ref: str, label: str) -> str:
++    """Resolve ``ref`` to a commit, or refuse naming what ``label`` is."""
++    try:
++        return git_ok(repo, "rev-parse", "--verify", f"{ref}^{{commit}}")
++    except Exception:
++        fail([f"{label} is not a resolvable commit in {repo}"])
++
++
++def recover_merge_commit(repo: Path, env: dict, merge_commit: str,
++                         base: str) -> str:
++    """Fetch ``origin/<base>`` and prove the named commit landed there.
++
++    The fetch comes first: a commit that only exists on the origin (the usual
++    071 direct-admin merge) is not in the local object database until that
++    fetch delivers it, so resolving beforehand would refuse a landed merge.
++    After the fetch the named commit must resolve locally and be an ancestor of
++    the freshly fetched ``FETCH_HEAD``; a failed fetch, a missing ``FETCH_HEAD``
++    or a commit absent from the fetched history all refuse before any write.
++    """
++    sha = (merge_commit or "").strip()
++    if not sha:
++        fail(["--merge-commit must be a non-empty commit"])
++    fetch = git(repo, "fetch", "--quiet", "origin", base)
++    if fetch.returncode != 0:
++        fail([f"cannot fetch origin/{base} in {repo}: "
++              f"{fetch.stderr.strip() or 'fetch failed'}"])
++    tip = resolve_recovered_commit(repo, "FETCH_HEAD",
++                                   f"fresh origin/{base} tip")
++    resolved = resolve_recovered_commit(repo, sha, f"merge commit {sha!r}")
++    if git(repo, "merge-base", "--is-ancestor", resolved,
++           tip).returncode != 0:
++        fail([f"merge commit {resolved} is not on freshly fetched origin/{base}; "
++              "a stale remote-tracking ref is not a landed merge"])
++    impl = env.get("implementation_head_sha")
++    if not isinstance(impl, str) or not impl.strip():
++        fail([f"envelope {env.get('envelope_id')} has no implementation_head_sha"])
++    impl = impl.strip()
++    impl_sha = resolve_recovered_commit(repo, impl, f"implementation head {impl!r}")
++    if git(repo, "merge-base", "--is-ancestor", impl_sha,
++           resolved).returncode != 0:
++        fail([f"merge commit {resolved} does not contain implementation head {impl}"])
++    return resolved
++
++
+ def envelope_remerge_errors(root: Path, env: dict, envelope_id: str) -> list[str]:
+     """Refuse a ``DRAFT`` envelope that a re-envelope reset (the 052 drift).
+ 
+-    ``envelope-new`` writes the first ``ENVELOPE_NEW`` and is also the
+-    re-envelope path.  A first envelope is legitimately ``DRAFT`` until it
+-    merges, so the file status alone cannot be the gate: only an envelope whose
+-    ledger already holds a previous ``ENVELOPE_NEW`` (a re-envelope) must still
+-    be ``WAITING``/``CORRECTION_REQUIRED``.  An envelope with no re-envelope
+-    history (hand-written legacy fixtures, one-shot envelopes) keeps the old
+-    behaviour, and a non-``DRAFT`` status is handled by the caller.
++    ``envelope-new`` is also the re-envelope path, so only an envelope whose
++    ledger already holds a previous ``ENVELOPE_NEW`` must still be
++    ``WAITING``/``CORRECTION_REQUIRED``; one-shot envelopes keep the old way.
+     """
+     if env.get("status") != "DRAFT":
+         return []

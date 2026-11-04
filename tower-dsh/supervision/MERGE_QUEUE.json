@@ -614,7 +614,15 @@
       "base": "main",
       "status": "WAITING",
       "added_at": "2026-11-04T12:25:00+08:00"
+    },
+    {
+      "envelope_id": "ENV-PILOT-073",
+      "task": "PILOT-073",
+      "branch": "pilot/PILOT-073",
+      "base": "main",
+      "status": "WAITING",
+      "added_at": "2026-11-04T16:03:25+08:00"
     }
   ],
-  "updated_at": "2026-11-04T12:25:00+08:00"
+  "updated_at": "2026-11-04T16:03:25+08:00"
 }

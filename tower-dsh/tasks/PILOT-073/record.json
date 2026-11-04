@@ -2,7 +2,7 @@
   "schema": "tower/task@1",
   "id": "PILOT-073",
   "title": "spec/campaign 入 state/docs + 直接 admin 合并后的 envelope 恢复",
-  "status": "dispatched",
+  "status": "closed",
   "authority": "workspace_write",
   "scope": [
     "base-sync state-only 增加 `pilot/*.spec.json`、`command/campaigns/**`（tower 前缀内）；tools/arch/EVENT_CATALOG/其它 pilot 仍 code",
@@ -47,18 +47,118 @@
   "dispatch": {
     "executor": "subagent:5cb98fda-92b5-49e2-b071-8043c9160c4e",
     "worktree": "pilot/worktrees/PILOT-073",
-    "at": "2026-11-04T13:17:10+08:00",
+    "at": "2026-11-04T15:26:31+08:00",
     "kind": "subagent",
     "model": null,
     "parent": null,
-    "base_sha": "2517f4d55616ab4368e120c7a31c2609ca1012f2",
+    "base_sha": "f29f114a1dc3a6b5f0130e1a76e3c33a8dda2d91",
     "campaign": "C-2026-Q4-04"
   },
-  "evidence": [],
-  "review": null,
-  "decision": null,
-  "closeout": null,
+  "evidence": [
+    {
+      "path": "tasks/PILOT-073/evidence/tower_cli.py",
+      "sha256": "18967a36c217652c9fc7a100d4b35bdf8d4d523d2a1893abbf5f11a7bf89f864",
+      "bytes": 44931,
+      "at": "2026-11-04T15:46:49+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-073/evidence/tower_envelope.py",
+      "sha256": "157abb293048fc0d62928dd24a7b8e3e1c1750ab10527ecae6e78b656c6fe8cd",
+      "bytes": 27244,
+      "at": "2026-11-04T15:46:49+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-073/evidence/test_envelope_recover.py",
+      "sha256": "ce95424582838d1bd7aa56319d14d2e301169c6b649de6c5133d6c4834c96689",
+      "bytes": 22511,
+      "at": "2026-11-04T15:46:49+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-073/evidence/test_base_sync.py",
+      "sha256": "9074f2dcd9c2a8c10118a8983efaac8c47da38b96fd6000310a08025ac8a16e5",
+      "bytes": 29764,
+      "at": "2026-11-04T15:46:49+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-073/evidence/test_modules.py",
+      "sha256": "ffa522a9e2798f88fc2df4c7483f6012ccbae6f298b70c8f127e0346106c0bb6",
+      "bytes": 5953,
+      "at": "2026-11-04T15:46:49+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-073/evidence/test-output.txt",
+      "sha256": "e5325a01b87cba61a28cdd20ec7dc55fc33bcf56580beddca3dc91b5676f34aa",
+      "bytes": 110345,
+      "at": "2026-11-04T15:46:49+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-073/evidence/recover_probe.py",
+      "sha256": "34f2130d7fe98306531aa05230cffe2ffdaa0349cc5de6720d9f47a27c18f97c",
+      "bytes": 11520,
+      "at": "2026-11-04T15:46:49+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-073/evidence/probe.txt",
+      "sha256": "538cd892bb4cc2b2af3f62635d9bafcadcc78878651631d61328faec71703ee6",
+      "bytes": 2028,
+      "at": "2026-11-04T15:46:49+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-073/evidence/commit.txt",
+      "sha256": "496b116ea91205569e599d5c09122b05e1da0850199852661b56bb5c8c7acbe9",
+      "bytes": 889,
+      "at": "2026-11-04T15:46:49+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-073/evidence/diff.txt",
+      "sha256": "150b2b736e12c9c2ee2dd1a1848f198a831ebc4845923b3bdb170e8fcff9acea",
+      "bytes": 68570,
+      "at": "2026-11-04T15:46:49+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-073/evidence/gates.txt",
+      "sha256": "222098beb2dae4a28826b46749befc5463be11f1a47a7ce918f1e193ad9fac88",
+      "bytes": 7901,
+      "at": "2026-11-04T15:46:49+08:00",
+      "id": "E-011"
+    }
+  ],
+  "review": {
+    "schema": "tower/review@1",
+    "task": "PILOT-073",
+    "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+    "verdict": "PASS",
+    "head": "19eb94bca245104d5f57ab7f3c1679666163296c",
+    "base": "f29f114a1dc3a6b5f0130e1a76e3c33a8dda2d91",
+    "scope": [],
+    "findings": [],
+    "note": "073 PASS。5 code paths；HEAD 19eb94b（base f29f114）；11/11 证据；Ran 788 OK；fetch-first remote-only、半写 repair、spec/campaign state-only；071 recover/069 supersede 待 controller。",
+    "at": "2026-11-04T16:03:09+08:00",
+    "structure": ""
+  },
+  "decision": {
+    "id": "D-PILOT-073",
+    "actor": "owner",
+    "text": "PASS; recover",
+    "at": "2026-11-04T16:03:09+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-073/CLOSEOUT.md",
+    "at": "2026-11-04T16:03:09+08:00"
+  },
   "created_at": "2026-11-04T13:13:19+08:00",
-  "updated_at": "2026-11-04T13:17:10+08:00",
-  "next": "等待 executor 交付"
+  "updated_at": "2026-11-04T16:03:09+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-073/MERGE.md",
+  "delivered_at": "2026-11-04T15:46:49+08:00",
+  "accepted_at": "2026-11-04T16:03:09+08:00"
 }
