@@ -18,7 +18,7 @@ from tower_ledger import (
 from tower_ledger_replay import (
     ENVELOPE_ABANDONABLE_STATUSES, ENVELOPE_ABANDONED_STATUS,
     ENVELOPE_MERGEABLE_STATUSES, ENVELOPE_TERMINAL_STATUSES,
-    cmd_verify_ledger, ledger_events_naming, ledger_has_event,
+    cmd_verify_ledger, is_legacy_envelope, ledger_events_naming, ledger_has_event,
 )
 from tower_task import (
     ACCEPTANCE_KINDS, ACCEPTANCE_STATUSES, cmd_spec_approve, cmd_task_new,
@@ -35,7 +35,8 @@ from tower_dispatch import cmd_dispatch
 from tower_delivery import cmd_completion_add, cmd_deliver
 from tower_envelope import (
     cmd_checkback, cmd_envelope_new, cmd_queue_add, load_queue,
-    load_supervision, recover_actor, recover_merge_commit, save_queue,
+    load_supervision, merge_commit_errors, recover_actor, recover_merge_commit,
+    save_queue,
 )
 from tower_handoff import (
     cmd_handoff_accept, cmd_handoff_activate, cmd_handoff_check, cmd_handoff_claim,
@@ -204,10 +205,21 @@ def envelope_recover_layer_parsers(
                              help="why the merge bypassed the merge gate")
         recover.add_argument("--by", default=None,
                              help="pinned supervisor id (default: the pin)")
+        recover.add_argument("--historical", action="store_true",
+                             help="PILOT-074: backfill the merge fact of a "
+                                  "pre-074 POST_MERGE_VERIFIED envelope")
     return parser
 
 
 def cmd_envelope_recover(root: Path, args) -> None:
+    """PILOT-074 entry point: ``--historical`` selects the legacy backfill."""
+    if getattr(args, "historical", False):
+        cmd_envelope_recover_historical(root, args)
+        return
+    cmd_envelope_recover_merge(root, args)
+
+
+def cmd_envelope_recover_merge(root: Path, args) -> None:
     """PILOT-073: record an out-of-band merge the ledger never saw.
 
     071's code landed on ``origin/main`` through a direct owner ``gh --admin``
@@ -277,6 +289,94 @@ def cmd_envelope_recover(root: Path, args) -> None:
     emit({"ok": True, "envelope": envelope_id, "status": "MERGED",
           "merge_commit": merge_commit, "recovered": True, "by": by,
           "repaired": repaired})
+
+
+def cmd_envelope_recover_historical(root: Path, args) -> None:
+    """PILOT-074: backfill the merge fact a pre-074 verified envelope lacks.
+
+    Only a pre-074 ``POST_MERGE_VERIFIED`` envelope with no merge event (and no
+    ``merge_commit``) qualifies.  The named commit is proved before any write:
+    non-empty, resolvable, on ``origin/<base>`` and carrying the implementation
+    head as its second parent.  Success records ``MERGE_HISTORICAL`` and the
+    envelope/queue ``merge_commit``; the status, ``admin`` and the verified
+    verdict are deliberately left untouched.  A retry finishes a half-write
+    without appending a second event, and a different commit is refused as a
+    history rewrite.
+    """
+    envelope_id = check_package_id(args.envelope, "envelope")
+    reason = (args.reason or "").strip()
+    if not reason:
+        fail(["--reason must be a non-empty string"])
+    by = recover_actor(root, args)
+    path, env, queue, entry, historical = historical_target(root, envelope_id)
+    base = str(env.get("base") or "main")
+    repo = resolve_repository(root, env.get("repository"))
+    errors = merge_commit_errors(repo, env, args.merge_commit, base)
+    if errors:
+        fail(errors)
+    commit = args.merge_commit.strip()
+    previous = [env.get("merge_commit"), entry.get("merge_commit")]
+    if historical:
+        previous.append(historical[0].get("merge_commit"))
+    recorded = [value for value in previous
+                if isinstance(value, str) and value.strip()]
+    if any(value != commit for value in recorded):
+        fail([f"envelope {envelope_id} already records merge commit "
+              f"{recorded!r}, not {commit!r}; a backfill cannot rewrite history"])
+    entry["merge_commit"] = commit
+    save_queue(root, queue)
+    env["merge_commit"] = commit
+    jdump(path, env)
+    if not historical:
+        append_supervision_ledger(root, "MERGE_HISTORICAL", "supervision",
+                                  {"envelope": envelope_id,
+                                   "merge_commit": commit, "recovered": True,
+                                   "historical": True, "by": by,
+                                   "reason": reason})
+    emit({"ok": True, "envelope": envelope_id, "status": env.get("status"),
+          "merge_commit": commit, "historical": True, "recovered": True,
+          "by": by, "repaired": bool(historical)})
+
+
+def historical_target(root: Path, envelope_id: str):
+    """Envelope/queue pair a historical backfill may touch; read-only refusals.
+
+    The source and both halves must be ``POST_MERGE_VERIFIED``, the card must
+    be pre-074 and no real ``MERGE`` may exist yet (that is post-merge's
+    business).  One existing ``MERGE_HISTORICAL`` is the half-write a retry
+    completes; a second one is ambiguous and is refused rather than guessed at.
+    """
+    path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
+    if not path.exists():
+        fail([f"envelope not found: {envelope_id}"])
+    env = jload(path)
+    if env.get("envelope_id") != envelope_id:
+        fail([f"envelope identity matches request: file declares "
+              f"{env.get('envelope_id')!r}, request {envelope_id!r}"])
+    if not is_legacy_envelope(env):
+        fail([f"envelope {envelope_id} is not pre-074; a 074+ verification "
+              "goes through post-merge and cannot be backfilled"])
+    if env.get("status") != "POST_MERGE_VERIFIED":
+        fail([f"envelope {envelope_id} status {env.get('status')!r} cannot be "
+              "backfilled; source must be POST_MERGE_VERIFIED"])
+    queue = load_queue(root)
+    entry = next((item for item in queue.get("entries") or []
+                  if isinstance(item, dict)
+                  and item.get("envelope_id") == envelope_id), None)
+    if entry is None:
+        fail([f"envelope not queued: {envelope_id}"])
+    if entry.get("status") != "POST_MERGE_VERIFIED":
+        fail([f"queue status {entry.get('status')!r} cannot be backfilled; "
+              "both halves must be POST_MERGE_VERIFIED"])
+    if ledger_events_naming(root, "supervision", "MERGE", envelope_id):
+        fail([f"envelope {envelope_id} already has a MERGE event; post-merge "
+              "verifies it, the historical backfill only fills a missing fact"])
+    historical = ledger_events_naming(root, "supervision", "MERGE_HISTORICAL",
+                                      envelope_id)
+    if len(historical) > 1:
+        fail([f"envelope {envelope_id} has {len(historical)} MERGE_HISTORICAL "
+              "events; refusing to guess which one to trust"])
+    return path, env, queue, entry, historical
 
 
 def recover_target(root: Path, envelope_id: str):

@@ -422,6 +422,24 @@
     },
     {
       "drift_kinds": [
+        "verified_without_merge"
+      ],
+      "ledger": "supervision",
+      "note": "PILOT-074 historical backfill: records the landed PR merge a pre-074 verified envelope never got; fact only, status/admin/verified untouched",
+      "payload_required": [
+        "envelope",
+        "merge_commit",
+        "recovered",
+        "historical",
+        "by",
+        "reason"
+      ],
+      "producer": "envelope-recover",
+      "state_verify": true,
+      "type": "MERGE_HISTORICAL"
+    },
+    {
+      "drift_kinds": [
         "envelope_missing",
         "envelope_unreadable",
         "envelope_status",
