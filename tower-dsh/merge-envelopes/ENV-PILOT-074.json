@@ -1,0 +1,69 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-074",
+  "task": "PILOT-074",
+  "repository": "..",
+  "branch": "pilot/PILOT-074",
+  "base": "main",
+  "implementation_head_sha": "9b23d6851de971f192ec705a591ffcba85339946",
+  "envelope_path": "merge-envelopes/ENV-PILOT-074.json",
+  "created_at": "2026-11-04T23:40:00+08:00",
+  "scope": "PILOT-074: verified requires MERGE fact; historical 065-068 backfill",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 788,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-074/evidence/tower_post_merge.py",
+      "sha256": "c973bdd7a837068851500db26345b3689c4d13662156c85f50da9cb2cb6e469c"
+    },
+    {
+      "path": "tasks/PILOT-074/evidence/tower_ledger_replay.py",
+      "sha256": "91dcd356ff9aad9a424247ee540ea9e0bf943f861dc906198fa66bdb3d455efb"
+    },
+    {
+      "path": "tasks/PILOT-074/evidence/tower_envelope.py",
+      "sha256": "c8e961e5d274385c3729719f1031c4a4070d4bd99a130c1fefb797b4f4fe9a7b"
+    },
+    {
+      "path": "tasks/PILOT-074/evidence/tower_cli.py",
+      "sha256": "f6a3d9e526b0b807805ec76173d2561c5c9380e4bd2359137cc6b89d0aa84418"
+    },
+    {
+      "path": "tasks/PILOT-074/evidence/EVENT_CATALOG.json",
+      "sha256": "2520fe6ce7cb4f8c2e835d9fef1df20f363e14bf967bd88144231294f3666965"
+    },
+    {
+      "path": "tasks/PILOT-074/evidence/test_verified_merge_fact.py",
+      "sha256": "ce72b154a04e16bdbf05617be2e3be15fbae32be1461d6adff2492ebca33e09a"
+    },
+    {
+      "path": "tasks/PILOT-074/evidence/test-output.txt",
+      "sha256": "072c351a8d1ba0bce4a4bd9996fa2c66affc3b1b8f2dcb9e78ee209c1ad57902"
+    },
+    {
+      "path": "tasks/PILOT-074/evidence/verified_probe.py",
+      "sha256": "fa748b1414fcf5ac70a5a3d2866c91f66a808f85487422ab18631448b6004b39"
+    },
+    {
+      "path": "tasks/PILOT-074/evidence/probe.txt",
+      "sha256": "65a80071b03550c5e0f428af549dd6370dcdab26705186bcd4f6e1ce031fefc5"
+    },
+    {
+      "path": "tasks/PILOT-074/evidence/commit.txt",
+      "sha256": "697755dbd9ca4160a26c118962caf735591bacb3e95ddf27ac59752b5cc04823"
+    },
+    {
+      "path": "tasks/PILOT-074/evidence/diff.txt",
+      "sha256": "fe9944624abe25d72883d85bf99f3e23d8c1ed33289b03d0378649de71c1ebb6"
+    },
+    {
+      "path": "tasks/PILOT-074/evidence/gates.txt",
+      "sha256": "d50b10ef6412f55cf2134831ea26e0cfed9b0778eaa7114919624c6736c12282"
+    }
+  ]
+}
