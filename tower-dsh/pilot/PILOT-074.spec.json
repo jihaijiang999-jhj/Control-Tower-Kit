@@ -27,7 +27,8 @@
     "pilot/worktrees/PILOT-074/tower-dsh/tools/tower_envelope.py",
     "pilot/worktrees/PILOT-074/tower-dsh/tools/tower_cli.py",
     "pilot/worktrees/PILOT-074/tower-dsh/EVENT_CATALOG.json",
-    "pilot/worktrees/PILOT-074/tower-dsh/tools/tests/test_verified_merge_fact.py"
+    "pilot/worktrees/PILOT-074/tower-dsh/tools/tests/test_verified_merge_fact.py",
+    ".github/workflows/tower-gate.yml"
   ],
   "forbidden": [
     "network",
@@ -47,6 +48,8 @@
     "legacy pre-074 CORRECTION→VERIFIED replay 0；074+ 转移只 MERGED→VERIFIED",
     "074 自身 PR 审计 admin；真实塔 74/70 drift []；arch 18；profile 11/0；shape 0"
   ],
-  "depends_on": ["PILOT-073"],
+  "depends_on": [
+    "PILOT-073"
+  ],
   "worktree": "pilot/worktrees/PILOT-074"
 }

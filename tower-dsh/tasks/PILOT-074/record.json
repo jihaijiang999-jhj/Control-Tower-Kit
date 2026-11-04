@@ -20,7 +20,8 @@
     "pilot/worktrees/PILOT-074/tower-dsh/tools/tower_envelope.py",
     "pilot/worktrees/PILOT-074/tower-dsh/tools/tower_cli.py",
     "pilot/worktrees/PILOT-074/tower-dsh/EVENT_CATALOG.json",
-    "pilot/worktrees/PILOT-074/tower-dsh/tools/tests/test_verified_merge_fact.py"
+    "pilot/worktrees/PILOT-074/tower-dsh/tools/tests/test_verified_merge_fact.py",
+    ".github/workflows/tower-gate.yml"
   ],
   "forbidden": [
     "network",
@@ -45,7 +46,7 @@
   ],
   "worktree": "pilot/worktrees/PILOT-074",
   "spec_path": "pilot/PILOT-074.spec.json",
-  "spec_sha256": "f9e1131607fd4d3bcdd877264f550118d4ac0e9657b323eabad3279bedd53d0d",
+  "spec_sha256": "613da6c35fde57fdaab403ccff3725d033184392894d0a6cfdc011f4d057e23d",
   "spec_gate": "PASS",
   "executor": "subagent:beeba869-6193-44df-aef8-8f55a51b51af",
   "dispatch": {
