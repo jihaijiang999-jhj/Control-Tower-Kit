@@ -72,6 +72,14 @@
   ],
   "envelope_head_sha": "d6ce1f005312690e7922c69bae45a2118c279bc7",
   "head": "d6ce1f005312690e7922c69bae45a2118c279bc7",
-  "status": "WAITING",
-  "base_side": true
+  "status": "CORRECTION_REQUIRED",
+  "base_side": true,
+  "merge_commit": "c0e1d5721317baed9356fed63f8aadc6d24c7ff0",
+  "merged_at": "2026-11-04T16:16:43+08:00",
+  "supervisor": "sup-phase2-pilot",
+  "recovered": true,
+  "recovered_by": "sup-phase2-pilot",
+  "recovery_reason": "071 direct admin fallback; recover MERGE",
+  "tests_count": 2,
+  "tower_tests_count": 788
 }
