@@ -572,7 +572,8 @@
       "branch": "pilot/PILOT-065",
       "base": "main",
       "status": "POST_MERGE_VERIFIED",
-      "added_at": "2026-11-02T20:52:48+08:00"
+      "added_at": "2026-11-02T20:52:48+08:00",
+      "merge_commit": "c1999284712d12a680c9956e9f08ac93c4961742"
     },
     {
       "envelope_id": "ENV-PILOT-066",
@@ -580,7 +581,8 @@
       "branch": "pilot/PILOT-066",
       "base": "main",
       "status": "POST_MERGE_VERIFIED",
-      "added_at": "2026-11-03T09:58:26+08:00"
+      "added_at": "2026-11-03T09:58:26+08:00",
+      "merge_commit": "713d7098b1d97af4ca818be3045a320d7d3d4081"
     },
     {
       "envelope_id": "ENV-PILOT-067",
@@ -588,7 +590,8 @@
       "branch": "pilot/PILOT-067",
       "base": "main",
       "status": "POST_MERGE_VERIFIED",
-      "added_at": "2026-11-03T13:06:31+08:00"
+      "added_at": "2026-11-03T13:06:31+08:00",
+      "merge_commit": "eba7ed3f5c485bd52dcef4c6e17ed42debe83a1e"
     },
     {
       "envelope_id": "ENV-PILOT-068",
@@ -596,7 +599,8 @@
       "branch": "pilot/PILOT-068",
       "base": "main",
       "status": "POST_MERGE_VERIFIED",
-      "added_at": "2026-11-03T15:54:26+08:00"
+      "added_at": "2026-11-03T15:54:26+08:00",
+      "merge_commit": "969acdb6c9f3aebb5ceb1182ef00f895c639e323"
     },
     {
       "envelope_id": "ENV-PILOT-070",
@@ -626,5 +630,5 @@
       "merge_commit": "1042265296b674c39c2b13458be5d82f3bec475b"
     }
   ],
-  "updated_at": "2026-11-04T17:51:44+08:00"
+  "updated_at": "2026-11-04T21:40:36+08:00"
 }

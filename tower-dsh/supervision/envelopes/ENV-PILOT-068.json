@@ -57,5 +57,6 @@
   "tests_count": 2,
   "tower_tests_count": 747,
   "post_merge_at": "2026-11-03T16:50:36+08:00",
-  "post_merge_note": "PR #53 admin merge 969acdb"
+  "post_merge_note": "PR #53 admin merge 969acdb",
+  "merge_commit": "969acdb6c9f3aebb5ceb1182ef00f895c639e323"
 }

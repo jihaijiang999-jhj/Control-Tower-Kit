@@ -61,5 +61,6 @@
   "tests_count": 2,
   "tower_tests_count": 744,
   "post_merge_at": "2026-11-03T14:12:46+08:00",
-  "post_merge_note": "PR #52 admin merge eba7ed3"
+  "post_merge_note": "PR #52 admin merge eba7ed3",
+  "merge_commit": "eba7ed3f5c485bd52dcef4c6e17ed42debe83a1e"
 }

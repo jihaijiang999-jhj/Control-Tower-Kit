@@ -721,7 +721,17 @@
       "reviewer": null,
       "next": "superseded by PILOT-070; no merge, see ledger TASK_SUPERSEDE",
       "updated_at": "2026-11-04T17:05:04+08:00"
+    },
+    {
+      "id": "PILOT-074",
+      "title": "verified 必须有 MERGE 事实；回填 065–068；新增 verified_without_merge drift",
+      "status": "dispatched",
+      "authority": "workspace_write",
+      "executor": "subagent:beeba869-6193-44df-aef8-8f55a51b51af",
+      "reviewer": null,
+      "next": "等待 executor 交付",
+      "updated_at": "2026-11-04T20:59:47+08:00"
     }
   ],
-  "updated_at": "2026-11-04T17:05:04+08:00"
+  "updated_at": "2026-11-04T20:59:47+08:00"
 }
