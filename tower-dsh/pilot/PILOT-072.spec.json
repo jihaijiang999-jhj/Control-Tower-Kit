@@ -1,0 +1,47 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-072",
+  "title": "task-reopen：closed → rework（owner 授权、写 ledger）",
+  "objective": {
+    "problem": "071 在 A 方案中被 closed 后才 rebase；checkback 只允许 delivered/reviewed/rework/accepted，closed 卡无法重审，导致只能回滚。生命周期缺少合法 reopen 出口。",
+    "outcome": "新增 task-reopen（owner-only）：closed 卡 → rework，写 TASK_REOPEN（primary ledger），保留 record/REVIEW/envelope 历史；不伪造 merge/verified；reopen 后可重新 checkback/accept/close。",
+    "approach": "tower_ledger_replay 加 TASK_REOPEN→rework、转移表 closed→rework；tower_task/CLI 加命令与 owner 校验；EVENT_CATALOG 登记；补测试。",
+    "non_goals_and_done": "不复用 MERGED/VERIFIED；不删除 review/envelope；753+ tests；reopen 后 checkback 可走通。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0005 / 071 closed-reopen deadlock",
+  "why_now": "071 的 code 已 PASS，但 closed 卡无法换 head 重审；没有 reopen，任何 rebase-only 重审都只能回滚。",
+  "scope": [
+    "task-reopen --task --reason --by：仅 owner；源 closed；目标存在；refuse 非 closed/重复",
+    "写 TASK_REOPEN（primary，payload task/by/reason/at）；record.status=rework；board.status=rework；不删 REVIEW/envelope；不写 MERGE/verified",
+    "TASK_LIFECYCLE_STATUS 加 TASK_REOPEN→rework；TASK_TRANSITIONS 允许 closed→rework；state-verify fold；reopen 后可 checkback→accept→close",
+    "EVENT_CATALOG 加 TASK_REOPEN（primary）",
+    "tests：closed→rework；非 closed/重复/非 owner 拒绝；reopen 后 checkback 可走；真实 071 fixture",
+    "071 的卡已随回滚不存在；072 后由 controller 从 071 分支 spec 重建卡，再 deliver/checkback；task-reopen 是通用出口，不伪造 071 的历史"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-072/tower-dsh/tools/tower_ledger_replay.py",
+    "pilot/worktrees/PILOT-072/tower-dsh/tools/tower_task.py",
+    "pilot/worktrees/PILOT-072/tower-dsh/tools/tower_cli.py",
+    "pilot/worktrees/PILOT-072/tower-dsh/tools/tests/test_task_reopen.py",
+    "pilot/worktrees/PILOT-072/tower-dsh/EVENT_CATALOG.json"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "reopening MERGED/POST_MERGE_VERIFIED envelopes",
+    "weakening review/acceptance"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-072/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 753 + 新增用例数（main 基线 753）",
+    "closed→rework：ledger/record/board 同步、review/envelope 保留、无 MERGE/verified、state-verify 0",
+    "非 closed/重复/非 owner/缺失目标 → exit 2 零写入",
+    "reopen 后可 checkback→accept→close；真实 071 fixture 可走",
+    "真实塔 72/68 drift []；arch 18；profile 11/0；shape 0"
+  ],
+  "depends_on": ["PILOT-070"],
+  "worktree": "pilot/worktrees/PILOT-072"
+}
