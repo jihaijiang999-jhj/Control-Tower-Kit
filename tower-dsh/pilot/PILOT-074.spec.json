@@ -1,0 +1,52 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-074",
+  "title": "verified 必须有 MERGE 事实；回填 065–068；新增 verified_without_merge drift",
+  "objective": {
+    "problem": "065–068 在塔内没有 MERGE 事件、envelope.merge_commit=null，却已 POST_MERGE_VERIFIED；根因是 POST_MERGE_VERIFIED 允许从 CORRECTION_REQUIRED 进入，且 post-merge 只检查 implementation 是 base 祖先。外审已确认这是 P0：verified 不等于经塔合并。",
+    "outcome": "新卡 post-merge 只允许 MERGED→VERIFIED，且必须存在 MERGE 事件、merge_commit 非空、merge commit 第二父 == implementation；CORRECTION 重试先走 recover。新增 verified_without_merge drift。用 historical recover 给 065–068 补 merge 事实（不回填 admin、不改历史状态），drift 清零。",
+    "approach": "收紧 post-merge 前置与转移；state-verify 检查 verified 的 MERGE 事实；新增 MERGE_HISTORICAL 事件（仅 pre-074 legacy + supervisor）记录 065–068 的 PR merge commit；legacy CORRECTION→VERIFIED 只对 pre-074 放行。",
+    "non_goals_and_done": "不伪造 admin、不把历史 direct admin 写成审计；不删除既有 evidence；788+ tests；065–068 有 merge_commit/MERGE_HISTORICAL、drift 0 才完成。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0009 / 外审 P0 verified-without-merge",
+  "why_now": "外审三份报告一致把“verified 无 MERGE”列为 P0；不修则外部 pilot 的验收没有审计价值。",
+  "scope": [
+    "post-merge：源状态只允许 MERGED；要求 supervision ledger 存在该 envelope 的 MERGE（或 MERGE_HISTORICAL）；merge_commit 必须非空、可解析、在 origin/main、第二父 == implementation_head_sha（无第二父则拒绝）",
+    "CORRECTION_REQUIRED 不再直接 post-merge；必须先 envelope-recover 补 MERGE 再 post-merge；新卡 CORRECTION→VERIFIED 拒绝",
+    "state-verify 新增 verified_without_merge：VERIFIED 但无 MERGE/MERGE_HISTORICAL 或 merge_commit 空/不匹配 → drift",
+    "新增 MERGE_HISTORICAL 事件（supervision）：仅 pre-074 envelope + pinned supervisor；payload merge_commit/recovered=true/historical=true/by/reason；只补事实、不改 status、不写 admin",
+    "envelope-recover --historical：源 VERIFIED 且 merge_commit 缺失；校验 merge_commit 第二父==impl 且在 origin/main；补 MERGE_HISTORICAL；不写 POST_MERGE_VERIFIED",
+    "回填 065 c199928、066 713d709、067 eba7ed3、068 969acdb；回填后 state-verify drift 0，merge_commit 非空",
+    "legacy 兼容：pre-074 的 CORRECTION→VERIFIED 事件仍 replay 通过；074+ 严格 MERGED→VERIFIED",
+    "测试：新卡 CORRECTION post-merge 2；MERGED 无 MERGE 2；第二父错 2；verified_without_merge drift；historical recover 0/拒绝；legacy replay 0"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-074/tower-dsh/tools/tower_post_merge.py",
+    "pilot/worktrees/PILOT-074/tower-dsh/tools/tower_ledger_replay.py",
+    "pilot/worktrees/PILOT-074/tower-dsh/tools/tower_envelope.py",
+    "pilot/worktrees/PILOT-074/tower-dsh/tools/tower_cli.py",
+    "pilot/worktrees/PILOT-074/tower-dsh/EVENT_CATALOG.json",
+    "pilot/worktrees/PILOT-074/tower-dsh/tools/tests/test_verified_merge_fact.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "writing admin=true for historical recovery",
+    "backfilling 065-068 without merge_commit second-parent check",
+    "weakening review/acceptance"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-074/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 788 + 新增用例数（main 基线 788）",
+    "新卡 CORRECTION_REQUIRED post-merge → 2；MERGED 但无 MERGE 事件/merge_commit → 2；merge_commit 第二父 != impl → 2；零 VERIFIED 写入",
+    "state-verify 在回填前报 065–068 verified_without_merge；回填后 drift 0；merge_commit 分别为 c199928/713d709/eba7ed3/969acdb",
+    "MERGE_HISTORICAL 仅 pre-074 + supervisor；074+ 拒绝；不写 admin=true、不写 POST_MERGE_VERIFIED",
+    "legacy pre-074 CORRECTION→VERIFIED replay 0；074+ 转移只 MERGED→VERIFIED",
+    "074 自身 PR 审计 admin；真实塔 74/70 drift []；arch 18；profile 11/0；shape 0"
+  ],
+  "depends_on": ["PILOT-073"],
+  "worktree": "pilot/worktrees/PILOT-074"
+}
