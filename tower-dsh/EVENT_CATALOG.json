@@ -308,6 +308,27 @@
     },
     {
       "drift_kinds": [
+        "record_missing",
+        "record_unreadable",
+        "task_status",
+        "board_status",
+        "illegal_transition"
+      ],
+      "ledger": "primary",
+      "note": "owner-only tombstone: delivered/rework -> superseded; no envelope, no MERGE",
+      "payload_required": [
+        "task",
+        "by",
+        "reason",
+        "superseded_by",
+        "at"
+      ],
+      "producer": "task-supersede",
+      "state_verify": true,
+      "type": "TASK_SUPERSEDE"
+    },
+    {
+      "drift_kinds": [
         "envelope_missing",
         "envelope_unreadable",
         "envelope_status",

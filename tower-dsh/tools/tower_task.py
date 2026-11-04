@@ -1,16 +1,20 @@
 """Task cards, ids, specs and the board (owning records)."""
 from __future__ import annotations
 
-import json
 import re
 import spec_lint
 from datetime import datetime
 from pathlib import Path
 from tower_common import (
-    COMMAND_ARCHIVE_SUFFIX, TASK_ID_RE, emit, ensure_within, fail, is_safe_id,
-    jdump, jload, now, rel, resolve_input_within, sha256_file,
+    COMMAND_ARCHIVE_SUFFIX, TASK_ID_RE, _read_json_object, check_task_id, emit,
+    ensure_within, fail, is_safe_id, jdump, jload, now, rel,
+    resolve_input_within, sha256_file,
 )
-from tower_ledger import activate_task_id, append_ledger, task_dir, task_id_view
+from tower_ledger import (
+    activate_task_id, append_ledger, task_dir, task_id_entry, task_ids_lock,
+    task_ids_save, task_id_view,
+)
+from tower_ledger_replay import ledger_events_in_seq_order
 
 
 def task_record_path(root: Path, tid: str) -> Path:
@@ -251,20 +255,136 @@ def cmd_task_new(root: Path, args) -> None:
     task_new_card(root, args)
 
 
+def ledger_task_event_payloads(root: Path, event_type: str,
+                               task: str) -> list[dict]:
+    """Every payload of ``event_type`` for ``task`` in the primary ledger."""
+    return [event["payload"]
+            for event in ledger_events_in_seq_order(root, "primary")
+            if event.get("type") == event_type
+            and isinstance(event.get("payload"), dict)
+            and event["payload"].get("task") == task]
+
+
 def ledger_has_task_event(root: Path, event_type: str, task: str) -> bool:
-    ledger = root / "ledger" / "primary.jsonl"
-    if not ledger.exists():
-        return False
-    for line in ledger.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            ev = json.loads(line)
-        except Exception:
-            continue
-        if ev.get("type") == event_type and (ev.get("payload") or {}).get("task") == task:
-            return True
-    return False
+    return bool(ledger_task_event_payloads(root, event_type, task))
+
+
+SUPERSEDE_SOURCE_STATUSES = ("delivered", "rework")
+
+
+def last_supersede_event(root: Path, task: str) -> dict | None:
+    """The latest ``TASK_SUPERSEDE`` payload for ``task``, or ``None``."""
+    payloads = ledger_task_event_payloads(root, "TASK_SUPERSEDE", task)
+    return payloads[-1] if payloads else None
+
+
+def task_id_status(root: Path, task: str) -> str | None:
+    """The id registry's status for ``task``, or ``None`` when absent."""
+    entry = task_id_view(root).get(task)
+    return entry.get("status") if isinstance(entry, dict) else None
+
+
+def board_task_status(root: Path, task: str) -> str | None:
+    """The board row's status for ``task``, or ``None`` when absent."""
+    return next((entry.get("status")
+                 for entry in load_board(root).get("tasks") or []
+                 if isinstance(entry, dict) and entry.get("id") == task), None)
+
+
+def supersede_request_errors(root: Path, rec: dict, target: str, by: str,
+                             reason: str) -> list[str]:
+    """Owner/reason/target half of the refusal set; read-only."""
+    tid = str(rec.get("id") or "")
+    _, state = _read_json_object(root / "primary" / "CURRENT_STATE.json")
+    owner = state.get("owner") if isinstance(state, dict) else None
+    owner = owner.get("name") if isinstance(owner, dict) else None
+    errors: list[str] = []
+    if not owner:
+        errors.append("primary/CURRENT_STATE.json has no owner.name")
+    elif by != owner:
+        errors.append(f"only the registered owner may supersede a task: "
+                      f"--by {by!r} != owner {owner!r}")
+    if not reason:
+        errors.append("--reason must be a non-empty string")
+    if target == tid:
+        errors.append(f"task {tid} cannot supersede itself")
+    if _optional_task_record(root, target) is None:
+        errors.append(f"target card missing: {target}")
+    return errors
+
+
+def supersede_state_errors(root: Path, rec: dict, target: str,
+                           event: dict | None) -> list[str]:
+    """Source-state half; a partial tombstone is repairable, not refused."""
+    tid = str(rec.get("id") or "")
+    errors: list[str] = []
+    event_target = event.get("superseded_by") if event else None
+    if event_target and event_target != target:
+        errors.append(f"ledger records {tid} superseded by {event_target!r}, "
+                      f"not {target!r}")
+    status = rec.get("status")
+    if status == "superseded":
+        recorded = rec.get("superseded_by") or event_target
+        if recorded and recorded != target:
+            errors.append(f"task {tid} is already superseded by {recorded}")
+    elif status not in SUPERSEDE_SOURCE_STATUSES:
+        errors.append(f"task status {status} cannot be superseded "
+                      f"(allowed: {', '.join(SUPERSEDE_SOURCE_STATUSES)})")
+    complete = (status == "superseded" and event is not None
+                and rec.get("superseded_by") == target
+                and board_task_status(root, tid) == "superseded"
+                and task_id_status(root, tid) == "void")
+    if complete:
+        errors.append(f"task {tid} is already superseded")
+    return errors
+
+
+def void_task_id(root: Path, record: dict) -> None:
+    """Void the card's id so ``task-new`` can never reuse it."""
+    tid = str(record["id"])
+    with task_ids_lock(root):
+        ids = task_id_view(root)
+        entry = ids.get(tid) or task_id_entry(root, tid, record, "void")
+        entry["status"] = "void"
+        entry["updated_at"] = now()
+        ids[tid] = entry
+        task_ids_save(root, ids, f"task {tid} is superseded but its id "
+                                 "registry entry was not voided")
+
+
+def cmd_task_supersede(root: Path, args) -> None:
+    """Owner-only tombstone, idempotent across a half-written crash.
+
+    The primary-ledger event is written first; record/board and the void id
+    follow.  A crash between any two writes is repaired by the next retry
+    (never a second event); only a fully applied tombstone is refused.
+    """
+    tid = check_task_id(args.task)
+    target = check_task_id(args.by_task, "by-task")
+    rec = load_record(root, tid)
+    by = (args.by or "").strip()
+    reason = (args.reason or "").strip()
+    event = last_supersede_event(root, tid)
+    errors = (supersede_request_errors(root, rec, target, by, reason)
+              + supersede_state_errors(root, rec, target, event))
+    if errors:
+        fail(errors)
+    repairing = event is not None or rec.get("status") == "superseded"
+    at = str((event or {}).get("at") or rec.get("superseded_at") or now())
+    if event is None:
+        append_ledger(root, "TASK_SUPERSEDE", "owner",
+                      {"task": tid, "by": by, "reason": reason,
+                       "superseded_by": target, "at": at})
+    rec["status"] = "superseded"
+    rec["superseded_by"] = target
+    rec["superseded_at"] = at
+    rec["next"] = f"superseded by {target}; no merge, see ledger TASK_SUPERSEDE"
+    save_record(root, rec)
+    update_board(root, rec)
+    if task_id_status(root, tid) != "void":
+        void_task_id(root, rec)
+    emit({"ok": True, "task": tid, "status": rec["status"],
+          "superseded_by": target, "by": by, "repaired": repairing})
 
 
 def cmd_spec_approve(root: Path, args) -> None:

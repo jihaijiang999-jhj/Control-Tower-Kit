@@ -196,6 +196,10 @@ TASK_LIFECYCLE_STATUS = {
     "DELIVER": "delivered",
     "ACCEPT": "accepted",
     "CLOSEOUT": "closed",
+    # PILOT-071: an owner-only tombstone for a card that will never merge.  It
+    # is a terminal task state (no envelope, no MERGE) but deliberately not
+    # "closed": the card was not accepted, so review/acceptance stay untouched.
+    "TASK_SUPERSEDE": "superseded",
 }
 
 
@@ -254,6 +258,11 @@ TASK_TRANSITIONS = {
     "CHECKBACK": frozenset(CHECKBACK_STATUSES),
     "ACCEPT": frozenset({"reviewed"}),
     "CLOSEOUT": frozenset({"accepted"}),
+    # PILOT-071: only a delivered or rework card may be superseded.  The
+    # tombstone is terminal: ``superseded`` is not a source state here, so a
+    # second TASK_SUPERSEDE is an illegal transition and no later lifecycle
+    # event (accept/close) can leave it.
+    "TASK_SUPERSEDE": frozenset({"delivered", "rework"}),
 }
 
 
