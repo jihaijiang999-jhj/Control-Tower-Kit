@@ -17,7 +17,8 @@ from tower_ledger import (
 )
 from tower_ledger_replay import (
     ENVELOPE_ABANDONABLE_STATUSES, ENVELOPE_ABANDONED_STATUS,
-    ENVELOPE_TERMINAL_STATUSES, cmd_verify_ledger, ledger_has_event,
+    ENVELOPE_MERGEABLE_STATUSES, ENVELOPE_TERMINAL_STATUSES,
+    cmd_verify_ledger, ledger_events_naming, ledger_has_event,
 )
 from tower_task import (
     ACCEPTANCE_KINDS, ACCEPTANCE_STATUSES, cmd_spec_approve, cmd_task_new,
@@ -34,7 +35,7 @@ from tower_dispatch import cmd_dispatch
 from tower_delivery import cmd_completion_add, cmd_deliver
 from tower_envelope import (
     cmd_checkback, cmd_envelope_new, cmd_queue_add, load_queue,
-    load_supervision, save_queue,
+    load_supervision, recover_actor, recover_merge_commit, save_queue,
 )
 from tower_handoff import (
     cmd_handoff_accept, cmd_handoff_activate, cmd_handoff_check, cmd_handoff_claim,
@@ -88,6 +89,10 @@ def cmd_spec_coverage(root: Path, args) -> None:
 
 
 ENVELOPE_ABANDON_EVENT = "ENVELOPE_ABANDON"
+
+# PILOT-073: a recovery starts from a live envelope and may also *finish* a
+# half-written one (the files already MERGED); nothing else can be recovered.
+RECOVERABLE_STATUSES = frozenset(ENVELOPE_MERGEABLE_STATUSES | {"MERGED"})
 
 
 def abandon_actor(root: Path, args) -> str:
@@ -179,6 +184,135 @@ def cmd_envelope_abandon(root: Path, args) -> None:
     emit({"ok": True, "envelope": envelope_id,
           "status": ENVELOPE_ABANDONED_STATUS, "by": by,
           "repaired": bool(recorded)})
+
+
+def envelope_recover_layer_parsers(
+        parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """PILOT-073: the ``envelope-recover`` surface for an out-of-band merge.
+
+    Registered through the command-layer chain like abandon/review, so
+    ``build_parser`` keeps its frozen PILOT-044 shape.
+    """
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        recover = action.add_parser("envelope-recover")
+        recover.add_argument("--envelope", required=True)
+        recover.add_argument("--merge-commit", dest="merge_commit", required=True,
+                             help="commit that landed on origin/<base>")
+        recover.add_argument("--reason", required=True,
+                             help="why the merge bypassed the merge gate")
+        recover.add_argument("--by", default=None,
+                             help="pinned supervisor id (default: the pin)")
+    return parser
+
+
+def cmd_envelope_recover(root: Path, args) -> None:
+    """PILOT-073: record an out-of-band merge the ledger never saw.
+
+    071's code landed on ``origin/main`` through a direct owner ``gh --admin``
+    while the envelope stayed ``WAITING``: no ``MERGE`` event exists, so
+    post-merge and the 069 supersede dead-ended.  Only the pinned merge
+    authority may recover, and the named commit must resolve, be on the
+    *freshly fetched* ``origin/<base>`` and contain the envelope's
+    implementation head.  Success appends ``MERGE_START`` (when still missing)
+    and ``MERGE`` (``merge_commit``, ``recovered=true``, ``by``, ``reason``),
+    sets the envelope and queue to ``MERGED`` and never writes
+    ``POST_MERGE_VERIFIED``.
+
+    A crash between those writes leaves a half state (files ``MERGED`` with no
+    ledger, or only the recovered ``MERGE_START``); a retry finishes it with
+    ``repaired=true`` and never duplicates an event.  Only the complete shape
+    (files ``MERGED`` plus ``MERGE``) is refused as a duplicate.  Every refusal
+    is read-only: exit 2 with zero writes.
+    """
+    envelope_id = check_package_id(args.envelope, "envelope")
+    reason = (args.reason or "").strip()
+    if not reason:
+        fail(["--reason must be a non-empty string"])
+    by = recover_actor(root, args)
+    path, env, queue, entry, starts, merges = recover_target(root, envelope_id)
+    base = str(env.get("base") or "main")
+    repo = resolve_repository(root, env.get("repository"))
+    merge_commit = recover_merge_commit(repo, env, args.merge_commit, base)
+    # A half state may already name the commit; a different one is not a repair
+    # but a rewrite of history, and is refused before any write.
+    recorded = [env.get("merge_commit"), entry.get("merge_commit")]
+    recorded += [event.get("merge_commit") for event in merges]
+    for value in recorded:
+        if value not in (None, "") and value != merge_commit:
+            fail([f"envelope {envelope_id} already records merge commit "
+                  f"{value!r}, not {merge_commit!r}; recovery cannot rewrite "
+                  "a merge"])
+    if (env.get("status") == "MERGED" and entry.get("status") == "MERGED"
+            and merges):
+        fail([f"envelope {envelope_id} already records a MERGE; nothing to "
+              "recover"])
+    repaired = bool(env.get("status") == "MERGED"
+                    or entry.get("status") == "MERGED" or starts or merges)
+    # The file writes are idempotent: a retry rewrites the same MERGED shape.
+    entry["status"] = "MERGED"
+    entry["merge_commit"] = merge_commit
+    save_queue(root, queue)
+    env.update({"status": "MERGED", "merge_commit": merge_commit})
+    env.setdefault("merged_at", now())
+    env.setdefault("supervisor", by)
+    env.update({"recovered": True, "recovered_by": by, "recovery_reason": reason})
+    jdump(path, env)
+    # The envelope transition table only admits MERGE from the internal MERGING
+    # state (tower_ledger_replay, out of this card's scope), so the recovered
+    # merge is preceded by its own MERGE_START, marked recovered: without it
+    # state-verify reports illegal_transition on the merged envelope.  A retry
+    # appends only what the half state is still missing.
+    if not starts and not merges:
+        append_supervision_ledger(root, "MERGE_START", "supervision",
+                                  {"envelope": envelope_id, "supervisor": by,
+                                   "recovered": True})
+    if not merges:
+        append_supervision_ledger(root, "MERGE", "supervision",
+                                  {"envelope": envelope_id,
+                                   "merge_commit": merge_commit,
+                                   "recovered": True, "by": by,
+                                   "reason": reason})
+    emit({"ok": True, "envelope": envelope_id, "status": "MERGED",
+          "merge_commit": merge_commit, "recovered": True, "by": by,
+          "repaired": repaired})
+
+
+def recover_target(root: Path, envelope_id: str):
+    """Envelope/queue pair plus its recovered events; read-only refusals.
+
+    ``WAITING``/``CORRECTION_REQUIRED`` is a fresh recovery, ``MERGED`` is the
+    half-write a retry completes.  A second ``MERGE`` event is ambiguous and is
+    refused rather than guessed at.
+    """
+    path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
+    if not path.exists():
+        fail([f"envelope not found: {envelope_id}"])
+    env = jload(path)
+    declared = env.get("envelope_id")
+    if declared != envelope_id:
+        fail([f"envelope identity matches request: file declares {declared!r}, "
+              f"request {envelope_id!r}"])
+    queue = load_queue(root)
+    entry = next((e for e in queue.get("entries") or []
+                  if isinstance(e, dict)
+                  and e.get("envelope_id") == envelope_id), None)
+    if entry is None:
+        fail([f"envelope not queued: {envelope_id}"])
+    for label, status in (("envelope", env.get("status")),
+                          ("queue", entry.get("status"))):
+        if status not in RECOVERABLE_STATUSES:
+            fail([f"{label} status {status!r} cannot be recovered (only "
+                  "WAITING/CORRECTION_REQUIRED, or MERGED to finish a "
+                  "half-write)"])
+    starts = ledger_events_naming(root, "supervision", "MERGE_START",
+                                  envelope_id)
+    merges = ledger_events_naming(root, "supervision", "MERGE", envelope_id)
+    if len(merges) > 1:
+        fail([f"envelope {envelope_id} has {len(merges)} MERGE events; "
+              "refusing to guess which one to trust"])
+    return path, env, queue, entry, starts, merges
 
 
 def envelope_abandon_layer_parsers(
@@ -283,6 +417,7 @@ COMMAND_LAYER_HANDLERS = {
     "arch-graph": cmd_arch_graph, "profile-check": cmd_profile_check,
     "acceptance-add": cmd_acceptance_add,
     "envelope-abandon": cmd_envelope_abandon,
+    "envelope-recover": cmd_envelope_recover,
     "task-supersede": cmd_task_supersede}
 
 
@@ -538,7 +673,8 @@ def base_sync_layer_parsers(
                 action="store_true",
                 help="allow an audited --admin merge when the base advanced "
                      "with state-only paths only (ledger/primary/supervision/"
-                     "tasks/state/merge-envelopes)")
+                     "tasks/state/merge-envelopes, plus pilot/*.spec.json and "
+                     "command/campaigns/**)")
     return parser
 
 
@@ -550,8 +686,15 @@ def base_sync_layer_parsers(
 # committed straight to the base branch before the PR exists (063/065/066/067),
 # so its appearance is state, not a code change; without this entry the
 # audited ``--allow-state-ahead`` path could never be used for its own envelope.
+# PILOT-073: the two *bookkeeping* inputs of a card join it as well --
+# ``pilot/*.spec.json`` (exactly one level below ``pilot/``) and
+# ``command/campaigns/**``.  They are card metadata, not code: rejecting them
+# forced the 071 direct-admin bypass.  ``pilot/`` itself is not widened:
+# worktrees, evidence, task cards and any deeper spec copy stay code/docs.
 STATE_ONLY_PREFIXES = ("ledger/", "primary/", "supervision/", "tasks/", "state/",
-                       "merge-envelopes/")
+                       "merge-envelopes/", "command/campaigns/")
+STATE_ONLY_PILOT_DIR = "pilot/"
+STATE_ONLY_SPEC_SUFFIX = ".spec.json"
 
 
 def tower_repo_prefix(root: Path, repo: Path) -> str:
@@ -560,16 +703,24 @@ def tower_repo_prefix(root: Path, repo: Path) -> str:
     return f"{relative}/" if relative else ""
 
 
+def pilot_spec_base_path(inside: str) -> bool:
+    """True for ``pilot/<card>.spec.json`` only -- never a deeper copy."""
+    if not inside.startswith(STATE_ONLY_PILOT_DIR):
+        return False
+    name = inside[len(STATE_ONLY_PILOT_DIR):]
+    return "/" not in name and name.endswith(STATE_ONLY_SPEC_SUFFIX)
+
+
 def classify_base_paths(paths: list[str], prefix: str) -> tuple[list[str], list[str]]:
     """Split base-only paths into ``(state_only, code_docs)``.
 
     A path is state-only only when it sits under the tower prefix and its
     tower-relative spelling starts with :data:`STATE_ONLY_PREFIXES` (the
-    primary/supervision ledgers and state, plus the base-side
-    ``merge-envelopes/``); every other path -- tools, arch, EVENT_CATALOG.json,
-    pilot, root docs, or anything outside the tower -- is code/docs.  The
-    default is the strict side, so an unclassifiable path can never earn
-    ``--admin``.
+    primary/supervision ledgers and state, the base-side ``merge-envelopes/``,
+    the campaign files) or is exactly ``pilot/<card>.spec.json``; every other
+    path -- tools, arch, EVENT_CATALOG.json, deeper pilot content, root docs,
+    or anything outside the tower -- is code/docs.  The default is the strict
+    side, so an unclassifiable path can never earn ``--admin``.
     """
     state: list[str] = []
     code: list[str] = []
@@ -577,6 +728,8 @@ def classify_base_paths(paths: list[str], prefix: str) -> tuple[list[str], list[
         path = str(raw).replace("\\", "/")
         inside = path[len(prefix):] if path.startswith(prefix) else ""
         if any(inside.startswith(name) for name in STATE_ONLY_PREFIXES):
+            state.append(path)
+        elif pilot_spec_base_path(inside):
             state.append(path)
         else:
             code.append(path)
@@ -780,8 +933,8 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         action.add_parser("brief")
     dispatch_campaign_parser(parser)
     review_layer_parsers(parser)
-    return base_sync_layer_parsers(envelope_base_side_layer_parsers(envelope_abandon_layer_parsers(supersede_layer_parsers(profile_layer_parsers(
-        arch_layer_parsers(position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser))))))))))
+    return base_sync_layer_parsers(envelope_recover_layer_parsers(envelope_base_side_layer_parsers(envelope_abandon_layer_parsers(supersede_layer_parsers(profile_layer_parsers(
+        arch_layer_parsers(position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser)))))))))))
 
 
 def cli_commands() -> list[str]:

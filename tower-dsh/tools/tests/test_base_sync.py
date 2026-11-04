@@ -21,6 +21,12 @@ that only gained ``tower-dsh/merge-envelopes/ENV-*.json`` plus tower state is
 still the audited state-only case, while ``tools/``, ``arch/``,
 ``EVENT_CATALOG.json``, ``pilot/`` and root docs stay code/docs.
 
+PILOT-073 narrows "``pilot/`` stays code/docs": the two *bookkeeping* inputs of
+a card -- ``pilot/<card>.spec.json`` (top level only) and
+``command/campaigns/**`` -- are state.  They were the 071 base-ahead that forced
+a direct ``gh --admin``; every other ``pilot/`` path (worktrees, evidence,
+deeper spec copies) and ``tools/``/``arch/`` stay code/docs even with the flag.
+
 The fixture is the PILOT-058 kit (a throw-away repository, a bare origin and an
 offline ``gh`` stub injected through ``TOWERCTL_GH``), so no network, token or
 real GitHub repository is involved.
@@ -56,6 +62,8 @@ BRANCH = review_gate.BRANCH
 STATE_PATH = "tower-dsh/ledger/BASE-SYNC-STATE.json"
 CODE_PATH = "tower-dsh/tools/base_sync_probe.py"
 TOOLS_PATH = "tower-dsh/tools/tower_cli.py"
+SPEC_PATH = "tower-dsh/pilot/PILOT-073.spec.json"
+CAMPAIGN_PATH = "tower-dsh/command/campaigns/C-2026-Q4-04.md"
 ENVELOPE_PATH = "tower-dsh/merge-envelopes/ENV-PILOT-068.json"
 ROOT_ENVELOPE_PATH = "merge-envelopes/ENV-PILOT-068.json"
 # The base-side envelope sits under the tower prefix of the kit repository.
@@ -157,6 +165,23 @@ class _BaseSyncKit(review_gate.ReviewGateKitCase):
     def promote_reviewed_envelope(self) -> None:
         self.promote("--head", self.implementation_head, "--base", self.base_sha)
 
+    def assert_state_ahead_refused(self, path: str) -> list[str]:
+        """A state-only base-ahead without the flag: exit 2, nothing written."""
+        self.promote_reviewed_envelope()
+        self.advance_base(path)
+        cp = self.run_merge()
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        errors = json.loads(cp.stdout)["errors"]
+        self.assertTrue(any("--allow-state-ahead" in error for error in errors),
+                        errors)
+        self.assertTrue(any(path in error for error in errors), errors)
+        self.assertEqual(self.envelope_state()["status"], "DRAFT")
+        self.assertEqual(self.queue_status(), "WAITING")
+        self.assertFalse([event for event in merge_event_types(self.root)
+                          if event.startswith("MERGE")])
+        self.assertFalse(self.gh_log.exists())
+        return errors
+
 
 class BaseSyncKitCase(_BaseSyncKit):
     """PILOT-067/068 cases: branch-side envelope, base still behind."""
@@ -205,19 +230,7 @@ class BaseSyncKitCase(_BaseSyncKit):
 
     # -- 3. state-only base without the flag ------------------------------
     def test_state_only_base_without_flag_is_refused(self) -> None:
-        self.promote_reviewed_envelope()
-        self.advance_base(STATE_PATH)
-        cp = self.run_merge()
-        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
-        errors = json.loads(cp.stdout)["errors"]
-        self.assertTrue(any("--allow-state-ahead" in error for error in errors),
-                        errors)
-        self.assertEqual(self.envelope_state()["status"], "DRAFT")
-        self.assertEqual(self.queue_status(), "WAITING")
-        events = merge_event_types(self.root)
-        self.assertFalse([event for event in events
-                          if event.startswith("MERGE")], events)
-        self.assertFalse(self.gh_log.exists())
+        self.assert_state_ahead_refused(STATE_PATH)
 
     # -- 4. code/docs base change -----------------------------------------
     def test_code_base_change_is_refused_even_with_the_flag(self) -> None:
@@ -293,7 +306,24 @@ class BaseSyncKitCase(_BaseSyncKit):
         self.assertEqual(self.queue_status(), "WAITING")
         self.assertFalse(self.gh_log.exists())
 
-    # -- 8. the review stays bound to the implementation ------------------
+    # -- 8. spec + campaign base advance is state, not code (PILOT-073) ----
+    def test_spec_and_campaign_base_with_flag_is_audited_admin(self) -> None:
+        self.promote_reviewed_envelope()
+        self.advance_base_paths([SPEC_PATH, CAMPAIGN_PATH])
+        cp = self.run_merge("--allow-state-ahead")
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        self.assertIn("--admin", self.merge_argv())
+        envelope = self.envelope_state()
+        self.assertEqual(envelope["status"], "MERGED")
+        self.assertEqual(envelope["base_sync"], "state-only")
+        self.assertEqual(envelope["base_ahead_paths"],
+                         [CAMPAIGN_PATH, SPEC_PATH])
+        self.assertIs(envelope["admin"], True)
+
+    def test_spec_base_advance_without_the_flag_is_refused(self) -> None:
+        self.assert_state_ahead_refused(SPEC_PATH)
+
+    # -- 9. the review stays bound to the implementation ------------------
     def test_review_head_stays_bound_to_the_envelope_implementation(self) -> None:
         self.promote_reviewed_envelope()
         self.advance_base(STATE_PATH)
@@ -496,11 +526,17 @@ class BasePathClassificationCase(unittest.TestCase):
                        "tower-dsh/supervision/CURRENT_STATE.json",
                        "tower-dsh/tasks/PILOT-067/TASK.md",
                        "tower-dsh/state/PROFILE-TOWER-DSH.md",
-                       "tower-dsh/merge-envelopes/ENV-PILOT-068.json"]
+                       "tower-dsh/merge-envelopes/ENV-PILOT-068.json",
+                       "tower-dsh/pilot/PILOT-071.spec.json",
+                       "tower-dsh/pilot/PILOT-073.spec.json",
+                       "tower-dsh/command/campaigns/C-2026-Q4-04.md"]
         code_paths = ["tower-dsh/tools/tower_merge.py",
                       "tower-dsh/arch/ADR-0009-delivery-trust.md",
                       "tower-dsh/EVENT_CATALOG.json",
-                      "tower-dsh/pilot/PILOT-067.spec.json",
+                      "tower-dsh/pilot/PILOT-067.md",
+                      "tower-dsh/pilot/PILOT-073.spec.json.bak",
+                      "tower-dsh/pilot/worktrees/PILOT-071/tower-dsh/tools/tower_cli.py",
+                      "tower-dsh/command/campaigns.md",
                       "tower-dsh/README.md",
                       "control-tower/README.md",
                       "merge-envelopes/ENV-PILOT-068.json"]
@@ -527,6 +563,23 @@ class BasePathClassificationCase(unittest.TestCase):
         self.assertEqual(state, [])
         self.assertEqual(code, [ROOT_ENVELOPE_PATH,
                                 "control-tower/merge-envelopes/ENV.json"])
+
+    def test_pilot_spec_and_campaign_are_state_only_inside_the_tower(self) -> None:
+        # PILOT-073: the spec/campaign pair is exactly what 071 lost.
+        state, code = tower_cli.classify_base_paths(
+            ["tower-dsh/pilot/PILOT-071.spec.json",
+             "tower-dsh/command/campaigns/C-2026-Q4-04.md"], "tower-dsh/")
+        self.assertEqual(state, ["tower-dsh/pilot/PILOT-071.spec.json",
+                                 "tower-dsh/command/campaigns/C-2026-Q4-04.md"])
+        self.assertEqual(code, [])
+        # Only the top-level ``pilot/<card>.spec.json`` spelling is state: a
+        # second level or another suffix stays code (the flag never widens it).
+        state, code = tower_cli.classify_base_paths(
+            ["tower-dsh/pilot/nested/PILOT-071.spec.json",
+             "tower-dsh/pilot/PILOT-071.spec.json.orig"], "tower-dsh/")
+        self.assertEqual(state, [])
+        self.assertEqual(code, ["tower-dsh/pilot/nested/PILOT-071.spec.json",
+                                "tower-dsh/pilot/PILOT-071.spec.json.orig"])
 
 
 class PrMergeArgvCase(unittest.TestCase):
