@@ -23,7 +23,8 @@
     "pilot/worktrees/PILOT-073/tower-dsh/tools/tower_cli.py",
     "pilot/worktrees/PILOT-073/tower-dsh/tools/tower_envelope.py",
     "pilot/worktrees/PILOT-073/tower-dsh/tools/tests/test_envelope_recover.py",
-    "pilot/worktrees/PILOT-073/tower-dsh/tools/tests/test_base_sync.py"
+    "pilot/worktrees/PILOT-073/tower-dsh/tools/tests/test_base_sync.py",
+    "pilot/worktrees/PILOT-073/tower-dsh/tools/tests/test_modules.py"
   ],
   "forbidden": [
     "network",
@@ -42,6 +43,8 @@
     "073 自身审计 admin 合并；071 recover 后 post-merge 9/9；069 superseded；where 11/11",
     "真实塔 73/70 drift []；arch 18；profile 11/0；shape 0"
   ],
-  "depends_on": ["PILOT-070"],
+  "depends_on": [
+    "PILOT-070"
+  ],
   "worktree": "pilot/worktrees/PILOT-073"
 }
