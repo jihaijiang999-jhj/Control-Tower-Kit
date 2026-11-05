@@ -60,6 +60,6 @@
   ],
   "envelope_head_sha": "7984cd410c33b75e635a400a20de15921b2f1980",
   "head": "7984cd410c33b75e635a400a20de15921b2f1980",
-  "status": "WAITING",
+  "status": "CORRECTION_REQUIRED",
   "base_side": true
 }
