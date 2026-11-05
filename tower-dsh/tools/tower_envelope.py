@@ -57,8 +57,7 @@ def envelope_has_baselines(env: dict) -> bool:
 
 def envelope_git_checks(repo: Path, env: dict,
                         tower_root: Path | None = None) -> tuple[str, list[dict]]:
-    """The envelope commit's git shape: one commit on the branch (pre-063) or
-    on the base (base-side); the head is returned so callers cannot drift."""
+    """The envelope commit's git shape; the head is returned so callers cannot drift."""
     def item(name: str, ok: bool, detail: str) -> dict:
         return {"name": name, "ok": ok, "detail": detail}
 
@@ -105,10 +104,7 @@ def envelope_git_checks(repo: Path, env: dict,
         return "", [item("git checks", False, str(exc))]
 
 def review_mismatches(root: Path, task: str, review: dict, head: str) -> list[str]:
-    """Field-level staleness between one ``REVIEW.json`` and the envelope.
-
-    ``base`` only matters when the record still carries ``dispatch.base_sha``.
-    """
+    """Field-level staleness between one ``REVIEW.json`` and the envelope."""
     base = _dispatch_base_sha(_optional_task_record(root, task) or {})
     expected = (("schema", review.get("schema"), REVIEW_SCHEMA),
                 ("verdict", review.get("verdict"), "PASS"),
@@ -132,8 +128,8 @@ def review_problems(root: Path, env: dict, task: str) -> list[str]:
     return review_mismatches(root, task, review, head)
 
 def review_binding_check(root: Path, env: dict, task: str) -> tuple[bool, str]:
-    """The ``review bound to head`` check: a pre-058 ``CHECKBACK`` has no
-    ``head`` and keeps the old gate; every newer one is decided by
+    """The ``review bound to head`` check (a pre-058 ``CHECKBACK`` has no head
+    and keeps the old gate); every newer one is decided by
     :func:`review_problems`."""
     if not is_safe_id(task, TASK_ID_RE):
         return True, "legacy: no task record to bind a review to"
@@ -509,12 +505,9 @@ def recover_merge_commit(repo: Path, env: dict, merge_commit: str,
                          base: str) -> str:
     """Fetch ``origin/<base>`` and prove the named commit landed there.
 
-    The fetch comes first: a commit that only exists on the origin (the usual
-    071 direct-admin merge) is not in the local object database until that
-    fetch delivers it, so resolving beforehand would refuse a landed merge.
-    After the fetch the named commit must resolve locally and be an ancestor of
-    the freshly fetched ``FETCH_HEAD``; a failed fetch, a missing ``FETCH_HEAD``
-    or a commit absent from the fetched history all refuse before any write.
+    The fetch comes first (an origin-only merge must be delivered before it can
+    resolve); afterwards the commit must resolve locally and be an ancestor of
+    the freshly fetched ``FETCH_HEAD``.
     """
     sha = (merge_commit or "").strip()
     if not sha:
@@ -540,14 +533,27 @@ def recover_merge_commit(repo: Path, env: dict, merge_commit: str,
         fail([f"merge commit {resolved} does not contain implementation head {impl}"])
     return resolved
 
+def append_recovery_events(root: Path, envelope_id: str, starts: list[dict],
+                           merges: list[dict], merge_commit: str, by: str,
+                           reason: str) -> None:
+    """PILOT-075: append the recovered ``MERGE_START``/``MERGE`` tail once."""
+    if not merges:
+        if not starts:
+            append_supervision_ledger(root, "MERGE_START", "supervision",
+                                      {"envelope": envelope_id,
+                                       "supervisor": by, "recovered": True})
+        append_supervision_ledger(root, "MERGE", "supervision",
+                                  {"envelope": envelope_id,
+                                   "merge_commit": merge_commit,
+                                   "recovered": True, "by": by, "reason": reason})
+
+
 def merge_commit_errors(repo: Path, env: dict, merge_commit, base: str) -> list[str]:
     """PILOT-074: why a claimed merge commit is not a landed merge.
 
     It must be non-empty, resolve locally, sit on ``origin/<base>`` (the
-    remote-tracking ref only -- no fetch, so no network) and carry the envelope's
-    implementation head as its second parent.  Every envelope the merge gate
-    still admits is base-side, where the branch head *is* the implementation, so
-    a root/one-parent commit refuses exactly like a different second parent.
+    remote-tracking ref only, no fetch) and carry the implementation head as its
+    second parent; a root/one-parent commit refuses like a wrong second parent.
     """
     sha = merge_commit.strip() if isinstance(merge_commit, str) else ""
     if not sha:
@@ -577,9 +583,8 @@ def merge_commit_errors(repo: Path, env: dict, merge_commit, base: str) -> list[
 def envelope_remerge_errors(root: Path, env: dict, envelope_id: str) -> list[str]:
     """Refuse a ``DRAFT`` envelope that a re-envelope reset (the 052 drift).
 
-    ``envelope-new`` is also the re-envelope path, so only an envelope whose
-    ledger already holds a previous ``ENVELOPE_NEW`` must still be
-    ``WAITING``/``CORRECTION_REQUIRED``; one-shot envelopes keep the old way.
+    An envelope whose ledger already holds a previous ``ENVELOPE_NEW`` must
+    still be ``WAITING``/``CORRECTION_REQUIRED``.
     """
     if env.get("status") != "DRAFT":
         return []

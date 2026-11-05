@@ -16,8 +16,11 @@ and queue to ``MERGED`` and never writes ``POST_MERGE_VERIFIED`` (that stays the
 post-merge gate's verdict).  Every refusal is exit 2 with zero writes, and a
 recovery that already happened is refused the same way.
 
-The fixture is a throw-away git repository plus a bare ``origin``, both under
-``%TEMP%``, so no network or real repository is involved.
+The fixture is a throw-away git repository plus a bare ``origin`` under
+``%TEMP%``, so no network or real repository is involved.  ``PILOT-075`` adds
+the order (recovered ``MERGE_START`` then ``MERGE`` from ``CORRECTION_REQUIRED``),
+074's no-duplicate repair, and pins that an ordinary correction-to-merge stays
+illegal; the 074-shaped fixture replays with zero drift once ``MERGED``.
 
 Run from the tower root (``tower-dsh``)::
 
@@ -78,6 +81,8 @@ class _RecoverKit(unittest.TestCase):
     """A tower whose ``main`` already contains an out-of-band merge."""
 
     REMOTE_ONLY = False
+    ENVELOPE_ID = ENVELOPE
+    TASK_ID = TASK
 
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory(
@@ -87,6 +92,8 @@ class _RecoverKit(unittest.TestCase):
         self.root = self.kit / "tower-dsh"
         self.origin = self.tmp / "origin.git"
         self.gh_log = self.tmp / "gh-argv.jsonl"
+        self.envelope_id = self.ENVELOPE_ID
+        self.task = self.TASK_ID
         for directory in ("primary", "supervision/envelopes", "ledger"):
             (self.root / directory).mkdir(parents=True, exist_ok=True)
         for name in ("primary.jsonl", "supervision.jsonl"):
@@ -168,22 +175,22 @@ class _RecoverKit(unittest.TestCase):
     def write_envelope(self) -> None:
         tower_envelope.append_supervision_ledger(
             self.root, "ENVELOPE_NEW", "primary",
-            {"envelope": ENVELOPE, "task": TASK,
+            {"envelope": self.envelope_id, "task": self.task,
              "head": self.implementation_head})
         tower_envelope.append_supervision_ledger(
             self.root, "QUEUE_ADD", "primary",
-            {"envelope": ENVELOPE, "task": TASK})
+            {"envelope": self.envelope_id, "task": self.task})
         write_json(self.envelope_path(), {
-            "schema": "tower/merge-envelope@1", "envelope_id": ENVELOPE,
-            "task": TASK, "repository": "..", "branch": BRANCH, "base": BASE,
-            "envelope_path": f"merge-envelopes/{ENVELOPE}.json",
+            "schema": "tower/merge-envelope@1", "envelope_id": self.envelope_id,
+            "task": self.task, "repository": "..", "branch": BRANCH, "base": BASE,
+            "envelope_path": f"merge-envelopes/{self.envelope_id}.json",
             "implementation_head_sha": self.implementation_head,
             "tests_baseline": 770, "tower_tests_baseline": 900,
             "status": "WAITING"})
         write_json(self.queue_path(), {
             "schema": "tower/merge-queue@1", "entries": [{
-                "envelope_id": ENVELOPE, "task": TASK, "branch": BRANCH,
-                "base": BASE, "status": "WAITING",
+                "envelope_id": self.envelope_id, "task": self.task,
+                "branch": BRANCH, "base": BASE, "status": "WAITING",
                 "added_at": "2026-11-04T00:00:00+08:00"}]})
 
     def authorize(self) -> None:
@@ -202,12 +209,12 @@ class _RecoverKit(unittest.TestCase):
             timeout=120)
 
     def recover(self, *extra: str) -> subprocess.CompletedProcess:
-        return self.cli("envelope-recover", "--envelope", ENVELOPE,
+        return self.cli("envelope-recover", "--envelope", self.envelope_id,
                         "--merge-commit", self.merge_commit,
                         "--reason", "071 direct owner admin", *extra)
 
     def envelope_path(self) -> Path:
-        return self.root / "supervision" / "envelopes" / f"{ENVELOPE}.json"
+        return self.root / "supervision" / "envelopes" / f"{self.envelope_id}.json"
 
     def queue_path(self) -> Path:
         return self.root.joinpath(*QUEUE)
@@ -225,7 +232,15 @@ class _RecoverKit(unittest.TestCase):
     def entry(self) -> dict:
         queue = json.loads(self.queue_path().read_text(encoding="utf-8"))
         return next(item for item in queue["entries"]
-                    if item["envelope_id"] == ENVELOPE)
+                    if item["envelope_id"] == self.envelope_id)
+
+    def save_entry(self, **changes) -> None:
+        """Update this envelope's queue entry in place (fixture shaping)."""
+        queue = json.loads(self.queue_path().read_text(encoding="utf-8"))
+        entry = next(item for item in queue["entries"]
+                     if item["envelope_id"] == self.envelope_id)
+        entry.update(changes)
+        write_json(self.queue_path(), queue)
 
     def events(self, event_type: str | None = None) -> list[dict]:
         rows = [json.loads(line) for line in
@@ -256,16 +271,12 @@ class _RecoverKit(unittest.TestCase):
         if merge_start:
             tower_envelope.append_supervision_ledger(
                 self.root, "MERGE_START", "supervision",
-                {"envelope": ENVELOPE, "supervisor": SUPERVISOR,
+                {"envelope": self.envelope_id, "supervisor": SUPERVISOR,
                  "recovered": True})
         env = self.envelope()
         env.update({"status": "MERGED", "merge_commit": self.merge_commit})
         write_json(self.envelope_path(), env)
-        queue = json.loads(self.queue_path().read_text(encoding="utf-8"))
-        entry = next(item for item in queue["entries"]
-                     if item["envelope_id"] == ENVELOPE)
-        entry.update({"status": "MERGED", "merge_commit": self.merge_commit})
-        write_json(self.queue_path(), queue)
+        self.save_entry(status="MERGED", merge_commit=self.merge_commit)
 
     def stale_local_ref(self, sha: str) -> None:
         """Move the local ``origin/main`` ref without touching the origin."""
@@ -273,6 +284,26 @@ class _RecoverKit(unittest.TestCase):
 
     def rewind_origin(self, sha: str) -> None:
         ok(run_git(self.origin, "update-ref", "refs/heads/main", sha))
+
+    # -- correction shaping (PILOT-075) -----------------------------------
+    def append(self, event_type: str, **payload) -> None:
+        tower_envelope.append_supervision_ledger(
+            self.root, event_type, "supervision",
+            {"envelope": self.envelope_id, **payload})
+
+    def block_merge(self, reason: str = "checks") -> None:
+        """The correction event a blocked merge writes (no merge happened)."""
+        self.append("MERGE_BLOCKED", phase=reason, reason=reason)
+
+    def set_status(self, status: str, merge_commit: str | None = None) -> None:
+        """Write the envelope/queue pair a command would leave behind."""
+        changes = {"status": status}
+        if merge_commit is not None:
+            changes["merge_commit"] = merge_commit
+        env = self.envelope()
+        env.update(changes)
+        write_json(self.envelope_path(), env)
+        self.save_entry(**changes)
 
 
 class EnvelopeRecoverCase(_RecoverKit):
@@ -299,7 +330,7 @@ class EnvelopeRecoverCase(_RecoverKit):
         merges = self.events("MERGE")
         self.assertEqual(len(merges), 1)
         payload = merges[0]["payload"]
-        self.assertEqual(payload["envelope"], ENVELOPE)
+        self.assertEqual(payload["envelope"], self.envelope_id)
         self.assertEqual(payload["merge_commit"], self.merge_commit)
         self.assertIs(payload["recovered"], True)
         self.assertEqual(payload["by"], SUPERVISOR)
@@ -478,6 +509,90 @@ class RemoteOnlyRecoverCase(_RecoverKit):
         cp = self.recover()
         self.assert_refused(cp, before)
         self.assertIn("is not a resolvable commit", cp.stdout)
+
+
+class CorrectionRecoverCase(_RecoverKit):
+    """PILOT-075: recovery out of ``CORRECTION_REQUIRED`` writes the order."""
+
+    def test_correction_recovery_appends_merge_start_then_merge(self) -> None:
+        self.authorize()
+        self.block_merge()
+        self.set_status("CORRECTION_REQUIRED")
+        cp = self.recover()
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        tail = self.events()[-2:]
+        self.assertEqual([event["type"] for event in tail],
+                         ["MERGE_START", "MERGE"])
+        start, merge = tail
+        self.assertIs(start["payload"]["recovered"], True)
+        self.assertIs(merge["payload"]["recovered"], True)
+        self.assertEqual(merge["payload"]["merge_commit"], self.merge_commit)
+        self.assertEqual((self.envelope()["status"], self.entry()["status"]),
+                         ("MERGED", "MERGED"))
+        self.assertEqual(self.events("POST_MERGE_VERIFIED"), [])
+        cp, verify = self.state_verify()
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        self.assertEqual(verify["drift"], [])
+
+    def test_ordinary_correction_to_merge_stays_illegal(self) -> None:
+        """No ``recovered`` flag: the 074 compatibility is not a blanket pass."""
+        self.append("MERGE_START", supervisor=SUPERVISOR)
+        self.block_merge()
+        self.append("MERGE", merge_commit=self.merge_commit, by=SUPERVISOR)
+        self.set_status("MERGED", self.merge_commit)
+        cp, verify = self.state_verify()
+        self.assertEqual(cp.returncode, 2, msg=cp.stdout + cp.stderr)
+        self.assertEqual(
+            [row for row in verify["drift"]
+             if row["kind"] == "illegal_transition"],
+            [{"kind": "illegal_transition", "target": self.envelope_id,
+              "event": "MERGE", "expected": ["MERGING"],
+              "actual": "CORRECTION_REQUIRED"}])
+
+
+class Recover074Case(_RecoverKit):
+    """PILOT-075: 074's real shape -- one recovered MERGE, two failures."""
+
+    ENVELOPE_ID = "ENV-PILOT-074"
+    TASK_ID = "PILOT-074"
+
+    def write_074_shape(self) -> None:
+        """``MERGE_START``, ``MERGE_BLOCKED``, recovered ``MERGE``, 2 failures."""
+        self.append("MERGE_START", supervisor=SUPERVISOR)
+        self.block_merge()
+        self.append("MERGE", merge_commit=self.merge_commit, recovered=True,
+                    by=SUPERVISOR, reason="074 admin merge")
+        self.append("POST_MERGE_FAILED", result="PASS")
+        self.append("POST_MERGE_FAILED", result="PASS")
+        self.set_status("CORRECTION_REQUIRED", self.merge_commit)
+
+    def test_existing_recovered_merge_is_normalized_without_a_second_merge(self):
+        self.authorize()
+        self.write_074_shape()
+        cp = self.recover()
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        self.assertEqual(json.loads(cp.stdout)["status"], "MERGED")
+        self.assertEqual(len(self.events("MERGE")), 1)       # never duplicated
+        self.assertEqual(len(self.events("MERGE_START")), 1)
+        self.assertEqual(self.events("POST_MERGE_VERIFIED"), [])
+        self.assertEqual((self.envelope()["status"], self.envelope()["merge_commit"]),
+                         ("MERGED", self.merge_commit))
+        self.assertEqual((self.entry()["status"], self.entry()["merge_commit"]),
+                         ("MERGED", self.merge_commit))
+
+    def test_074_real_shape_recovers_to_zero_drift(self) -> None:
+        self.authorize()
+        self.write_074_shape()
+        # Only the file halves disagree: the recovered MERGE is already legal.
+        before, verify = self.state_verify()
+        self.assertEqual(before.returncode, 2, msg=before.stdout + before.stderr)
+        self.assertEqual(sorted(row["kind"] for row in verify["drift"]),
+                         ["envelope_status", "queue_status"])
+        cp = self.recover()
+        self.assertEqual(cp.returncode, 0, msg=cp.stdout + cp.stderr)
+        after, verify = self.state_verify()
+        self.assertEqual(after.returncode, 0, msg=after.stdout + after.stderr)
+        self.assertEqual(verify["drift"], [])
 
 
 if __name__ == "__main__":

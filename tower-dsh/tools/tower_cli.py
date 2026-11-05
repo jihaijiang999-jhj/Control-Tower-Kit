@@ -34,9 +34,9 @@ from tower_campaign import cmd_campaign_check
 from tower_dispatch import cmd_dispatch
 from tower_delivery import cmd_completion_add, cmd_deliver
 from tower_envelope import (
-    cmd_checkback, cmd_envelope_new, cmd_queue_add, load_queue,
-    load_supervision, merge_commit_errors, recover_actor, recover_merge_commit,
-    save_queue,
+    append_recovery_events, cmd_checkback, cmd_envelope_new, cmd_queue_add,
+    load_queue, load_supervision, merge_commit_errors, recover_actor,
+    recover_merge_commit, save_queue,
 )
 from tower_handoff import (
     cmd_handoff_accept, cmd_handoff_activate, cmd_handoff_check, cmd_handoff_claim,
@@ -227,10 +227,15 @@ def cmd_envelope_recover_merge(root: Path, args) -> None:
     post-merge and the 069 supersede dead-ended.  Only the pinned merge
     authority may recover, and the named commit must resolve, be on the
     *freshly fetched* ``origin/<base>`` and contain the envelope's
-    implementation head.  Success appends ``MERGE_START`` (when still missing)
-    and ``MERGE`` (``merge_commit``, ``recovered=true``, ``by``, ``reason``),
-    sets the envelope and queue to ``MERGED`` and never writes
-    ``POST_MERGE_VERIFIED``.
+    implementation head.  Success appends a recovered ``MERGE_START`` (unless
+    the half state already carries one) and then ``MERGE`` (``merge_commit``,
+    ``recovered=true``, ``by``, ``reason``), sets the envelope and queue to
+    ``MERGED`` and never writes ``POST_MERGE_VERIFIED``.
+
+    PILOT-075: an envelope whose recovered ``MERGE`` already landed (074: a
+    ``CORRECTION_REQUIRED`` after a failed post-merge) is normalised in place --
+    the envelope and queue become ``MERGED`` with the recorded commit and no
+    second ``MERGE`` is written; the replay admits that one recovered source.
 
     A crash between those writes leaves a half state (files ``MERGED`` with no
     ledger, or only the recovered ``MERGE_START``); a retry finishes it with
@@ -271,21 +276,8 @@ def cmd_envelope_recover_merge(root: Path, args) -> None:
     env.setdefault("supervisor", by)
     env.update({"recovered": True, "recovered_by": by, "recovery_reason": reason})
     jdump(path, env)
-    # The envelope transition table only admits MERGE from the internal MERGING
-    # state (tower_ledger_replay, out of this card's scope), so the recovered
-    # merge is preceded by its own MERGE_START, marked recovered: without it
-    # state-verify reports illegal_transition on the merged envelope.  A retry
-    # appends only what the half state is still missing.
-    if not starts and not merges:
-        append_supervision_ledger(root, "MERGE_START", "supervision",
-                                  {"envelope": envelope_id, "supervisor": by,
-                                   "recovered": True})
-    if not merges:
-        append_supervision_ledger(root, "MERGE", "supervision",
-                                  {"envelope": envelope_id,
-                                   "merge_commit": merge_commit,
-                                   "recovered": True, "by": by,
-                                   "reason": reason})
+    append_recovery_events(root, envelope_id, starts, merges, merge_commit,
+                           by, reason)
     emit({"ok": True, "envelope": envelope_id, "status": "MERGED",
           "merge_commit": merge_commit, "recovered": True, "by": by,
           "repaired": repaired})
