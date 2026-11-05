@@ -60,6 +60,12 @@
   ],
   "envelope_head_sha": "7984cd410c33b75e635a400a20de15921b2f1980",
   "head": "7984cd410c33b75e635a400a20de15921b2f1980",
-  "status": "CORRECTION_REQUIRED",
-  "base_side": true
+  "status": "MERGED",
+  "base_side": true,
+  "merge_commit": "eb25ff596be67486e867ff5a28e1794b915c5bd3",
+  "merged_at": "2026-11-05T16:42:09+08:00",
+  "supervisor": "sup-phase2-pilot",
+  "recovered": true,
+  "recovered_by": "sup-phase2-pilot",
+  "recovery_reason": "075 PR #59 admin merge recovery"
 }
