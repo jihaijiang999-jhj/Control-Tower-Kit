@@ -39,12 +39,10 @@ CHECKBACK_STATUSES = ("delivered", "reviewed", "rework", "accepted")
 def verify_ledger_file(root: Path, name: str) -> dict:
     """Validate one ledger file: presence, JSON, seq, hashes and prev links.
 
-    A missing ledger is a *failed* verification, not an empty one: the old
-    code parsed it as zero rows and reported no errors, so every caller read
-    "the file is not there" as "the chain is intact".  An existing empty file
-    is still a valid empty chain.  Any read error (a directory in place of the
-    file, an ACL denial, ...) becomes one ``ledger unreadable`` error instead
-    of a traceback, so the CLI can always emit exactly one JSON payload.
+    A missing ledger is a *failed* verification, not an empty one (the old code
+    reported no errors for it); an existing empty file is a valid empty chain.
+    Any read error becomes one ``ledger unreadable`` error, so the CLI can
+    always emit exactly one JSON payload.
     """
     path = root / "ledger" / LEDGER_FILES[name]
     result = {
@@ -105,13 +103,10 @@ def verify_ledger_file(root: Path, name: str) -> dict:
 def ledger_precondition_breaks(root: Path) -> list[tuple[str, str]]:
     """``(ledger name, first error)`` for every ledger that fails verification.
 
-    PILOT-039 v2: ``merge`` and the legacy ``merge-check`` precondition verify
-    *both* ledgers unconditionally.  A missing ledger is a failure, not "no
-    chain to verify": PILOT-036 already established that absence is not
-    integrity, and skipping it let deleting ``ledger/supervision.jsonl`` turn a
-    legacy envelope into a MERGED merge whose ledger was then recreated.  An
-    existing ledger is verified in full -- a forged row can keep
-    ``seq``/``prev_hash`` legal and still be caught by the hash.
+    PILOT-039 v2: ``merge`` and ``merge-check`` verify *both* ledgers, and a
+    missing ledger is a failure, not "no chain to verify" (PILOT-036: absence
+    is not integrity).  An existing ledger is verified in full -- a forged row
+    can keep ``seq``/``prev_hash`` legal and still be caught by the hash.
     """
     breaks: list[tuple[str, str]] = []
     for name in ("primary", "supervision"):
@@ -135,11 +130,9 @@ def supervision_artifacts(root: Path) -> list[str]:
     """Supervision artifacts that imply history the ledger should back.
 
     PILOT-040: envelope files, merge-queue entries and merge-ledger entries are
-    the three files a tower writes as it merges.  They are only legitimate when
-    ``ledger/supervision.jsonl`` records how they got there.  Read-only, and
-    unreadable artifacts are skipped here: ``state-verify`` already reports
-    them (`queue_unreadable` / `merge-ledger` drift) and this guard must not
-    pretend an unparseable file is history.
+    legitimate only when ``ledger/supervision.jsonl`` records how they got
+    there.  Unreadable artifacts are skipped: ``state-verify`` reports them and
+    this guard must not pretend an unparseable file is history.
     """
     artifacts: list[str] = []
     envelope_dir = root / "supervision" / "envelopes"
@@ -167,10 +160,9 @@ def supervision_artifacts(root: Path) -> list[str]:
 def supervision_ledger_event_count(root: Path) -> int | None:
     """Parseable events in ``ledger/supervision.jsonl``; ``None`` if unreadable.
 
-    A whitespace-only file counts as zero events (it is an empty chain), while
-    a row that is not a JSON object is not an event either.  ``None`` means the
-    file itself cannot be read; that is a chain failure handled by 039, not an
-    empty ledger, so the 040 guard must decline to judge it.
+    A whitespace-only file counts as zero events, and a non-object row is not
+    an event either.  ``None`` means the file itself cannot be read; that is a
+    chain failure handled by 039, not an empty ledger.
     """
     path = root / "ledger" / LEDGER_FILES["supervision"]
     if not path.is_file():
@@ -236,19 +228,15 @@ ENVELOPE_TERMINAL_STATUSES = frozenset({"MERGED", "POST_MERGE_VERIFIED"})
 
 
 # PILOT-062: the statuses a failed envelope may be tombstoned from.  A
-# ``MERGE_BLOCKED`` *event* folds to ``CORRECTION_REQUIRED``, so that source is
-# covered by the status; ``MERGING`` is the internal state after ``MERGE_START``
-# (the queue entry, and after a merge start the replay, still see it).  The
-# literal ``MERGE_BLOCKED`` is accepted as well: a hand-written queue/envelope
-# may carry the event name, and treating it as blocked only widens nothing --
-# the replay fold itself never produces that string.
+# ``MERGE_BLOCKED`` event folds to ``CORRECTION_REQUIRED``; ``MERGING`` is the
+# post-``MERGE_START`` internal state, and the literal ``MERGE_BLOCKED`` is
+# accepted for a hand-written queue/envelope.
 ENVELOPE_ABANDONABLE_STATUSES = frozenset({
     "WAITING", "CORRECTION_REQUIRED", "MERGE_BLOCKED", ENVELOPE_MERGING_STATUS})
 
 
-# PILOT-074: verified is not "the merge landed".  The strict MERGED-only
-# transition and verified_without_merge start at card 074; earlier envelopes
-# keep their lifecycle and are backfilled with MERGE_HISTORICAL instead.
+# PILOT-074: verified is not "the merge landed"; 074+ needs MERGED, legacy
+# envelopes are backfilled with MERGE_HISTORICAL instead.
 PILOT_074 = 74
 MERGE_FACT_EVENTS = ("MERGE", "MERGE_HISTORICAL")
 MERGE_HISTORICAL_EVENT = "MERGE_HISTORICAL"
@@ -289,12 +277,9 @@ def envelope_transition_allowed(event_type: str, envelope_id) -> frozenset | Non
 TASK_TRANSITIONS = {
     "TASK_NEW": frozenset({None, "ready", "dispatched", "delivered",
                            "reviewed", "rework"}),
-    # PILOT-055 (owner choice A): a second DISPATCH replaces the executor of a
-    # card that is already ``dispatched``.  The real ledger re-dispatched
-    # PILOT-055 from its placeholder executor to the real one, which is a
-    # replacement, not a new lifecycle step.  Only ``dispatched`` joins the
-    # table: a ``delivered``/``reviewed``/``closed`` card still cannot be
-    # re-dispatched, so the table is not a blanket ``any -> dispatched``.
+    # PILOT-055 (owner choice A): a second DISPATCH replaces the executor of an
+    # already-dispatched card; only ``dispatched`` joins the table, so a
+    # delivered/reviewed/closed card still cannot be re-dispatched.
     "DISPATCH": frozenset({"ready", "rework", "dispatched"}),
     "DELIVER": frozenset({"dispatched", "delivered", "rework"}),
     # PILOT-058 adds ``accepted``: a re-envelope can move the reviewed head, so
@@ -314,11 +299,8 @@ ENVELOPE_TRANSITIONS = {
     "ENVELOPE_NEW": frozenset({None, "DRAFT", "WAITING",
                                "CORRECTION_REQUIRED"}),
     "QUEUE_ADD": frozenset({"DRAFT"}),
-    # PILOT-060: a merge that already wrote ``MERGE_START`` and then failed
-    # (056: dirty working tree before any ledger write) retries from the
-    # internal ``MERGING`` state.  Only the retry joins the table: the merge
-    # has not settled anything yet, so ``DRAFT`` / ``MERGED`` /
-    # ``POST_MERGE_VERIFIED`` still cannot start a merge.
+    # PILOT-060: a merge that wrote ``MERGE_START`` and then failed retries from
+    # the internal ``MERGING`` state; nothing else may start a merge.
     "MERGE_START": frozenset({"WAITING", "CORRECTION_REQUIRED",
                               ENVELOPE_MERGING_STATUS}),
     "MERGE": frozenset({ENVELOPE_MERGING_STATUS}),
@@ -336,8 +318,7 @@ ENVELOPE_TRANSITIONS = {
 def ledger_events_in_seq_order(root: Path, name: str) -> list[dict]:
     """Parsed ledger events sorted by ``seq`` (file order breaks ties).
 
-    Rows that are not JSON objects are skipped here; ``verify_ledger_file``
-    reports them, and ``state-verify`` refuses to replay a broken ledger.
+    Non-object rows are skipped here; ``verify_ledger_file`` reports them.
     """
     rows = []
     for index, raw in enumerate(ledger_rows(root / "ledger" / LEDGER_FILES[name])):
@@ -356,10 +337,9 @@ def ledger_events_naming(root: Path, name: str, event_type: str,
                          envelope_id) -> list[dict]:
     """Payloads of ``event_type`` events in ``ledger/<name>.jsonl`` naming it.
 
-    Read-only.  A caller that needs more than existence (the ``ENVELOPE_NEW``
-    binding check) can inspect the payloads; :func:`ledger_has_event` is the
-    boolean wrapper.  Rows that are not JSON objects are ignored, exactly like
-    :func:`ledger_has_event`.
+    Read-only.  A caller needing more than existence can inspect the payloads;
+    :func:`ledger_has_event` is the boolean wrapper, and non-object rows are
+    ignored exactly like there.
     """
     payloads = []
     for event in ledger_events_in_seq_order(root, name):
@@ -409,14 +389,9 @@ def replay_task_statuses(root: Path,
                          transitions: list[dict] | None = None) -> dict[str, str]:
     """Fold ``ledger/primary.jsonl`` by task into the expected status.
 
-    When ``transitions`` is a list, append one ``illegal_transition`` row for
-    every lifecycle event whose source state is outside :data:`TASK_TRANSITIONS`
-    (``TASK_NEW`` creates a card from ``None`` and rebuilds only unfinished
-    cards, never one that is already ``accepted``/``closed``).  The fold itself
-    is untouched: an illegal event is still replayed last-writer-wins, so the
-    final-state map and every existing drift stay exactly as before; the caller
-    reports the extra rows.  Unknown event types are ignored and never produce
-    a transition.
+    With ``transitions``, every lifecycle event outside :data:`TASK_TRANSITIONS`
+    appends one ``illegal_transition`` row; the last-writer-wins fold itself is
+    untouched, and unknown event types are ignored.
     """
     states: dict[str, str] = {}
     for event in ledger_events_in_seq_order(root, "primary"):
@@ -444,17 +419,50 @@ def replay_task_statuses(root: Path,
     return states
 
 
+def _replay_event(states: dict[str, str], envelope: str, event_type: str,
+                  payload: dict, previous: str | None, started: set[str],
+                  recovered: set[str]) -> tuple[str | None, list[dict]]:
+    """PILOT-075: one event's fold target, merge flags and transition rows.
+
+    A recovered ``MERGE`` may follow ``CORRECTION_REQUIRED`` when the envelope
+    already started its merge, and its ``POST_MERGE_FAILED`` keeps ``MERGED``
+    so verification can retry; an ordinary correction-to-merge still yields its
+    ``illegal_transition`` row.
+    """
+    if event_type == "MERGE_START":
+        started.add(envelope)
+    elif event_type == "MERGE":
+        if payload.get("recovered") is True:
+            recovered.add(envelope)
+        else:
+            recovered.discard(envelope)
+    next_state = (ENVELOPE_MERGING_STATUS if event_type == "MERGE_START"
+                  else ENVELOPE_LIFECYCLE_STATUS.get(event_type))
+    if event_type in ENVELOPE_CORRECTION_EVENTS:
+        next_state = "CORRECTION_REQUIRED"
+        if (event_type == "POST_MERGE_FAILED" and envelope in recovered
+                and states.get(envelope) == "MERGED"):
+            next_state = "MERGED"
+    if next_state is None:
+        return None, []
+    allowed = envelope_transition_allowed(event_type, envelope)
+    if allowed is None or previous in allowed:
+        return next_state, []
+    if (event_type == "MERGE" and previous == "CORRECTION_REQUIRED"
+            and payload.get("recovered") is True and envelope in started):
+        return next_state, []
+    return next_state, [_illegal_transition(envelope, event_type, allowed,
+                                            previous)]
+
+
 def _fold_envelope_state(states: dict[str, str], internal: dict[str, str],
                          envelope: str, event_type: str, next_state: str) -> None:
     """Fold one envelope lifecycle event without resetting a live envelope.
 
-    ``states`` is the folded status, ``internal`` the last event's state used
-    for the transition table (``MERGE_START`` pins ``MERGING`` without settling
-    the status).  A re-envelope ``ENVELOPE_NEW`` on an envelope that already
-    reached a status in :data:`ENVELOPE_REOPEN_STATUSES` only re-records its
-    head: the folded status and the transition source stay where they were, so
-    a corrected envelope still replays to ``CORRECTION_REQUIRED``.  A brand-new
-    envelope (no previous status) still folds to ``DRAFT``.
+    ``states`` is the folded status and ``internal`` the transition source
+    (``MERGE_START`` pins ``MERGING`` without settling).  A re-envelope of an
+    envelope in :data:`ENVELOPE_REOPEN_STATUSES` only re-records its head, so a
+    corrected envelope still replays to ``CORRECTION_REQUIRED``.
     """
     if (event_type == "ENVELOPE_NEW"
             and states.get(envelope) in ENVELOPE_REOPEN_STATUSES):
@@ -468,15 +476,14 @@ def replay_envelope_statuses(root: Path,
                              transitions: list[dict] | None = None) -> dict[str, str]:
     """Fold ``ledger/supervision.jsonl`` by envelope into expected status.
 
-    ``MERGE_START`` moves an internal-only state to ``MERGING`` (it still
-    leaves the folded status unchanged), so a following ``MERGE`` is checked
-    against the merge that actually started.  When ``transitions`` is a list,
-    append one ``illegal_transition`` row for every lifecycle event whose
-    source state is outside :data:`ENVELOPE_TRANSITIONS`; the fold and every
-    existing drift keep their previous values.  Unknown events are ignored.
+    ``MERGE_START`` pins ``MERGING`` without settling the folded status; with
+    ``transitions``, out-of-table sources append their rows (PILOT-075 narrows
+    one in :func:`_replay_event`).
     """
     states: dict[str, str] = {}
     internal: dict[str, str] = {}
+    started: set[str] = set()
+    recovered: set[str] = set()
     for event in ledger_events_in_seq_order(root, "supervision"):
         payload = event.get("payload")
         if not isinstance(payload, dict):
@@ -485,21 +492,13 @@ def replay_envelope_statuses(root: Path,
         if not isinstance(envelope, str) or not envelope:
             continue
         event_type = event.get("type")
-        if event_type == "MERGE_START":
-            next_state = ENVELOPE_MERGING_STATUS
-        elif event_type in ENVELOPE_LIFECYCLE_STATUS:
-            next_state = ENVELOPE_LIFECYCLE_STATUS[event_type]
-        elif event_type in ENVELOPE_CORRECTION_EVENTS:
-            next_state = "CORRECTION_REQUIRED"
-        else:
-            # Unknown / non-lifecycle event: ignored, exactly as before.
+        next_state, rows = _replay_event(
+            states, envelope, event_type, payload, internal.get(envelope),
+            started, recovered)
+        if next_state is None:
             continue
         if transitions is not None:
-            allowed = envelope_transition_allowed(event_type, envelope)
-            previous = internal.get(envelope)
-            if allowed is not None and previous not in allowed:
-                transitions.append(
-                    _illegal_transition(envelope, event_type, allowed, previous))
+            transitions.extend(rows)
         _fold_envelope_state(states, internal, envelope, event_type, next_state)
     verified_without_merge_drift(root, states, transitions)
     return states
@@ -515,10 +514,9 @@ def verified_without_merge_drift(root: Path, states: dict[str, str],
                                  issues: list[dict] | None = None) -> list[dict]:
     """PILOT-074: verified envelopes that carry no landed merge fact.
 
-    A verified envelope needs a ``MERGE``/``MERGE_HISTORICAL`` event whose
-    ``merge_commit`` agrees with the envelope (base-side and 074+ need both
-    halves), and the base-side commit must have the implementation as second
-    parent.  Rows are appended to ``issues`` when passed.
+    The ``MERGE``/``MERGE_HISTORICAL`` commit must agree with the envelope
+    (both halves for base-side and 074+), and a base-side commit must have the
+    implementation as second parent.  Rows are appended to ``issues``.
     """
     rows = _verified_merge_fact_rows(root, states)
     if issues is not None:
