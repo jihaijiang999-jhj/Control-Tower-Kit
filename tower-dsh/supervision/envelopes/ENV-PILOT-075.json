@@ -60,7 +60,7 @@
   ],
   "envelope_head_sha": "7984cd410c33b75e635a400a20de15921b2f1980",
   "head": "7984cd410c33b75e635a400a20de15921b2f1980",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "base_side": true,
   "merge_commit": "eb25ff596be67486e867ff5a28e1794b915c5bd3",
   "merged_at": "2026-11-05T16:42:09+08:00",
@@ -69,5 +69,7 @@
   "recovered_by": "sup-phase2-pilot",
   "recovery_reason": "075 baseline refresh + merge recovery",
   "tests_count": 2,
-  "tower_tests_count": 811
+  "tower_tests_count": 811,
+  "post_merge_at": "2026-11-05T17:36:55+08:00",
+  "post_merge_note": "PR #59 eb25ff5"
 }

@@ -643,10 +643,10 @@
       "task": "PILOT-075",
       "branch": "pilot/PILOT-075",
       "base": "main",
-      "status": "MERGED",
+      "status": "POST_MERGE_VERIFIED",
       "added_at": "2026-11-05T14:57:02+08:00",
       "merge_commit": "eb25ff596be67486e867ff5a28e1794b915c5bd3"
     }
   ],
-  "updated_at": "2026-11-05T17:09:31+08:00"
+  "updated_at": "2026-11-05T17:36:55+08:00"
 }
