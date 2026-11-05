@@ -514,10 +514,10 @@
     },
     "PILOT-075": {
       "title": "recover 从 CORRECTION 补 MERGE 的顺序；CI fetch-depth 0；恢复 074",
-      "status": "active",
+      "status": "closed",
       "spec_path": "pilot/PILOT-075.spec.json",
       "created_at": "2026-11-05T12:40:11+08:00",
-      "updated_at": "2026-11-05T12:40:11+08:00"
+      "updated_at": "2026-11-05T14:56:45+08:00"
     }
   }
 }

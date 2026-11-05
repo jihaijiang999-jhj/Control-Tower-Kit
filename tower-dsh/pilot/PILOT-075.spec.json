@@ -23,8 +23,7 @@
     "pilot/worktrees/PILOT-075/tower-dsh/tools/tower_envelope.py",
     "pilot/worktrees/PILOT-075/tower-dsh/tools/tower_cli.py",
     "pilot/worktrees/PILOT-075/tower-dsh/tools/tower_ledger_replay.py",
-    "pilot/worktrees/PILOT-075/tower-dsh/tools/tests/test_envelope_recover.py",
-    "pilot/worktrees/PILOT-075/tower-dsh/.github/workflows/tower-gate.yml"
+    "pilot/worktrees/PILOT-075/tower-dsh/tools/tests/test_envelope_recover.py"
   ],
   "forbidden": [
     "network",
@@ -44,6 +43,8 @@
     "CI workflow fetch-depth 0；8 步不变",
     "074 真实恢复后 state-verify 74/70 drift []；post-merge 9/9；075 PR 审计 admin"
   ],
-  "depends_on": ["PILOT-074"],
+  "depends_on": [
+    "PILOT-074"
+  ],
   "worktree": "pilot/worktrees/PILOT-075"
 }

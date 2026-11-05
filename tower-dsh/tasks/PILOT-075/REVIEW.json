@@ -1,0 +1,12 @@
+{
+  "schema": "tower/review@1",
+  "task": "PILOT-075",
+  "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+  "verdict": "PASS",
+  "head": "e1e63b0102ef5218fff407ee9e056eb82cf4f4d3",
+  "base": "6f8f3164ecdfb8e4ff7497456219c040c0298de0",
+  "scope": [],
+  "findings": [],
+  "note": "075 PASS。4 paths；HEAD e1e63b0（base 6f8f316）；10/10 证据；Ran 811 OK；CORRECTION recover 先 MERGE_START 再 MERGE；已有 MERGE 不重复；074 已恢复 MERGED；CI fetch-depth 由 controller 单独落。",
+  "at": "2026-11-05T14:56:44+08:00"
+}

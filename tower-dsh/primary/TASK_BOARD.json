@@ -735,13 +735,13 @@
     {
       "id": "PILOT-075",
       "title": "recover 从 CORRECTION 补 MERGE 的顺序；CI fetch-depth 0；恢复 074",
-      "status": "dispatched",
+      "status": "closed",
       "authority": "workspace_write",
       "executor": "subagent:b28755e5-d239-4110-83c8-80985facca8d",
-      "reviewer": null,
-      "next": "等待 executor 交付",
-      "updated_at": "2026-11-05T13:22:35+08:00"
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-075/MERGE.md",
+      "updated_at": "2026-11-05T14:56:45+08:00"
     }
   ],
-  "updated_at": "2026-11-05T13:22:35+08:00"
+  "updated_at": "2026-11-05T14:56:45+08:00"
 }
