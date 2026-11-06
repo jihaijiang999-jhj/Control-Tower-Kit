@@ -741,7 +741,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-075/MERGE.md",
       "updated_at": "2026-11-05T14:56:45+08:00"
+    },
+    {
+      "id": "PILOT-076",
+      "title": "owner GitHub 批准 + REVIEW/CHECKBACK 对账 + 删除硬编码 actor",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:cb023e6e-cad7-479f-8a16-7dbc67d2eac4",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-076/MERGE.md",
+      "updated_at": "2026-11-07T04:12:07+08:00"
     }
   ],
-  "updated_at": "2026-11-05T14:56:45+08:00"
+  "updated_at": "2026-11-07T04:12:07+08:00"
 }

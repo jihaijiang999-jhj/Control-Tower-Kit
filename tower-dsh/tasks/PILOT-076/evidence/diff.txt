@@ -1,0 +1,19 @@
+﻿=== changed paths (HEAD^..HEAD) ===
+tower-dsh/shared/AUTHORITY_MODEL.json
+tower-dsh/tools/tests/test_owner_approval.py
+tower-dsh/tools/tests/test_review_checkback.py
+tower-dsh/tools/tower_cli.py
+tower-dsh/tools/tower_envelope.py
+tower-dsh/tools/tower_merge.py
+tower-dsh/tools/tower_post_merge.py
+tower-dsh/tools/tower_state_verify.py
+=== stat ===
+ tower-dsh/shared/AUTHORITY_MODEL.json          |   6 +-
+ tower-dsh/tools/tests/test_owner_approval.py   | 519 +++++++++++++++++++++++++
+ tower-dsh/tools/tests/test_review_checkback.py | 226 +++++++++++
+ tower-dsh/tools/tower_cli.py                   | 192 ++++++++-
+ tower-dsh/tools/tower_envelope.py              |  40 +-
+ tower-dsh/tools/tower_merge.py                 |  60 +--
+ tower-dsh/tools/tower_post_merge.py            |   8 +-
+ tower-dsh/tools/tower_state_verify.py          |  36 +-
+ 8 files changed, 1025 insertions(+), 62 deletions(-)

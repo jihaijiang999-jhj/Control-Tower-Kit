@@ -1,0 +1,206 @@
+﻿=== python tools/towerctl.py state-verify ===
+{
+  "ok": true,
+  "tasks": 74,
+  "envelopes": 72,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-039-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-041-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-043-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-044-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-053-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID2",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID2",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 10,
+  "evidence_checked": 709
+}
+EXIT=0
+
+=== python tools/towerctl.py authority-check ===
+{
+  "ok": true,
+  "status": "configured",
+  "requirement": "required",
+  "required": true,
+  "checks": [
+    {
+      "name": "primary ledger chain intact",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority state file readable",
+      "ok": true,
+      "detail": "state/AUTHORITY.json"
+    },
+    {
+      "name": "authority schema is tower/authority-state@1",
+      "ok": true,
+      "detail": "schema 'tower/authority-state@1'"
+    },
+    {
+      "name": "authority state backed by ledger",
+      "ok": true,
+      "detail": "AUTHORITY_SET revision 2"
+    },
+    {
+      "name": "authority field types",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority tower_id matches primary state",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority owner matches primary state",
+      "ok": true,
+      "detail": "file 'mac' vs primary state 'mac'"
+    },
+    {
+      "name": "authority primary.id matches primary state",
+      "ok": true,
+      "detail": "file 'ctl-yingxian-qa-001' vs primary state 'ctl-yingxian-qa-001'"
+    },
+    {
+      "name": "authority supervision.id matches supervision state",
+      "ok": true,
+      "detail": "file 'sup-phase2-pilot' vs supervision state 'sup-phase2-pilot'"
+    },
+    {
+      "name": "merge authority differs from primary",
+      "ok": true,
+      "detail": "merge authority 'sup-phase2-pilot' vs primary 'ctl-yingxian-qa-001'"
+    },
+    {
+      "name": "authority ledger payload types",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority requirement pinned",
+      "ok": true,
+      "detail": "authority requirement pinned: shared/AUTHORITY_POLICY.json + AUTHORITY_REQUIRED event"
+    },
+    {
+      "name": "authority github logins",
+      "ok": true,
+      "detail": "distinct owner/primary logins"
+    }
+  ]
+}
+EXIT=0
+
+=== python tools/towerctl.py arch-check ===
+{
+  "ok": true,
+  "counts": {
+    "gates": 18,
+    "invariants": 16,
+    "events": 32,
+    "event_types_in_code": 32,
+    "unresolved_event_calls": 1,
+    "adrs": 8,
+    "sections": 6,
+    "nodes": 81,
+    "edges": 182
+  },
+  "errors": []
+}
+EXIT=0
+
+=== python tools/towerctl.py profile-check ===
+{
+  "ok": true,
+  "object": "TOWER-DSH",
+  "checked": 11,
+  "findings": []
+}
+EXIT=0
+
+=== python tools/towerctl.py shape-check ===
+{
+  "ok": true,
+  "shape_check": "checked",
+  "shape_checked": true,
+  "files": 81,
+  "functions": 2370,
+  "duplicate_blocks": 169,
+  "unused_imports": 1
+}
+EXIT=0
+
+=== python tools/towerctl.py verify-ledger ===
+{
+  "ok": true,
+  "files": {
+    "primary": {
+      "path": "ledger/primary.jsonl",
+      "exists": true,
+      "events": 723,
+      "legacy_unhashed": 53,
+      "errors": []
+    },
+    "supervision": {
+      "path": "ledger/supervision.jsonl",
+      "exists": true,
+      "events": 421,
+      "legacy_unhashed": 26,
+      "errors": []
+    }
+  },
+  "errors": []
+}
+EXIT=0
+

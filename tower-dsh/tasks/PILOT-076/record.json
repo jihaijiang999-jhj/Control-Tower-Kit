@@ -1,0 +1,191 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-076",
+  "title": "owner GitHub 批准 + REVIEW/CHECKBACK 对账 + 删除硬编码 actor",
+  "status": "closed",
+  "authority": "workspace_write",
+  "scope": [
+    "shared/AUTHORITY_MODEL.json：owner.github_login 与 primary.github_login 必填且不同；authority-check 校验",
+    "merge --mode pr：gh pr view reviews/author；要求 owner login 的 APPROVED review，且 approver != primary.github_login、approver != PR author；缺失/同 primary/自批 exit 2 零 MERGE",
+    "accept/post-merge：删除 actor:\"owner\" 硬编码；写 --by（默认 authority owner.name）与 git author 一致性；不匹配拒绝",
+    "state-verify：REVIEW.json 的 reviewer/verdict/head/base 必须等于最后一条 CHECKBACK 事件；不匹配/缺失 → review_unbacked drift",
+    "merge-check：以最后一条 CHECKBACK 为准，REVIEW.json 只作快照；stale 仍拒",
+    "076 自身标记 legacy bootstrap（owner approval 未启用前）；077+ 强制；测试覆盖缺失/同 primary/自批/对账 drift",
+    "不改 058 的 PASS/stale 语义、059 acceptance、070/073/074/075 行为"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-076/tower-dsh/shared/AUTHORITY_MODEL.json",
+    "pilot/worktrees/PILOT-076/tower-dsh/tools/tower_merge.py",
+    "pilot/worktrees/PILOT-076/tower-dsh/tools/tower_post_merge.py",
+    "pilot/worktrees/PILOT-076/tower-dsh/tools/tower_state_verify.py",
+    "pilot/worktrees/PILOT-076/tower-dsh/tools/tower_envelope.py",
+    "pilot/worktrees/PILOT-076/tower-dsh/tools/tower_cli.py",
+    "pilot/worktrees/PILOT-076/tower-dsh/tools/tests/test_owner_approval.py",
+    "pilot/worktrees/PILOT-076/tower-dsh/tools/tests/test_review_checkback.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "same GitHub login for owner and primary",
+    "self-approval",
+    "keeping actor:\"owner\" default",
+    "weakening review/acceptance"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-076/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 811 + 新增用例数（main 基线 811）",
+    "owner/primary github_login 缺失/相同 → authority-check 2",
+    "PR 无 owner APPROVED / owner==primary / owner==PR author → merge 2 零 MERGE；有 owner APPROVED 且不同 → 0",
+    "REVIEW.json 与最后 CHECKBACK 的 reviewer/head/base/verdict 不符 → review_unbacked drift；merge-check 2",
+    "accept/post-merge 不再写 actor:\"owner\"；--by 与 owner 不一致拒绝",
+    "076 legacy bootstrap 合并；077+ 强制；真实塔 76/72 drift []；arch 18；profile 11/0；shape 0"
+  ],
+  "depends_on": [
+    "PILOT-075"
+  ],
+  "worktree": "pilot/worktrees/PILOT-076",
+  "spec_path": "pilot/PILOT-076.spec.json",
+  "spec_sha256": "99a105305fedb381d19039ff66c0e7423bb35dcfc29c5acd06a3a36848587f8b",
+  "spec_gate": "PASS",
+  "executor": "subagent:cb023e6e-cad7-479f-8a16-7dbc67d2eac4",
+  "dispatch": {
+    "executor": "subagent:cb023e6e-cad7-479f-8a16-7dbc67d2eac4",
+    "worktree": "pilot/worktrees/PILOT-076",
+    "at": "2026-11-07T03:25:24+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "1e5c4d62498677cd8cb3bd61022b13746902f65d",
+    "campaign": "C-2026-Q4-04"
+  },
+  "evidence": [
+    {
+      "path": "tasks/PILOT-076/evidence/AUTHORITY_MODEL.json",
+      "sha256": "0a6356514bf63db4933951738bab97b661050e06ad1932f19dc8276cf73d92d7",
+      "bytes": 2972,
+      "at": "2026-11-07T03:55:44+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-076/evidence/tower_merge.py",
+      "sha256": "3df77e05b0e8e47a74fd817154717ad71d53cd892bb49ae79bfc2f76adf7d088",
+      "bytes": 30037,
+      "at": "2026-11-07T03:55:44+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-076/evidence/tower_post_merge.py",
+      "sha256": "f237a2cbd77955d47106bc31974cfec51095d5da281c29ee9b97b34b0fd083dd",
+      "bytes": 28507,
+      "at": "2026-11-07T03:55:44+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-076/evidence/tower_state_verify.py",
+      "sha256": "ed5b8d62ef4354d294bcf4b68ae4ec2f3e8a7d5a0e48342d7d0e107307be1a7a",
+      "bytes": 26566,
+      "at": "2026-11-07T03:55:44+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-076/evidence/tower_envelope.py",
+      "sha256": "9ff78966cebab09bf22bccb33d87c8aeb3b3d364e3c54e2ef1ee64e65a6d524c",
+      "bytes": 29559,
+      "at": "2026-11-07T03:55:44+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-076/evidence/tower_cli.py",
+      "sha256": "38cbc26aaebd2481e6e78a6ec1ecb8966249371ca5aa0b2e1bde19f503df19ff",
+      "bytes": 57375,
+      "at": "2026-11-07T03:55:44+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-076/evidence/test_owner_approval.py",
+      "sha256": "edf397991f64d1611a97bd6b626d45fd09aff5ea8d7c5d686f2819fdba9dcb9f",
+      "bytes": 22953,
+      "at": "2026-11-07T03:55:45+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-076/evidence/test_review_checkback.py",
+      "sha256": "bc758420274f0e7b1a9f76f62406ebc7d3fce86f398204881a8e8eb3928c092c",
+      "bytes": 10368,
+      "at": "2026-11-07T03:55:45+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-076/evidence/test-output.txt",
+      "sha256": "9352053ab14e1f705b14a7b0f2754ca6e9f6be8e038a12ec5c6cfe78f7b0e9a1",
+      "bytes": 237294,
+      "at": "2026-11-07T03:55:45+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-076/evidence/owner_probe.py",
+      "sha256": "34583816267eb3c7063bb2d6c2405dc47b3f1244ed86721adf5798f8dce7c2f8",
+      "bytes": 6435,
+      "at": "2026-11-07T03:55:45+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-076/evidence/probe.txt",
+      "sha256": "978ab97c84eaeeeccf27fec994d0d78397f4a7519ef037e98866ef70495e3884",
+      "bytes": 2528,
+      "at": "2026-11-07T03:55:45+08:00",
+      "id": "E-011"
+    },
+    {
+      "path": "tasks/PILOT-076/evidence/commit.txt",
+      "sha256": "b9b205b2aa3b25674a39dbd85187d5a87a7aac0d4c61611534615a22623aaa60",
+      "bytes": 889,
+      "at": "2026-11-07T03:55:45+08:00",
+      "id": "E-012"
+    },
+    {
+      "path": "tasks/PILOT-076/evidence/diff.txt",
+      "sha256": "0400a53358df6e00bd89825b02b11d0300aec79d164fd46f031674aea6335c15",
+      "bytes": 919,
+      "at": "2026-11-07T03:55:45+08:00",
+      "id": "E-013"
+    },
+    {
+      "path": "tasks/PILOT-076/evidence/gates.txt",
+      "sha256": "51201be76686b2935f206389864b2a6029ea4beba5cf9f906bf77a24ab6e66f5",
+      "bytes": 4549,
+      "at": "2026-11-07T03:55:45+08:00",
+      "id": "E-014"
+    }
+  ],
+  "review": {
+    "schema": "tower/review@1",
+    "task": "PILOT-076",
+    "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+    "verdict": "PASS",
+    "head": "bd1e12c80853f12752314b49e1fd470f49ca0e18",
+    "base": "1e5c4d62498677cd8cb3bd61022b13746902f65d",
+    "scope": [],
+    "findings": [],
+    "note": "076 PASS。8 paths；HEAD bd1e12c（base 1e5c4d6）；14/14 证据；Ran 834 OK；missing REVIEW drift、git author/--by、owner 三拒绝、actor 去除；076 legacy bootstrap。",
+    "at": "2026-11-07T04:12:07+08:00",
+    "structure": ""
+  },
+  "decision": {
+    "id": "D-PILOT-076",
+    "actor": "owner",
+    "text": "PASS; identity",
+    "at": "2026-11-07T04:12:07+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-076/CLOSEOUT.md",
+    "at": "2026-11-07T04:12:07+08:00"
+  },
+  "created_at": "2026-11-06T19:01:56+08:00",
+  "updated_at": "2026-11-07T04:12:07+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-076/MERGE.md",
+  "delivered_at": "2026-11-07T03:55:45+08:00",
+  "accepted_at": "2026-11-07T04:12:07+08:00"
+}

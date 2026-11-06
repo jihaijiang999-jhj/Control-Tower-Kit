@@ -1,0 +1,19 @@
+﻿=== branch ===
+pilot/PILOT-076
+=== HEAD ===
+bd1e12c80853f12752314b49e1fd470f49ca0e18
+=== commit ===
+bd1e12c PILOT-076: owner GitHub approval + review/checkback binding
+=== show --stat ===
+bd1e12c PILOT-076: owner GitHub approval + review/checkback binding
+ tower-dsh/shared/AUTHORITY_MODEL.json          |   6 +-
+ tower-dsh/tools/tests/test_owner_approval.py   | 519 +++++++++++++++++++++++++
+ tower-dsh/tools/tests/test_review_checkback.py | 226 +++++++++++
+ tower-dsh/tools/tower_cli.py                   | 192 ++++++++-
+ tower-dsh/tools/tower_envelope.py              |  40 +-
+ tower-dsh/tools/tower_merge.py                 |  60 +--
+ tower-dsh/tools/tower_post_merge.py            |   8 +-
+ tower-dsh/tools/tower_state_verify.py          |  36 +-
+ 8 files changed, 1025 insertions(+), 62 deletions(-)
+=== status --short (expect only ?? scratch/) ===
+?? scratch/
