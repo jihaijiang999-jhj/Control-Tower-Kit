@@ -124,5 +124,5 @@
   "tower_tests_count": 834,
   "recovered": true,
   "recovered_by": "sup-phase2-pilot",
-  "recovery_reason": "076 merge recovery"
+  "recovery_reason": "076 final recovery before verify"
 }
