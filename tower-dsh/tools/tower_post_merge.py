@@ -209,7 +209,7 @@ def accept_card(root: Path, args) -> None:
     acceptance_errors = acceptance_gate_errors(root, rec, args)
     if acceptance_errors:
         fail(acceptance_errors)
-    rec["decision"] = {"id": args.decision, "actor": "owner",
+    rec["decision"] = {"id": args.decision, "actor": getattr(args, "by", ""),
                        "text": args.note or "owner authorized pilot acceptance",
                        "at": now()}
     rec["status"] = "accepted"
@@ -357,7 +357,7 @@ def merge_fact_gate(root: Path, env: dict, envelope_id: str, repo: Path,
         fail(errors)
 
 def cmd_post_merge(root: Path, args) -> None:
-    envelope_id = check_package_id(args.envelope, "envelope")
+    envelope_id, by = check_package_id(args.envelope, "envelope"), (getattr(args, "by", "") or "")
     env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
     if not env_path.exists():
         fail([f"envelope not found: {args.envelope}"])
@@ -494,14 +494,14 @@ def cmd_post_merge(root: Path, args) -> None:
                   if e.get("envelope_id") == args.envelope), None)
     if ok:
         env.update({"status": "POST_MERGE_VERIFIED", "post_merge_at": now(),
-                    "post_merge_note": args.note or ""})
+                    "post_merge_note": args.note or "", "post_merge_by": by})
         jdump(env_path, env)
         if entry is not None:
             entry["status"] = "POST_MERGE_VERIFIED"
             save_queue(root, queue)
         merge_record = write_task_merge_record(root, env, envelope_id, checks)
         append_supervision_ledger(root, "POST_MERGE_VERIFIED", "supervision",
-                                  {"envelope": args.envelope,
+                                  {"envelope": args.envelope, "by": by,
                                    "tests_count": tests_count,
                                    "tower_tests_count": tower_count,
                                    "checks": checks,

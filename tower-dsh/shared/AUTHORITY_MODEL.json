@@ -7,6 +7,7 @@
   "roles": {
     "owner": {
       "name": "mac",
+      "github_login": "jihaijiang999-jhj",
       "reserves": [
         "merge",
         "external_call",
@@ -18,6 +19,7 @@
       ]
     },
     "primary_control_tower": {
+      "github_login": "tower-primary",
       "owns": [
         "goal_decomposition",
         "task_cards",
@@ -76,6 +78,7 @@
       ]
     }
   },
+  "bootstrap_note": "owner.github_login is the real owner account; primary_control_tower.github_login is a bootstrap placeholder until the primary tower has its own GitHub identity. PILOT-076 merged before the owner-approval gate existed; PILOT-077+ requires the owner APPROVED review, and the owner login must differ from the primary login and from the PR author.",
   "separation_invariants": [
     "pr_author_must_not_be_merge_approver",
     "reviewer_must_not_equal_executor",
@@ -83,7 +86,8 @@
     "merge_requires_machine_valid_merge_envelope",
     "merge_requires_independent_checkback",
     "merged_is_not_complete_until_post_merge_verified",
-    "repository_authority_does_not_imply_production_authority"
+    "repository_authority_does_not_imply_production_authority",
+    "owner_github_login_must_differ_from_primary_github_login"
   ],
   "supervision": {
     "status": "ACTIVE",

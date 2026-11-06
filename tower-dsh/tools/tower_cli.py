@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import tower_arch_check
 import argparse
+import json
+import re
 import spec_coverage
 import spec_lint
 from pathlib import Path
@@ -25,8 +27,7 @@ from tower_task import (
     cmd_task_supersede,
 )
 from tower_authority_cmd import (
-    authority_state_check, cmd_authority_check, cmd_authority_require,
-    cmd_authority_set,
+    authority_state_check, cmd_authority_require, cmd_authority_set,
 )
 from tower_profile import cmd_profile_check
 from tower_shape import cmd_shape_check
@@ -515,6 +516,164 @@ COMMAND_LAYER_HANDLERS = {
 
 TASK_IDS_HANDLERS = {"task-ids-init": cmd_task_ids_init,
                      "task-ids-reserve": cmd_task_ids_reserve}
+
+
+def authority_has_roles(root: Path) -> bool:
+    """PILOT-076: the authority model declares its ``roles`` block."""
+    try:
+        model = jload(root / "shared" / "AUTHORITY_MODEL.json")
+    except (OSError, ValueError):
+        return False
+    return isinstance(model, dict) and isinstance(model.get("roles"), dict)
+
+
+def authority_github_logins(root: Path) -> tuple:
+    """PILOT-076: ``(owner, primary)`` GitHub logins from the authority model."""
+    try:
+        roles = jload(root / "shared" / "AUTHORITY_MODEL.json").get("roles") or {}
+    except (OSError, ValueError):
+        return "", ""
+
+    def login(role: str) -> str:
+        entry = roles.get(role) if isinstance(roles, dict) else None
+        value = entry.get("github_login") if isinstance(entry, dict) else None
+        return value.strip() if isinstance(value, str) else ""
+
+    return login("owner"), login("primary_control_tower")
+
+
+def authority_login_errors(logins: tuple) -> list[str]:
+    """PILOT-076: both GitHub logins are required and must differ."""
+    owner, primary = logins
+    errors = [f"shared/AUTHORITY_MODEL.json: roles.{role}.github_login is not "
+              "configured"
+              for role, value in (("owner", owner),
+                                  ("primary_control_tower", primary)) if not value]
+    if owner and owner == primary:
+        errors.append(f"shared/AUTHORITY_MODEL.json: owner.github_login "
+                      f"{owner!r} equals primary_control_tower.github_login")
+    return errors
+
+
+def cmd_authority_check_with_model(root: Path, args) -> None:
+    """PILOT-076: ``authority-check`` plus the model's GitHub login rules."""
+    result = authority_state_check(root)
+    errors = list(result["errors"])
+    checks = list(result["checks"])
+    if authority_has_roles(root):
+        login_errors = authority_login_errors(authority_github_logins(root))
+        errors += login_errors
+        checks.append({"name": "authority github logins", "ok": not login_errors,
+                       "detail": "; ".join(login_errors)
+                       or "distinct owner/primary logins"})
+    emit({"ok": not errors, "status": result["status"],
+          "requirement": "required" if result["required"] else "optional",
+          "required": result["required"], "checks": checks},
+         0 if not errors else 2)
+
+
+def authority_owner_name(root: Path) -> str:
+    """PILOT-076: the registered owner name (model first, primary state next)."""
+    nodes = []
+    for path in (root / "shared" / "AUTHORITY_MODEL.json",
+                 root / "primary" / "CURRENT_STATE.json"):
+        try:
+            nodes.append(jload(path))
+        except (OSError, ValueError):
+            nodes.append({})
+    model_owner = ((nodes[0] or {}).get("roles") or {}).get("owner") or {}
+    state_owner = (nodes[1] or {}).get("owner") or {}
+    return str((model_owner or state_owner).get("name") or "").strip()
+
+
+def pr_view_login(value) -> str:
+    """PILOT-076: one ``gh pr view`` login field (object or bare string)."""
+    value = value.get("login") if isinstance(value, dict) else value
+    return value.strip() if isinstance(value, str) else ""
+
+
+def pr_view_approved(stdout: str):
+    """PILOT-076: ``(author, APPROVED logins)`` from ``gh pr view --json``."""
+    try:
+        data = json.loads(stdout)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    reviews = data.get("reviews")
+    approved = [pr_view_login(item.get("author")) for item in
+                (reviews if isinstance(reviews, list) else [])
+                if isinstance(item, dict)
+                and str(item.get("state") or "").upper() == "APPROVED"]
+    return pr_view_login(data.get("author")), approved
+
+
+def owner_approval_errors(logins: tuple, stdout: str) -> list[str]:
+    """PILOT-076: why ``gh pr view`` output is not the owner's approval."""
+    view = pr_view_approved(stdout)
+    if view is None:
+        return ["owner approval: gh pr view output is not JSON"]
+    owner, primary = logins
+    author, approved = view
+    errors = [f"shared/AUTHORITY_MODEL.json: roles.{role}.github_login is not "
+              "configured"
+              for role, value in (("owner", owner), ("primary", primary))
+              if not value]
+    if owner and owner == primary:
+        errors.append(f"owner approval: owner {owner!r} equals the primary login")
+    if author == owner:
+        errors.append("self-approval: the pull-request author is the owner "
+                      "account")
+    if owner not in approved:
+        errors.append(f"owner approval: no APPROVED review by {owner!r}")
+    if primary in approved:
+        errors.append("owner approval: the primary control tower may not approve")
+    return errors
+
+
+def git_author_name(root: Path) -> str:
+    """PILOT-076: the tower repository's git author name ('' = unpinned).
+
+    The repo-local ``user.name`` is the identity a commit of the tower state
+    would be made as; a global-only or template identity is not the tower's, so
+    it is treated as unknown and the check is skipped.
+    """
+    cp = git(root, "config", "--local", "user.name")
+    return cp.stdout.strip() if cp.returncode == 0 else ""
+
+
+def same_person(actor: str, author: str) -> bool:
+    """PILOT-076: ``actor`` names the same person as a git author string."""
+    tokens = [token for token in re.split(r"[^0-9a-z_.-]+", author.casefold())
+              if token]
+    return actor.casefold() in tokens
+
+
+def stamp_authority_identity(root: Path, args) -> Path:
+    """PILOT-076: resolve the authority identity once, before dispatch.
+
+    The merge gate consumes ``args.owner_approval`` and the ``accept`` /
+    ``post-merge`` writes consume ``args.by``, exactly like the PILOT-067
+    base-sync audit is handed to ``merge`` through ``args``.  Both writers also
+    require the git author to be the same person as the owner (an unknown git
+    author, e.g. a host without ``user.name``, keeps the old behaviour).
+    """
+    args.authority_logins = authority_github_logins(root)
+    args.owner_approval = lambda stdout: owner_approval_errors(
+        args.authority_logins, stdout)
+    if args.cmd in ("accept", "post-merge"):
+        owner = authority_owner_name(root)
+        requested = (getattr(args, "by", None) or "").strip()
+        if owner and requested and requested != owner:
+            fail([f"{args.cmd}: --by {requested!r} != registered owner "
+                  f"{owner!r}"])
+        actor = requested or owner
+        author = git_author_name(root)
+        if actor and author and not same_person(actor, author):
+            fail([f"{args.cmd}: git author {author!r} != registered owner "
+                  f"{actor!r}"])
+        args.by = actor
+    return root
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1008,6 +1167,27 @@ def envelope_base_side_layer_parsers(
     return parser
 
 
+def owner_actor_layer_parsers(
+        parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """PILOT-076: the ``--by`` owner identity on ``accept`` and ``post-merge``.
+
+    Same layering as the other post-044 flags: ``build_parser`` keeps its
+    frozen size, and this layer owns only the actor the write is attributed to
+    (default: the authority model's ``roles.owner.name``).
+    """
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        for name in ("accept", "post-merge"):
+            command = action.choices.get(name)
+            if command is not None:
+                command.add_argument(
+                    "--by", default=None,
+                    help="owner identity recorded on the write (default: the "
+                         "authority model's roles.owner.name)")
+    return parser
+
+
 def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Register the PILOT-045 commands on the parser built by ``build_parser``.
 
@@ -1025,8 +1205,8 @@ def command_layer_parsers(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         action.add_parser("brief")
     dispatch_campaign_parser(parser)
     review_layer_parsers(parser)
-    return base_sync_layer_parsers(envelope_recover_layer_parsers(envelope_base_side_layer_parsers(envelope_abandon_layer_parsers(supersede_layer_parsers(profile_layer_parsers(
-        arch_layer_parsers(position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser)))))))))))
+    return owner_actor_layer_parsers(base_sync_layer_parsers(envelope_recover_layer_parsers(envelope_base_side_layer_parsers(envelope_abandon_layer_parsers(supersede_layer_parsers(profile_layer_parsers(
+        arch_layer_parsers(position_layer_parsers(status_layer_parsers(acceptance_layer_parsers(task_ids_layer_parsers(parser))))))))))))
 
 
 def cli_commands() -> list[str]:
@@ -1041,7 +1221,7 @@ def cli_commands() -> list[str]:
 def main() -> None:
     args = build_parser().parse_args()
     _force_utf8_stdio()
-    root = Path(args.root).resolve()
+    root = stamp_authority_identity(Path(args.root).resolve(), args)
     if not root.exists():
         fail([f"root not found: {root}"])
     handlers = {**COMMAND_LAYER_HANDLERS, **TASK_IDS_HANDLERS,
@@ -1062,7 +1242,7 @@ def main() -> None:
         "merge-check": cmd_merge_check, "merge": cmd_merge_with_base_sync, "post-merge": cmd_post_merge,
         "verify-ledger": cmd_verify_ledger,
         "state-verify": cmd_state_verify,
-        "authority-check": cmd_authority_check,
+        "authority-check": cmd_authority_check_with_model,
         "authority-set": cmd_authority_set,
         "authority-require": cmd_authority_require,
         "spec-lint": cmd_spec_lint,
