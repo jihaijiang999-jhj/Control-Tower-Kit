@@ -22,16 +22,14 @@ from tower_envelope import (
     envelope_remerge_errors, load_queue, load_supervision, save_queue,
 )
 
-
 def cmd_merge_check(root: Path, args) -> None:
     envelope_id = check_package_id(args.envelope, "envelope")
     env_path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
     if not env_path.exists():
         fail([f"envelope not found: {args.envelope}"])
     env = jload(env_path)
-    # Exact comparison, with no ``str()`` normalisation: a JSON declaration
-    # of ``42`` is not the requested id ``"42"``.  Command-level failures are
-    # plain strings (``errors``), not check dictionaries.
+    # Exact comparison, with no ``str()`` normalisation: a JSON ``42`` is not
+    # the requested id ``"42"``; command-level failures are plain strings.
     declared = env.get("envelope_id")
     if declared != envelope_id:
         fail([f"envelope identity matches request: file declares "
@@ -57,11 +55,9 @@ def cmd_merge_check(root: Path, args) -> None:
         checks.append({"name": "merge authority pinned", "ok": True,
                        "detail": f"merge authority pinned: {authority['merge_authority']}"})
     # PILOT-039: a legacy envelope has no lifecycle events, so
-    # ``envelope_checks`` never verifies the ledgers for it.  Without this
-    # independent check a forged ledger row would only be caught by ``merge``.
-    # New-style envelopes already carry ``ledger chain intact``; adding the
-    # same verification twice would report one broken chain as two synonymous
-    # failures, so the check is deliberately legacy-only.
+    # ``envelope_checks`` never verifies the ledgers for it; a forged row would
+    # only be caught by ``merge``.  New-style envelopes already carry
+    # ``ledger chain intact``, so the check is deliberately legacy-only.
     if not envelope_has_baselines(env):
         breaks = ledger_precondition_breaks(root)
         checks.append({
@@ -85,9 +81,7 @@ def cmd_merge_check(root: Path, args) -> None:
               "errors": [c for c in checks if not c["ok"]]}, 2)
     emit({"ok": True, "envelope": args.envelope, "checks": checks})
 
-
 PR_URL_RE = re.compile(r"^https?://\S+/pull/(\d+)$")
-
 
 def parse_created_pr(stdout: str):
     """Parse the PR identity ``gh pr create`` prints as its last line.
@@ -105,9 +99,7 @@ def parse_created_pr(stdout: str):
         return None
     return url, int(match.group(1))
 
-
 GH_AUTH_HINT = "run 'gh auth login' to authenticate"
-
 
 def run_gh(repo: Path, argv: list[str], *, phase: str,
            timeout: float) -> subprocess.CompletedProcess:
@@ -127,7 +119,6 @@ def run_gh(repo: Path, argv: list[str], *, phase: str,
             f"within {timeout:g}s") from None
     except OSError as exc:
         raise MergeBlocked("gh", "gh-exec", str(exc)) from None
-
 
 def require_gh_auth(repo: Path, timeout: float) -> None:
     """Fail closed unless ``gh auth status`` reports an authenticated host.
@@ -150,7 +141,6 @@ def require_gh_auth(repo: Path, timeout: float) -> None:
         detail = f"{output}\n{GH_AUTH_HINT}" if output else GH_AUTH_HINT
         raise MergeBlocked("gh-auth", "not-authenticated", detail)
 
-
 def require_git(repo: Path, phase: str, *git_args: str) -> subprocess.CompletedProcess:
     """Run one git step of the PR flow, blocking the merge when it fails."""
     cp = git(repo, *git_args)
@@ -158,18 +148,14 @@ def require_git(repo: Path, phase: str, *git_args: str) -> subprocess.CompletedP
         raise MergeBlocked(phase, phase, command_failure(cp))
     return cp
 
-
 CHECKS_PENDING_EXIT = 8
 
-
 CHECKS_PENDING_RE = re.compile(r"no checks reported", re.IGNORECASE)
-
 
 def checks_timeout_detail(number: int, timeout: float, last: str) -> str:
     detail = (f"gh pr checks {number} did not report a usable result within "
               f"{timeout:g}s")
     return f"{detail}; last output: {last}" if last else detail
-
 
 def wait_for_checks(repo: Path, number: int, timeout: float,
                     interval: float) -> None:
@@ -206,12 +192,10 @@ def wait_for_checks(repo: Path, number: int, timeout: float,
                                checks_timeout_detail(number, timeout, last))
         time.sleep(min(interval, remaining))
 
-
 def expected_merge_head(env: dict) -> str:
     """The implementation head a PR merge must match (PILOT-058)."""
     head = env.get("implementation_head_sha")
     return head.strip() if isinstance(head, str) else ""
-
 
 def pr_merge_head(repo: Path, env: dict) -> str:
     """Pin the merge at the implementation head; a child is branch-side only."""
@@ -237,19 +221,39 @@ def pr_merge_head(repo: Path, env: dict) -> str:
                            f"PR head {head} is not a single envelope commit on {impl}")
     return head
 
-
 def pr_merge_argv(number: int, match_head: str, args) -> list[str]:
     """The ``gh pr merge`` argv; ``--admin`` only for an audited state-only base."""
     audit = getattr(args, "base_sync_audit", None) or {}
     return ["pr", "merge", str(number), "--merge", "--match-head-commit",
             match_head] + (["--admin"] if audit.get("admin") is True else [])
 
+def owner_approval_gate(repo: Path, env: dict, number: int, args,
+                        timeout: float) -> None:
+    """PILOT-076: a 077+ PR is merged only after the entry layer's owner check.
+
+    ``args.owner_approval`` is the checker ``tower_cli`` hands over; a refusal
+    raises :class:`MergeBlocked` before ``gh pr merge``, so the queue lands in
+    ``CORRECTION_REQUIRED`` with a ``MERGE_BLOCKED`` event and no ``MERGE``.
+    """
+    match = re.search(r"(\d+)$", str(env.get("task") or ""))
+    if match is None or int(match.group(1)) < 77:
+        return
+    check = getattr(args, "owner_approval", None)
+    if check is None:
+        raise MergeBlocked("owner-approval", "unconfigured",
+                           "the owner-approval gate is not configured")
+    cp = run_gh(repo, ["pr", "view", str(number), "--json", "author,reviews"],
+                phase="owner-approval", timeout=timeout)
+    if cp.returncode != 0:
+        raise MergeBlocked("owner-approval", "view", command_failure(cp))
+    errors = check(cp.stdout or "")
+    if errors:
+        raise MergeBlocked("owner-approval", "approval", "; ".join(errors))
 
 def pr_merge_ledger_keys(env: dict) -> tuple[str, ...]:
     """PR merge ledger fields, plus the base-sync audit when it was recorded."""
     audit = ("base_sync", "base_ahead_paths", "admin")
     return ("merge_mode", "pr_number", "pr_url") + tuple(k for k in audit if k in env)
-
 
 def pr_remote_merge(repo: Path, env: dict, args) -> dict:
     """Steps 1-4 of a ``--mode pr`` merge: push, create, checks, merge the PR.
@@ -312,14 +316,14 @@ def pr_remote_merge(repo: Path, env: dict, args) -> dict:
     #    registered yet is retried until that deadline.
     wait_for_checks(repo, number, timeout, interval)
 
-    # 4. merge the PR once the checks are green.  ``--match-head-commit`` pins
-    #    the real PR head resolved above; any other shape was already refused.
+    # 4. merge the PR once the checks are green; --match-head-commit pins the
+    #    real head.  A 076+ card also needs the owner's APPROVED review first.
+    owner_approval_gate(repo, env, number, args, timeout)
     cp = run_gh(repo, pr_merge_argv(number, match_head, args),
                 phase="pr-merge", timeout=timeout)
     if cp.returncode != 0:
         raise MergeBlocked("pr-merge", "merge", command_failure(cp))
     return {"pr_number": number, "pr_url": url}
-
 
 def pr_fast_forward(repo: Path, env: dict, args) -> str:
     """Steps 5-6: fetch the merged base, require a fast-forward, return HEAD."""
@@ -328,7 +332,6 @@ def pr_fast_forward(repo: Path, env: dict, args) -> str:
     require_git(repo, "fetch", "fetch", remote, base)
     require_git(repo, "ff-only", "merge", "--ff-only", f"{remote}/{base}")
     return git_ok(repo, "rev-parse", "HEAD")
-
 
 def block_pr_merge(root: Path, args, env: dict, env_path: Path, queue: dict,
                    entry: dict, phase: str, reason: str, detail: str) -> None:
@@ -348,7 +351,6 @@ def block_pr_merge(root: Path, args, env: dict, env_path: Path, queue: dict,
         "detail": detail,
     })
 
-
 def merge_queue_errors(root: Path, env: dict, envelope_id: str,
                        entry: dict | None) -> list[str]:
     """Envelope/queue preconditions checked after both files are read.
@@ -367,7 +369,6 @@ def merge_queue_errors(root: Path, env: dict, envelope_id: str,
             "may merge"
         ]
     return envelope_remerge_errors(root, env, envelope_id)
-
 
 def cmd_merge(root: Path, args) -> None:
     if args.role != "supervisor":
@@ -562,7 +563,6 @@ def cmd_merge(root: Path, args) -> None:
     append_supervision_ledger(root, "MERGE", "supervision", merge_payload)
     emit({"ok": True, "envelope": args.envelope, "status": "MERGED",
           "merge_commit": merge_commit})
-
 
 def write_task_merge_record(root: Path, env: dict, envelope_id: str,
                             checks: list[dict]) -> Path | None:

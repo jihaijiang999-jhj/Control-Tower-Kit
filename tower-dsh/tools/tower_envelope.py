@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from pathlib import Path
 from tower_common import (
-    TASK_ID_RE, check_package_id, check_task_id, emit, fail, git, git_ok,
-    is_safe_id, jdump, jload, now, rel, resolve_input_within, resolve_repository,
+    TASK_ID_RE, _read_json_object, check_package_id, check_task_id, emit, fail,
+    git, git_ok, is_safe_id, jdump, jload, now, rel, resolve_input_within,
+    resolve_repository,
 )
 from tower_ledger import append_ledger, append_supervision_ledger, task_dir
 from tower_ledger_replay import (
@@ -115,17 +116,23 @@ def review_mismatches(root: Path, task: str, review: dict, head: str) -> list[st
 
 def review_problems(root: Path, env: dict, task: str) -> list[str]:
     """Why this envelope's structured review does not bind it (``[]`` = bound):
-    a mismatch (schema, PASS, head, base) is *stale* -- re-run, never accept."""
+    a mismatch is *stale*; a snapshot differing from the last head-bearing
+    ``CHECKBACK`` is ``review_unbacked``."""
     path = review_json_path(root, task)
     head = str(env.get("implementation_head_sha") or "")
-    try:
-        review = jload(path) if path.exists() else None
-    except (OSError, ValueError) as exc:
-        return [f"REVIEW.json unreadable: {rel(root, path)}: {exc}"]
+    _, review = _read_json_object(path)
     if not isinstance(review, dict):
-        return [f"stale review: {rel(root, path)} missing or not a JSON object; "
-                f"checkback must bind the review to head {head}"]
-    return review_mismatches(root, task, review, head)
+        return [f"stale review: {rel(root, path)} missing or not a JSON object"]
+    payloads = [payload for payload in
+                ledger_payloads_by_task(root, "CHECKBACK").get(task, [])
+                if "head" in payload]
+    latest = payloads[-1] if payloads else {}
+    problems = review_mismatches(root, task, review, head)
+    problems += [f"review_unbacked: {field} {review.get(field)!r} != last "
+                 f"CHECKBACK {latest.get(field)!r}"
+                 for field in ("reviewer", "verdict", "head", "base")
+                 if latest and latest.get(field) != review.get(field)]
+    return problems
 
 def review_binding_check(root: Path, env: dict, task: str) -> tuple[bool, str]:
     """The ``review bound to head`` check (a pre-058 ``CHECKBACK`` has no head
@@ -136,8 +143,7 @@ def review_binding_check(root: Path, env: dict, task: str) -> tuple[bool, str]:
     try:
         payloads = ledger_payloads_by_task(root, "CHECKBACK").get(task, [])
     except OSError:
-        # An unreadable primary ledger is already a failing gate of its own
-        # (``ledger chain intact`` / ``verify-ledger``), never a second error.
+        # An unreadable primary ledger is already its own failing gate.
         return True, "legacy: CHECKBACK ledger unreadable"
     if not any("head" in payload for payload in payloads):
         review_path = task_dir(root, task) / "REVIEW.json"
@@ -166,10 +172,9 @@ def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
             f"file={declared!r} request={expected_id!r}")
     repo = resolve_repository(root, env.get("repository"))
     add("repository exists", repo.exists(), str(repo))
-    # A new-style envelope must reach the queue through ``queue-add``; a
-    # hand-edited MERGE_QUEUE.json leaves no ``QUEUE_ADD`` event.
+    # A new-style envelope must reach the queue through ``queue-add`` (a
+    # hand-edited MERGE_QUEUE.json or a forged row leaves no/broken events).
     if envelope_has_baselines(env):
-        # A forged row naming the envelope is still caught as a broken chain.
         chain_errors: list[str] = []
         reports: dict[str, dict] = {}
         for ledger_name in ("primary", "supervision"):
@@ -241,7 +246,6 @@ def envelope_checks(root: Path, env: dict, expected_id=None) -> list[dict]:
         add("evidence hashes valid", not ev_errors, "; ".join(ev_errors) or "ok")
     return checks
 
-
 STRUCTURE_QUESTIONS = (
     "新抽象是否有 ≥2 个使用点？",
     "有无死代码/永久开关？",
@@ -249,7 +253,6 @@ STRUCTURE_QUESTIONS = (
     "测试是否只镜像实现？",
     "新增 TODO 是否有卡号？",
 )
-
 
 STRUCTURE_PENDING = "未提供（044 起建议填写，暂不阻塞）"
 
@@ -284,9 +287,7 @@ def checkback_reviewer(rec: dict, raw) -> str:
         fail(["reviewer must differ from executor"])
     return reviewer
 
-
 REVIEW_SCHEMA = "tower/review@1"
-
 
 REVIEW_CHECK = "review bound to head"
 
@@ -546,7 +547,6 @@ def append_recovery_events(root: Path, envelope_id: str, starts: list[dict],
                                   {"envelope": envelope_id,
                                    "merge_commit": merge_commit,
                                    "recovered": True, "by": by, "reason": reason})
-
 
 def merge_commit_errors(repo: Path, env: dict, merge_commit, base: str) -> list[str]:
     """PILOT-074: why a claimed merge commit is not a landed merge.

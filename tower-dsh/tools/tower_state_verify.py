@@ -307,6 +307,40 @@ def _record_layer_drift(root: Path, task_id: str, record: dict,
             + _dispatch_base_sha_drift(task_id, record, dispatch_events))
 
 
+def review_unbacked_drift(root: Path, task_id: str) -> list[dict]:
+    """PILOT-076: ``REVIEW.json`` must match the last head-bearing CHECKBACK.
+
+    The ledger event is the authority (append-only, hash-chained); the JSON
+    snapshot is only a copy, so a rewritten reviewer/verdict/head/base -- or a
+    snapshot that is missing entirely -- is ``review_unbacked`` drift.
+    """
+    if not is_safe_id(task_id, TASK_ID_RE):
+        return []
+    payloads = [payload for payload in
+                ledger_payloads_by_task(root, "CHECKBACK").get(task_id, [])
+                if "head" in payload]
+    state, review = _read_json_object(root / "tasks" / task_id / "REVIEW.json")
+    if state == "missing":
+        if not payloads:
+            return []
+        return [{"kind": "review_unbacked", "target": task_id,
+                 "expected": "REVIEW.json snapshot of the last CHECKBACK",
+                 "actual": "missing"}]
+    if not isinstance(review, dict):
+        return [{"kind": "review_unbacked", "target": task_id,
+                 "expected": "parseable REVIEW.json", "actual": state}]
+    if not payloads:
+        return []
+    payload, fields = payloads[-1], ("reviewer", "verdict", "head", "base")
+    changed = [field for field in fields if payload.get(field) != review.get(field)]
+    if not changed:
+        return []
+    return [{"kind": "review_unbacked", "target": task_id,
+             "expected": {field: payload.get(field) for field in fields},
+             "actual": {field: review.get(field) for field in fields},
+             "fields": changed}]
+
+
 def state_verify_drift(root: Path) -> dict:
     """Compare replayed state with records, board, queue and envelopes.
 
@@ -448,7 +482,7 @@ def state_verify_drift(root: Path) -> dict:
                 completion_events_by_task.get(task_id, [])))
             drift.extend(_record_layer_drift(root, task_id, record,
                                              completion_events_by_task.get(task_id, []),
-                                             dispatch_events_by_task.get(task_id, [])))
+                                             dispatch_events_by_task.get(task_id, [])) + review_unbacked_drift(root, task_id))
         if board is None:
             continue
         board_entry = board_tasks.get(task_id)
