@@ -1,0 +1,54 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-076",
+  "title": "owner GitHub 批准 + REVIEW/CHECKBACK 对账 + 删除硬编码 actor",
+  "objective": {
+    "problem": "身份全是 CLI 字符串；accept/post-merge 硬编码 actor:\"owner\"；REVIEW.json 与 CHECKBACK 事件不交叉校验，事后可篡改。外审把它列为 High（P0 身份/审计）。",
+    "outcome": "authority 模型显式配置 owner/primary GitHub login 且必须不同；merge --mode pr 要求 owner 账号 APPROVED review，且批准者 != primary/PR author；REVIEW.json 与最后一条 CHECKBACK 的 head/base/reviewer/verdict 对账，不匹配 drift review_unbacked；删除 actor:\"owner\" 默认，写实际 --by。076 自身按 legacy bootstrap 合并，077+ 强制。",
+    "approach": "扩展 shared/AUTHORITY_MODEL.json 角色 github_login；tower_merge 读取 gh PR reviews/作者并校验；tower_post_merge 用 --by/owner 替代硬编码；tower_state_verify/envelope 对账 REVIEW 与 CHECKBACK；补测试。",
+    "non_goals_and_done": "不做密码学签名、不接 GitHub App；811+ tests；076 自身 legacy、077 起强制；owner 批准缺失/同 primary/自批拒绝。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0009 / 外审身份 P0",
+  "why_now": "外审一致指出四闸和 reviewer 只是自报字符串；不修则外部 pilot 无法追责。",
+  "scope": [
+    "shared/AUTHORITY_MODEL.json：owner.github_login 与 primary.github_login 必填且不同；authority-check 校验",
+    "merge --mode pr：gh pr view reviews/author；要求 owner login 的 APPROVED review，且 approver != primary.github_login、approver != PR author；缺失/同 primary/自批 exit 2 零 MERGE",
+    "accept/post-merge：删除 actor:\"owner\" 硬编码；写 --by（默认 authority owner.name）与 git author 一致性；不匹配拒绝",
+    "state-verify：REVIEW.json 的 reviewer/verdict/head/base 必须等于最后一条 CHECKBACK 事件；不匹配/缺失 → review_unbacked drift",
+    "merge-check：以最后一条 CHECKBACK 为准，REVIEW.json 只作快照；stale 仍拒",
+    "076 自身标记 legacy bootstrap（owner approval 未启用前）；077+ 强制；测试覆盖缺失/同 primary/自批/对账 drift",
+    "不改 058 的 PASS/stale 语义、059 acceptance、070/073/074/075 行为"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-076/tower-dsh/shared/AUTHORITY_MODEL.json",
+    "pilot/worktrees/PILOT-076/tower-dsh/tools/tower_merge.py",
+    "pilot/worktrees/PILOT-076/tower-dsh/tools/tower_post_merge.py",
+    "pilot/worktrees/PILOT-076/tower-dsh/tools/tower_state_verify.py",
+    "pilot/worktrees/PILOT-076/tower-dsh/tools/tower_envelope.py",
+    "pilot/worktrees/PILOT-076/tower-dsh/tools/tower_cli.py",
+    "pilot/worktrees/PILOT-076/tower-dsh/tools/tests/test_owner_approval.py",
+    "pilot/worktrees/PILOT-076/tower-dsh/tools/tests/test_review_checkback.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "same GitHub login for owner and primary",
+    "self-approval",
+    "keeping actor:\"owner\" default",
+    "weakening review/acceptance"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-076/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 811 + 新增用例数（main 基线 811）",
+    "owner/primary github_login 缺失/相同 → authority-check 2",
+    "PR 无 owner APPROVED / owner==primary / owner==PR author → merge 2 零 MERGE；有 owner APPROVED 且不同 → 0",
+    "REVIEW.json 与最后 CHECKBACK 的 reviewer/head/base/verdict 不符 → review_unbacked drift；merge-check 2",
+    "accept/post-merge 不再写 actor:\"owner\"；--by 与 owner 不一致拒绝",
+    "076 legacy bootstrap 合并；077+ 强制；真实塔 76/72 drift []；arch 18；profile 11/0；shape 0"
+  ],
+  "depends_on": ["PILOT-075"],
+  "worktree": "pilot/worktrees/PILOT-076"
+}
