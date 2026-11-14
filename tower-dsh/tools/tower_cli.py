@@ -4,13 +4,16 @@ from __future__ import annotations
 import tower_arch_check
 import argparse
 import json
+import os
 import re
 import spec_coverage
 import spec_lint
+import subprocess
+import tower_post_merge
 from pathlib import Path
 from tower_common import (
-    DEFAULT_ROOT, PACKAGE_ID_RE, _force_utf8_stdio, check_package_id, emit,
-    fail, git, git_ok, is_safe_id, jdump, jload, now, repo_relative,
+    DEFAULT_ROOT, PACKAGE_ID_RE, TASK_ID_RE, _force_utf8_stdio, check_package_id,
+    emit, fail, git, git_ok, is_safe_id, jdump, jload, now, repo_relative,
     resolve_repository,
 )
 from tower_ledger import (
@@ -21,6 +24,7 @@ from tower_ledger_replay import (
     ENVELOPE_ABANDONABLE_STATUSES, ENVELOPE_ABANDONED_STATUS,
     ENVELOPE_MERGEABLE_STATUSES, ENVELOPE_TERMINAL_STATUSES,
     cmd_verify_ledger, is_legacy_envelope, ledger_events_naming, ledger_has_event,
+    replay_envelope_statuses,
 )
 from tower_task import (
     ACCEPTANCE_KINDS, ACCEPTANCE_STATUSES, cmd_spec_approve, cmd_task_new,
@@ -238,6 +242,14 @@ def cmd_envelope_recover_merge(root: Path, args) -> None:
     the envelope and queue become ``MERGED`` with the recorded commit and no
     second ``MERGE`` is written; the replay admits that one recovered source.
 
+    PILOT-077: a ``CORRECTION_REQUIRED`` envelope whose ``MERGE`` predates the
+    failures (076: a real merge, then ``POST_MERGE_FAILED`` rows and no
+    recovered tail) replays to ``CORRECTION_REQUIRED``.  Flipping only the files
+    leaves ``state-verify`` red, so recovery appends one recovered
+    ``MERGE_START``/``MERGE`` tail after the failures, with the same commit the
+    recorded ``MERGE`` names, to make the replay agree.  When the replay already
+    says ``MERGED`` nothing is appended.
+
     A crash between those writes leaves a half state (files ``MERGED`` with no
     ledger, or only the recovered ``MERGE_START``); a retry finishes it with
     ``repaired=true`` and never duplicates an event.  Only the complete shape
@@ -250,6 +262,8 @@ def cmd_envelope_recover_merge(root: Path, args) -> None:
         fail(["--reason must be a non-empty string"])
     by = recover_actor(root, args)
     path, env, queue, entry, starts, merges = recover_target(root, envelope_id)
+    replay = replay_envelope_statuses(root).get(envelope_id)
+    reopened = bool(merges) and replay == "CORRECTION_REQUIRED"
     base = str(env.get("base") or "main")
     repo = resolve_repository(root, env.get("repository"))
     merge_commit = recover_merge_commit(repo, env, args.merge_commit, base)
@@ -263,7 +277,7 @@ def cmd_envelope_recover_merge(root: Path, args) -> None:
                   f"{value!r}, not {merge_commit!r}; recovery cannot rewrite "
                   "a merge"])
     if (env.get("status") == "MERGED" and entry.get("status") == "MERGED"
-            and merges):
+            and merges and not reopened):
         fail([f"envelope {envelope_id} already records a MERGE; nothing to "
               "recover"])
     repaired = bool(env.get("status") == "MERGED"
@@ -277,11 +291,34 @@ def cmd_envelope_recover_merge(root: Path, args) -> None:
     env.setdefault("supervisor", by)
     env.update({"recovered": True, "recovered_by": by, "recovery_reason": reason})
     jdump(path, env)
-    append_recovery_events(root, envelope_id, starts, merges, merge_commit,
-                           by, reason)
+    if reopened:
+        append_reopened_merge(root, envelope_id, starts, merge_commit, by, reason)
+    else:
+        append_recovery_events(root, envelope_id, starts, merges, merge_commit,
+                               by, reason)
     emit({"ok": True, "envelope": envelope_id, "status": "MERGED",
           "merge_commit": merge_commit, "recovered": True, "by": by,
-          "repaired": repaired})
+          "repaired": repaired, "reopened": reopened})
+
+
+def append_reopened_merge(root: Path, envelope_id: str, starts: list[dict],
+                          merge_commit: str, by: str, reason: str) -> None:
+    """PILOT-077: put a recovered ``MERGE`` tail after the folding failures.
+
+    The envelope already records its ``MERGE``, but a later
+    ``POST_MERGE_FAILED`` still folds the replay to ``CORRECTION_REQUIRED``.
+    One recovered ``MERGE_START``/``MERGE`` pair after that failure makes the
+    ledger agree with the files; a retry that only lost the ``MERGE`` appends
+    just that event.
+    """
+    if not any(event.get("recovered") is True for event in starts):
+        append_supervision_ledger(root, "MERGE_START", "supervision",
+                                  {"envelope": envelope_id, "supervisor": by,
+                                   "recovered": True})
+    append_supervision_ledger(root, "MERGE", "supervision",
+                              {"envelope": envelope_id,
+                               "merge_commit": merge_commit,
+                               "recovered": True, "by": by, "reason": reason})
 
 
 def cmd_envelope_recover_historical(root: Path, args) -> None:
@@ -376,8 +413,10 @@ def recover_target(root: Path, envelope_id: str):
     """Envelope/queue pair plus its recovered events; read-only refusals.
 
     ``WAITING``/``CORRECTION_REQUIRED`` is a fresh recovery, ``MERGED`` is the
-    half-write a retry completes.  A second ``MERGE`` event is ambiguous and is
-    refused rather than guessed at.
+    half-write a retry completes.  More than one ``MERGE`` may exist only when
+    every one of them records the same commit (PILOT-077 replays the recovered
+    tail of a merged envelope); disagreeing or empty commits are ambiguous and
+    are refused rather than guessed at.
     """
     path = root / "supervision" / "envelopes" / f"{envelope_id}.json"
     if not path.exists():
@@ -402,9 +441,11 @@ def recover_target(root: Path, envelope_id: str):
     starts = ledger_events_naming(root, "supervision", "MERGE_START",
                                   envelope_id)
     merges = ledger_events_naming(root, "supervision", "MERGE", envelope_id)
-    if len(merges) > 1:
-        fail([f"envelope {envelope_id} has {len(merges)} MERGE events; "
-              "refusing to guess which one to trust"])
+    commits = [str(event.get("merge_commit") or "").strip() for event in merges]
+    if merges and (not all(commits) or len(set(commits)) > 1):
+        fail([f"envelope {envelope_id} has {len(merges)} MERGE events whose "
+              "merge_commit values are empty or disagree; refusing to guess "
+              "which one to trust"])
     return path, env, queue, entry, starts, merges
 
 
@@ -674,6 +715,161 @@ def stamp_authority_identity(root: Path, args) -> Path:
                   f"{actor!r}"])
         args.by = actor
     return root
+
+
+# PILOT-077: the post-merge test run freezes the tower state it verifies.
+# ``TOWER_POST_MERGE`` marks every child of the run, and
+# ``TOWER_POST_MERGE_ROOT`` names the live tower the entry layer protects.
+POST_MERGE_ENV = "TOWER_POST_MERGE"
+POST_MERGE_ROOT_ENV = "TOWER_POST_MERGE_ROOT"
+POST_MERGE_STATE_FILES = ("supervision/MERGE_QUEUE.json",
+                          "ledger/supervision.jsonl", "primary/TASK_BOARD.json")
+
+
+def isolated_child_env(root: Path | None) -> dict[str, str]:
+    """The child environment of an isolated post-merge test run."""
+    child_env = dict(os.environ)
+    child_env["PYTHONIOENCODING"] = "utf-8"
+    child_env["PYTHONDONTWRITEBYTECODE"] = "1"
+    child_env[POST_MERGE_ENV] = "1"
+    child_env[POST_MERGE_ROOT_ENV] = str(root) if root is not None else ""
+    return child_env
+
+
+def snapshot_state(root: Path, env: dict) -> dict[str, bytes | None]:
+    """Byte snapshot of the tower state the verification tests must only read.
+
+    Every ``supervision/envelopes/*.json`` file, the merge queue, the
+    supervision ledger, the task board and the verified task's own record are
+    captured; ``None`` records a file that did not exist yet.
+    """
+    paths = [root / name for name in POST_MERGE_STATE_FILES]
+    paths += sorted((root / "supervision" / "envelopes").glob("*.json"))
+    task = env.get("task")
+    if isinstance(task, str) and is_safe_id(task, TASK_ID_RE):
+        paths.append(root / "tasks" / task / "record.json")
+    return {path.relative_to(root).as_posix():
+            path.read_bytes() if path.is_file() else None for path in paths}
+
+
+def restore_state(root: Path, snapshot: dict[str, bytes | None]) -> list[str]:
+    """Rewrite the snapshot bytes and drop envelope files the tests added.
+
+    Returns the tower-root-relative paths that actually had to be changed, so
+    a caller can report whether a child tried to write state it must only read.
+    """
+    changed = []
+    for key, data in snapshot.items():
+        path = root / key
+        if data is not None and (not path.is_file() or path.read_bytes() != data):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+            changed.append(key)
+        elif data is None and path.is_file():
+            path.unlink()
+            changed.append(key)
+    for path in (root / "supervision" / "envelopes").glob("*.json"):
+        if path.relative_to(root).as_posix() not in snapshot:
+            path.unlink()
+            changed.append(path.relative_to(root).as_posix())
+    return changed
+
+
+def isolated_test_run(argv, cwd, root, env) -> subprocess.CompletedProcess:
+    """Run one post-merge suite on a frozen tower-state snapshot.
+
+    The snapshot is taken before the child starts and restored in a
+    ``finally`` block, so the suites observe one stable ``MERGED`` state and
+    the failure path writes ``CORRECTION_REQUIRED`` onto clean state instead of
+    onto whatever a test left behind.
+    """
+    snapshot = snapshot_state(root, env) if root is not None else {}
+    try:
+        return subprocess.run(
+            argv, cwd=str(cwd), capture_output=True, text=True, encoding="utf-8",
+            errors="replace", env=isolated_child_env(root))
+    finally:
+        restore_state(root, snapshot) if root is not None else None
+
+
+# The domain layer owns *when* the two post-merge suites run; the entry layer
+# owns *how* their state is isolated, so the runner is installed here.
+tower_post_merge.TEST_RUNNER = isolated_test_run
+
+
+# Commands that only read the tower.  While post-merge runs its suites, the
+# live tower state is a frozen snapshot, so the entry layer lets these through
+# and refuses every other command that resolves to that root.
+POST_MERGE_READ_ONLY_COMMANDS = frozenset({
+    "arch-check", "arch-graph", "authority-check", "brief", "campaign-check",
+    "check", "handoff-status", "hash", "profile-check", "shape-check",
+    "spec-coverage", "spec-lint", "startup", "state-verify", "status",
+    "supervision-status", "verify-ledger", "where", "wiring",
+})
+
+
+def post_merge_isolation_errors(root: Path, args) -> list[str]:
+    """PILOT-077: why this command would write the tower under test.
+
+    ``post-merge`` runs its suites with ``TOWER_POST_MERGE=1`` and names the
+    live tower in ``TOWER_POST_MERGE_ROOT``.  A command that resolves to that
+    root may then only read it -- the fixture roots the suites build are
+    unaffected -- and overwriting the shape baseline stays a write even though
+    ``shape-check`` is otherwise read-only.
+    """
+    if os.environ.get(POST_MERGE_ENV) != "1":
+        return []
+    live = os.environ.get(POST_MERGE_ROOT_ENV) or ""
+    if not live or Path(live).resolve() != Path(root).resolve():
+        return []
+    if args.cmd in POST_MERGE_READ_ONLY_COMMANDS:
+        if args.cmd == "shape-check" and getattr(args, "write_baseline", False):
+            return [f"{args.cmd}: post-merge isolation forbids rewriting the "
+                    "shape baseline of the live tower"]
+        return []
+    return [f"{args.cmd}: post-merge isolation keeps the live tower {root} "
+            "read-only while its tests run (TOWER_POST_MERGE=1)"]
+
+
+def command_handlers() -> dict:
+    """The dispatch table: the layered handlers over the base command map."""
+    return {**COMMAND_LAYER_HANDLERS, **TASK_IDS_HANDLERS,
+        "init": cmd_init, "wiring": cmd_wiring, "startup": cmd_startup,
+        "status": cmd_status, "phase": cmd_phase, "task-new": cmd_task_new, "check": cmd_check,
+        "spec-approve": cmd_spec_approve,
+        "task-next": cmd_task_next,
+        "hash": cmd_hash, "dispatch": cmd_dispatch, "deliver": cmd_deliver,
+        "completion-add": cmd_completion_add,
+        "checkback": cmd_checkback, "accept": cmd_accept, "close": cmd_close,
+        "supervision-init": cmd_supervision_init, "supervision-status": cmd_supervision_status,
+        "supervision-phase": cmd_supervision_phase,
+        "handoff-new": cmd_handoff_new, "handoff-check": cmd_handoff_check,
+        "handoff-claim": cmd_handoff_claim, "handoff-accept": cmd_handoff_accept,
+        "handoff-receipt": cmd_handoff_receipt, "handoff-activate": cmd_handoff_activate,
+        "handoff-status": cmd_handoff_status,
+        "envelope-new": cmd_envelope_new, "queue-add": cmd_queue_add,
+        "merge-check": cmd_merge_check, "merge": cmd_merge_with_base_sync, "post-merge": cmd_post_merge,
+        "verify-ledger": cmd_verify_ledger,
+        "state-verify": cmd_state_verify,
+        "authority-check": cmd_authority_check_with_model,
+        "authority-set": cmd_authority_set,
+        "authority-require": cmd_authority_require,
+        "spec-lint": cmd_spec_lint,
+        "spec-coverage": cmd_spec_coverage, "shape-check": cmd_shape_check,
+    }
+
+
+def dispatch_command(root: Path, args) -> None:
+    """Enforce the root and isolation contract, then run the command handler."""
+    if not root.exists():
+        fail([f"root not found: {root}"])
+    errors = post_merge_isolation_errors(root, args)
+    if errors:
+        fail(errors)
+    try:
+        command_handlers()[args.cmd](root, args)
+    except LedgerLockTimeout as exc:
+        fail([str(exc)])
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1222,36 +1418,7 @@ def main() -> None:
     args = build_parser().parse_args()
     _force_utf8_stdio()
     root = stamp_authority_identity(Path(args.root).resolve(), args)
-    if not root.exists():
-        fail([f"root not found: {root}"])
-    handlers = {**COMMAND_LAYER_HANDLERS, **TASK_IDS_HANDLERS,
-        "init": cmd_init, "wiring": cmd_wiring, "startup": cmd_startup,
-        "status": cmd_status, "phase": cmd_phase, "task-new": cmd_task_new, "check": cmd_check,
-        "spec-approve": cmd_spec_approve,
-        "task-next": cmd_task_next,
-        "hash": cmd_hash, "dispatch": cmd_dispatch, "deliver": cmd_deliver,
-        "completion-add": cmd_completion_add,
-        "checkback": cmd_checkback, "accept": cmd_accept, "close": cmd_close,
-        "supervision-init": cmd_supervision_init, "supervision-status": cmd_supervision_status,
-        "supervision-phase": cmd_supervision_phase,
-        "handoff-new": cmd_handoff_new, "handoff-check": cmd_handoff_check,
-        "handoff-claim": cmd_handoff_claim, "handoff-accept": cmd_handoff_accept,
-        "handoff-receipt": cmd_handoff_receipt, "handoff-activate": cmd_handoff_activate,
-        "handoff-status": cmd_handoff_status,
-        "envelope-new": cmd_envelope_new, "queue-add": cmd_queue_add,
-        "merge-check": cmd_merge_check, "merge": cmd_merge_with_base_sync, "post-merge": cmd_post_merge,
-        "verify-ledger": cmd_verify_ledger,
-        "state-verify": cmd_state_verify,
-        "authority-check": cmd_authority_check_with_model,
-        "authority-set": cmd_authority_set,
-        "authority-require": cmd_authority_require,
-        "spec-lint": cmd_spec_lint,
-        "spec-coverage": cmd_spec_coverage, "shape-check": cmd_shape_check,
-    }
-    try:
-        handlers[args.cmd](root, args)
-    except LedgerLockTimeout as exc:
-        fail([str(exc)])
+    dispatch_command(root, args)
 
 
 # The parser owns the command list; arch-check reads it through this
