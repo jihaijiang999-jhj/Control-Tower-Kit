@@ -2,7 +2,7 @@
   "schema": "tower/task@1",
   "id": "PILOT-077",
   "title": "post-merge 测试隔离与稳定 MERGED 快照；恢复 076 后 9/9",
-  "status": "dispatched",
+  "status": "closed",
   "authority": "workspace_write",
   "scope": [
     "post-merge 测试前 snapshot tower 状态（supervision/envelopes、MERGE_QUEUE、ledger/supervision.jsonl、primary/TASK_BOARD、tasks/<id>/record.json），测试期间不改这些文件",
@@ -47,18 +47,118 @@
   "dispatch": {
     "executor": "subagent:agent-1",
     "worktree": "pilot/worktrees/PILOT-077",
-    "at": "2026-11-14T22:17:18+08:00",
+    "at": "2026-11-14T23:39:16+08:00",
     "kind": "subagent",
     "model": null,
     "parent": null,
-    "base_sha": "171944ba0b15f2ac55d998ea3a08c1b3653ede16",
+    "base_sha": "bef425e3dbac24e1dc9694d3fed286d52958f596",
     "campaign": "C-2026-Q4-04"
   },
-  "evidence": [],
-  "review": null,
-  "decision": null,
-  "closeout": null,
+  "evidence": [
+    {
+      "path": "tasks/PILOT-077/evidence/tower_post_merge.py",
+      "sha256": "b929cdfed877b69974119a18ad72394e3a5fe13318515b31831696cb37a5cb47",
+      "bytes": 28892,
+      "at": "2026-11-14T23:39:18+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-077/evidence/tower_cli.py",
+      "sha256": "1369273074b6364c326417822341363e93d99347833c8a2289eeb75c5d781994",
+      "bytes": 65219,
+      "at": "2026-11-14T23:39:18+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-077/evidence/test_tower_gates.py",
+      "sha256": "f65146b8cb96e7066aec400302b77bd483012e0a7d401b840e05765be9c83a2a",
+      "bytes": 3915,
+      "at": "2026-11-14T23:39:18+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-077/evidence/test_post_merge_isolation.py",
+      "sha256": "54d4d9a91460a0aed4469773e57c453f865c43f31e5ab24fa02f16c9a9cc29a4",
+      "bytes": 29786,
+      "at": "2026-11-14T23:39:18+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-077/evidence/test-output.txt",
+      "sha256": "9e512eaf696208988f6975cc505e02a2a337d3d7ff8cbc6ee50e8957779a36f3",
+      "bytes": 122900,
+      "at": "2026-11-14T23:39:18+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-077/evidence/isolation_probe.py",
+      "sha256": "f5053fb07cadd7076d6a429a14400d86a10f09165157e8285055072f95b5da43",
+      "bytes": 19183,
+      "at": "2026-11-14T23:39:18+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-077/evidence/probe.txt",
+      "sha256": "325956e07c55b492e145164e9fcb58e5f1f3b569332103266bf8ce4b8071267a",
+      "bytes": 1759,
+      "at": "2026-11-14T23:39:18+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-077/evidence/real076_recover_probe.py",
+      "sha256": "5f764136135f554838bcbb9e38f35c6fd4349ed1bddd98be74cbd4c548be7fd9",
+      "bytes": 4534,
+      "at": "2026-11-14T23:39:18+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-077/evidence/commit.txt",
+      "sha256": "9d22d79828d0f78e05ec2ddc87122b9606f13ce6929660a356935d76ad3b6478",
+      "bytes": 891,
+      "at": "2026-11-14T23:39:18+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-077/evidence/diff.txt",
+      "sha256": "a68b02798e1685ee72b262ade5d491696d977bf9505c4726bb38c9afb8f99ad0",
+      "bytes": 53174,
+      "at": "2026-11-14T23:39:18+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-077/evidence/gates.txt",
+      "sha256": "f9715455fee512387e4037c6cccac7b2dcdbe3ae9734c6d5214f7211b5f00f12",
+      "bytes": 3693,
+      "at": "2026-11-14T23:39:18+08:00",
+      "id": "E-011"
+    }
+  ],
+  "review": {
+    "schema": "tower/review@1",
+    "task": "PILOT-077",
+    "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+    "verdict": "PASS",
+    "head": "60265c48f1ea5c7d241ac821f4619656e50bbbab",
+    "base": "bef425e3dbac24e1dc9694d3fed286d52958f596",
+    "scope": [],
+    "findings": [],
+    "note": "077 PASS。4 paths；HEAD 60265c4（base bef425e）；11/11 证据；Ran 844 OK；076 recovered tail MERGED；post-merge snapshot/restore；TOWER_POST_MERGE 阻断递归。",
+    "at": "2026-11-14T23:47:33+08:00",
+    "structure": ""
+  },
+  "decision": {
+    "id": "D-PILOT-077",
+    "actor": "mac",
+    "text": "PASS; isolation",
+    "at": "2026-11-14T23:47:33+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-077/CLOSEOUT.md",
+    "at": "2026-11-14T23:47:33+08:00"
+  },
   "created_at": "2026-11-07T11:48:33+08:00",
-  "updated_at": "2026-11-14T22:17:18+08:00",
-  "next": "等待 executor 交付"
+  "updated_at": "2026-11-14T23:47:33+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-077/MERGE.md",
+  "delivered_at": "2026-11-14T23:39:18+08:00",
+  "accepted_at": "2026-11-14T23:47:33+08:00"
 }

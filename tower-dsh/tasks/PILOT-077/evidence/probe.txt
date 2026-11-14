@@ -1,0 +1,40 @@
+PILOT-077 probes
+
+# 1) scratch/isolation_probe.py (frozen state + recovery fixture)
+[ok] snapshot/restore bytes: all five state files byte-identical
+[ok] snapshot drops added envelope
+[ok] failing run exits 2: exit 2
+[ok] failing run keeps board/record bytes
+[ok] failing run writes only the correction
+[ok] green run verifies: exit 0, status POST_MERGE_VERIFIED
+[ok] TOWER_POST_MERGE blocks recursion: exit 0, tower suite not entered
+[ok] 076 recovery re-folds the replay: CORRECTION_REQUIRED -> MERGED
+[ok] 076 recovery appends one recovered tail
+[ok] 076 recovery leaves state-verify at zero drift
+[ok] second recovery writes nothing
+PROBE OK 11/11
+
+# 2) scratch/real076_recover_probe.py (real 076 state bytes, read-only copy)
+fetch real merge: 0 From C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-077
+ * branch            0d9cab0dc8d2b2aee555d6758c7c289881399176 -> FETCH_HEAD
+push main: 0 To C:/Users/mac/AppData/Local/Temp/tower-real076-0z09echj/origin.git
+ * [new branch]      main -> main
+before ok: False
+before drift: [{'kind': 'envelope_status', 'target': 'ENV-PILOT-076', 'expected': 'CORRECTION_REQUIRED', 'actual': 'MERGED'}, {'kind': 'queue_status', 'target': 'ENV-PILOT-076', 'expected': 'CORRECTION_REQUIRED', 'actual': 'MERGED'}]
+recover exit: 0
+recover out: {
+  "ok": true,
+  "envelope": "ENV-PILOT-076",
+  "status": "MERGED",
+  "merge_commit": "0d9cab0dc8d2b2aee555d6758c7c289881399176",
+  "recovered": true,
+  "by": "sup-phase2-pilot",
+  "repaired": true,
+  "reopened": true
+}
+after ok: True
+after drift: []
+event tail: [('POST_MERGE_FAILED', None, ''), ('MERGE_START', True, ''), ('MERGE', True, '0d9cab0')]
+merge count: 2
+verified: []
+REAL076 PROBE OK

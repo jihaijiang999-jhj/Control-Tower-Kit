@@ -1,0 +1,24 @@
+HEAD: ac70395c601600569cdee3efaea3522a8de818a0
+branch: pilot/PILOT-077
+
+ac70395c601600569cdee3efaea3522a8de818a0
+mac <mac@local>
+Sat Nov 14 22:56:19 2026 +0800
+PILOT-077: post-merge state isolation; recovery re-folds MERGED
+
+-- git show --stat --oneline HEAD --
+ac70395 PILOT-077: post-merge state isolation; recovery re-folds MERGED
+ tests/test_tower_gates.py                          |  18 +
+ tower-dsh/tools/tests/test_post_merge_isolation.py | 600 +++++++++++++++++++++
+ tower-dsh/tools/tower_cli.py                       | 249 +++++++--
+ tower-dsh/tools/tower_post_merge.py                |  22 +-
+ 4 files changed, 840 insertions(+), 49 deletions(-)
+
+-- diff name-status HEAD^ HEAD --
+M	tests/test_tower_gates.py
+A	tower-dsh/tools/tests/test_post_merge_isolation.py
+M	tower-dsh/tools/tower_cli.py
+M	tower-dsh/tools/tower_post_merge.py
+
+-- status --
+?? scratch/

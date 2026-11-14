@@ -1,0 +1,176 @@
+PILOT-077 gate evidence
+HEAD: ac70395c601600569cdee3efaea3522a8de818a0
+tower cwd: C:\Users\mac\Documents\deepseek-harness\default-workspace\tower-dsh\pilot\worktrees\PILOT-077\tower-dsh
+
+== python tools/towerctl.py state-verify  -> exit 0 ==
+{
+  "ok": true,
+  "tasks": 75,
+  "envelopes": 73,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-039-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-041-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-043-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-044-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-053-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID2",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID2",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 10,
+  "evidence_checked": 723
+}
+
+== python tools/towerctl.py arch-check  -> exit 0 ==
+{
+  "ok": true,
+  "counts": {
+    "gates": 18,
+    "invariants": 16,
+    "events": 32,
+    "event_types_in_code": 32,
+    "unresolved_event_calls": 1,
+    "adrs": 8,
+    "sections": 6,
+    "nodes": 82,
+    "edges": 185
+  },
+  "errors": []
+}
+
+== python tools/towerctl.py shape-check  -> exit 0 ==
+{
+  "ok": true,
+  "shape_check": "checked",
+  "shape_checked": true,
+  "files": 82,
+  "functions": 2424,
+  "duplicate_blocks": 169,
+  "unused_imports": 1
+}
+
+== python tools/towerctl.py verify-ledger  -> exit 0 ==
+{
+  "ok": true,
+  "files": {
+    "primary": {
+      "path": "ledger/primary.jsonl",
+      "exists": true,
+      "events": 734,
+      "legacy_unhashed": 53,
+      "errors": []
+    },
+    "supervision": {
+      "path": "ledger/supervision.jsonl",
+      "exists": true,
+      "events": 428,
+      "legacy_unhashed": 26,
+      "errors": []
+    }
+  },
+  "errors": []
+}
+
+== python tools/towerctl.py profile-check  -> exit 0 ==
+{
+  "ok": true,
+  "object": "TOWER-DSH",
+  "checked": 11,
+  "findings": []
+}
+
+== python tools/towerctl.py campaign-check  -> exit 0 ==
+{
+  "ok": true,
+  "strict": false,
+  "strategy": "S-2026-Q4",
+  "goals": [
+    "G1",
+    "G2",
+    "G3",
+    "G4"
+  ],
+  "campaigns": 4,
+  "campaign_ids": [
+    "C-2026-Q4-01",
+    "C-2026-Q4-02",
+    "C-2026-Q4-03",
+    "C-2026-Q4-04"
+  ],
+  "wip": {
+    "in_flight": 0,
+    "limit": 1,
+    "campaigns": {
+      "C-2026-Q4-04": 0
+    }
+  },
+  "errors": [],
+  "warnings": [
+    {
+      "code": "W2",
+      "target": "C-2026-Q4-02",
+      "detail": "review_by 2026-11-15 is within 7 days"
+    },
+    {
+      "code": "W2",
+      "target": "C-2026-Q4-03",
+      "detail": "review_by 2026-11-15 is within 7 days"
+    },
+    {
+      "code": "W2",
+      "target": "C-2026-Q4-04",
+      "detail": "review_by 2026-11-20 is within 7 days"
+    },
+    {
+      "code": "W3",
+      "target": "C-2026-Q4-04",
+      "detail": "task_forces references a spec-only card (no tasks/PILOT-077/): PILOT-077"
+    }
+  ]
+}
+
+__git status --porcelain (worktree)__
+?? scratch/
