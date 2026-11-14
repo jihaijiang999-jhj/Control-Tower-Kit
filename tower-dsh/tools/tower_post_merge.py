@@ -258,12 +258,9 @@ def parse_test_count(stdout: str | None, stderr: str | None) -> int | None:
         return None
     return int(matches[-1])
 
-def run_test_suite(argv: list[str], cwd: Path) -> subprocess.CompletedProcess:
-    """Run a test-suite child process with the tower's pinned env contract.
-
-    Read-only: the child inherits ``os.environ`` with UTF-8 stdio forced and
-    bytecode writing disabled so the verified tree stays clean.
-    """
+def plain_test_run(argv: list[str], cwd: Path, root: Path | None,
+                   env: dict | None) -> subprocess.CompletedProcess:
+    """Run one suite with UTF-8 stdio and no bytecode (the un-isolated path)."""
     child_env = dict(os.environ)
     child_env["PYTHONIOENCODING"] = "utf-8"
     child_env["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -271,6 +268,15 @@ def run_test_suite(argv: list[str], cwd: Path) -> subprocess.CompletedProcess:
         argv, cwd=str(cwd), capture_output=True, text=True, encoding="utf-8",
         errors="replace", env=child_env,
     )
+
+# PILOT-077: the entry layer installs the isolated runner (frozen state
+# snapshot plus ``TOWER_POST_MERGE`` markers) when post-merge is dispatched.
+TEST_RUNNER = plain_test_run
+
+def run_test_suite(argv: list[str], cwd: Path, root: Path | None = None,
+                   env: dict | None = None) -> subprocess.CompletedProcess:
+    """Run a test-suite child; ``TEST_RUNNER`` decides how it is isolated."""
+    return TEST_RUNNER(argv, cwd, root, env)
 
 def max_verified_tower_tests(root: Path) -> int | None:
     """Highest tower count ever verified in the supervision ledger.
@@ -380,7 +386,7 @@ def cmd_post_merge(root: Path, args) -> None:
     envelope_path = envelope_repo_path(root, env)
     tests = run_test_suite(
         [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
-        repo)
+        repo, root, env)
     tests_count = parse_test_count(tests.stdout, tests.stderr)
     baseline = env.get("tests_baseline")
     baseline_ok = valid_baseline(baseline)
@@ -423,7 +429,7 @@ def cmd_post_merge(root: Path, args) -> None:
             # the real tower always ships the runner.
             tower_argv = [sys.executable, "-B", "-m", "unittest", "discover",
                           "-s", "tools/tests", "-v"]
-        tower_tests = run_test_suite(tower_argv, root)
+        tower_tests = run_test_suite(tower_argv, root, root, env)
         tower_count = parse_test_count(tower_tests.stdout, tower_tests.stderr)
         tower_check = {
             "name": "tower tests count >= baseline",

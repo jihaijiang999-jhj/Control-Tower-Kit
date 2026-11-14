@@ -5,6 +5,12 @@ Fixes AUDIT-2026-10-19 P1-9.  Also fixes PILOT-024's false red: the tower suite
 child writes a locale code page (cp936 on this host) and the parent used to
 decode its pipes as strict UTF-8, so a localized skip message crashed the gate
 with ``UnicodeDecodeError`` and left ``stdout``/``stderr`` as ``None``.
+
+PILOT-077: ``post-merge`` runs this root suite *and* the tower suite
+(``tools/run_tests.py``) in separate steps.  Recursing into the tower suite from
+inside the root suite ran the whole 800+ test gate twice and made the root gate
+read live tower state mid-verification, so a ``TOWER_POST_MERGE=1`` child only
+checks this layer and lets the dedicated tower gate do the one full run.
 """
 
 import os
@@ -16,6 +22,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TOWER = ROOT / "tower-dsh"
+POST_MERGE_ENV = "TOWER_POST_MERGE"
+
+
+def recursion_allowed() -> bool:
+    """PILOT-077: the root wrapper recurses only outside a post-merge run."""
+    return os.environ.get(POST_MERGE_ENV) != "1"
 
 
 def run_captured(argv, cwd):
@@ -52,6 +64,12 @@ def run_captured(argv, cwd):
 
 class TowerGateSuite(unittest.TestCase):
     def test_tower_gate_suite(self):
+        if not recursion_allowed():
+            # PILOT-077: the dedicated ``tools/run_tests.py`` gate inside
+            # post-merge runs the tower suite in full; recursing here would run
+            # it twice and read live tower state from the root wrapper.
+            self.assertTrue((TOWER / "tools" / "run_tests.py").is_file())
+            return
         cp = run_captured(
             [sys.executable, "-B", "tools/run_tests.py"],
             TOWER,
