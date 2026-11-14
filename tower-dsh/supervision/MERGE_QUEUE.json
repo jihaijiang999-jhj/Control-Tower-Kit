@@ -661,10 +661,10 @@
       "task": "PILOT-077",
       "branch": "pilot/PILOT-077",
       "base": "main",
-      "status": "MERGED",
+      "status": "POST_MERGE_VERIFIED",
       "added_at": "2026-11-14T23:47:47+08:00",
       "merge_commit": "2bfab80aaeec4a15df614ebbe67360b7f33210ff"
     }
   ],
-  "updated_at": "2026-11-15T00:19:13+08:00"
+  "updated_at": "2026-11-15T00:34:47+08:00"
 }
