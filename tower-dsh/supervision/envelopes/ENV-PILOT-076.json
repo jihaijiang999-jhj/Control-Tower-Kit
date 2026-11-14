@@ -76,7 +76,7 @@
   ],
   "envelope_head_sha": "5da96e5c6f77f1bb9a3e084c2c1a3aa897f41c56",
   "head": "5da96e5c6f77f1bb9a3e084c2c1a3aa897f41c56",
-  "status": "CORRECTION_REQUIRED",
+  "status": "MERGED",
   "base_side": true,
   "pr_number": 60,
   "pr_url": "https://github.com/jihaijiang999-jhj/Control-Tower-Kit/pull/60",

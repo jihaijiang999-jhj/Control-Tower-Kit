@@ -751,7 +751,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-076/MERGE.md",
       "updated_at": "2026-11-07T04:12:07+08:00"
+    },
+    {
+      "id": "PILOT-077",
+      "title": "post-merge 测试隔离与稳定 MERGED 快照；恢复 076 后 9/9",
+      "status": "dispatched",
+      "authority": "workspace_write",
+      "executor": "subagent:agent-1",
+      "reviewer": null,
+      "next": "等待 executor 交付",
+      "updated_at": "2026-11-14T22:17:18+08:00"
     }
   ],
-  "updated_at": "2026-11-07T04:12:07+08:00"
+  "updated_at": "2026-11-14T22:17:18+08:00"
 }

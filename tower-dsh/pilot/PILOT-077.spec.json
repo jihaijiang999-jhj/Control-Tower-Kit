@@ -17,13 +17,15 @@
     "失败路径：先 restore snapshot，再写 CORRECTION_REQUIRED + POST_MERGE_FAILED；成功路径才写 POST_MERGE_VERIFIED",
     "076 恢复：envelope-recover 到 MERGED（0d9cab0），提交稳定快照，再 post-merge 9/9",
     "补测试：snapshot/restore 字节一致；失败不污染 envelope/queue；递归被阻断；076 恢复路径",
-    "不改 074 的 merge_fact_gate、075 的 recover、076 owner/review 语义"
+    "不改 074 的 merge_fact_gate、075 的 recover、076 owner/review 语义",
+    "envelope-recover：源 CORRECTION 且已有 MERGE，但尾部 POST_MERGE_FAILED 使 replay 仍 CORRECTION 时，追加 MERGE_START+recovered MERGE，使状态真正 MERGED；不能只改文件状态"
   ],
   "allowed_paths": [
     "pilot/worktrees/PILOT-077/tower-dsh/tools/tower_post_merge.py",
     "pilot/worktrees/PILOT-077/tower-dsh/tools/tower_cli.py",
     "pilot/worktrees/PILOT-077/tests/test_tower_gates.py",
-    "pilot/worktrees/PILOT-077/tower-dsh/tools/tests/test_post_merge_isolation.py"
+    "pilot/worktrees/PILOT-077/tower-dsh/tools/tests/test_post_merge_isolation.py",
+    "pilot/worktrees/PILOT-077/tower-dsh/tools/tower_envelope.py"
   ],
   "forbidden": [
     "network",
@@ -42,6 +44,8 @@
     "076 真实恢复：ENV-PILOT-076 MERGED，post-merge 9/9，drift 0",
     "077 自身 PR 审计 admin；真实塔 76/73 drift []；arch 18；profile 11/0；shape 0"
   ],
-  "depends_on": ["PILOT-076"],
+  "depends_on": [
+    "PILOT-076"
+  ],
   "worktree": "pilot/worktrees/PILOT-077"
 }
