@@ -652,7 +652,7 @@
       "task": "PILOT-076",
       "branch": "pilot/PILOT-076",
       "base": "main",
-      "status": "MERGED",
+      "status": "POST_MERGE_VERIFIED",
       "added_at": "2026-11-07T04:12:22+08:00",
       "merge_commit": "0d9cab0dc8d2b2aee555d6758c7c289881399176"
     },
@@ -666,5 +666,5 @@
       "merge_commit": "2bfab80aaeec4a15df614ebbe67360b7f33210ff"
     }
   ],
-  "updated_at": "2026-11-15T00:03:37+08:00"
+  "updated_at": "2026-11-15T00:19:13+08:00"
 }
