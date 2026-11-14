@@ -64,6 +64,12 @@
   ],
   "envelope_head_sha": "bd5c66ebbded169f365f7a2560e32994a74167de",
   "head": "bd5c66ebbded169f365f7a2560e32994a74167de",
-  "status": "WAITING",
-  "base_side": true
+  "status": "MERGED",
+  "base_side": true,
+  "merge_commit": "2bfab80aaeec4a15df614ebbe67360b7f33210ff",
+  "merged_at": "2026-11-15T00:03:37+08:00",
+  "supervisor": "sup-phase2-pilot",
+  "recovered": true,
+  "recovered_by": "sup-phase2-pilot",
+  "recovery_reason": "077 PR #61 admin; strict owner gate bootstrap"
 }
