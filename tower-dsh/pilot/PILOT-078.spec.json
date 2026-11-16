@@ -1,0 +1,54 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-078",
+  "title": "文档口径 76/74/844/16-16、072 注册 void、端到端 walkthrough",
+  "objective": {
+    "problem": "NEXT-WINDOW/MAP/README/REPRODUCE/ARCHITECTURE 仍停留在 72/70/788/12-12 或更早口径；072 未在 TASK_IDS 注册为 void，task-new 可能复用；没有一张卡从 spec 到 post-merge 的可执行 walkthrough，外审把可复现性列为 FAIL。",
+    "outcome": "文档统一为 76 代码卡 / 74 信封 / 844 tests / 16-16（078 文档卡单独标注，不计入 76 代码卡）；072 注册为 void/reserved；新增从 task-new 到 post-merge 的逐步 walkthrough；CI fetch-depth 0 保持不变；数字可由命令复算。",
+    "approach": "改 NEXT-WINDOW/MAP/README/REPRODUCE/ARCHITECTURE；state/TASK_IDS.json 加 072 void；新增 docs/WALKTHROUGH.md；补一个文档数字测试；不改变任何运行时代码。",
+    "non_goals_and_done": "不改 tower 运行时代码、不新增卡到 C-04、不把 078 计入 16-16；844+ tests；072 task-new 拒绝；walkthrough 命令可执行。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0009 / 外审可复现性 FAIL",
+  "why_now": "074–077 已 verified，但文档口径落后 4 张卡；外证前必须让新窗口按文档复现一张卡。",
+  "scope": [
+    "NEXT-WINDOW.md：76 代码卡 / 74 信封 / 844 tests / 16-16；078 文档卡单列；065–068 回填、074–077 verified、076/077 admin/recover 事实",
+    "control-tower/MAP.md：§5/§6 进度与事件/门数同步；删除 58 任务/58 信封旧数；补 074 MERGE_HISTORICAL、075 recover re-fold、076 owner gate、077 snapshot",
+    "README.md：去掉 58 tests/001-006 旧口径，指向 NEXT-WINDOW/START-HERE",
+    "REPRODUCE.md：844 tests、真实 CI 8 步、fetch-depth 0；删除 252 旧期望；补端到端 walkthrough 链接",
+    "ARCHITECTURE.md：事件数/门数/模块数与命令输出一致（不硬编码过期数）",
+    "docs/WALKTHROUGH.md：task-new → worktree → dispatch → deliver → checkback → envelope → queue → PR → merge → post-merge 的完整命令与判据",
+    "state/TASK_IDS.json：PILOT-072 status=void，spec_path=pilot/PILOT-072.spec.json.parked；task-new 拒绝复用",
+    "tools/tests/test_docs_current.py：断言文档数字来自 state/命令（76/74/844/16-16），072 void；不访问网络"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-078/tower-dsh/NEXT-WINDOW.md",
+    "pilot/worktrees/PILOT-078/tower-dsh/control-tower/MAP.md",
+    "pilot/worktrees/PILOT-078/tower-dsh/README.md",
+    "pilot/worktrees/PILOT-078/tower-dsh/REPRODUCE.md",
+    "pilot/worktrees/PILOT-078/tower-dsh/ARCHITECTURE.md",
+    "pilot/worktrees/PILOT-078/tower-dsh/docs/WALKTHROUGH.md",
+    "pilot/worktrees/PILOT-078/tower-dsh/state/TASK_IDS.json",
+    "pilot/worktrees/PILOT-078/tower-dsh/tools/tests/test_docs_current.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "runtime code changes",
+    "adding 078 to C-04",
+    "claiming 16-16 means 16 verified merges"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-078/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 844 + 新增用例数（main 基线 844）",
+    "文档数字 76 代码卡 / 74 信封 / 844 tests / 16-16；078 文档卡单列；072 void",
+    "task-new --id PILOT-072 拒绝；TASK_IDS 072 status=void",
+    "docs/WALKTHROUGH.md 的每条命令可执行，含 owner/reviewer/envelope/post-merge 判据",
+    "CI fetch-depth 0 不变；REPRODUCE 844 与真实 8 步一致",
+    "真实塔 77/74 drift []；arch 18；profile 11/0；shape 0；078 PR 审计 admin"
+  ],
+  "depends_on": ["PILOT-077"],
+  "worktree": "pilot/worktrees/PILOT-078"
+}
