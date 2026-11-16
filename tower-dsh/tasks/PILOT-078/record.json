@@ -1,0 +1,70 @@
+{
+  "schema": "tower/task@1",
+  "id": "PILOT-078",
+  "title": "文档口径 76/74/844/16-16、072 注册 void、端到端 walkthrough",
+  "status": "dispatched",
+  "authority": "workspace_write",
+  "scope": [
+    "NEXT-WINDOW.md：76 代码卡 / 74 信封 / 844 tests / 16-16；078 文档卡单列；065–068 回填、074–077 verified、076/077 admin/recover 事实",
+    "control-tower/MAP.md：§5/§6 进度与事件/门数同步；删除 58 任务/58 信封旧数；补 074 MERGE_HISTORICAL、075 recover re-fold、076 owner gate、077 snapshot",
+    "README.md：去掉 58 tests/001-006 旧口径，指向 NEXT-WINDOW/START-HERE",
+    "REPRODUCE.md：844 tests、真实 CI 8 步、fetch-depth 0；删除 252 旧期望；补端到端 walkthrough 链接",
+    "ARCHITECTURE.md：事件数/门数/模块数与命令输出一致（不硬编码过期数）",
+    "docs/WALKTHROUGH.md：task-new → worktree → dispatch → deliver → checkback → envelope → queue → PR → merge → post-merge 的完整命令与判据",
+    "state/TASK_IDS.json：PILOT-072 status=void，spec_path=pilot/PILOT-072.spec.json.parked；task-new 拒绝复用",
+    "tools/tests/test_docs_current.py：断言文档数字来自 state/命令（76/74/844/16-16），072 void；不访问网络"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-078/tower-dsh/NEXT-WINDOW.md",
+    "pilot/worktrees/PILOT-078/control-tower/MAP.md",
+    "pilot/worktrees/PILOT-078/tower-dsh/README.md",
+    "pilot/worktrees/PILOT-078/tower-dsh/REPRODUCE.md",
+    "pilot/worktrees/PILOT-078/tower-dsh/ARCHITECTURE.md",
+    "pilot/worktrees/PILOT-078/tower-dsh/docs/WALKTHROUGH.md",
+    "pilot/worktrees/PILOT-078/tower-dsh/state/TASK_IDS.json",
+    "pilot/worktrees/PILOT-078/tower-dsh/tools/tests/test_docs_current.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "runtime code changes",
+    "adding 078 to C-04",
+    "claiming 16-16 means 16 verified merges"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-078/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 844 + 新增用例数（main 基线 844）",
+    "文档数字 76 代码卡 / 74 信封 / 844 tests / 16-16；078 文档卡单列；072 void",
+    "task-new --id PILOT-072 拒绝；TASK_IDS 072 status=void",
+    "docs/WALKTHROUGH.md 的每条命令可执行，含 owner/reviewer/envelope/post-merge 判据",
+    "CI fetch-depth 0 不变；REPRODUCE 844 与真实 8 步一致",
+    "真实塔 77/74 drift []；arch 18；profile 11/0；shape 0；078 PR 审计 admin"
+  ],
+  "depends_on": [
+    "PILOT-077"
+  ],
+  "worktree": "pilot/worktrees/PILOT-078",
+  "spec_path": "pilot/PILOT-078.spec.json",
+  "spec_sha256": "3c1ebb4097aac1143a0fc4d3f90cffc06035b0d9f68310bb0fcd3f1af47b92c1",
+  "spec_gate": "PASS",
+  "executor": "subagent:agent-2",
+  "dispatch": {
+    "executor": "subagent:agent-2",
+    "worktree": "pilot/worktrees/PILOT-078",
+    "at": "2026-11-16T16:55:44+08:00",
+    "kind": "subagent",
+    "model": null,
+    "parent": null,
+    "base_sha": "db5336782167db727cfa01f3d43582becbad46b0",
+    "campaign": "C-2026-Q4-04"
+  },
+  "evidence": [],
+  "review": null,
+  "decision": null,
+  "closeout": null,
+  "created_at": "2026-11-16T16:52:46+08:00",
+  "updated_at": "2026-11-16T16:55:44+08:00",
+  "next": "等待 executor 交付"
+}

@@ -23,7 +23,7 @@
   ],
   "allowed_paths": [
     "pilot/worktrees/PILOT-078/tower-dsh/NEXT-WINDOW.md",
-    "pilot/worktrees/PILOT-078/tower-dsh/control-tower/MAP.md",
+    "pilot/worktrees/PILOT-078/control-tower/MAP.md",
     "pilot/worktrees/PILOT-078/tower-dsh/README.md",
     "pilot/worktrees/PILOT-078/tower-dsh/REPRODUCE.md",
     "pilot/worktrees/PILOT-078/tower-dsh/ARCHITECTURE.md",
@@ -49,6 +49,8 @@
     "CI fetch-depth 0 不变；REPRODUCE 844 与真实 8 步一致",
     "真实塔 77/74 drift []；arch 18；profile 11/0；shape 0；078 PR 审计 admin"
   ],
-  "depends_on": ["PILOT-077"],
+  "depends_on": [
+    "PILOT-077"
+  ],
   "worktree": "pilot/worktrees/PILOT-078"
 }
