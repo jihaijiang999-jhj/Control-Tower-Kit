@@ -1,0 +1,81 @@
+{
+  "schema": "tower/merge-envelope@1",
+  "envelope_id": "ENV-PILOT-078",
+  "task": "PILOT-078",
+  "repository": "..",
+  "branch": "pilot/PILOT-078",
+  "base": "main",
+  "implementation_head_sha": "61673ef285296ae56fa9c6799934149f7477b308",
+  "envelope_path": "merge-envelopes/ENV-PILOT-078.json",
+  "created_at": "2026-11-16T18:02:56+08:00",
+  "scope": "PILOT-078: docs 76/74/844/16-16; 072 void; walkthrough",
+  "tests_baseline": 2,
+  "tower_tests_baseline": 844,
+  "forbidden": [
+    "production",
+    "external_call",
+    "deploy"
+  ],
+  "evidence": [
+    {
+      "path": "tasks/PILOT-078/evidence/MAP.md",
+      "sha256": "84958c3039af7f915562c15090f4db64edd618040fa5cd5bc14dbd5a36823dd6"
+    },
+    {
+      "path": "tasks/PILOT-078/evidence/NEXT-WINDOW.md",
+      "sha256": "8d5d7cd2221f7d01ca097cbf9a2940b7d0f39266f1c003a6c551ae3bbc18a159"
+    },
+    {
+      "path": "tasks/PILOT-078/evidence/README.md",
+      "sha256": "2eaa99b03ad54dff5fc1c251ab06a82280aa56d8080a661dc48e66f17b1c87f6"
+    },
+    {
+      "path": "tasks/PILOT-078/evidence/REPRODUCE.md",
+      "sha256": "51a0b38e175f5c5ed15301c1899142ab1ee0de44bbaed8ea0548c8d3e4fdfbb7"
+    },
+    {
+      "path": "tasks/PILOT-078/evidence/ARCHITECTURE.md",
+      "sha256": "234489b25215af4ddc392c364ed3b1a766390daca947c3aa01276e0c21f91713"
+    },
+    {
+      "path": "tasks/PILOT-078/evidence/WALKTHROUGH.md",
+      "sha256": "d086dd548ed07fac5f16227fdc3acb08e5ca8644194a2d6188254d58119ee0e0"
+    },
+    {
+      "path": "tasks/PILOT-078/evidence/TASK_IDS.json",
+      "sha256": "3334355a5f16e2608a1409b91b8e77e2e487837b6ccfd7d6aa0575caf7d6b033"
+    },
+    {
+      "path": "tasks/PILOT-078/evidence/test_docs_current.py",
+      "sha256": "bf40333398854a56c20d12ae3567de7ea69313c20b4c16311aec36ae97946604"
+    },
+    {
+      "path": "tasks/PILOT-078/evidence/test-output.txt",
+      "sha256": "583e23919276952023d740e5a867d6e372af4a1b9d5a3e052ae3e785c8fa00fe"
+    },
+    {
+      "path": "tasks/PILOT-078/evidence/docs_probe.py",
+      "sha256": "ada45e276d23132e06f667f0cc54d6d571c31ec5aaf9deaab43e7a547523eb7c"
+    },
+    {
+      "path": "tasks/PILOT-078/evidence/probe.txt",
+      "sha256": "a73bf4f25f8764c53a381b61e586863106e628924e32f70a221590918bf1557a"
+    },
+    {
+      "path": "tasks/PILOT-078/evidence/commit.txt",
+      "sha256": "e2bf8e4185a4d3556fa367a41a1083ea2a9540aa0bf94d5d1666ed6455204472"
+    },
+    {
+      "path": "tasks/PILOT-078/evidence/diff.txt",
+      "sha256": "2d6e102ef2ac3e2f563919c06ee9276af7d1a71514cbc5ab1a3cb851f9c342f0"
+    },
+    {
+      "path": "tasks/PILOT-078/evidence/gates.txt",
+      "sha256": "92dac9e9cb7fc1df3abf98f9d585a473fa2962d19b653a2b66a413e995c157c5"
+    }
+  ],
+  "envelope_head_sha": "52d9c75da6e9c38a495342f0baf1ebd2bbc41558",
+  "head": "52d9c75da6e9c38a495342f0baf1ebd2bbc41558",
+  "status": "WAITING",
+  "base_side": true
+}

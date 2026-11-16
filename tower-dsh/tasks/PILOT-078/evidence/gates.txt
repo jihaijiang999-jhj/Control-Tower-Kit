@@ -1,0 +1,331 @@
+PILOT-078 gates — 2026-11-16T17:44:14+08:00
+HEAD=d5719c60e6b927c8a121c882b2c6eaa7cdb6df23
+
+===== state-verify =====
+{
+  "ok": true,
+  "tasks": 76,
+  "envelopes": 74,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-039-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-041-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-043-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-044-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-053-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID2",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID2",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 10,
+  "evidence_checked": 734
+}
+exit=0
+
+===== arch-check =====
+{
+  "ok": true,
+  "counts": {
+    "gates": 18,
+    "invariants": 16,
+    "events": 32,
+    "event_types_in_code": 32,
+    "unresolved_event_calls": 1,
+    "adrs": 8,
+    "sections": 6,
+    "nodes": 83,
+    "edges": 185
+  },
+  "errors": []
+}
+exit=0
+
+===== shape-check =====
+{
+  "ok": true,
+  "shape_check": "checked",
+  "shape_checked": true,
+  "files": 83,
+  "functions": 2445,
+  "duplicate_blocks": 169,
+  "unused_imports": 1
+}
+exit=0
+
+===== profile-check =====
+{
+  "ok": true,
+  "object": "TOWER-DSH",
+  "checked": 11,
+  "findings": []
+}
+exit=0
+
+===== spec-coverage =====
+{
+  "ok": true,
+  "specs": 6,
+  "clauses": 56,
+  "tool_check": 27,
+  "covered": 27,
+  "tool_gaps": [],
+  "manual": [
+    "POL-CHANGE-LEVELS/C-04",
+    "POL-CHANGE-LEVELS/C-05",
+    "POL-CHANGE-LEVELS/C-06",
+    "POL-CHANGE-LEVELS/C-09",
+    "POL-RED-LINES/C-08",
+    "POL-RED-LINES/C-10",
+    "POL-RED-LINES/C-12",
+    "POL-RED-LINES/C-13",
+    "WF-HANDOFF/INV-06",
+    "WF-HANDOFF/INV-07",
+    "WF-LEDGER/INV-06",
+    "WF-TASK/INV-04"
+  ],
+  "owner": [
+    "POL-CHANGE-LEVELS/C-01",
+    "POL-CHANGE-LEVELS/C-07",
+    "POL-CHANGE-LEVELS/C-10",
+    "POL-RED-LINES/C-01",
+    "POL-RED-LINES/C-02",
+    "POL-RED-LINES/C-03",
+    "POL-RED-LINES/C-04",
+    "POL-RED-LINES/C-05",
+    "POL-RED-LINES/C-06",
+    "POL-RED-LINES/C-07",
+    "POL-RED-LINES/C-15",
+    "POL-RED-LINES/C-16",
+    "WF-HANDOFF/INV-05",
+    "WF-LEDGER/INV-07",
+    "WF-MERGE/INV-08",
+    "WF-MERGE/INV-09",
+    "WF-TASK/INV-05"
+  ],
+  "unknown": [],
+  "errors": []
+}
+exit=0
+
+===== verify-ledger =====
+{
+  "ok": true,
+  "files": {
+    "primary": {
+      "path": "ledger/primary.jsonl",
+      "exists": true,
+      "events": 743,
+      "legacy_unhashed": 53,
+      "errors": []
+    },
+    "supervision": {
+      "path": "ledger/supervision.jsonl",
+      "exists": true,
+      "events": 436,
+      "legacy_unhashed": 26,
+      "errors": []
+    }
+  },
+  "errors": []
+}
+exit=0
+
+===== campaign-check =====
+{
+  "ok": true,
+  "strict": false,
+  "strategy": "S-2026-Q4",
+  "goals": [
+    "G1",
+    "G2",
+    "G3",
+    "G4"
+  ],
+  "campaigns": 4,
+  "campaign_ids": [
+    "C-2026-Q4-01",
+    "C-2026-Q4-02",
+    "C-2026-Q4-03",
+    "C-2026-Q4-04"
+  ],
+  "wip": {
+    "in_flight": 0,
+    "limit": 1,
+    "campaigns": {
+      "C-2026-Q4-04": 0
+    }
+  },
+  "errors": [],
+  "warnings": [
+    {
+      "code": "W2",
+      "target": "C-2026-Q4-04",
+      "detail": "review_by 2026-11-20 is within 7 days"
+    },
+    {
+      "code": "W3",
+      "target": "C-2026-Q4-04",
+      "detail": "task_forces references a spec-only card (no tasks/PILOT-078/): PILOT-078"
+    }
+  ]
+}
+exit=0
+
+===== where --json =====
+{
+  "blocked": [],
+  "campaign": "C-2026-Q4-04",
+  "current": "PILOT-078",
+  "goal": "G2",
+  "index": 16,
+  "next": "PILOT-078",
+  "nodes": [
+    {
+      "id": "PILOT-061",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-062",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-063",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-064",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-065",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-066",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-067",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-068",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-069",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-070",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-071",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-073",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-074",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-075",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-076",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-077",
+      "status": "done"
+    },
+    {
+      "id": "PILOT-078",
+      "status": "active"
+    }
+  ],
+  "schema": "tower/position@1",
+  "sources": [
+    "command/campaigns/C-2026-Q4-04.md",
+    "primary/TASK_BOARD.json",
+    "tasks"
+  ],
+  "stop_conditions": [
+    "drift != 0 立即停",
+    "PR merge 仍需 local fallback 立即停"
+  ],
+  "total": 17,
+  "wip": {
+    "in_flight": 0,
+    "limit": 1
+  }
+}
+exit=0
+
+===== unittest tools.tests.test_docs_current -v =====
+
+--- stderr ---
+test_072_is_registered_void (tools.tests.test_docs_current.DocNumbersTestCase.test_072_is_registered_void) ... ok
+test_078_is_a_separate_doc_card (tools.tests.test_docs_current.DocNumbersTestCase.test_078_is_a_separate_doc_card) ... ok
+test_16_16_is_not_16_verified_merges (tools.tests.test_docs_current.DocNumbersTestCase.test_16_16_is_not_16_verified_merges) ... ok
+test_architecture_numbers_match_the_arch_files (tools.tests.test_docs_current.DocNumbersTestCase.test_architecture_numbers_match_the_arch_files) ... ok
+test_docs_keep_16_delivery_cards (tools.tests.test_docs_current.DocNumbersTestCase.test_docs_keep_16_delivery_cards) ... ok
+test_docs_keep_74_envelopes (tools.tests.test_docs_current.DocNumbersTestCase.test_docs_keep_74_envelopes) ... ok
+test_docs_keep_76_code_cards (tools.tests.test_docs_current.DocNumbersTestCase.test_docs_keep_76_code_cards) ... ok
+test_docs_keep_844_tests (tools.tests.test_docs_current.DocNumbersTestCase.test_docs_keep_844_tests) ... ok
+test_reproduce_matches_the_ci_contract (tools.tests.test_docs_current.DocNumbersTestCase.test_reproduce_matches_the_ci_contract) ... ok
+test_walkthrough_covers_the_whole_path (tools.tests.test_docs_current.DocNumbersTestCase.test_walkthrough_covers_the_whole_path) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.017s
+
+OK
+exit=0
+

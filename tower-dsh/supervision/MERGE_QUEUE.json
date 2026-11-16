@@ -664,7 +664,15 @@
       "status": "POST_MERGE_VERIFIED",
       "added_at": "2026-11-14T23:47:47+08:00",
       "merge_commit": "2bfab80aaeec4a15df614ebbe67360b7f33210ff"
+    },
+    {
+      "envelope_id": "ENV-PILOT-078",
+      "task": "PILOT-078",
+      "branch": "pilot/PILOT-078",
+      "base": "main",
+      "status": "WAITING",
+      "added_at": "2026-11-16T18:02:56+08:00"
     }
   ],
-  "updated_at": "2026-11-15T00:34:47+08:00"
+  "updated_at": "2026-11-16T18:02:56+08:00"
 }

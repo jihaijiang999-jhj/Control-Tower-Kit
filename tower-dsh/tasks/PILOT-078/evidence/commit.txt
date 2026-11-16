@@ -1,0 +1,18 @@
+﻿commit d5719c60e6b927c8a121c882b2c6eaa7cdb6df23
+Author:     mac <mac@local>
+AuthorDate: Mon Nov 16 17:29:45 2026 +0800
+Commit:     mac <mac@local>
+CommitDate: Mon Nov 16 17:29:45 2026 +0800
+
+    PILOT-078: docs 76/74/844/16-16; 072 void; walkthrough
+
+ control-tower/MAP.md                       |  45 ++++-
+ tower-dsh/ARCHITECTURE.md                  |  12 +-
+ tower-dsh/NEXT-WINDOW.md                   | 153 +++++++++-------
+ tower-dsh/README.md                        |  40 +++--
+ tower-dsh/REPRODUCE.md                     |  52 +++++-
+ tower-dsh/docs/WALKTHROUGH.md              | 269 +++++++++++++++++++++++++++++
+ tower-dsh/state/TASK_IDS.json              |   7 +
+ tower-dsh/tools/tests/test_docs_current.py | 203 ++++++++++++++++++++++
+ 8 files changed, 688 insertions(+), 93 deletions(-)
+d5719c60e6b927c8a121c882b2c6eaa7cdb6df23

@@ -761,7 +761,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-077/MERGE.md",
       "updated_at": "2026-11-14T23:47:33+08:00"
+    },
+    {
+      "id": "PILOT-078",
+      "title": "文档口径 76/74/844/16-16、072 注册 void、端到端 walkthrough",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:agent-2",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-078/MERGE.md",
+      "updated_at": "2026-11-16T18:02:44+08:00"
     }
   ],
-  "updated_at": "2026-11-14T23:47:33+08:00"
+  "updated_at": "2026-11-16T18:02:44+08:00"
 }
