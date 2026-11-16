@@ -13,6 +13,12 @@ owner: mac
 > 机读部分：`arch/GATES.json`（门表）、`arch/INVARIANTS.json`（红线 probe）、
 > `EVENT_CATALOG.json`（事件目录）、`adr/`（关键决策）。
 > `towerctl arch-check` 把本文档说的与代码有的逐条对账；文档过期即 exit 2。
+>
+> **数字口径（2026-11-16 实跑，不用记忆值）**：`python tools/towerctl.py arch-check` →
+> gates 18 / invariants 16 / events 32 / adrs 8 / sections 6 / nodes 82 / edges 185；
+> `tools/tower_*.py` → 23 个模块；`tools/towerctl.py` → 236 行；
+> `python tools/towerctl.py profile-check` → 11/0；`shape-check` → 82 文件 / 2,424 函数，exit 0。
+> 改代码后先跑这些命令，再改本文；数字对不上就是文档缺陷。
 
 ## 1. 系统上下文
 
@@ -42,7 +48,7 @@ owner: mac
 
 ### 2.1 `towerctl` 模块（PILOT-056）
 
-`tools/towerctl.py` 只是入口 + 兼容 facade（246 行，`main` 与历史 import 面）；实现在
+`tools/towerctl.py` 只是入口 + 兼容 facade（236 行，`main` 与历史 import 面）；实现在
 `tools/tower_*.py` 的 23 个模块里，每个模块 <600 行。依赖是单向 4 层 DAG（下表顺序
 即声明拓扑序）：只允许 import 更早的模块，禁止循环；compose 可 import 下层 domain，
 entry 可 import 全部。`tools/tests/test_modules.py` 用 AST 校验行数与 DAG，
@@ -117,7 +123,7 @@ spec (pilot/<ID>.spec.json)
 
 ## 4. 关键契约
 
-**事件**：`EVENT_CATALOG.json` 是唯一目录（29 条：primary 19 / supervision 10）。
+**事件**：`EVENT_CATALOG.json` 是唯一目录（32 条：primary 20 / supervision 12）。
 每条声明 `ledger`、`producer`（真实子命令）、`payload_required`、
 `state_verify`、`drift_kinds`、`note`。目录与代码**双向**对账（AST 扫描三个
 ledger writer 的字面 type）：代码有而目录无、目录有而代码无都 exit 2；
@@ -214,7 +220,7 @@ active` 的每条事实以子进程运行 probe（cwd=塔根，60s 超时），�
 
 **已知边界（Known limits）**：
 
-1. **模块化（PILOT-056）**：`tools/towerctl.py` 是 246 行入口/facade，实现在 23 个
+1. **模块化（PILOT-056）**：`tools/towerctl.py` 是 236 行入口/facade，实现在 23 个
    `tools/tower_*.py` 模块（每模块 <600 行，4 层单向 DAG，`test_modules` 锁住）；
    单进程、单 parser 的假设不变。
 2. **无密钥链**：owner 四闸依赖人工决定与记录，没有密码学签名；信任是 TOFU

@@ -5,10 +5,13 @@ Clean-environment rerun checklist for `tower-dsh`.  `tools/run_tests.py` points
 runs in a restricted DSH sandbox where the inherited `%TEMP%` directory carries
 ACLs that break `tempfile.mkdtemp`.
 
+The end-to-end card path (spec → dispatch → review → envelope → PR → merge →
+post-merge) is in [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md).
+
 ## 1. Prerequisites
 
 - Python 3.12 (`python -V` → `Python 3.12.x`; last verified on 3.12.10).
-- Git (only used by the `.test-tmp` ignore test).
+- Git (used by the worktree/diff gates and the `.test-tmp` ignore test).
 - No network, no credentials, no `towerctl` state change: this is read-only
   apart from the ignored `.test-tmp` sandbox.
 
@@ -29,6 +32,7 @@ Optional flags:
 ```sh
 python -B tools/run_tests.py --suite tools/tests --pattern "test*.py"
 python -B tools/run_tests.py --suite <dir> --pattern test_smoke.py --tmp-root <dir>
+python -B tools/run_tests.py --pattern test_docs_current.py
 ```
 
 Backward-compatible direct discovery (does **not** redirect temp; it uses the
@@ -64,28 +68,60 @@ TOWER_TEST_TMP=<tower>/.test-tmp/run-YYYYmmdd-HHMMSS-<pid>
 
 ## 4. Expected result
 
-`Ran 246+ tests` followed by `OK`, exit code `0`.  On this branch (PILOT-027
-adds six runner tests) the count is 252:
+`Ran 844 tests` followed by `OK (skipped=1)`, exit code `0` — 844 is the frozen
+077 close-out count (`ENV-PILOT-077.tower_tests_baseline = 844`).  This branch
+adds the document guard `tools/tests/test_docs_current.py`, so the live total
+is `844 + N` where `N` is the number of new test methods; the runner prints the
+exact count:
 
 ```text
-TOWER_TEST_TMP=.../.test-tmp/run-20261022-190837-4242
+TOWER_TEST_TMP=.../.test-tmp/run-20261116-170000-4242
 ...
-Ran 252 tests in 90.123s
+Ran 844+N tests in 90.123s
 
 OK (skipped=1)
 ```
 
 One skip is expected environment gating (it is reported, not silent).  Any
-failure or error is not expected.
+failure or error is not expected.  Do **not** rewrite 844 to the local `N` in
+the docs: 844 is the close-out number, `N` grows with every new card.
 
-## 5. What to preserve on failure
+Any claim that the **online** CI run was observed must come with a run URL.
+This file only pins the workflow contract; it does not assert an online run.
+
+## 5. CI contract (8 steps, fetch-depth 0)
+
+The workflow lives at the **repository root**, one level above the tower:
+`../.github/workflows/tower-gate.yml` (GitHub path
+`.github/workflows/tower-gate.yml`).  It runs on `windows-latest` with Python
+3.12, `working-directory: tower-dsh`, `permissions: contents: read`, and
+`actions/checkout@v7` with `fetch-depth: 0` (full history: the
+`verified_without_merge` / `MERGE_HISTORICAL` checks need the merge commits).
+
+Eight steps, in order, no `continue-on-error`; `status` stays last:
+
+```text
+1  python -B -m unittest discover -s tools/tests -v
+2  python tools/towerctl.py spec-lint --strict
+3  python tools/towerctl.py spec-coverage
+4  python tools/towerctl.py verify-ledger
+5  python tools/towerctl.py arch-check
+6  python tools/towerctl.py campaign-check
+7  python tools/towerctl.py shape-check
+8  python tools/towerctl.py status
+```
+
+`tools/tests/test_ci_gate.py` pins the step count, order, `fetch-depth: 0`,
+`working-directory`, and the absence of `continue-on-error`.
+
+## 6. What to preserve on failure
 
 - Full stdout **and** stderr, including the `TOWER_TEST_TMP=` line.
 - The run directory it names — keep it until the failure is captured and
   copied into evidence.
 - `python -V`, `git status --short`, and the failing test's name/traceback.
 
-## 6. Cleanup
+## 7. Cleanup
 
 From the **repository root** (one level above `tower-dsh`):
 
