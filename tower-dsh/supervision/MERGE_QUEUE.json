@@ -670,9 +670,10 @@
       "task": "PILOT-078",
       "branch": "pilot/PILOT-078",
       "base": "main",
-      "status": "WAITING",
-      "added_at": "2026-11-16T18:02:56+08:00"
+      "status": "MERGED",
+      "added_at": "2026-11-16T18:02:56+08:00",
+      "merge_commit": "793ca89e87316484f164598b04fdb0eda63d55ee"
     }
   ],
-  "updated_at": "2026-11-16T18:02:56+08:00"
+  "updated_at": "2026-11-16T18:18:41+08:00"
 }
