@@ -498,6 +498,13 @@
       "created_at": "2026-11-04T12:23:45+08:00",
       "updated_at": "2026-11-04T12:24:18+08:00"
     },
+    "PILOT-072": {
+      "title": "task-reopen 未实现；spec parked，编号保留 void，不复用",
+      "status": "void",
+      "spec_path": "pilot/PILOT-072.spec.json.parked",
+      "created_at": "2026-11-16T17:20:00+08:00",
+      "updated_at": "2026-11-16T17:20:00+08:00"
+    },
     "PILOT-073": {
       "title": "spec/campaign 入 state/docs + 直接 admin 合并后的 envelope 恢复",
       "status": "closed",
