@@ -76,12 +76,17 @@
   ],
   "envelope_head_sha": "52d9c75da6e9c38a495342f0baf1ebd2bbc41558",
   "head": "52d9c75da6e9c38a495342f0baf1ebd2bbc41558",
-  "status": "MERGED",
+  "status": "POST_MERGE_VERIFIED",
   "base_side": true,
   "merge_commit": "793ca89e87316484f164598b04fdb0eda63d55ee",
   "merged_at": "2026-11-16T18:18:41+08:00",
   "supervisor": "sup-phase2-pilot",
   "recovered": true,
   "recovered_by": "sup-phase2-pilot",
-  "recovery_reason": "078 PR #62 admin; strict owner gate bootstrap"
+  "recovery_reason": "078 PR #62 admin; strict owner gate bootstrap",
+  "tests_count": 2,
+  "tower_tests_count": 854,
+  "post_merge_at": "2026-11-16T18:30:09+08:00",
+  "post_merge_note": "PR #62 793ca89",
+  "post_merge_by": "mac"
 }
