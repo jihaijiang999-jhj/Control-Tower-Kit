@@ -1,0 +1,39 @@
+﻿# PILOT-079 commit diff (7 authorized paths)
+
+
+HEAD parent is the dispatch base_sha 78a9b61 (tasks/PILOT-079/record.json);
+main moved to 7d2ab3b (spec 7 paths + dispatch record) while the task ran,
+so main..HEAD is NOT the PR diff: compare HEAD^..HEAD (or 78a9b61..HEAD).
+
+--- git diff --name-only HEAD^ HEAD (the 7 paths) ---
+.github/workflows/tower-gate.yml
+tower-dsh/command/campaigns/C-2026-Q4-04.md
+tower-dsh/tools/ledger_guard.py
+tower-dsh/tools/tests/test_ci_gate.py
+tower-dsh/tools/tests/test_docs_current.py
+tower-dsh/tools/tests/test_ledger_guard.py
+tower-dsh/tools/tests/test_wiring.py
+
+--- git diff --stat HEAD^ HEAD ---
+ .github/workflows/tower-gate.yml            |  12 +
+ tower-dsh/command/campaigns/C-2026-Q4-04.md |   2 +-
+ tower-dsh/tools/ledger_guard.py             | 289 +++++++++++++++++++++++
+ tower-dsh/tools/tests/test_ci_gate.py       |  83 ++++++-
+ tower-dsh/tools/tests/test_docs_current.py  |  23 +-
+ tower-dsh/tools/tests/test_ledger_guard.py  | 351 ++++++++++++++++++++++++++++
+ tower-dsh/tools/tests/test_wiring.py        |  27 ++-
+ 7 files changed, 762 insertions(+), 25 deletions(-)
+
+--- path count ---
+7
+
+--- main..HEAD (9 = 7 mine + spec.json/record.json from main's advance) ---
+.github/workflows/tower-gate.yml
+tower-dsh/command/campaigns/C-2026-Q4-04.md
+tower-dsh/pilot/PILOT-079.spec.json
+tower-dsh/tasks/PILOT-079/record.json
+tower-dsh/tools/ledger_guard.py
+tower-dsh/tools/tests/test_ci_gate.py
+tower-dsh/tools/tests/test_docs_current.py
+tower-dsh/tools/tests/test_ledger_guard.py
+tower-dsh/tools/tests/test_wiring.py

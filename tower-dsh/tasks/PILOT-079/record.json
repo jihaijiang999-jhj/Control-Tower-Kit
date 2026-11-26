@@ -2,7 +2,7 @@
   "schema": "tower/task@1",
   "id": "PILOT-079",
   "title": "ledger 只追加 CI 守卫 + state/authority/profile 入 CI",
-  "status": "dispatched",
+  "status": "closed",
   "authority": "workspace_write",
   "scope": [
     "tools/ledger_guard.py：读取 base 的 ledger/*.jsonl 与当前文件；当前必须逐字节以 base 为前缀；截断/改写/删除历史行 exit 2；新增行允许",
@@ -46,18 +46,132 @@
   "dispatch": {
     "executor": "subagent:agent-3",
     "worktree": "pilot/worktrees/PILOT-079",
-    "at": "2026-11-26T17:38:22+08:00",
+    "at": "2026-11-26T17:38:32+08:00",
     "kind": "subagent",
     "model": null,
     "parent": null,
-    "base_sha": "7d2ab3bcf913bc83ff63b8b81856c8aa09cd93f0",
+    "base_sha": "d56478485fc57643dbe6a8869b968cb274f3385c",
     "campaign": "C-2026-Q4-04"
   },
-  "evidence": [],
-  "review": null,
-  "decision": null,
-  "closeout": null,
+  "evidence": [
+    {
+      "path": "tasks/PILOT-079/evidence/tower-gate.yml",
+      "sha256": "c3767405bb308bd6434b75b5869751136037d7a65509ea501047507ab1d55c6d",
+      "bytes": 1466,
+      "at": "2026-11-26T17:38:33+08:00",
+      "id": "E-001"
+    },
+    {
+      "path": "tasks/PILOT-079/evidence/ledger_guard.py",
+      "sha256": "edf7e6fc9da0f00db236bad32bb3c0bb9342fc61a3359b103ef3b79e7a15c6e4",
+      "bytes": 10539,
+      "at": "2026-11-26T17:38:33+08:00",
+      "id": "E-002"
+    },
+    {
+      "path": "tasks/PILOT-079/evidence/test_ledger_guard.py",
+      "sha256": "4ab8472cea748adbe9df3ccf1790dc39476e5e8f421ee3414ae79fb903e3ad8d",
+      "bytes": 15849,
+      "at": "2026-11-26T17:38:33+08:00",
+      "id": "E-003"
+    },
+    {
+      "path": "tasks/PILOT-079/evidence/test_ci_gate.py",
+      "sha256": "a7f2e0f453cc3bd00e4eb83ed911869e41ea9d9f73c7f5e0f37079506aec08b1",
+      "bytes": 14300,
+      "at": "2026-11-26T17:38:33+08:00",
+      "id": "E-004"
+    },
+    {
+      "path": "tasks/PILOT-079/evidence/test_wiring.py",
+      "sha256": "c4a9d01ab5bd997e3cd83a8425f48c7540bf8c3a34d4cf2305a0cf06074c1bfa",
+      "bytes": 21445,
+      "at": "2026-11-26T17:38:33+08:00",
+      "id": "E-005"
+    },
+    {
+      "path": "tasks/PILOT-079/evidence/test_docs_current.py",
+      "sha256": "8e50f0c15cc8e6f92eb2df0cea6c684f11012fe5f4c3244bd58f23dcc1029132",
+      "bytes": 10366,
+      "at": "2026-11-26T17:38:33+08:00",
+      "id": "E-006"
+    },
+    {
+      "path": "tasks/PILOT-079/evidence/C-2026-Q4-04.md",
+      "sha256": "4848e8f4d159ace9ba1ac7b0204049d1880397c8ac1b9d54477d9976ebf0e7f6",
+      "bytes": 1699,
+      "at": "2026-11-26T17:38:33+08:00",
+      "id": "E-007"
+    },
+    {
+      "path": "tasks/PILOT-079/evidence/test-output.txt",
+      "sha256": "e4fcd831a76e12c69eb3dbc1d4f9c95493b31cb99979db39cf92d825f1425a92",
+      "bytes": 121972,
+      "at": "2026-11-26T17:38:33+08:00",
+      "id": "E-008"
+    },
+    {
+      "path": "tasks/PILOT-079/evidence/ledger_probe.py",
+      "sha256": "11f7d544986a1fa3696866fe73e16b1a7e02bc72dbe48d6a2e2ccd6188236cac",
+      "bytes": 5396,
+      "at": "2026-11-26T17:38:33+08:00",
+      "id": "E-009"
+    },
+    {
+      "path": "tasks/PILOT-079/evidence/probe.txt",
+      "sha256": "e8635067913ec134ff8bff9500ef92062924cc758832562a5fb9bde987db442d",
+      "bytes": 2484,
+      "at": "2026-11-26T17:38:33+08:00",
+      "id": "E-010"
+    },
+    {
+      "path": "tasks/PILOT-079/evidence/commit.txt",
+      "sha256": "996e7a52cae93b5ea150f4ac50ae630f92b0f90f7e109eeb91e40e005b392802",
+      "bytes": 909,
+      "at": "2026-11-26T17:38:33+08:00",
+      "id": "E-011"
+    },
+    {
+      "path": "tasks/PILOT-079/evidence/diff.txt",
+      "sha256": "e401636f1722a2f9a7bdd92ea46c85f6e22ec87dbd176b675677d6608bf557c3",
+      "bytes": 1600,
+      "at": "2026-11-26T17:38:33+08:00",
+      "id": "E-012"
+    },
+    {
+      "path": "tasks/PILOT-079/evidence/gates.txt",
+      "sha256": "36ff9393c486deea684ef1b64f3cf1856900e73ee47ae21eebef0fdeb32ff148",
+      "bytes": 48615,
+      "at": "2026-11-26T17:38:33+08:00",
+      "id": "E-013"
+    }
+  ],
+  "review": {
+    "schema": "tower/review@1",
+    "task": "PILOT-079",
+    "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+    "verdict": "PASS",
+    "head": "9a8ed68db76e8bd5c904ccb6518855104397da49",
+    "base": "d56478485fc57643dbe6a8869b968cb274f3385c",
+    "scope": [],
+    "findings": [],
+    "note": "079 PASS。7 paths；HEAD 9a8ed68（base d564784）；13/13 证据；Ran 871 OK；ledger_guard 5 探针；CI 12 步；test_wiring/docs/campaign 同步。",
+    "at": "2026-11-26T17:50:50+08:00",
+    "structure": ""
+  },
+  "decision": {
+    "id": "D-PILOT-079",
+    "actor": "mac",
+    "text": "PASS; ledger",
+    "at": "2026-11-26T17:50:50+08:00"
+  },
+  "closeout": {
+    "path": "tasks/PILOT-079/CLOSEOUT.md",
+    "at": "2026-11-26T17:50:50+08:00"
+  },
   "created_at": "2026-11-26T16:47:15+08:00",
-  "updated_at": "2026-11-26T17:38:22+08:00",
-  "next": "等待 executor 交付"
+  "updated_at": "2026-11-26T17:50:50+08:00",
+  "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-079/MERGE.md",
+  "delivered_at": "2026-11-26T17:38:33+08:00",
+  "accepted_at": "2026-11-26T17:50:50+08:00"
 }

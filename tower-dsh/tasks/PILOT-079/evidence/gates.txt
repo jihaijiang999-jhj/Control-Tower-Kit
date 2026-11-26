@@ -1,0 +1,1322 @@
+=== candidate: python tools/towerctl.py spec-lint --strict
+{
+  "ok": true,
+  "dir": ".",
+  "files": [
+    {
+      "path": "specs/WF-HANDOFF.md",
+      "kind": "workflow",
+      "id": "WF-HANDOFF",
+      "states": [
+        "PREPARED",
+        "READY_FOR_RECEIVER",
+        "RECEIVED",
+        "ACCEPTED",
+        "ACTIVE"
+      ],
+      "transitions": [
+        "TR-01",
+        "TR-02",
+        "TR-03",
+        "TR-04",
+        "TR-05"
+      ],
+      "invariants": [
+        "INV-01",
+        "INV-02",
+        "INV-03",
+        "INV-04",
+        "INV-05",
+        "INV-06",
+        "INV-07"
+      ],
+      "failures": [
+        "FM-01",
+        "FM-02",
+        "FM-03",
+        "FM-04",
+        "FM-05",
+        "FM-06"
+      ],
+      "errors": []
+    },
+    {
+      "path": "specs/WF-LEDGER.md",
+      "kind": "workflow",
+      "id": "WF-LEDGER",
+      "states": [
+        "empty",
+        "legacy",
+        "chained",
+        "broken"
+      ],
+      "transitions": [
+        "TR-01",
+        "TR-02",
+        "TR-03",
+        "TR-04",
+        "TR-05",
+        "TR-06",
+        "TR-07"
+      ],
+      "invariants": [
+        "INV-01",
+        "INV-02",
+        "INV-03",
+        "INV-04",
+        "INV-05",
+        "INV-06",
+        "INV-07"
+      ],
+      "failures": [
+        "FM-01",
+        "FM-02",
+        "FM-03",
+        "FM-04",
+        "FM-05",
+        "FM-06"
+      ],
+      "errors": []
+    },
+    {
+      "path": "specs/WF-MERGE.md",
+      "kind": "workflow",
+      "id": "WF-MERGE",
+      "states": [
+        "DRAFT",
+        "WAITING",
+        "MERGING",
+        "MERGED",
+        "POST_MERGE_VERIFIED",
+        "CORRECTION_REQUIRED"
+      ],
+      "transitions": [
+        "TR-01",
+        "TR-02",
+        "TR-03",
+        "TR-04",
+        "TR-05",
+        "TR-06",
+        "TR-07"
+      ],
+      "invariants": [
+        "INV-01",
+        "INV-02",
+        "INV-03",
+        "INV-04",
+        "INV-05",
+        "INV-06",
+        "INV-07",
+        "INV-08",
+        "INV-09"
+      ],
+      "failures": [
+        "FM-01",
+        "FM-02",
+        "FM-03",
+        "FM-04",
+        "FM-05",
+        "FM-06"
+      ],
+      "errors": []
+    },
+    {
+      "path": "specs/WF-TASK.md",
+      "kind": "workflow",
+      "id": "WF-TASK",
+      "states": [
+        "ready",
+        "dispatched",
+        "delivered",
+        "reviewed",
+        "rework",
+        "accepted",
+        "closed"
+      ],
+      "transitions": [
+        "TR-01",
+        "TR-02",
+        "TR-03",
+        "TR-04",
+        "TR-05",
+        "TR-06",
+        "TR-07",
+        "TR-08",
+        "TR-09"
+      ],
+      "invariants": [
+        "INV-01",
+        "INV-02",
+        "INV-03",
+        "INV-04",
+        "INV-05",
+        "INV-06",
+        "INV-07"
+      ],
+      "failures": [
+        "FM-01",
+        "FM-02",
+        "FM-03",
+        "FM-04",
+        "FM-05",
+        "FM-06"
+      ],
+      "errors": []
+    },
+    {
+      "path": "CHANGE-LEVELS.md",
+      "kind": "policy",
+      "id": "POL-CHANGE-LEVELS",
+      "clauses": [
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-06",
+        "C-07",
+        "C-08",
+        "C-09",
+        "C-10"
+      ],
+      "failures": [
+        "FM-01",
+        "FM-02",
+        "FM-03",
+        "FM-04"
+      ],
+      "errors": []
+    },
+    {
+      "path": "RED-LINES.md",
+      "kind": "policy",
+      "id": "POL-RED-LINES",
+      "clauses": [
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-06",
+        "C-07",
+        "C-08",
+        "C-09",
+        "C-10",
+        "C-11",
+        "C-12",
+        "C-13",
+        "C-14",
+        "C-15",
+        "C-16"
+      ],
+      "failures": [
+        "FM-01",
+        "FM-02",
+        "FM-03",
+        "FM-04"
+      ],
+      "errors": []
+    }
+  ],
+  "errors": []
+}
+exit=0
+
+=== candidate: python tools/towerctl.py spec-coverage
+{
+  "ok": true,
+  "specs": 6,
+  "clauses": 56,
+  "tool_check": 27,
+  "covered": 27,
+  "tool_gaps": [],
+  "manual": [
+    "POL-CHANGE-LEVELS/C-04",
+    "POL-CHANGE-LEVELS/C-05",
+    "POL-CHANGE-LEVELS/C-06",
+    "POL-CHANGE-LEVELS/C-09",
+    "POL-RED-LINES/C-08",
+    "POL-RED-LINES/C-10",
+    "POL-RED-LINES/C-12",
+    "POL-RED-LINES/C-13",
+    "WF-HANDOFF/INV-06",
+    "WF-HANDOFF/INV-07",
+    "WF-LEDGER/INV-06",
+    "WF-TASK/INV-04"
+  ],
+  "owner": [
+    "POL-CHANGE-LEVELS/C-01",
+    "POL-CHANGE-LEVELS/C-07",
+    "POL-CHANGE-LEVELS/C-10",
+    "POL-RED-LINES/C-01",
+    "POL-RED-LINES/C-02",
+    "POL-RED-LINES/C-03",
+    "POL-RED-LINES/C-04",
+    "POL-RED-LINES/C-05",
+    "POL-RED-LINES/C-06",
+    "POL-RED-LINES/C-07",
+    "POL-RED-LINES/C-15",
+    "POL-RED-LINES/C-16",
+    "WF-HANDOFF/INV-05",
+    "WF-LEDGER/INV-07",
+    "WF-MERGE/INV-08",
+    "WF-MERGE/INV-09",
+    "WF-TASK/INV-05"
+  ],
+  "unknown": [],
+  "errors": []
+}
+exit=0
+
+=== candidate: python tools/towerctl.py verify-ledger
+{
+  "ok": true,
+  "files": {
+    "primary": {
+      "path": "ledger/primary.jsonl",
+      "exists": true,
+      "events": 752,
+      "legacy_unhashed": 53,
+      "errors": []
+    },
+    "supervision": {
+      "path": "ledger/supervision.jsonl",
+      "exists": true,
+      "events": 441,
+      "legacy_unhashed": 26,
+      "errors": []
+    }
+  },
+  "errors": []
+}
+exit=0
+
+=== candidate: python tools/towerctl.py state-verify
+{
+  "ok": true,
+  "tasks": 77,
+  "envelopes": 75,
+  "drift": [],
+  "skipped": [
+    {
+      "kind": "task",
+      "target": "PILOT-025-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-039-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-041-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-043-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-044-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-053-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-055-VOID2",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID",
+      "reason": "no_lifecycle_events"
+    },
+    {
+      "kind": "task",
+      "target": "PILOT-057-VOID2",
+      "reason": "no_lifecycle_events"
+    }
+  ],
+  "skipped_count": 10,
+  "evidence_checked": 748
+}
+exit=0
+
+=== candidate: python tools/towerctl.py authority-check
+{
+  "ok": true,
+  "status": "configured",
+  "requirement": "required",
+  "required": true,
+  "checks": [
+    {
+      "name": "primary ledger chain intact",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority state file readable",
+      "ok": true,
+      "detail": "state/AUTHORITY.json"
+    },
+    {
+      "name": "authority schema is tower/authority-state@1",
+      "ok": true,
+      "detail": "schema 'tower/authority-state@1'"
+    },
+    {
+      "name": "authority state backed by ledger",
+      "ok": true,
+      "detail": "AUTHORITY_SET revision 2"
+    },
+    {
+      "name": "authority field types",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority tower_id matches primary state",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority owner matches primary state",
+      "ok": true,
+      "detail": "file 'mac' vs primary state 'mac'"
+    },
+    {
+      "name": "authority primary.id matches primary state",
+      "ok": true,
+      "detail": "file 'ctl-yingxian-qa-001' vs primary state 'ctl-yingxian-qa-001'"
+    },
+    {
+      "name": "authority supervision.id matches supervision state",
+      "ok": true,
+      "detail": "file 'sup-phase2-pilot' vs supervision state 'sup-phase2-pilot'"
+    },
+    {
+      "name": "merge authority differs from primary",
+      "ok": true,
+      "detail": "merge authority 'sup-phase2-pilot' vs primary 'ctl-yingxian-qa-001'"
+    },
+    {
+      "name": "authority ledger payload types",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority file matches last AUTHORITY_SET",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "authority requirement pinned",
+      "ok": true,
+      "detail": "authority requirement pinned: shared/AUTHORITY_POLICY.json + AUTHORITY_REQUIRED event"
+    },
+    {
+      "name": "authority github logins",
+      "ok": true,
+      "detail": "distinct owner/primary logins"
+    }
+  ]
+}
+exit=0
+
+=== candidate: python tools/towerctl.py profile-check
+{
+  "ok": true,
+  "object": "TOWER-DSH",
+  "checked": 11,
+  "findings": []
+}
+exit=0
+
+=== candidate: python tools/towerctl.py arch-check
+{
+  "ok": true,
+  "counts": {
+    "gates": 18,
+    "invariants": 16,
+    "events": 32,
+    "event_types_in_code": 32,
+    "unresolved_event_calls": 1,
+    "adrs": 8,
+    "sections": 6,
+    "nodes": 85,
+    "edges": 186
+  },
+  "errors": []
+}
+exit=0
+
+=== candidate: python tools/towerctl.py campaign-check
+{
+  "ok": true,
+  "strict": false,
+  "strategy": "S-2026-Q4",
+  "goals": [
+    "G1",
+    "G2",
+    "G3",
+    "G4"
+  ],
+  "campaigns": 4,
+  "campaign_ids": [
+    "C-2026-Q4-01",
+    "C-2026-Q4-02",
+    "C-2026-Q4-03",
+    "C-2026-Q4-04"
+  ],
+  "wip": {
+    "in_flight": 0,
+    "limit": 1,
+    "campaigns": {
+      "C-2026-Q4-04": 0
+    }
+  },
+  "errors": [],
+  "warnings": [
+    {
+      "code": "W3",
+      "target": "C-2026-Q4-04",
+      "detail": "task_forces references a spec-only card (no tasks/PILOT-079/): PILOT-079"
+    }
+  ]
+}
+exit=0
+
+=== candidate: python tools/towerctl.py shape-check
+{
+  "ok": true,
+  "shape_check": "checked",
+  "shape_checked": true,
+  "files": 85,
+  "functions": 2493,
+  "duplicate_blocks": 169,
+  "unused_imports": 1
+}
+exit=0
+
+=== candidate: python tools/towerctl.py status
+{
+  "ok": true,
+  "tower": "tower-dsh",
+  "role": "primary",
+  "phase": "HANDOFF_ACTIVE",
+  "next_action": "resume from handoffs/HANDOFF-PILOT-002/HANDOFF.md",
+  "tasks": [
+    {
+      "id": "PILOT-001",
+      "title": "Ledger SHA-256 哈希链模块与篡改检�?,
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:173919b7-0cb1-4867-9685-e8113368ab97",
+      "reviewer": "subagent:aed01de9-71f1-46cd-ace8-84b720a3e01f",
+      "next": "merged via ENV-PILOT-001; POST_MERGE_VERIFIED",
+      "updated_at": "2026-10-19T12:29:52+08:00"
+    },
+    {
+      "id": "PILOT-002",
+      "title": "towerctl 门禁硬化：spec 前置、证据前置、reviewer 非空、merge 分支断言 + 回归测试",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:4e3a1640-cff9-4135-8f67-caa396bed7ba",
+      "reviewer": "subagent:11381940-604b-4d97-90cb-b6a85349a162",
+      "next": "merge/handoff decision (owner gate) �?not performed in Phase 1",
+      "updated_at": "2026-10-19T16:45:02+08:00"
+    },
+    {
+      "id": "PILOT-003",
+      "title": "post-merge 修复：清洁检查先于写 review，且允许�?CORRECTION_REQUIRED 重试",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:a7474492-5d9f-4ccb-ba30-51826c4f6e24",
+      "reviewer": "subagent:70e01687-6426-4ff7-ac79-1d6d24c0d10e",
+      "next": "merge/handoff decision (owner gate) �?not performed in Phase 1",
+      "updated_at": "2026-10-19T16:57:25+08:00"
+    },
+    {
+      "id": "PILOT-004",
+      "title": "handoff 参数化：去写�?PILOT-001，改为按 task/envelope 生成与校�?,
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:a9bf21b3-8952-4466-a4d1-3c0ab3444354",
+      "reviewer": "subagent:3866b916-9dd7-41f6-adce-e6ea1fdf6a40",
+      "next": "merge/handoff decision (owner gate) �?not performed in Phase 1",
+      "updated_at": "2026-10-19T17:21:39+08:00"
+    },
+    {
+      "id": "PILOT-005",
+      "title": "ledger 哈希�?+ 单写者锁 + verify-ledger 命令",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:3acc8111-e88b-46bd-b4a7-de18648f161f",
+      "reviewer": "subagent:c7546d3e-2dfa-4815-9eca-607a14e9e34b",
+      "next": "merged; audit recommendations complete",
+      "updated_at": "2026-10-19T17:31:44+08:00"
+    },
+    {
+      "id": "PILOT-006",
+      "title": "ledger �?Windows 竞态修复：PermissionError 视作锁竞�?+ 并发压测",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:a7172926-6f3e-4ca4-a6ff-add402ef215b",
+      "reviewer": "subagent:5882dd69-c4a0-492d-b483-f76207104f76",
+      "next": "merge/handoff decision (owner gate) �?not performed in Phase 1",
+      "updated_at": "2026-10-19T17:50:43+08:00"
+    },
+    {
+      "id": "PILOT-007",
+      "title": "spec-lint：让工作流规范可被机器校�?,
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:b98bd372-3dcc-4cb6-add8-06c16b7b364d",
+      "reviewer": "subagent:dcfb55f3-6d2d-44cc-bc2a-cf61e8e54a30",
+      "next": "merge/handoff decision (owner gate) �?not performed in Phase 1",
+      "updated_at": "2026-10-19T18:35:37+08:00"
+    },
+    {
+      "id": "PILOT-008",
+      "title": "spec-lint 扩展：policy 文档校验 + 严格模式",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:12af8987-2ef2-4913-adfa-2ea01a64e937",
+      "reviewer": "subagent:6dfa3e2b-0e5f-4a5d-9432-7350d5bbdedf",
+      "next": "merge/handoff decision (owner gate) �?not performed in Phase 1",
+      "updated_at": "2026-10-19T18:54:47+08:00"
+    },
+    {
+      "id": "PILOT-009",
+      "title": "条款覆盖：把 spec 条款绑定到真实测试并设门",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:4ed8e3bc-a5f4-47e6-97d3-c05242723887",
+      "reviewer": "subagent:f443bad6-ba3a-4f69-b7a2-25f95ae18b85",
+      "next": "merge/handoff decision (owner gate) �?not performed in Phase 1",
+      "updated_at": "2026-10-19T19:57:16+08:00"
+    },
+    {
+      "id": "PILOT-010",
+      "title": "硬化 2：路径越界防护、单 JSON 输出、closeout 文案、ACL 忙等、覆盖补�?,
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:b570c09a-fccf-4e18-a4f1-4d134b06f186",
+      "reviewer": "subagent:92bab935-b241-4a3e-aa17-58d68106244e",
+      "next": "merged via ENV-PILOT-010; POST_MERGE_VERIFIED; hardening 2 complete",
+      "updated_at": "2026-10-19T22:43:52+08:00"
+    },
+    {
+      "id": "PILOT-011",
+      "title": "权威状态脏检测：status/startup 报告未提交的权威状态，handoff-activate 提示提交",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-011",
+      "reviewer": "subagent:rev-pilot-011",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-011/MERGE.md",
+      "updated_at": "2026-10-20T01:50:28+08:00"
+    },
+    {
+      "id": "PILOT-012",
+      "title": "把验证搬到服务端：GitHub Actions 门禁 workflow + CODEOWNERS + 自测",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-012",
+      "reviewer": "subagent:rev-pilot-012",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-012/MERGE.md",
+      "updated_at": "2026-10-20T07:29:29+08:00"
+    },
+    {
+      "id": "PILOT-013",
+      "title": "让门禁测�?hermetic：CLI 子进程注�?git 身份，空全局配置下全套件仍绿",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-013",
+      "reviewer": "subagent:rev-pilot-013",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-013/MERGE.md",
+      "updated_at": "2026-10-20T07:49:13+08:00"
+    },
+    {
+      "id": "PILOT-014",
+      "title": "输出编码：towerctl 在非 UTF-8 控制台不再崩溃，并让 status 的失败可�?,
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-014",
+      "reviewer": "subagent:rev-pilot-014",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-014/MERGE.md",
+      "updated_at": "2026-10-20T08:17:06+08:00"
+    },
+    {
+      "id": "PILOT-015",
+      "title": "实现合并 PR 化：merge --mode pr �?GitHub PR �?CI 检查，本地模式保持原样",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-015",
+      "reviewer": "subagent:rev-pilot-015",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-015/MERGE.md",
+      "updated_at": "2026-10-20T12:01:40+08:00"
+    },
+    {
+      "id": "PILOT-016",
+      "title": "PR 合并上真机：gh 认证预检 + checks 注册竞态重试，并用 --mode pr 合并本卡",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-016",
+      "reviewer": "subagent:rev-pilot-016",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-016/MERGE.md",
+      "updated_at": "2026-10-20T19:43:34+08:00"
+    },
+    {
+      "id": "PILOT-017",
+      "title": "权威状态检测补�?tasks/ �?pilot/，并把目录集合变成可测试的常�?,
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-017",
+      "reviewer": "subagent:rev-pilot-017",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-017/MERGE.md",
+      "updated_at": "2026-10-20T20:41:57+08:00"
+    },
+    {
+      "id": "PILOT-018",
+      "title": "修复 deliver 重复投递产生的重复证据 ID：每次投递后按序重排 E-001..E-00N",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-018",
+      "reviewer": "subagent:rev-pilot-018",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-018/MERGE.md",
+      "updated_at": "2026-10-20T21:04:39+08:00"
+    },
+    {
+      "id": "PILOT-019",
+      "title": "checks pending 判定改用 gh 退出码 8，不再用宽泛子串匹配",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-019",
+      "reviewer": "subagent:rev-pilot-019",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-019/MERGE.md",
+      "updated_at": "2026-10-20T21:31:26+08:00"
+    },
+    {
+      "id": "PILOT-020",
+      "title": "CI action 升级�?checkout@v7 / setup-python@v7，消�?Node 20 弃用告警",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-020",
+      "reviewer": "subagent:rev-pilot-020",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-020/MERGE.md",
+      "updated_at": "2026-10-20T21:57:13+08:00"
+    },
+    {
+      "id": "PILOT-021",
+      "title": "state-verify：从 ledger 重放权威状态并与磁盘比对，不一致即 drift",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-021",
+      "reviewer": "subagent:rev-pilot-021",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-021/MERGE.md",
+      "updated_at": "2026-10-20T23:20:38+08:00"
+    },
+    {
+      "id": "PILOT-022",
+      "title": "state-verify 收紧：坏文件�?drift、输�?skipped、board 期望值改用重放�?,
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-022",
+      "reviewer": "subagent:rev-pilot-022",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-022/MERGE.md",
+      "updated_at": "2026-10-20T23:49:12+08:00"
+    },
+    {
+      "id": "PILOT-023",
+      "title": "state-verify 校验证据完整性：证据缺失/哈希/字节数不符与 spec 哈希漂移都算 drift",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-023",
+      "reviewer": "subagent:rev-pilot-023",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-023/MERGE.md",
+      "updated_at": "2026-10-21T04:37:16+08:00"
+    },
+    {
+      "id": "PILOT-024",
+      "title": "post-merge 门禁解码：子进程�?UTF-8 输出不再让门禁误判红",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-024",
+      "reviewer": "subagent:rev-pilot-024",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-024/MERGE.md",
+      "updated_at": "2026-10-21T05:01:37+08:00"
+    },
+    {
+      "id": "PILOT-025",
+      "title": "测试计数门：post-merge 解析 Ran N tests 并对 envelope 里的 baseline 设门",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-025",
+      "reviewer": "subagent:rev-pilot-025",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-025/MERGE.md",
+      "updated_at": "2026-10-22T00:34:53+08:00"
+    },
+    {
+      "id": "PILOT-026",
+      "title": "塔套件计数入闸：post-merge 直接�?tools/tests 并按 tower_tests_baseline 设门",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-pilot-026",
+      "reviewer": "subagent:rev-pilot-026",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-026/MERGE.md",
+      "updated_at": "2026-10-22T15:31:00+08:00"
+    },
+    {
+      "id": "PILOT-027",
+      "title": "测试运行器收口：TMP 指向仓内沙箱，受限环境可复跑",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-run-b-027",
+      "reviewer": "subagent:rev-run-b-027",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-027/MERGE.md",
+      "updated_at": "2026-10-22T19:40:05+08:00"
+    },
+    {
+      "id": "PILOT-028",
+      "title": "state-verify 校验状态迁移合法性：跳步/乱序事件�?drift",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-run-b-028",
+      "reviewer": "subagent:rev-run-b-028",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-028/MERGE.md",
+      "updated_at": "2026-10-22T20:11:12+08:00"
+    },
+    {
+      "id": "PILOT-029",
+      "title": "baseline 必填：新信封必须声明 tests_baseline �?tower_tests_baseline",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-run-b-029",
+      "reviewer": "subagent:rev-run-b-029",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-029/MERGE.md",
+      "updated_at": "2026-10-22T20:34:59+08:00"
+    },
+    {
+      "id": "PILOT-030",
+      "title": "queue-add 也强�?baseline：堵住手写信封入队旁�?,
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-run-c-030",
+      "reviewer": "subagent:rev-run-c-030",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-030/MERGE.md",
+      "updated_at": "2026-10-23T01:56:40+08:00"
+    },
+    {
+      "id": "PILOT-031",
+      "title": "baseline 不得回退：以 ledger 已验证计数为锚拒绝更�?baseline",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-run-c-031",
+      "reviewer": "subagent:rev-run-c-031",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-031/MERGE.md",
+      "updated_at": "2026-10-23T02:24:41+08:00"
+    },
+    {
+      "id": "PILOT-032",
+      "title": "完成卡不得静默重建：TASK_NEW �?accepted/closed �?illegal_transition",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-run-c-032",
+      "reviewer": "subagent:rev-run-c-032",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-032/MERGE.md",
+      "updated_at": "2026-10-23T02:56:33+08:00"
+    },
+    {
+      "id": "PILOT-033",
+      "title": "队列完整性：手写�?queue/envelope 不再隐形，merge-check 校验 QUEUE_ADD 来源",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-033",
+      "reviewer": "subagent:rev-033",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-033/MERGE.md",
+      "updated_at": "2026-10-23T07:31:59+08:00"
+    },
+    {
+      "id": "PILOT-034",
+      "title": "合并门自验：ledger 链完整、ENVELOPE_NEW 存在、信封身份绑定请�?id",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-034",
+      "reviewer": "subagent:rev-034",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-034/MERGE.md",
+      "updated_at": "2026-10-23T16:34:12+08:00"
+    },
+    {
+      "id": "PILOT-035",
+      "title": "半写窗口可恢复：queue-add 检测队列条目存在但 QUEUE_ADD 缺失时补事件",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:exec-035",
+      "reviewer": "subagent:rev-035",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-035/MERGE.md",
+      "updated_at": "2026-10-23T17:01:32+08:00"
+    },
+    {
+      "id": "PILOT-036",
+      "title": "信任边界收口：缺�?不可�?ledger 不再算链 ok、identity 精确比较、ENVELOPE_NEW 绑定 head/task",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:84acc730-6e26-4667-a2df-93f5055815b5",
+      "reviewer": "subagent:ca85fa50-d817-4714-a0b7-563237d90ba8",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-036/MERGE.md",
+      "updated_at": "2026-10-23T18:27:03+08:00"
+    },
+    {
+      "id": "PILOT-037",
+      "title": "授权态单写者：state/AUTHORITY.json + authority-check，把 merge 权限从字符串变成登记身份",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:ecd81442-d4f0-4fc0-9b9a-94b037923b74",
+      "reviewer": "subagent:50413a27-baf7-4c93-876d-f183fe168d6b",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-037/MERGE.md",
+      "updated_at": "2026-10-24T18:46:51+08:00"
+    },
+    {
+      "id": "PILOT-038",
+      "title": "授权必需标记：authority_required 持久化，禁止删文�?截账本退�?legacy；authority-set 写账本失�?fail-closed",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:087f1403-4792-435d-8476-cec76c13877c",
+      "reviewer": "subagent:bf7571e7-8da5-4a64-bd41-c9579c9b31f3",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-038/MERGE.md",
+      "updated_at": "2026-10-24T20:55:09+08:00"
+    },
+    {
+      "id": "PILOT-039",
+      "title": "授权态收�?v2：policy⇄event 逐字段同构、authority-require/set 跨锁、merge 前置链（缺失也算错）",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:22a3bc64-2174-4957-aeb2-a59ce6539dc8",
+      "reviewer": "subagent:baa3ec9e-499a-4a82-b5d5-41d279b1e51a",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-039/MERGE.md",
+      "updated_at": "2026-10-25T13:26:33+08:00"
+    },
+    {
+      "id": "PILOT-040",
+      "title": "空账本语义：0 字节截断不得掩护 legacy merge；authority-require �?already 分支回显真实 decision",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:cf06e1f9-f8e9-444d-b8df-8be1c25372bb",
+      "reviewer": "subagent:3ecc3001-a65f-462b-a63d-3d8ee3e1cdd4",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-040/MERGE.md",
+      "updated_at": "2026-10-26T12:11:44+08:00"
+    },
+    {
+      "id": "PILOT-041",
+      "title": "执行契约 L1 v2：deliver 校验 worktree diff �?allowed_paths；dispatch 记录 kind/model/parent",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:eea7c311-4511-404e-96a6-c27f4079742e",
+      "reviewer": "subagent:7d878b41-c0f6-4ddb-9a04-c1ca69ffb904",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-041/MERGE.md",
+      "updated_at": "2026-10-26T18:52:16+08:00"
+    },
+    {
+      "id": "PILOT-042",
+      "title": "授权完成清单（completion list�? dispatch 锚定 base_sha 作为 deliver 基线",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:0abf19e6-b6d2-4807-b368-59b2f5d4ca5f",
+      "reviewer": "subagent:457986b8-942e-4c38-a696-aa6649938d3b",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-042/MERGE.md",
+      "updated_at": "2026-10-26T22:41:55+08:00"
+    },
+    {
+      "id": "PILOT-044",
+      "title": "形状预算 ratchet：shape-check（只判新增债务�? REVIEW Structure 五问",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:d87cf646-a7cc-4217-a573-5613f961985d",
+      "reviewer": "subagent:862dbc9b-d3a8-4a2a-93ce-3d4a7a8ad9a6",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-044/MERGE.md",
+      "updated_at": "2026-10-28T01:49:02+08:00"
+    },
+    {
+      "id": "PILOT-045",
+      "title": "命令�?v1：STRATEGY + campaigns + campaign-check + brief",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:6259e584-7196-4c14-8921-ae4cb8dd7419",
+      "reviewer": "subagent:10266429-6ccc-4ea3-a735-136c5f58bd5d",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-045/MERGE.md",
+      "updated_at": "2026-10-28T18:12:35+08:00"
+    },
+    {
+      "id": "PILOT-046",
+      "title": "状态历�?+ 命令层硬化：status 快照/rollup/index + R2–R5 + W3",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:6bea1d8d-3f30-4fdc-8090-b0ef7dd7cd92",
+      "reviewer": "subagent:60f3d8a7-46aa-4f30-ba4d-54f07fad7e43",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-046/MERGE.md",
+      "updated_at": "2026-10-28T23:03:06+08:00"
+    },
+    {
+      "id": "PILOT-047",
+      "title": "双视图位置图：campaign roadmap/current + where --json|--md + 注入",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:4a3f2452-e2e3-4811-bcb7-a88f646b8e3b",
+      "reviewer": "subagent:adf9823d-0837-480c-949c-90a6c8707149",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-047/MERGE.md",
+      "updated_at": "2026-10-29T12:49:45+08:00"
+    },
+    {
+      "id": "PILOT-048",
+      "title": "架构脊柱：ARCHITECTURE + adr/ + EVENT_CATALOG + arch-check；归�?DESIGN.md",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:e18823a1-15ca-4b92-8f45-4bee4c111521",
+      "reviewer": "subagent:81305cc0-e15e-4a7d-8912-1e5345b8065c",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-048/MERGE.md",
+      "updated_at": "2026-10-29T15:44:40+08:00"
+    },
+    {
+      "id": "PILOT-049",
+      "title": "objective 硬门：spec@2 四要�?+ task-new/spec-lint 双层拒绝",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:bd290de8-3c54-4bc0-9a78-e7dab6b92891",
+      "reviewer": "subagent:b45e8bd9-f024-4cb0-bc60-adb5837c9da5",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-049/MERGE.md",
+      "updated_at": "2026-10-30T00:45:28+08:00"
+    },
+    {
+      "id": "PILOT-050",
+      "title": "命令层接线：dispatch 必填 campaign、post-merge/CI �?campaign+arch、W1 回填",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:93bbf7ad-dba7-4d8d-922f-c028407eb467",
+      "reviewer": "subagent:c27e8cf0-2109-4114-b3b1-a016ddfb5de6",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-050/MERGE.md",
+      "updated_at": "2026-10-30T16:06:25+08:00"
+    },
+    {
+      "id": "PILOT-051",
+      "title": "depends_on 硬校验：存在、闭合、无�?,
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:23ab9302-2fa7-490f-9bd1-95290a0c46a7",
+      "reviewer": "subagent:3de51ba3-63bb-4df7-81de-031fc5b21368",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-051/MERGE.md",
+      "updated_at": "2026-10-30T19:43:11+08:00"
+    },
+    {
+      "id": "PILOT-052",
+      "title": "对象层：PROFILE v1 + profile-check（∅5�?,
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:e670b2b0-4946-409c-a1d2-847823f8739a",
+      "reviewer": "subagent:97ccf947-1d19-43b7-930b-1ae23ed8b575",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-052/MERGE.md",
+      "updated_at": "2026-10-30T23:57:05+08:00"
+    },
+    {
+      "id": "PILOT-053",
+      "title": "re-envelope 热修：ENVELOPE_NEW 保留已有状�?+ merge 校验信封",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:5b847429-1fcf-4d8e-aa8d-f18b2ba0fef6",
+      "reviewer": "subagent:45a48c46-014e-4a8d-ac69-64657684df01",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-053/MERGE.md",
+      "updated_at": "2026-10-31T02:02:06+08:00"
+    },
+    {
+      "id": "PILOT-043",
+      "title": "记录层纵深：deliver 反查 completion、state-verify 审计 base_sha 与孤�?completion",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:1f5074d9-400f-40e9-b713-50c910475816",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-043/MERGE.md",
+      "updated_at": "2026-10-31T13:47:19+08:00"
+    },
+    {
+      "id": "PILOT-054",
+      "title": "记录层纵深：deliver 反查 completion、state-verify 审计 base_sha 与孤�?completion",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:7e5c828f-e90c-4c2a-93f6-d54aa2844f2f",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-054/MERGE.md",
+      "updated_at": "2026-10-31T16:47:47+08:00"
+    },
+    {
+      "id": "PILOT-055",
+      "title": "shape �?CI�? 步门�? re-dispatch 修复",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:7cca490f-1148-4dfc-b4aa-4b7231b10248",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-055/MERGE.md",
+      "updated_at": "2026-11-01T03:36:28+08:00"
+    },
+    {
+      "id": "PILOT-057",
+      "title": "Task ID 注册表：ID 永不复用",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:0b065961-9a06-48d9-be7d-81b8382f4aea",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-057/MERGE.md",
+      "updated_at": "2026-11-01T18:07:18+08:00"
+    },
+    {
+      "id": "PILOT-058",
+      "title": "结构�?REVIEW：head/base 绑定 + expected-head merge",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:52e3fde0-716c-4cb9-a369-3453d263ddc7",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-058/MERGE.md",
+      "updated_at": "2026-11-01T20:42:57+08:00"
+    },
+    {
+      "id": "PILOT-059",
+      "title": "每卡 ACCEPTANCE.md：自�?人工分项",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:4c015b24-58fc-4514-a048-ba7b34f7aa00",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-059/MERGE.md",
+      "updated_at": "2026-11-01T22:08:32+08:00"
+    },
+    {
+      "id": "PILOT-056",
+      "title": "towerctl 模块化（23 模块 / 4 �?DAG�? 基线迁移",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:7ea1af07-2467-48d3-8be3-ecd7855e1cc9",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-056/MERGE.md",
+      "updated_at": "2026-11-02T01:51:53+08:00"
+    },
+    {
+      "id": "PILOT-060",
+      "title": "信封 MERGE_START 允许 MERGING 重试",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:39278b6e-c160-4e96-ad10-28260b9467c8",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-060/MERGE.md",
+      "updated_at": "2026-11-02T02:54:33+08:00"
+    },
+    {
+      "id": "PILOT-061",
+      "title": "PR merge head 一致性：只允�?implementation + envelope-only 差量",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:2a45be4f-1318-4174-8ef6-2cca1d51203e",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-061/MERGE.md",
+      "updated_at": "2026-11-02T13:14:03+08:00"
+    },
+    {
+      "id": "PILOT-062",
+      "title": "账本清债：ENVELOPE_ABANDON + 记录豁免 + PR 路径首验",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:e54a79fb-2ccc-49c9-95c0-03ad78b5d2d6",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-062/MERGE.md",
+      "updated_at": "2026-11-02T16:03:55+08:00"
+    },
+    {
+      "id": "PILOT-063",
+      "title": "base-side envelope：PR head 恒等�?implementation",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:00acc448-0691-4907-8405-a52708489456",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-063/MERGE.md",
+      "updated_at": "2026-11-02T18:00:33+08:00"
+    },
+    {
+      "id": "PILOT-064",
+      "title": "base-side envelope 重建（tower 子目录前缀 + PR 首验�?,
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:049a91da-d2ef-4096-b276-4eb2989d4281",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-064/MERGE.md",
+      "updated_at": "2026-11-02T18:55:50+08:00"
+    },
+    {
+      "id": "PILOT-065",
+      "title": "base-side envelope 形状检查用 envelope_head_sha（允�?state 后置�?,
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:8660c9c8-0cbd-424d-ad39-325345631037",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-065/MERGE.md",
+      "updated_at": "2026-11-02T20:52:32+08:00"
+    },
+    {
+      "id": "PILOT-066",
+      "title": "post-merge base-side envelope 路径 + 删除 repo-root shim",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:06e39300-891d-4add-b63d-5d3a2a49b8a0",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-066/MERGE.md",
+      "updated_at": "2026-11-03T09:58:15+08:00"
+    },
+    {
+      "id": "PILOT-067",
+      "title": "base 同步策略：state-only 可审�?admin，code 变更必须 rebase + 重审",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:830426d6-a56a-4c00-8ffa-f2b778e0c212",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-067/MERGE.md",
+      "updated_at": "2026-11-03T13:06:19+08:00"
+    },
+    {
+      "id": "PILOT-068",
+      "title": "base-sync 白名单补 merge-envelopes/**�?68 自身审计 admin",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:5da277d4-5748-4165-8c9c-8551e1edca87",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-068/MERGE.md",
+      "updated_at": "2026-11-03T15:54:13+08:00"
+    },
+    {
+      "id": "PILOT-070",
+      "title": "base-ahead �?envelope implementation head 为基准；070 审计 admin",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:f704eaa9-c78e-40a8-9dcf-fb361e6e0b7c",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-070/MERGE.md",
+      "updated_at": "2026-11-04T01:14:30+08:00"
+    },
+    {
+      "id": "PILOT-071",
+      "title": "task-supersede：owner 授权、写 ledger、不伪�?merge",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:194c8e77-e9e7-442d-b326-9c359de4d360",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-071/MERGE.md",
+      "updated_at": "2026-11-04T12:24:18+08:00"
+    },
+    {
+      "id": "PILOT-073",
+      "title": "spec/campaign �?state/docs + 直接 admin 合并后的 envelope 恢复",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:5cb98fda-92b5-49e2-b071-8043c9160c4e",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-073/MERGE.md",
+      "updated_at": "2026-11-04T16:03:09+08:00"
+    },
+    {
+      "id": "PILOT-069",
+      "title": "base-ahead �?merge-base..origin/main�?69 自身审计 admin",
+      "status": "superseded",
+      "authority": "workspace_write",
+      "executor": "subagent:7a9c5089-da2b-4d0a-9507-f63580912f11",
+      "reviewer": null,
+      "next": "superseded by PILOT-070; no merge, see ledger TASK_SUPERSEDE",
+      "updated_at": "2026-11-04T17:05:04+08:00"
+    },
+    {
+      "id": "PILOT-074",
+      "title": "verified 必须�?MERGE 事实；回�?065�?68；新�?verified_without_merge drift",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:beeba869-6193-44df-aef8-8f55a51b51af",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-074/MERGE.md",
+      "updated_at": "2026-11-04T23:27:29+08:00"
+    },
+    {
+      "id": "PILOT-075",
+      "title": "recover �?CORRECTION �?MERGE 的顺序；CI fetch-depth 0；恢�?074",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:b28755e5-d239-4110-83c8-80985facca8d",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-075/MERGE.md",
+      "updated_at": "2026-11-05T14:56:45+08:00"
+    },
+    {
+      "id": "PILOT-076",
+      "title": "owner GitHub 批准 + REVIEW/CHECKBACK 对账 + 删除硬编�?actor",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:cb023e6e-cad7-479f-8a16-7dbc67d2eac4",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-076/MERGE.md",
+      "updated_at": "2026-11-07T04:12:07+08:00"
+    },
+    {
+      "id": "PILOT-077",
+      "title": "post-merge 测试隔离与稳�?MERGED 快照；恢�?076 �?9/9",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:agent-1",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-077/MERGE.md",
+      "updated_at": "2026-11-14T23:47:33+08:00"
+    },
+    {
+      "id": "PILOT-078",
+      "title": "文档口径 76/74/844/16-16�?72 注册 void、端到端 walkthrough",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:agent-2",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) �?see supervision/MERGE_QUEUE.json and tasks/PILOT-078/MERGE.md",
+      "updated_at": "2026-11-16T18:02:44+08:00"
+    }
+  ],
+  "authority_dirty": [],
+  "authority_dirty_count": 0,
+  "authority_state": "configured"
+}
+exit=0
+
+=== candidate: python tools/ledger_guard.py --base origin/main
+{
+  "ok": true,
+  "base": "origin/main",
+  "base_commit": "954985f0cb6765337c0d9ec65f307f0c8b393537",
+  "ledger": "tower-dsh/ledger",
+  "checks": [
+    {
+      "path": "tower-dsh/ledger/primary.jsonl",
+      "ok": true,
+      "base_bytes": 257044,
+      "current_bytes": 257044,
+      "detail": "unchanged"
+    },
+    {
+      "path": "tower-dsh/ledger/supervision.jsonl",
+      "ok": true,
+      "base_bytes": 328205,
+      "current_bytes": 328205,
+      "detail": "unchanged"
+    }
+  ],
+  "errors": []
+}
+exit=0

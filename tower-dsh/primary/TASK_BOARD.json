@@ -771,7 +771,17 @@
       "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
       "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-078/MERGE.md",
       "updated_at": "2026-11-16T18:02:44+08:00"
+    },
+    {
+      "id": "PILOT-079",
+      "title": "ledger 只追加 CI 守卫 + state/authority/profile 入 CI",
+      "status": "closed",
+      "authority": "workspace_write",
+      "executor": "subagent:agent-3",
+      "reviewer": "subagent:89f8ccd5-553e-49fd-815b-c7c73e72b678",
+      "next": "merge/handoff decision (owner gate) — see supervision/MERGE_QUEUE.json and tasks/PILOT-079/MERGE.md",
+      "updated_at": "2026-11-26T17:50:50+08:00"
     }
   ],
-  "updated_at": "2026-11-16T18:02:44+08:00"
+  "updated_at": "2026-11-26T17:50:50+08:00"
 }

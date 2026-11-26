@@ -546,6 +546,13 @@
       "spec_path": "pilot/PILOT-078.spec.json",
       "created_at": "2026-11-16T16:52:46+08:00",
       "updated_at": "2026-11-16T18:02:44+08:00"
+    },
+    "PILOT-079": {
+      "title": "ledger 只追加 CI 守卫 + state/authority/profile 入 CI",
+      "status": "closed",
+      "spec_path": "pilot/PILOT-079.spec.json",
+      "created_at": "2026-11-26T16:47:15+08:00",
+      "updated_at": "2026-11-26T17:50:50+08:00"
     }
   }
 }

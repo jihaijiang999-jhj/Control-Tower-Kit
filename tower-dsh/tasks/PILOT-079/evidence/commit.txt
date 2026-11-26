@@ -1,0 +1,21 @@
+﻿# PILOT-079 commit (amended, 7 authorized paths)
+
+HEAD 2461aeeef2132c9f2a59fc021f2e29c41398d891
+parent 78a9b618112cca67bfff93b64d2b3671931500cb
+subject PILOT-079: ledger prefix guard + CI gates
+author mac <mac@local> Thu Nov 26 17:11:28 2026 +0800
+
+--- git show --stat HEAD ---
+2461aeeef2132c9f2a59fc021f2e29c41398d891 PILOT-079: ledger prefix guard + CI gates
+
+ .github/workflows/tower-gate.yml            |  12 +
+ tower-dsh/command/campaigns/C-2026-Q4-04.md |   2 +-
+ tower-dsh/tools/ledger_guard.py             | 289 +++++++++++++++++++++++
+ tower-dsh/tools/tests/test_ci_gate.py       |  83 ++++++-
+ tower-dsh/tools/tests/test_docs_current.py  |  23 +-
+ tower-dsh/tools/tests/test_ledger_guard.py  | 351 ++++++++++++++++++++++++++++
+ tower-dsh/tools/tests/test_wiring.py        |  27 ++-
+ 7 files changed, 762 insertions(+), 25 deletions(-)
+
+--- git status --short ---
+?? scratch/
