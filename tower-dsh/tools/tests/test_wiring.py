@@ -428,6 +428,22 @@ class PostMergeWiringCase(unittest.TestCase):
         self.assertEqual(payload["status"], "POST_MERGE_VERIFIED")
 
 
+EXPECTED_CI_RUNS = (
+    "python -B -m unittest discover -s tools/tests -v",
+    "python tools/towerctl.py spec-lint --strict",
+    "python tools/towerctl.py spec-coverage",
+    "python tools/towerctl.py verify-ledger",
+    "python tools/ledger_guard.py --base origin/main",
+    "python tools/towerctl.py state-verify",
+    "python tools/towerctl.py authority-check",
+    "python tools/towerctl.py profile-check",
+    "python tools/towerctl.py arch-check",
+    "python tools/towerctl.py campaign-check",
+    "python tools/towerctl.py shape-check",
+    "python tools/towerctl.py status",
+)
+
+
 class CiWorkflowCase(unittest.TestCase):
     """The CI workflow runs the two new gates before a final status step."""
 
@@ -437,16 +453,7 @@ class CiWorkflowCase(unittest.TestCase):
         text = WORKFLOW.read_text(encoding="utf-8")
         self.assertNotIn("continue-on-error", text)
         runs = [match.strip() for match in self.RUN_RE.findall(text)]
-        self.assertEqual(runs, [
-            "python -B -m unittest discover -s tools/tests -v",
-            "python tools/towerctl.py spec-lint --strict",
-            "python tools/towerctl.py spec-coverage",
-            "python tools/towerctl.py verify-ledger",
-            "python tools/towerctl.py arch-check",
-            "python tools/towerctl.py campaign-check",
-            "python tools/towerctl.py shape-check",
-            "python tools/towerctl.py status",
-        ])
+        self.assertEqual(runs, list(EXPECTED_CI_RUNS))
         self.assertEqual(runs[-1], "python tools/towerctl.py status")
 
 

@@ -16,6 +16,13 @@ build red.
 after ``campaign-check`` and before ``status``, which stays last.  The step
 table and the step count below pin that order.
 
+``PILOT-079`` grows the gate from eight to twelve steps.  ``verify-ledger`` only
+checks the current hash chain, so a re-hashed rewrite passes it; the new
+``Ledger prefix`` step runs ``tools/ledger_guard.py --base origin/main`` (and
+therefore needs the full history from ``fetch-depth: 0``).  ``state-verify``,
+``authority-check`` and ``profile-check`` join it, and the exact command
+sequence is pinned below so no gate can be dropped or reordered silently.
+
 These tests only read files inside the repository.  They never touch the
 network, never call ``gh`` and never depend on the live working-tree state, so
 they run unchanged locally and in CI.
@@ -46,18 +53,29 @@ COMMANDS = {
     "spec lint": "python tools/towerctl.py spec-lint --strict",
     "spec coverage": "python tools/towerctl.py spec-coverage",
     "verify ledger": "python tools/towerctl.py verify-ledger",
+    "ledger prefix": "python tools/ledger_guard.py --base origin/main",
+    "state verify": "python tools/towerctl.py state-verify",
+    "authority check": "python tools/towerctl.py authority-check",
+    "profile check": "python tools/towerctl.py profile-check",
     "arch check": "python tools/towerctl.py arch-check",
     "campaign check": "python tools/towerctl.py campaign-check",
     "shape check": "python tools/towerctl.py shape-check",
     "status": "python tools/towerctl.py status",
 }
-# PILOT-055: seven gates plus the informational status step.
-GATE_STEP_COUNT = 8
-HARD_GATE_COMMANDS = [COMMANDS[name] for name in
-                      ("unit tests", "spec lint", "spec coverage", "verify ledger",
-                       "arch check", "campaign check", "shape check")]
+# PILOT-079: eleven hard gates plus the informational status step.
+GATE_STEP_COUNT = 12
+STEP_ORDER = (
+    "unit tests", "spec lint", "spec coverage", "verify ledger",
+    "ledger prefix", "state verify", "authority check", "profile check",
+    "arch check", "campaign check", "shape check", "status",
+)
+HARD_GATE_COMMANDS = [COMMANDS[name] for name in STEP_ORDER
+                      if name != "status"]
+NEW_GATE_LABELS = ("Ledger prefix", "State verify", "Authority check",
+                   "Profile check")
 
 STEP_RE = re.compile(r"(?m)^\s*-\s+name:")
+RUN_RE = re.compile(r"(?m)^\s+run:\s*(\S.*?)\s*$")
 
 
 def read_text(path: Path) -> str:
@@ -72,6 +90,12 @@ def step_blocks(workflow: str) -> list[str]:
     starts = [match.start() for match in STEP_RE.finditer(workflow)]
     return [workflow[start:starts[index + 1] if index + 1 < len(starts) else len(workflow)]
             for index, start in enumerate(starts)]
+
+
+def step_command(block: str) -> str:
+    """The single-line ``run:`` command of a step block, ``""`` when absent."""
+    match = RUN_RE.search(block)
+    return match.group(1).strip() if match else ""
 
 
 class CiGateWorkflowTestCase(unittest.TestCase):
@@ -121,10 +145,9 @@ class CiGateWorkflowTestCase(unittest.TestCase):
             msg="workflow steps are out of order; commands found at "
                 f"{dict(zip(COMMANDS, positions))}:\n{self.workflow}")
 
-    def test_gate_runs_eight_steps_with_shape_after_campaign(self) -> None:
-        """PILOT-055: seven gates + status = eight steps; shape before status."""
-        run_steps = [block for block in self.steps
-                     if re.search(r"(?m)^\s+run:\s", block)]
+    def test_gate_runs_twelve_steps_in_fixed_order(self) -> None:
+        """PILOT-079: eleven gates + status = twelve steps in a pinned order."""
+        run_steps = [block for block in self.steps if step_command(block)]
         self.assertEqual(
             len(run_steps), GATE_STEP_COUNT,
             msg=f"expected {GATE_STEP_COUNT} steps that run a command, found "
@@ -133,6 +156,24 @@ class CiGateWorkflowTestCase(unittest.TestCase):
             len(COMMANDS), GATE_STEP_COUNT,
             msg=f"COMMANDS must describe all {GATE_STEP_COUNT} steps, "
                 f"found {len(COMMANDS)}")
+        self.assertEqual(
+            len(STEP_ORDER), GATE_STEP_COUNT,
+            msg=f"STEP_ORDER must describe all {GATE_STEP_COUNT} steps, "
+                f"found {len(STEP_ORDER)}")
+
+        # The exact sequence is the contract: a dropped, duplicated or
+        # reordered gate fails here, not only in production.
+        actual = [step_command(block) for block in run_steps]
+        expected = [COMMANDS[name] for name in STEP_ORDER]
+        self.assertEqual(
+            actual, expected,
+            msg=f"workflow steps are not in the pinned order:\n"
+                f"expected={expected}\nactual={actual}\n{self.workflow}")
+
+        for label in NEW_GATE_LABELS:
+            self.assertRegex(
+                self.workflow, rf"(?m)^\s*-\s+name:\s*{re.escape(label)}\s*$",
+                msg=f"step {label!r} missing from workflow:\n{self.workflow}")
 
         campaign = self.workflow.index(COMMANDS["campaign check"])
         shape = self.workflow.index(COMMANDS["shape check"])
@@ -141,6 +182,30 @@ class CiGateWorkflowTestCase(unittest.TestCase):
                         msg=f"shape check must follow campaign check:\n{self.workflow}")
         self.assertLess(shape, status,
                         msg=f"shape check must precede status:\n{self.workflow}")
+
+    def test_checkout_fetches_the_full_history(self) -> None:
+        """PILOT-079: ``ledger_guard --base origin/main`` needs real history."""
+        self.assertRegex(
+            self.workflow, r"(?m)^\s*fetch-depth:\s*0\s*$",
+            msg=f"fetch-depth: 0 missing; ledger_guard cannot see the base "
+                f"commit without it:\n{self.workflow}")
+        checkout = self.workflow.index(CHECKOUT)
+        fetch_depth = re.search(r"(?m)^\s*fetch-depth:\s*0\s*$", self.workflow)
+        self.assertLess(fetch_depth.start(), self.workflow.index(SETUP_PYTHON),
+                        msg=f"fetch-depth belongs to the checkout step:\n"
+                            f"{self.workflow}")
+        self.assertLess(checkout, fetch_depth.start(),
+                        msg=f"fetch-depth must be set on the checkout:\n"
+                            f"{self.workflow}")
+
+    def test_ledger_prefix_guard_runs_after_verify_ledger(self) -> None:
+        self.assertIn(COMMANDS["ledger prefix"], self.workflow,
+                      msg=f"ledger_guard step missing:\n{self.workflow}")
+        verify = self.workflow.index(COMMANDS["verify ledger"])
+        guard = self.workflow.index(COMMANDS["ledger prefix"])
+        self.assertLess(verify, guard,
+                        msg=f"ledger prefix guard must follow verify-ledger:\n"
+                            f"{self.workflow}")
 
     # -- 5. every command runs inside tower-dsh ---------------------------
     def test_workflow_uses_tower_dsh_working_directory(self) -> None:

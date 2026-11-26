@@ -10,8 +10,10 @@ control plane already owns, so a doc drift turns the suite red:
   ``<= PILOT-077`` (the 078 doc card adds no close-out envelope);
 * **844 tests** — ``ENV-PILOT-077.tower_tests_baseline`` (frozen close-out
   count, not the local ``844 + N``);
-* **16 张交付卡 / 16-16** — C-04 roadmap nodes other than the 078 doc card;
-* **17 节点** — the whole C-04 roadmap, 078 included;
+* **16 张交付卡 / 16-16** — C-04 roadmap nodes **061-077** only; PILOT-078 is
+  the doc card and PILOT-079+ may extend the roadmap without inflating 16-16;
+* **17+ 节点** — the whole C-04 roadmap: 16 delivery cards + 078 doc card, with
+  079+ allowed on top;
 * **gates/events/modules** — ``arch/GATES.json``, ``EVENT_CATALOG.json`` and
   ``tools/tower_*.py``, exactly what ``arch-check`` reads.
 
@@ -35,6 +37,7 @@ TOWER = Path(__file__).resolve().parents[2]
 REPO = TOWER.parent
 
 CODE_CARD_LIMIT = 77          # 078 is a doc card, not a code card
+DELIVERY_CARD_LIMIT = 77      # 16-16 counts only the historical 061-077 cards
 DOC_CARD = "PILOT-078"
 VOID_CARD = "PILOT-072"
 CLOSEOUT_ENVELOPE = "ENV-PILOT-077.json"
@@ -101,7 +104,9 @@ class DocNumbersTestCase(unittest.TestCase):
             "tower_tests_baseline"]
 
     def delivery_cards(self) -> list[str]:
-        return [node for node in campaign_nodes() if node != DOC_CARD]
+        """The 16 historical delivery cards; 078 and 079+ are not 16-16."""
+        return [node for node in campaign_nodes()
+                if card_number(node) <= DELIVERY_CARD_LIMIT]
 
     # -- 1. the four headline numbers -------------------------------------
     def test_docs_keep_76_code_cards(self) -> None:
@@ -133,8 +138,16 @@ class DocNumbersTestCase(unittest.TestCase):
     def test_docs_keep_16_delivery_cards(self) -> None:
         delivery = self.delivery_cards()
         self.assertEqual(len(delivery), 16, msg=f"delivery cards: {delivery}")
-        self.assertEqual(len(campaign_nodes()), 17,
-                         msg="C-04 must carry 17 nodes: 16 delivery + 078 doc card")
+        # 079+ may join the roadmap; 16-16 must never absorb them.
+        self.assertTrue(
+            all(card_number(node) <= DELIVERY_CARD_LIMIT for node in delivery),
+            msg=f"079+ nodes must not be counted as 16-16 delivery cards: {delivery}")
+        nodes = campaign_nodes()
+        self.assertGreaterEqual(
+            len(nodes), 17,
+            msg="C-04 must keep the 16 delivery nodes and the 078 doc card")
+        self.assertIn(DOC_CARD, nodes)
+        self.assertIn("PILOT-077", nodes)
         for name, text in (("NEXT-WINDOW.md", self.next_window),
                            ("README.md", self.readme),
                            ("control-tower/MAP.md", self.map_md)):
