@@ -1,0 +1,44 @@
+{
+  "schema": "tower/spec@2",
+  "id": "PILOT-079",
+  "title": "ledger 只追加 CI 守卫 + state/authority/profile 入 CI",
+  "objective": {
+    "problem": "P0-1：账本可被改写后重算哈希；CI 8 步只跑 verify-ledger，不校验 PR ledger 是否 base 的字节前缀，也没有 state-verify/authority-check/profile-check。外审的篡改探针仍成立。",
+    "outcome": "CI 用 git 历史校验 ledger/*.jsonl 是 origin/main 的字节前缀；新增 state-verify、authority-check、profile-check 三步，共 12 步；测试锁定顺序；篡改/截断/新增历史行在 CI 直接红。",
+    "approach": "新增 tools/ledger_guard.py（--base origin/main）；workflow 加 4 步；test_ci_gate 从 8 改 12；test_ledger_guard 覆盖前缀/截断/改写/新增/合法追加。",
+    "non_goals_and_done": "不改账本算法/密钥；不做签名；854+ tests；12 步 CI；合法追加通过。"
+  },
+  "authority": "workspace_write",
+  "anchor": "ADR-0009 / 外审 B-3/B-14",
+  "why_now": "074–078 后外审仍判 FAIL，第一条就是账本可改写；CI 是唯一能对每次 PR 强制的地方。",
+  "scope": [
+    "tools/ledger_guard.py：读取 base 的 ledger/*.jsonl 与当前文件；当前必须逐字节以 base 为前缀；截断/改写/删除历史行 exit 2；新增行允许",
+    "workflow：checkout fetch-depth 0；新增 Ledger prefix、State verify、Authority check、Profile check 四步；顺序在 verify-ledger 之后",
+    "test_ci_gate：GATE_STEP_COUNT 8→12，断言四个新步骤顺序",
+    "test_ledger_guard：合法追加 0；改写历史 2；截断 2；删除文件 2；新增文件允许？ledger 新文件不允许，拒绝",
+    "不引入网络/密钥；不改变 ledger 链算法"
+  ],
+  "allowed_paths": [
+    "pilot/worktrees/PILOT-079/tower-dsh/.github/workflows/tower-gate.yml",
+    "pilot/worktrees/PILOT-079/tower-dsh/tools/ledger_guard.py",
+    "pilot/worktrees/PILOT-079/tower-dsh/tools/tests/test_ledger_guard.py",
+    "pilot/worktrees/PILOT-079/tower-dsh/tools/tests/test_ci_gate.py"
+  ],
+  "forbidden": [
+    "network",
+    "external dependencies",
+    "changes outside the task worktree",
+    "merge",
+    "production access",
+    "weakening CI steps",
+    "allowing history rewrite"
+  ],
+  "acceptance": [
+    "cd pilot/worktrees/PILOT-079/tower-dsh && python -B tools/run_tests.py 全部通过，Ran N >= 854 + 新增用例数（main 基线 854）",
+    "CI 12 步：unit/spec-lint/coverage/verify-ledger/ledger-prefix/state-verify/authority/profile/arch/campaign/shape/status",
+    "篡改 base ledger 历史行 → ledger_guard 2；截断 → 2；合法追加 → 0",
+    "真实塔 79/75 drift []；arch 18；profile 11/0；shape 0；079 PR 审计 admin"
+  ],
+  "depends_on": ["PILOT-078"],
+  "worktree": "pilot/worktrees/PILOT-079"
+}
