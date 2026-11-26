@@ -16,13 +16,17 @@
     "workflow：checkout fetch-depth 0；新增 Ledger prefix、State verify、Authority check、Profile check 四步；顺序在 verify-ledger 之后",
     "test_ci_gate：GATE_STEP_COUNT 8→12，断言四个新步骤顺序",
     "test_ledger_guard：合法追加 0；改写历史 2；截断 2；删除文件 2；新增文件允许？ledger 新文件不允许，拒绝",
-    "不引入网络/密钥；不改变 ledger 链算法"
+    "不引入网络/密钥；不改变 ledger 链算法",
+    "修复 079 引入的 12 步 test_wiring 期望；docs_current 只认 061–077 的 16-16 历史口径，不因 079+ 卡变红；campaign review_by 续期"
   ],
   "allowed_paths": [
     "pilot/worktrees/PILOT-079/tower-dsh/.github/workflows/tower-gate.yml",
     "pilot/worktrees/PILOT-079/tower-dsh/tools/ledger_guard.py",
     "pilot/worktrees/PILOT-079/tower-dsh/tools/tests/test_ledger_guard.py",
-    "pilot/worktrees/PILOT-079/tower-dsh/tools/tests/test_ci_gate.py"
+    "pilot/worktrees/PILOT-079/tower-dsh/tools/tests/test_ci_gate.py",
+    "pilot/worktrees/PILOT-079/tower-dsh/tools/tests/test_wiring.py",
+    "pilot/worktrees/PILOT-079/tower-dsh/tools/tests/test_docs_current.py",
+    "pilot/worktrees/PILOT-079/tower-dsh/command/campaigns/C-2026-Q4-04.md"
   ],
   "forbidden": [
     "network",
@@ -39,6 +43,8 @@
     "篡改 base ledger 历史行 → ledger_guard 2；截断 → 2；合法追加 → 0",
     "真实塔 79/75 drift []；arch 18；profile 11/0；shape 0；079 PR 审计 admin"
   ],
-  "depends_on": ["PILOT-078"],
+  "depends_on": [
+    "PILOT-078"
+  ],
   "worktree": "pilot/worktrees/PILOT-079"
 }
