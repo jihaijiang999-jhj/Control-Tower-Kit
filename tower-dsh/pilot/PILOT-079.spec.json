@@ -20,7 +20,7 @@
     "修复 079 引入的 12 步 test_wiring 期望；docs_current 只认 061–077 的 16-16 历史口径，不因 079+ 卡变红；campaign review_by 续期"
   ],
   "allowed_paths": [
-    "pilot/worktrees/PILOT-079/tower-dsh/.github/workflows/tower-gate.yml",
+    "pilot/worktrees/PILOT-079/.github/workflows/tower-gate.yml",
     "pilot/worktrees/PILOT-079/tower-dsh/tools/ledger_guard.py",
     "pilot/worktrees/PILOT-079/tower-dsh/tools/tests/test_ledger_guard.py",
     "pilot/worktrees/PILOT-079/tower-dsh/tools/tests/test_ci_gate.py",
